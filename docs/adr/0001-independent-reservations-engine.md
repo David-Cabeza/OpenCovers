@@ -1,6 +1,6 @@
 # ADR-0001: OpenCovers is an independent reservations engine
 
-- Status: Proposed
+- Status: Accepted (the storage decision is superseded by ADR-0002)
 - Date: 2026-11-08
 - Deciders: David Cabeza
 
