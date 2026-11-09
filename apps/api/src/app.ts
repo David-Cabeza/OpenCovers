@@ -14,7 +14,7 @@ import {
   searchReservations,
   setStatus,
 } from "./lib/reservations";
-import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
+import { createVenue, erase, getConfig, listTables, setConfig } from "./lib/venue";
 
 const DEFAULT_DURATION_MINUTES = 120;
 
@@ -278,6 +278,12 @@ app.get("/v1/venues/:venueId/availability", async (c) => {
   if (Number.isNaN(partySize)) return error(c, "invalid_request", 400);
   const availability = await getAvailability(db, venueId, date, partySize);
   return c.json({ availability });
+});
+
+app.get("/v1/venues/:venueId/tables", async (c) => {
+  const venueId = c.req.param("venueId");
+  const tables = await listTables(db, venueId);
+  return c.json({ tables });
 });
 
 async function writeResponse(c: any, result: any, venueId: string) {

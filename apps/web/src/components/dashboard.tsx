@@ -1,9 +1,11 @@
 import { useEffect } from "react";
 import { authClient } from "@/lib/auth-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useVenues } from "@/hooks/use-venues";
 import { useUiStore } from "@/stores/ui-store";
 import { AgendaView } from "./agenda/agenda-view";
+import { AvailabilityView } from "./availability/availability-view";
 import { AppHeader } from "./layout/app-header";
 import { EmptyVenues } from "./venue/empty-venues";
 
@@ -36,7 +38,18 @@ export function Dashboard() {
         ) : venues.length === 0 ? (
           <EmptyVenues />
         ) : venueId ? (
-          <AgendaView venueId={venueId} />
+          <Tabs defaultValue="agenda">
+            <TabsList>
+              <TabsTrigger value="agenda">Agenda</TabsTrigger>
+              <TabsTrigger value="availability">Availability</TabsTrigger>
+            </TabsList>
+            <TabsContent value="agenda" className="pt-6">
+              <AgendaView venueId={venueId} />
+            </TabsContent>
+            <TabsContent value="availability" className="pt-6">
+              <AvailabilityView venueId={venueId} />
+            </TabsContent>
+          </Tabs>
         ) : null}
       </main>
     </div>

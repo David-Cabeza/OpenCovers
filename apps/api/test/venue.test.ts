@@ -1,10 +1,12 @@
 import { sql } from "drizzle-orm";
 import { migrateDb } from "../src/db/migrate";
 import { beforeAll, describe, expect, it } from "vitest";
+import app from "../src/app";
 import { db } from "../src/db/client";
 import { services, tables, venues } from "../src/db/schema";
+import { addKey } from "../src/lib/api-keys";
 import { createReservation } from "../src/lib/reservations";
-import { erase, getConfig, setConfig } from "../src/lib/venue";
+import { erase, getConfig, listTables, setConfig } from "../src/lib/venue";
 
 async function seedVenue(venueId: string) {
   await db.insert(venues).values({ id: venueId, timezone: "Europe/Madrid" }).onConflictDoNothing();
@@ -75,5 +77,22 @@ describe("venue config and erasure", () => {
 
     const again = await erase(db, "erase", "carlos@example.com");
     expect(again).toEqual({ erasedReservations: 0, erasedGuests: 0 });
+  });
+
+  it("lists tables for a venue over the API", async () => {
+    await seedVenue("tables-venue");
+    const tables = await listTables(db, "tables-venue");
+    expect(tables).toEqual([
+      { id: "1", name: "T1", seats: 2, zone: "" },
+      { id: "2", name: "T2", seats: 4, zone: "" },
+      { id: "3", name: "T3", seats: 6, zone: "" },
+    ]);
+
+    await addKey(db, "tables-key", "tables-principal", ["tables-venue"], "read");
+    const res = await app.request("/v1/venues/tables-venue/tables", {
+      headers: { apikey: "tables-key" },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ tables });
   });
 });

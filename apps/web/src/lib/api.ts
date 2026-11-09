@@ -8,6 +8,13 @@ export interface Venue {
   role: Role;
 }
 
+export interface Table {
+  id: string;
+  name: string;
+  seats: number;
+  zone: string;
+}
+
 export interface Reservation {
   id: string;
   venueId: string;
@@ -19,6 +26,25 @@ export interface Reservation {
   version: number;
   bookedVia: string;
   guest: {
+    name?: string;
+    contact?: string;
+  };
+}
+
+export interface AvailabilitySlot {
+  time: string;
+  available: boolean;
+  type: string;
+}
+
+export type Availability = Record<string, AvailabilitySlot[]>;
+
+export interface CreateReservationBody {
+  date: string;
+  time: string;
+  partySize: number;
+  tables: string[];
+  guest?: {
     name?: string;
     contact?: string;
   };
@@ -61,8 +87,36 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  listTables: (venueId: string) =>
+    request<{ tables: Table[] }>(`/v1/venues/${venueId}/tables`),
+
   agenda: (venueId: string, date: string) =>
     request<{ reservations: Reservation[] }>(
       `/v1/venues/${venueId}/agenda?date=${date}`,
     ),
+
+  availability: (venueId: string, date: string, partySize: number) =>
+    request<{ availability: Availability }>(
+      `/v1/venues/${venueId}/availability?date=${date}&partySize=${partySize}`,
+    ),
+
+  createReservation: (venueId: string, body: CreateReservationBody) =>
+    request<Reservation>(`/v1/venues/${venueId}/reservations`, {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify(body),
+    }),
+
+  cancelReservation: (venueId: string, id: string) =>
+    request<Reservation>(`/v1/venues/${venueId}/reservations/${id}/cancel`, {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+    }),
+
+  setStatus: (venueId: string, id: string, status: string) =>
+    request<Reservation>(`/v1/venues/${venueId}/reservations/${id}/status`, {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({ status }),
+    }),
 };
