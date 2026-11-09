@@ -1,6 +1,7 @@
 {
   "name": "opencovers",
   "private": true,
+  "packageManager": "pnpm@11.0.9",
   "scripts": {
     "dev": "pnpm --filter @opencovers/api dev",
     "typecheck": "pnpm -r typecheck",
