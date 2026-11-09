@@ -1,6 +1,15 @@
 import { Hono } from "hono";
 import { db } from "./db/client";
-import { addKey, authenticate, authenticateAdmin, listKeys, revokeKey } from "./lib/api-keys";
+import {
+  addKey,
+  addVenueKey,
+  authenticate,
+  authenticateAdmin,
+  listKeys,
+  listVenueKeys,
+  revokeKey,
+  revokeVenueKey,
+} from "./lib/api-keys";
 import { auth } from "./lib/auth";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import {
@@ -45,6 +54,7 @@ const HTTP_STATUS: Record<string, number> = {
 type AppEnv = {
   Variables: {
     principal: string;
+    role: string;
   };
 };
 
@@ -84,6 +94,7 @@ app.use("/v1/venues/:venueId/*", async (c, next) => {
     return error(c, "forbidden", 403);
   }
   c.set("principal", principal);
+  c.set("role", role);
   await next();
 });
 
@@ -357,6 +368,41 @@ app.delete("/v1/venues/:venueId/services/:name", async (c) => {
   await deleteService(db, venueId, name);
   const services = await listServices(db, venueId);
   return c.json({ services });
+});
+
+app.get("/v1/venues/:venueId/keys", async (c) => {
+  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+  const venueId = c.req.param("venueId");
+  const keys = await listVenueKeys(db, venueId);
+  return c.json({ keys });
+});
+
+app.post("/v1/venues/:venueId/keys", async (c) => {
+  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+  const venueId = c.req.param("venueId");
+  const body = await c.req.json();
+  if (
+    typeof body.key !== "string" ||
+    body.key === "" ||
+    typeof body.principal !== "string" ||
+    body.principal === "" ||
+    (body.role !== "read" && body.role !== "write")
+  ) {
+    return error(c, "invalid_request", 400);
+  }
+  await addVenueKey(db, venueId, body.key, body.principal, body.role);
+  const keys = await listVenueKeys(db, venueId);
+  return c.json({ keys }, 201);
+});
+
+app.delete("/v1/venues/:venueId/keys", async (c) => {
+  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+  const venueId = c.req.param("venueId");
+  const body = await c.req.json();
+  if (typeof body.hash !== "string") return error(c, "invalid_request", 400);
+  await revokeVenueKey(db, venueId, body.hash);
+  const keys = await listVenueKeys(db, venueId);
+  return c.json({ keys });
 });
 
 async function writeResponse(c: any, result: any, venueId: string) {

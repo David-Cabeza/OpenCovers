@@ -25,13 +25,16 @@ import { api, type Service, type Table as TableInfo } from "@/lib/api";
 import { ServiceFormDialog } from "./service-form-dialog";
 import { TableFormDialog } from "./table-form-dialog";
 import { VenueSettings } from "./venue-settings";
+import { ApiKeysCard } from "./api-keys-card";
+import type { Role } from "@/lib/api";
 
-export function SetupView({ venueId }: { venueId: string }) {
+export function SetupView({ venueId, role }: { venueId: string; role?: Role }) {
   return (
     <div className="space-y-8">
       <VenueSettings venueId={venueId} />
       <TablesSection venueId={venueId} />
       <ServicesSection venueId={venueId} />
+      {role === "admin" && <ApiKeysCard venueId={venueId} />}
     </div>
   );
 }

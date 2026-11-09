@@ -26,6 +26,12 @@ export interface VenueConfig {
   noticeAddress: string;
 }
 
+export interface ApiKey {
+  principal: string;
+  role: Role;
+  hash: string;
+}
+
 export interface Reservation {
   id: string;
   venueId: string;
@@ -135,6 +141,24 @@ export const api = {
     request<VenueConfig>(`/v1/venues/${venueId}/config`, {
       method: "PUT",
       body: JSON.stringify(body),
+    }),
+
+  listVenueKeys: (venueId: string) =>
+    request<{ keys: ApiKey[] }>(`/v1/venues/${venueId}/keys`),
+
+  createVenueKey: (
+    venueId: string,
+    body: { key: string; principal: string; role: "read" | "write" },
+  ) =>
+    request<{ keys: ApiKey[] }>(`/v1/venues/${venueId}/keys`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  revokeVenueKey: (venueId: string, hash: string) =>
+    request<{ keys: ApiKey[] }>(`/v1/venues/${venueId}/keys`, {
+      method: "DELETE",
+      body: JSON.stringify({ hash }),
     }),
 
   agenda: (venueId: string, date: string) =>
