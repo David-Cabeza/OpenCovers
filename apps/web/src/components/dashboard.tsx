@@ -1,0 +1,44 @@
+import { useEffect } from "react";
+import { authClient } from "@/lib/auth-client";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useVenues } from "@/hooks/use-venues";
+import { useUiStore } from "@/stores/ui-store";
+import { AgendaView } from "./agenda/agenda-view";
+import { AppHeader } from "./layout/app-header";
+import { EmptyVenues } from "./venue/empty-venues";
+
+export function Dashboard() {
+  const { data: session } = authClient.useSession();
+  const { data, isPending } = useVenues();
+  const venueId = useUiStore((s) => s.venueId);
+  const setVenue = useUiStore((s) => s.setVenue);
+
+  const venues = data?.venues ?? [];
+
+  useEffect(() => {
+    if (
+      venues.length > 0 &&
+      (!venueId || !venues.some((v) => v.id === venueId))
+    ) {
+      setVenue(venues[0].id);
+    }
+  }, [venues, venueId, setVenue]);
+
+  return (
+    <div className="min-h-dvh">
+      <AppHeader email={session?.user.email} />
+      <main className="mx-auto max-w-5xl px-6 py-8">
+        {isPending ? (
+          <div className="space-y-4">
+            <Skeleton className="h-9 w-56" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : venues.length === 0 ? (
+          <EmptyVenues />
+        ) : venueId ? (
+          <AgendaView venueId={venueId} />
+        ) : null}
+      </main>
+    </div>
+  );
+}
