@@ -142,14 +142,17 @@ export function createServer(): McpServer {
     {
       title: "Create reservation",
       description:
-        "Create a reservation. Assigns specific tables and returns the reservation. The party size must fit the selected tables.",
+        "Create a reservation and return it. Pass table ids to assign them explicitly, or omit tables to let the engine assign tables automatically for the party size.",
       annotations: { idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         date: z.string().describe("Date as YYYY-MM-DD."),
         time: z.string().describe("Time as HH:MM in the venue timezone."),
         partySize: z.number().int().positive(),
-        tables: z.array(z.string()).min(1).describe("Table ids to assign."),
+        tables: z
+          .array(z.string())
+          .optional()
+          .describe("Table ids to assign. Omit to auto-assign."),
         guestName: z.string().optional(),
         guestContact: z.string().optional(),
         idempotencyKey: z.string().optional(),

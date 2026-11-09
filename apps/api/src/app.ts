@@ -42,6 +42,7 @@ const HTTP_STATUS: Record<string, number> = {
   reservation_not_found: 404,
   venue_not_found: 404,
   slot_taken: 409,
+  no_suitable_table: 409,
   invalid_transition: 409,
   already_cancelled: 409,
   notice_address_required: 409,
@@ -164,8 +165,9 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
     typeof body.date !== "string" ||
     typeof body.time !== "string" ||
     typeof body.partySize !== "number" ||
-    !Array.isArray(body.tables) ||
-    body.tables.length === 0
+    (body.tables !== undefined &&
+      (!Array.isArray(body.tables) ||
+        body.tables.some((t: unknown) => typeof t !== "string")))
   ) {
     return error(c, "invalid_request", 400);
   }
