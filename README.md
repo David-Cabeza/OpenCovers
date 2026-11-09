@@ -1,10 +1,10 @@
 # OpenCovers
 
-OpenCovers is an open-source reservations engine for restaurants. It covers availability, bookings, table allocation, guest confirmations, and the reservation event feed. Platforms and AI agents use it through an HTTP API. An MCP server is planned.
+OpenCovers is an open-source reservations engine for restaurants. It covers availability, bookings, table allocation, guest confirmations, and the reservation event feed. Platforms and AI agents use it through an HTTP API and an MCP server.
 
 OpenCovers is the working name. Trademark clearance is pending.
 
-**Status.** Pre-alpha. The engine runs locally with tests, but nothing is deployed. The contract, the write and read routes, the exclusion rule, availability, erasure, authentication, and the staff screens are implemented. The email confirmations and a deployment are not. See [ROADMAP.md](ROADMAP.md).
+**Status.** Pre-alpha. The engine runs locally with tests, but nothing is deployed. The contract, the write and read routes, the exclusion rule, availability, erasure, authentication, the staff screens, and the MCP server are implemented. The email confirmations and a deployment are not. See [ROADMAP.md](ROADMAP.md).
 
 ## Why
 

@@ -1,6 +1,6 @@
 # MCP tool catalog
 
-The MCP server is planned, not yet implemented. This catalog is the target contract. The HTTP API implements these operations today.
+The MCP server implements this catalog. It wraps the HTTP API and is scoped per agent key.
 
 | Tool id | HTTP operation | Kind | Idempotency |
 | --- | --- | --- | --- |
