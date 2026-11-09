@@ -21,11 +21,12 @@ CREATE TABLE "grants" (
 );
 --> statement-breakpoint
 CREATE TABLE "idempotency_keys" (
-	"key" text PRIMARY KEY NOT NULL,
+	"key" text NOT NULL,
 	"venue_id" text NOT NULL,
 	"reservation_id" text NOT NULL,
 	"kind" text NOT NULL,
-	"version" integer NOT NULL
+	"version" integer NOT NULL,
+	CONSTRAINT "idempotency_keys_venue_id_key_pk" PRIMARY KEY("venue_id","key")
 );
 --> statement-breakpoint
 CREATE TABLE "reservations" (

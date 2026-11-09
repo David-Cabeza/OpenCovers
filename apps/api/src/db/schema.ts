@@ -91,13 +91,17 @@ export const tableAllocations = pgTable(
   ],
 );
 
-export const idempotencyKeys = pgTable("idempotency_keys", {
-  key: text("key").primaryKey(),
-  venueId: text("venue_id").notNull(),
-  reservationId: text("reservation_id").notNull(),
-  kind: text("kind").notNull(),
-  version: integer("version").notNull(),
-});
+export const idempotencyKeys = pgTable(
+  "idempotency_keys",
+  {
+    key: text("key").notNull(),
+    venueId: text("venue_id").notNull(),
+    reservationId: text("reservation_id").notNull(),
+    kind: text("kind").notNull(),
+    version: integer("version").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.venueId, t.key] })],
+);
 
 export const events = pgTable(
   "events",

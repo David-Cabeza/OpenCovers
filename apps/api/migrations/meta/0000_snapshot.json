@@ -1,5 +1,5 @@
 {
-  "id": "1c5b4ca3-2617-48a1-9c4b-f1c08ce99569",
+  "id": "2a1aed86-1eb9-42b1-990f-ac54417ed532",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -168,7 +168,7 @@
         "key": {
           "name": "key",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true
         },
         "venue_id": {
@@ -198,7 +198,15 @@
       },
       "indexes": {},
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "idempotency_keys_venue_id_key_pk": {
+          "name": "idempotency_keys_venue_id_key_pk",
+          "columns": [
+            "venue_id",
+            "key"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
