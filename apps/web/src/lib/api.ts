@@ -32,6 +32,18 @@ export interface ApiKey {
   hash: string;
 }
 
+export interface WaitlistEntry {
+  id: string;
+  venueId: string;
+  partySize: number;
+  zone: string;
+  guestName: string;
+  guestContact: string;
+  status: string;
+  reservationId: string | null;
+  createdAt: string;
+}
+
 export interface Reservation {
   id: string;
   venueId: string;
@@ -189,5 +201,38 @@ export const api = {
       method: "POST",
       headers: { "Idempotency-Key": crypto.randomUUID() },
       body: JSON.stringify({ status }),
+    }),
+
+  walkIn: (
+    venueId: string,
+    body: { partySize: number; tables?: string[]; zone?: string; guest?: { name?: string; contact?: string } },
+  ) =>
+    request<Reservation>(`/v1/venues/${venueId}/reservations/walk-in`, {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify(body),
+    }),
+
+  listWaitlist: (venueId: string) =>
+    request<{ entries: WaitlistEntry[] }>(`/v1/venues/${venueId}/waitlist`),
+
+  addWaitlist: (
+    venueId: string,
+    body: { partySize: number; zone?: string; guest?: { name?: string; contact?: string } },
+  ) =>
+    request<{ entries: WaitlistEntry[] }>(`/v1/venues/${venueId}/waitlist`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  seatWaitlist: (venueId: string, id: string) =>
+    request<Reservation>(`/v1/venues/${venueId}/waitlist/${id}/seat`, {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+    }),
+
+  cancelWaitlist: (venueId: string, id: string) =>
+    request<{ entries: WaitlistEntry[] }>(`/v1/venues/${venueId}/waitlist/${id}/cancel`, {
+      method: "POST",
     }),
 };
