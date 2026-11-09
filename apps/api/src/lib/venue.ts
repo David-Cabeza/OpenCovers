@@ -1,0 +1,107 @@
+import { and, eq } from "drizzle-orm";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { events, reservations, tombstones, venues } from "../db/schema";
+import * as schema from "../db/schema";
+import { sha256Hex } from "./reservations";
+
+export type Db = NodePgDatabase<typeof schema>;
+
+export interface VenueConfig {
+  enabled: boolean;
+  noticeAddress: string;
+}
+
+export type ConfigResult =
+  | { ok: true; config: VenueConfig }
+  | { ok: false; code: "notice_address_required" | "venue_not_found" };
+
+export interface ErasureResult {
+  erasedReservations: number;
+  erasedGuests: number;
+}
+
+export async function getConfig(db: Db, venueId: string): Promise<VenueConfig | null> {
+  const venue = (
+    await db.select().from(venues).where(eq(venues.id, venueId)).limit(1)
+  )[0];
+  if (!venue) return null;
+  return { enabled: venue.enabled, noticeAddress: venue.noticeAddress };
+}
+
+export async function setConfig(
+  db: Db,
+  venueId: string,
+  input: { enabled?: boolean; noticeAddress?: string },
+): Promise<ConfigResult> {
+  const venue = (
+    await db.select().from(venues).where(eq(venues.id, venueId)).limit(1)
+  )[0];
+  if (!venue) return { ok: false, code: "venue_not_found" };
+  const enabled = input.enabled ?? venue.enabled;
+  const noticeAddress =
+    input.noticeAddress !== undefined ? input.noticeAddress : venue.noticeAddress;
+  if (enabled && noticeAddress === "") {
+    return { ok: false, code: "notice_address_required" };
+  }
+  await db
+    .update(venues)
+    .set({ enabled, noticeAddress })
+    .where(eq(venues.id, venueId));
+  return { ok: true, config: { enabled, noticeAddress } };
+}
+
+export async function erase(
+  db: Db,
+  venueId: string,
+  guestId?: string,
+  principal?: string,
+): Promise<ErasureResult> {
+  const matches = guestId
+    ? await db
+        .select({ id: reservations.id, version: reservations.version })
+        .from(reservations)
+        .where(
+          and(
+            eq(reservations.venueId, venueId),
+            eq(reservations.guestContact, guestId),
+            eq(reservations.erased, false),
+          ),
+        )
+    : principal
+      ? await db
+          .select({ id: reservations.id, version: reservations.version })
+          .from(reservations)
+          .where(
+            and(
+              eq(reservations.venueId, venueId),
+              eq(reservations.ownerPrincipal, principal),
+              eq(reservations.erased, false),
+            ),
+          )
+      : [];
+  if (matches.length === 0) {
+    return { erasedReservations: 0, erasedGuests: 0 };
+  }
+  await db.transaction(async (tx) => {
+    for (const m of matches) {
+      const hash = await sha256Hex(m.id);
+      await tx
+        .update(reservations)
+        .set({ guestName: "", guestContact: "", erased: true })
+        .where(eq(reservations.id, m.id));
+      await tx.insert(tombstones).values({
+        reservationId: m.id,
+        venueId,
+        hash,
+      });
+      await tx.insert(events).values({
+        venueId,
+        type: "erased",
+        reservationId: m.id,
+        version: m.version,
+        tombstoneHash: hash,
+      });
+    }
+  });
+  return { erasedReservations: matches.length, erasedGuests: 1 };
+}

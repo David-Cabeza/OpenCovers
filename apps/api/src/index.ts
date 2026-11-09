@@ -12,6 +12,7 @@ import {
   searchReservations,
   setStatus,
 } from "./lib/reservations";
+import { erase, getConfig, setConfig } from "./lib/venue";
 
 const DEFAULT_DURATION_MINUTES = 120;
 const CHANNEL = "api";
@@ -215,6 +216,31 @@ function mapError(c: any, code: string) {
 function error(c: any, code: string, status: number) {
   return c.json({ code, message: code }, status);
 }
+
+app.get("/v1/venues/:venueId/config", async (c) => {
+  const venueId = c.req.param("venueId");
+  const config = await getConfig(db, venueId);
+  if (!config) return mapError(c, "venue_not_found");
+  return c.json(config);
+});
+
+app.put("/v1/venues/:venueId/config", async (c) => {
+  const venueId = c.req.param("venueId");
+  const body = await c.req.json();
+  const result = await setConfig(db, venueId, {
+    enabled: body.enabled,
+    noticeAddress: body.noticeAddress,
+  });
+  if (!result.ok) return mapError(c, result.code);
+  return c.json(result.config);
+});
+
+app.post("/v1/venues/:venueId/erasure", async (c) => {
+  const venueId = c.req.param("venueId");
+  const body = await c.req.json();
+  const result = await erase(db, venueId, body.guestId, body.principal);
+  return c.json(result);
+});
 
 const port = Number(process.env.PORT ?? 3000);
 serve({ fetch: app.fetch, port }, (info) => {
