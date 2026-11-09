@@ -1,31 +1,96 @@
+<div align="center">
+
+<img src="docs/logo.png" alt="OpenCovers logo" width="120">
+
 # OpenCovers
 
-OpenCovers is an open-source reservations engine for restaurants. It covers availability, bookings, table allocation, guest confirmations, and the reservation event feed. Platforms and AI agents use it through an HTTP API and an MCP server.
+**The open-source reservations engine for restaurants — availability, bookings, tables, and the event feed, with an API and an MCP server.**
 
-OpenCovers is the working name. Trademark clearance is pending.
+<sub>OpenCovers is the working name. Trademark clearance is pending. Pre-alpha: it runs locally with tests, nothing is deployed yet.</sub>
 
-**Status.** Pre-alpha. The engine runs locally with tests, but nothing is deployed. The contract, the write and read routes, the exclusion rule, availability, erasure, authentication, the staff screens, and the MCP server are implemented. The email confirmations and a deployment are not. See [ROADMAP.md](ROADMAP.md).
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=node.js&logoColor=white)
+![Hono](https://img.shields.io/badge/Hono-API-ff5b35)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![Tailwind](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss&logoColor=white)
+![MCP](https://img.shields.io/badge/MCP-server-7c3aed)
+![Status](https://img.shields.io/badge/status-pre--alpha-ffb020)
+[![License](https://img.shields.io/badge/License-Apache_2.0-d97757)](LICENSE)
+![PRs](https://img.shields.io/badge/PRs-welcome-38d591)
 
-## What it does
+</div>
 
-- A Postgres-backed reservation engine with a database-enforced no-double-booking rule.
-- An HTTP API for platforms and agents: availability, agenda, search, create, modify, cancel, status, events, and erasure.
-- Staff login with per-venue roles, plus scoped API keys for agents.
-- A React staff app for the daily book: agenda, availability, reservations, tables, services, and settings.
-- An MCP server so AI assistants can operate a venue directly.
+---
 
 ## Why
 
-Most booking systems are tied to a CRM, a point-of-sale system, or a single vendor. A venue that changes its front end or its messaging provider risks losing its reservation book. OpenCovers keeps the book independent. Any platform or AI agent can read availability, create a booking, modify it, or cancel it through the same contract.
+Most booking systems are tied to a CRM, a point-of-sale system, or a single vendor. A venue that changes its front end or its messaging provider risks losing its reservation book.
 
-## Stack
+OpenCovers keeps the book independent. Any platform or AI agent reads availability, creates a booking, modifies it, or cancels it through the same contract — and the no-double-booking rule is enforced by the database, not by application code.
 
-- **API:** Node.js, Hono, Drizzle, PostgreSQL.
-- **Staff app:** React, Vite, Tailwind CSS, shadcn/ui, react-hook-form, TanStack Query, Zustand.
-- **Auth:** Better Auth for staff sessions, scoped API keys for agents.
-- **MCP:** `@modelcontextprotocol/sdk`.
+## Features
 
-The no-double-booking rule is a GiST exclusion constraint in PostgreSQL, so it holds for any number of concurrent writers.
+### 📅 Availability and booking
+
+Read free time slots per service, create a booking against specific tables, and move, cancel, or seat it. Every write carries an idempotency key and a monotonic version.
+
+### 🚫 No double bookings, guaranteed
+
+A GiST exclusion constraint in PostgreSQL rejects overlapping table allocations. It holds for any number of concurrent writers — no application-level locking.
+
+### 🔑 Humans and machines, both first-class
+
+Staff sign in with Better Auth and get a per-venue role. Platforms and AI agents use scoped API keys (`read`/`write`) that a venue admin mints and revokes from the staff app.
+
+### 🤖 An MCP server
+
+The 13-tool catalog (`reservation.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly.
+
+### 🧹 Erasure built in
+
+Erase guest data by contact or principal, and get back counts. Tombstones keep the hashes, never the personal values.
+
+## How it works
+
+```mermaid
+flowchart LR
+    subgraph web["Staff app · React + Tailwind (5173)"]
+        UI[Agenda · Availability · Setup]
+    end
+    subgraph api["API · Node.js + Hono (3000)"]
+        AUTH[Better Auth · sessions]
+        KEYS[API keys · roles · grants]
+        DOMAIN[Reservations · availability · erasure]
+    end
+    subgraph mcp["MCP server · stdio"]
+        TOOLS[13 tools]
+    end
+    DB[(PostgreSQL<br/>GiST exclusion)]
+
+    UI -- "session cookie" --> AUTH
+    UI -- "HTTP /v1" --> DOMAIN
+    TOOLS -- "apikey" --> KEYS
+    DOMAIN --> DB
+    KEYS --> DB
+```
+
+## Quick start
+
+You need Node.js 22 or newer, pnpm, and Docker.
+
+```sh
+git clone https://github.com/David-Cabeza/OpenCovers.git
+cd OpenCovers
+docker compose up -d   # PostgreSQL
+pnpm install
+pnpm db:migrate
+pnpm dev               # API on :3000, staff app on :5173
+```
+
+Open <http://localhost:5173>, sign up, and create a venue. The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+To run the MCP server, see [apps/mcp](apps/mcp/README.md). Create an agent key from the staff app under **Setup → API keys**.
 
 ## Repository layout
 
@@ -47,27 +112,13 @@ docs/      the contract, ADRs, and requirements
 - Erasure returns counts and keeps hashes, not personal values.
 - The contract and the conformance cases come before the implementation.
 
-## Development
+## Status
 
-You need Node.js 22 or newer, pnpm, and Docker.
-
-```
-docker compose up -d
-pnpm install
-pnpm db:migrate
-pnpm test
-pnpm dev
-```
-
-`docker compose up -d` starts a local PostgreSQL. `pnpm dev` starts both the API on port 3000 and the staff app on port 5173. Open <http://localhost:5173> and sign up. The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md).
-
-To run the MCP server, see [apps/mcp](apps/mcp/README.md). Create an agent key from the staff app under **Setup → API keys**.
+Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally. What's missing: email confirmations (blocked on legal review and a delivery provider) and a deployment. See [ROADMAP.md](ROADMAP.md).
 
 ## Contributing
 
-OpenCovers uses flags. A flag is a scoped task with acceptance criteria, dependencies, and a size. Anyone can propose or claim one. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [flag issue form](.github/ISSUE_TEMPLATE/flag.yml).
-
-The project is pre-alpha. Help with the remaining roadmap phases, the documentation, and the flags is welcome.
+OpenCovers uses flags — scoped tasks with acceptance criteria, dependencies, and a size. Anyone can propose or claim one. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [flag issue form](.github/ISSUE_TEMPLATE/flag.yml).
 
 ## Governance and security
 
