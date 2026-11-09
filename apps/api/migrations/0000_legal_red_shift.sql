@@ -100,5 +100,4 @@ CREATE INDEX "idx_events_venue_occurred" ON "events" USING btree ("venue_id","oc
 CREATE INDEX "idx_reservations_venue_date" ON "reservations" USING btree ("venue_id","date");--> statement-breakpoint
 CREATE INDEX "idx_allocations_venue_table" ON "table_allocations" USING btree ("venue_id","table_id");
 --> statement-breakpoint
-CREATE EXTENSION IF NOT EXISTS btree_gist;--> statement-breakpoint
 ALTER TABLE "table_allocations" ADD CONSTRAINT "table_allocations_no_overlap" EXCLUDE USING gist ("venue_id" WITH =, "table_id" WITH =, tstzrange("starts_at", "ends_at", '[)') WITH &&);

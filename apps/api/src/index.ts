@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { db } from "./db/client";
+import { auth } from "./lib/auth";
 import {
   cancelReservation,
   createReservation,
@@ -36,6 +37,8 @@ const HTTP_STATUS: Record<string, number> = {
 const app = new Hono();
 
 app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
+
+app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.post("/v1/venues/:venueId/reservations", async (c) => {
   const venueId = c.req.param("venueId");

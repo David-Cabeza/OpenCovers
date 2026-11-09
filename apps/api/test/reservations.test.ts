@@ -1,5 +1,5 @@
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { sql } from "drizzle-orm";
+import { migrateDb } from "../src/db/migrate";
 import { beforeAll, describe, expect, it } from "vitest";
 import { db } from "../src/db/client";
 import { services, tables, venues } from "../src/db/schema";
@@ -39,7 +39,7 @@ const input = {
 };
 
 beforeAll(async () => {
-  await migrate(db, { migrationsFolder: "migrations" });
+  await migrateDb();
   await db.execute(
     sql`TRUNCATE TABLE events, tombstones, idempotency_keys, table_allocations, reservations, grants, api_keys, services, tables, venues RESTART IDENTITY CASCADE`,
   );
