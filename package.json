@@ -8,8 +8,5 @@
     "test": "pnpm -r test",
     "db:generate": "pnpm --filter @opencovers/api db:generate",
     "db:migrate": "pnpm --filter @opencovers/api db:migrate"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
   }
 }

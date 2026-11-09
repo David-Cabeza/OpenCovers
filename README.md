@@ -113,9 +113,13 @@ docs/      the contract, ADRs, and requirements
 - Erasure returns counts and keeps hashes, not personal values.
 - The contract and the conformance cases come before the implementation.
 
+## Deploy
+
+The API ships as a Docker image (`apps/api/Dockerfile`) that applies migrations on boot. The staff app and site are static builds. See [docs/deploy.md](docs/deploy.md) for the full runbook, including Railway.
+
 ## Status
 
-Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally. What's missing: email confirmations (blocked on legal review and a delivery provider) and a deployment. See [ROADMAP.md](ROADMAP.md).
+Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally, and a deployment is prepared (Dockerfile and runbook) but not yet live. Email confirmations remain blocked on legal review and a delivery provider. See [ROADMAP.md](ROADMAP.md).
 
 ## Contributing
 
