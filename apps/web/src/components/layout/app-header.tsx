@@ -18,6 +18,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { useVenues } from "@/hooks/use-venues";
 import { useUiStore } from "@/stores/ui-store";
+import { ThemeToggle } from "./theme-toggle";
 
 export function AppHeader({ email }: { email?: string }) {
   const { data } = useVenues();
@@ -51,6 +52,8 @@ export function AppHeader({ email }: { email?: string }) {
               </SelectContent>
             </Select>
           )}
+
+          <ThemeToggle />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
