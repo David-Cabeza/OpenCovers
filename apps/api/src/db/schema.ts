@@ -195,4 +195,18 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updated_at"),
 });
 
+export const venueMemberships = pgTable(
+  "venue_memberships",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("read"),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.venueId] })],
+);
+
 export const betterAuthSchema = { user, session, account, verification };

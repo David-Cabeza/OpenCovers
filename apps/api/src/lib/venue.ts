@@ -1,6 +1,13 @@
+import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { events, reservations, tombstones, venues } from "../db/schema";
+import {
+  events,
+  reservations,
+  tombstones,
+  venueMemberships,
+  venues,
+} from "../db/schema";
 import * as schema from "../db/schema";
 import { sha256Hex } from "./reservations";
 
@@ -18,6 +25,28 @@ export type ConfigResult =
 export interface ErasureResult {
   erasedReservations: number;
   erasedGuests: number;
+}
+
+export async function createVenue(
+  db: Db,
+  userId: string,
+  input: { id?: string; name: string; timezone?: string },
+): Promise<{ id: string }> {
+  const id = input.id ?? randomUUID();
+  await db.transaction(async (tx) => {
+    await tx.insert(venues).values({
+      id,
+      name: input.name,
+      timezone: input.timezone ?? "UTC",
+      enabled: false,
+    });
+    await tx.insert(venueMemberships).values({
+      userId,
+      venueId: id,
+      role: "admin",
+    });
+  });
+  return { id };
 }
 
 export async function getConfig(db: Db, venueId: string): Promise<VenueConfig | null> {
