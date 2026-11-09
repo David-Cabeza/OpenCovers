@@ -6,7 +6,8 @@ import { db } from "../src/db/client";
 import { services, tables, venues } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
 import { createReservation } from "../src/lib/reservations";
-import { erase, getConfig, listTables, setConfig } from "../src/lib/venue";
+import { listTables } from "../src/lib/catalog";
+import { erase, getConfig, setConfig } from "../src/lib/venue";
 
 async function seedVenue(venueId: string) {
   await db.insert(venues).values({ id: venueId, timezone: "Europe/Madrid" }).onConflictDoNothing();

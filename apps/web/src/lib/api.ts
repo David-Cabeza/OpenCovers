@@ -15,6 +15,12 @@ export interface Table {
   zone: string;
 }
 
+export interface Service {
+  name: string;
+  openStart: string;
+  openEnd: string;
+}
+
 export interface Reservation {
   id: string;
   venueId: string;
@@ -89,6 +95,33 @@ export const api = {
 
   listTables: (venueId: string) =>
     request<{ tables: Table[] }>(`/v1/venues/${venueId}/tables`),
+
+  upsertTable: (venueId: string, body: { id: string; name: string; seats: number; zone?: string }) =>
+    request<{ tables: Table[] }>(`/v1/venues/${venueId}/tables`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  deleteTable: (venueId: string, tableId: string) =>
+    request<{ tables: Table[] }>(
+      `/v1/venues/${venueId}/tables/${encodeURIComponent(tableId)}`,
+      { method: "DELETE" },
+    ),
+
+  listServices: (venueId: string) =>
+    request<{ services: Service[] }>(`/v1/venues/${venueId}/services`),
+
+  upsertService: (venueId: string, body: { name: string; openStart: string; openEnd: string }) =>
+    request<{ services: Service[] }>(`/v1/venues/${venueId}/services`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  deleteService: (venueId: string, name: string) =>
+    request<{ services: Service[] }>(
+      `/v1/venues/${venueId}/services/${encodeURIComponent(name)}`,
+      { method: "DELETE" },
+    ),
 
   agenda: (venueId: string, date: string) =>
     request<{ reservations: Reservation[] }>(

@@ -4,6 +4,14 @@ import { addKey, authenticate, authenticateAdmin, listKeys, revokeKey } from "./
 import { auth } from "./lib/auth";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import {
+  deleteService,
+  deleteTable,
+  listServices,
+  listTables,
+  upsertService,
+  upsertTable,
+} from "./lib/catalog";
+import {
   cancelReservation,
   createReservation,
   getAvailability,
@@ -14,7 +22,7 @@ import {
   searchReservations,
   setStatus,
 } from "./lib/reservations";
-import { createVenue, erase, getConfig, listTables, setConfig } from "./lib/venue";
+import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
 
 const DEFAULT_DURATION_MINUTES = 120;
 
@@ -71,7 +79,7 @@ app.use("/v1/venues/:venueId/*", async (c, next) => {
     role = membership.role;
   }
 
-  const isWrite = c.req.method === "POST" || c.req.method === "PUT";
+  const isWrite = ["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method);
   if (isWrite && role === "read") {
     return error(c, "forbidden", 403);
   }
@@ -284,6 +292,71 @@ app.get("/v1/venues/:venueId/tables", async (c) => {
   const venueId = c.req.param("venueId");
   const tables = await listTables(db, venueId);
   return c.json({ tables });
+});
+
+app.post("/v1/venues/:venueId/tables", async (c) => {
+  const venueId = c.req.param("venueId");
+  const body = await c.req.json();
+  if (
+    typeof body.id !== "string" ||
+    body.id === "" ||
+    typeof body.name !== "string" ||
+    typeof body.seats !== "number" ||
+    !Number.isInteger(body.seats) ||
+    body.seats < 1
+  ) {
+    return error(c, "invalid_request", 400);
+  }
+  await upsertTable(db, venueId, {
+    id: body.id,
+    name: body.name,
+    seats: body.seats,
+    zone: typeof body.zone === "string" ? body.zone : undefined,
+  });
+  const tables = await listTables(db, venueId);
+  return c.json({ tables });
+});
+
+app.delete("/v1/venues/:venueId/tables/:tableId", async (c) => {
+  const venueId = c.req.param("venueId");
+  const tableId = c.req.param("tableId");
+  await deleteTable(db, venueId, tableId);
+  const tables = await listTables(db, venueId);
+  return c.json({ tables });
+});
+
+app.get("/v1/venues/:venueId/services", async (c) => {
+  const venueId = c.req.param("venueId");
+  const services = await listServices(db, venueId);
+  return c.json({ services });
+});
+
+app.post("/v1/venues/:venueId/services", async (c) => {
+  const venueId = c.req.param("venueId");
+  const body = await c.req.json();
+  if (
+    typeof body.name !== "string" ||
+    body.name === "" ||
+    typeof body.openStart !== "string" ||
+    typeof body.openEnd !== "string"
+  ) {
+    return error(c, "invalid_request", 400);
+  }
+  await upsertService(db, venueId, {
+    name: body.name,
+    openStart: body.openStart,
+    openEnd: body.openEnd,
+  });
+  const services = await listServices(db, venueId);
+  return c.json({ services });
+});
+
+app.delete("/v1/venues/:venueId/services/:name", async (c) => {
+  const venueId = c.req.param("venueId");
+  const name = c.req.param("name");
+  await deleteService(db, venueId, name);
+  const services = await listServices(db, venueId);
+  return c.json({ services });
 });
 
 async function writeResponse(c: any, result: any, venueId: string) {

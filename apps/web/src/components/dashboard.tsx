@@ -7,6 +7,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { AgendaView } from "./agenda/agenda-view";
 import { AvailabilityView } from "./availability/availability-view";
 import { AppHeader } from "./layout/app-header";
+import { SetupView } from "./setup/setup-view";
 import { EmptyVenues } from "./venue/empty-venues";
 
 export function Dashboard() {
@@ -42,12 +43,16 @@ export function Dashboard() {
             <TabsList>
               <TabsTrigger value="agenda">Agenda</TabsTrigger>
               <TabsTrigger value="availability">Availability</TabsTrigger>
+              <TabsTrigger value="setup">Setup</TabsTrigger>
             </TabsList>
             <TabsContent value="agenda" className="pt-6">
               <AgendaView venueId={venueId} />
             </TabsContent>
             <TabsContent value="availability" className="pt-6">
               <AvailabilityView venueId={venueId} />
+            </TabsContent>
+            <TabsContent value="setup" className="pt-6">
+              <SetupView venueId={venueId} />
             </TabsContent>
           </Tabs>
         ) : null}

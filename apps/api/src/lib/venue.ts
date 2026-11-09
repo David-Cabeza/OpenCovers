@@ -4,7 +4,6 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   events,
   reservations,
-  tables,
   tombstones,
   venueMemberships,
   venues,
@@ -26,27 +25,6 @@ export type ConfigResult =
 export interface ErasureResult {
   erasedReservations: number;
   erasedGuests: number;
-}
-
-export interface TableInfo {
-  id: string;
-  name: string;
-  seats: number;
-  zone: string;
-}
-
-export async function listTables(db: Db, venueId: string): Promise<TableInfo[]> {
-  const rows = await db
-    .select()
-    .from(tables)
-    .where(eq(tables.venueId, venueId))
-    .orderBy(tables.name);
-  return rows.map((t) => ({
-    id: t.id,
-    name: t.name,
-    seats: t.seats,
-    zone: t.zone,
-  }));
 }
 
 export async function createVenue(
