@@ -22,6 +22,7 @@ export interface CreateReservationInput {
   durationMinutes: number;
   partySize: number;
   tableIds?: string[];
+  zone?: string;
   guestName?: string;
   guestContact?: string;
   bookedVia?: string;
@@ -39,6 +40,7 @@ export interface Reservation {
   date: string;
   time: string;
   service: string;
+  zone: string;
   partySize: number;
   status: string;
   version: number;
@@ -146,11 +148,16 @@ async function autoAssignTables(
   startsAt: Date,
   endsAt: Date,
   partySize: number,
+  zone?: string,
 ): Promise<string[]> {
   const allTables = await tx
     .select()
     .from(tables)
-    .where(eq(tables.venueId, venueId));
+    .where(
+      zone
+        ? and(eq(tables.venueId, venueId), eq(tables.zone, zone))
+        : eq(tables.venueId, venueId),
+    );
   const totalCapacity = allTables.reduce((sum, t) => sum + t.seats, 0);
   if (partySize > totalCapacity) throw new ReservationError("party_size_too_large");
 
@@ -221,6 +228,7 @@ function toReservation(row: typeof reservations.$inferSelect, timezone: string):
     date: row.date,
     time: formatTime(row.startsAt, timezone),
     service: row.service,
+    zone: row.zone,
     partySize: row.partySize,
     status: row.status,
     version: row.version,
@@ -246,11 +254,27 @@ export async function createReservation(
   const service = await deriveService(db, venueId, input.time);
   if (service === "") return { ok: false, code: "outside_hours" };
   const autoAssign = !input.tableIds || input.tableIds.length === 0;
+  const zone = input.zone ?? "";
   if (
     !autoAssign &&
     input.partySize > (await totalSeats(db, venueId, input.tableIds as string[]))
   ) {
     return { ok: false, code: "party_size_too_large" };
+  }
+  if (!autoAssign && zone !== "") {
+    const inZone = await db
+      .select({ id: tables.id })
+      .from(tables)
+      .where(
+        and(
+          eq(tables.venueId, venueId),
+          inArray(tables.id, input.tableIds as string[]),
+          eq(tables.zone, zone),
+        ),
+      );
+    if (inZone.length !== (input.tableIds as string[]).length) {
+      return { ok: false, code: "invalid_request" };
+    }
   }
   const id = crypto.randomUUID();
   try {
@@ -270,6 +294,7 @@ export async function createReservation(
           startsAt,
           endsAt,
           input.partySize,
+          zone,
         );
       }
       await tx.insert(reservations).values({
@@ -277,6 +302,7 @@ export async function createReservation(
         venueId,
         date: input.date,
         service,
+        zone,
         startsAt,
         endsAt,
         partySize: input.partySize,
