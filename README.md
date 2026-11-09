@@ -85,10 +85,10 @@ cd OpenCovers
 docker compose up -d   # PostgreSQL
 pnpm install
 pnpm db:migrate
-pnpm dev               # API on :3000, staff app on :5173
+pnpm dev               # API :3000 · staff app :5173 · site :5174
 ```
 
-Open <http://localhost:5173>, sign up, and create a venue. The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md).
+Open <http://localhost:5173>, sign up, and create a venue. The public site is at <http://localhost:5174>. The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 To run the MCP server, see [apps/mcp](apps/mcp/README.md). Create an agent key from the staff app under **Setup → API keys**.
 
@@ -98,6 +98,7 @@ To run the MCP server, see [apps/mcp](apps/mcp/README.md). Create an agent key f
 apps/api   the reservation engine and the HTTP API
 apps/web   the staff app
 apps/mcp   the MCP server
+apps/site  the public website
 docs/      the contract, ADRs, and requirements
 ```
 
