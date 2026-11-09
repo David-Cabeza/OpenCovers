@@ -14,13 +14,14 @@ import * as schema from "../db/schema";
 import { formatTime, generateSlots, toMinutes, toTimestamp } from "./time";
 
 export type Db = NodePgDatabase<typeof schema>;
+type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 export interface CreateReservationInput {
   date: string;
   time: string;
   durationMinutes: number;
   partySize: number;
-  tableIds: string[];
+  tableIds?: string[];
   guestName?: string;
   guestContact?: string;
   bookedVia?: string;
@@ -72,6 +73,7 @@ export type WriteErrorCode =
   | "already_cancelled"
   | "invalid_request"
   | "party_size_too_large"
+  | "no_suitable_table"
   | "outside_hours"
   | "venue_not_found";
 
@@ -138,6 +140,81 @@ async function totalSeats(db: Db, venueId: string, tableIds: string[]) {
   return rows.reduce((sum, r) => sum + r.seats, 0);
 }
 
+async function autoAssignTables(
+  tx: DbTx,
+  venueId: string,
+  startsAt: Date,
+  endsAt: Date,
+  partySize: number,
+): Promise<string[]> {
+  const allTables = await tx
+    .select()
+    .from(tables)
+    .where(eq(tables.venueId, venueId));
+  const totalCapacity = allTables.reduce((sum, t) => sum + t.seats, 0);
+  if (partySize > totalCapacity) throw new ReservationError("party_size_too_large");
+
+  const free: { id: string; seats: number }[] = [];
+  for (const t of allTables) {
+    const busy = await tx
+      .select()
+      .from(tableAllocations)
+      .innerJoin(reservations, eq(tableAllocations.reservationId, reservations.id))
+      .where(
+        and(
+          eq(tableAllocations.venueId, venueId),
+          eq(tableAllocations.tableId, t.id),
+          inArray(reservations.status, ACTIVE_STATUSES),
+          lt(tableAllocations.startsAt, endsAt),
+          gt(tableAllocations.endsAt, startsAt),
+        ),
+      )
+      .limit(1);
+    if (busy.length === 0) free.push({ id: t.id, seats: t.seats });
+  }
+
+  const picked = pickCombination(free, partySize);
+  if (picked === null) throw new ReservationError("no_suitable_table");
+  return picked;
+}
+
+function pickCombination(
+  free: { id: string; seats: number }[],
+  partySize: number,
+): string[] | null {
+  const sorted = [...free].sort((a, b) => a.seats - b.seats);
+  const state: { best: { id: string; seats: number }[] | null; seats: number } = {
+    best: null,
+    seats: Number.POSITIVE_INFINITY,
+  };
+
+  (function search(
+    start: number,
+    chosen: { id: string; seats: number }[],
+    total: number,
+  ) {
+    if (state.best && chosen.length > state.best.length) return;
+    if (total >= partySize) {
+      if (
+        state.best === null ||
+        chosen.length < state.best.length ||
+        (chosen.length === state.best.length && total < state.seats)
+      ) {
+        state.best = chosen.slice();
+        state.seats = total;
+      }
+      return;
+    }
+    for (let i = start; i < sorted.length; i++) {
+      chosen.push(sorted[i]);
+      search(i + 1, chosen, total + sorted[i].seats);
+      chosen.pop();
+    }
+  })(0, [], 0);
+
+  return state.best ? state.best.map((t) => t.id) : null;
+}
+
 function toReservation(row: typeof reservations.$inferSelect, timezone: string): Reservation {
   return {
     id: row.id,
@@ -168,7 +245,11 @@ export async function createReservation(
   const endsAt = new Date(startsAt.getTime() + input.durationMinutes * 60000);
   const service = await deriveService(db, venueId, input.time);
   if (service === "") return { ok: false, code: "outside_hours" };
-  if (input.partySize > (await totalSeats(db, venueId, input.tableIds))) {
+  const autoAssign = !input.tableIds || input.tableIds.length === 0;
+  if (
+    !autoAssign &&
+    input.partySize > (await totalSeats(db, venueId, input.tableIds as string[]))
+  ) {
     return { ok: false, code: "party_size_too_large" };
   }
   const id = crypto.randomUUID();
@@ -180,6 +261,16 @@ export async function createReservation(
       if (existing) {
         if (existing.kind !== "create") throw new ReservationError("invalid_request");
         return { id: existing.reservationId, version: existing.version };
+      }
+      let tableIds = input.tableIds ?? [];
+      if (autoAssign) {
+        tableIds = await autoAssignTables(
+          tx,
+          venueId,
+          startsAt,
+          endsAt,
+          input.partySize,
+        );
       }
       await tx.insert(reservations).values({
         id,
@@ -197,7 +288,7 @@ export async function createReservation(
         guestName: input.guestName ?? "",
         guestContact: input.guestContact ?? "",
       });
-      for (const tableId of input.tableIds) {
+      for (const tableId of tableIds) {
         await tx.insert(tableAllocations).values({
           reservationId: id,
           venueId,

@@ -1,8 +1,8 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { migrateDb } from "../src/db/migrate";
 import { beforeAll, describe, expect, it } from "vitest";
 import { db } from "../src/db/client";
-import { services, tables, venues } from "../src/db/schema";
+import { services, tableAllocations, tables, venues } from "../src/db/schema";
 import {
   cancelReservation,
   createReservation,
@@ -133,5 +133,89 @@ describe("reservations", () => {
     expect(res?.service).toBe("dinner");
     expect(res?.time).toBe("21:00");
     expect(res?.status).toBe("booked");
+  });
+});
+
+async function allocatedTableIds(reservationId: string): Promise<string[]> {
+  const rows = await db
+    .select()
+    .from(tableAllocations)
+    .where(eq(tableAllocations.reservationId, reservationId));
+  return rows.map((r) => r.tableId).sort();
+}
+
+describe("auto-assign tables", () => {
+  it("picks the smallest free table that fits the party", async () => {
+    await seedVenue("auto-small");
+    const res = await createReservation(
+      db,
+      "auto-small",
+      { ...input, tableIds: undefined },
+      "k1",
+    );
+    if (!res.ok) throw new Error("create failed");
+    expect(await allocatedTableIds(res.id)).toEqual(["1"]);
+  });
+
+  it("picks a single larger table when the party exceeds the small ones", async () => {
+    await seedVenue("auto-single");
+    const res = await createReservation(
+      db,
+      "auto-single",
+      { ...input, partySize: 5, tableIds: undefined },
+      "k1",
+    );
+    if (!res.ok) throw new Error("create failed");
+    expect(await allocatedTableIds(res.id)).toEqual(["3"]);
+  });
+
+  it("combines tables when no single table fits", async () => {
+    await seedVenue("auto-combo");
+    const res = await createReservation(
+      db,
+      "auto-combo",
+      { ...input, partySize: 7, tableIds: undefined },
+      "k1",
+    );
+    if (!res.ok) throw new Error("create failed");
+    expect(await allocatedTableIds(res.id)).toEqual(["1", "3"]);
+  });
+
+  it("skips occupied tables", async () => {
+    await seedVenue("auto-skip");
+    await createReservation(db, "auto-skip", { ...input, tableIds: ["1"] }, "busy");
+    const res = await createReservation(
+      db,
+      "auto-skip",
+      { ...input, tableIds: undefined },
+      "k1",
+    );
+    if (!res.ok) throw new Error("create failed");
+    expect(await allocatedTableIds(res.id)).toEqual(["2"]);
+  });
+
+  it("returns no_suitable_table when every table is taken", async () => {
+    await seedVenue("auto-full");
+    await createReservation(db, "auto-full", { ...input, tableIds: ["1"] }, "b1");
+    await createReservation(db, "auto-full", { ...input, tableIds: ["2"] }, "b2");
+    await createReservation(db, "auto-full", { ...input, tableIds: ["3"] }, "b3");
+    const res = await createReservation(
+      db,
+      "auto-full",
+      { ...input, tableIds: undefined },
+      "k1",
+    );
+    expect(res).toEqual({ ok: false, code: "no_suitable_table" });
+  });
+
+  it("returns party_size_too_large when the party exceeds the venue capacity", async () => {
+    await seedVenue("auto-capacity");
+    const res = await createReservation(
+      db,
+      "auto-capacity",
+      { ...input, partySize: 13, tableIds: undefined },
+      "k1",
+    );
+    expect(res).toEqual({ ok: false, code: "party_size_too_large" });
   });
 });
