@@ -87,3 +87,50 @@ export async function revokeKey(db: Db, key: string): Promise<void> {
     await tx.delete(apiKeys).where(eq(apiKeys.hash, hash));
   });
 }
+
+export async function listVenueKeys(
+  db: Db,
+  venueId: string,
+): Promise<{ principal: string; role: Role; hash: string }[]> {
+  const rows = await db
+    .select({ principal: apiKeys.principal, role: apiKeys.role, hash: apiKeys.hash })
+    .from(grants)
+    .innerJoin(apiKeys, eq(grants.keyHash, apiKeys.hash))
+    .where(eq(grants.venueId, venueId))
+    .orderBy(apiKeys.principal);
+  return rows.map((r) => ({
+    principal: r.principal,
+    role: r.role as Role,
+    hash: r.hash,
+  }));
+}
+
+export async function addVenueKey(
+  db: Db,
+  venueId: string,
+  key: string,
+  principal: string,
+  role: Role = "read",
+): Promise<void> {
+  await addKey(db, key, principal, [venueId], role);
+}
+
+export async function revokeVenueKey(
+  db: Db,
+  venueId: string,
+  hash: string,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(grants)
+      .where(and(eq(grants.keyHash, hash), eq(grants.venueId, venueId)));
+    const remaining = await tx
+      .select()
+      .from(grants)
+      .where(eq(grants.keyHash, hash))
+      .limit(1);
+    if (remaining.length === 0) {
+      await tx.delete(apiKeys).where(eq(apiKeys.hash, hash));
+    }
+  });
+}

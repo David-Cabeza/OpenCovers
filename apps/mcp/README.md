@@ -17,6 +17,8 @@ Environment variables:
 
 The key determines which venues the server can see and which tools it may call. A read-only key is rejected on writes.
 
+Create and revoke keys from the staff app under **Setup → API keys** (venue admins only).
+
 ## Configure a host
 
 Claude Desktop (`claude_desktop_config.json`):

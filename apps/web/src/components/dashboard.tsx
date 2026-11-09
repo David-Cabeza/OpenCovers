@@ -17,6 +17,7 @@ export function Dashboard() {
   const setVenue = useUiStore((s) => s.setVenue);
 
   const venues = data?.venues ?? [];
+  const role = venues.find((v) => v.id === venueId)?.role;
 
   useEffect(() => {
     if (
@@ -52,7 +53,7 @@ export function Dashboard() {
               <AvailabilityView venueId={venueId} />
             </TabsContent>
             <TabsContent value="setup" className="pt-6">
-              <SetupView venueId={venueId} />
+              <SetupView venueId={venueId} role={role} />
             </TabsContent>
           </Tabs>
         ) : null}
