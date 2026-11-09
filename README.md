@@ -10,6 +10,13 @@ OpenCovers is the working name. Trademark clearance is pending.
 
 Most booking systems are tied to a CRM, a point-of-sale system, or a single vendor. A venue that changes its front end or its messaging provider risks losing its reservation book. OpenCovers keeps the book independent. Any platform or AI agent can read availability, create a booking, modify it, or cancel it through the same contract.
 
+## Stack
+
+- Node.js and Hono for the HTTP API.
+- PostgreSQL with Drizzle. The no-double-booking rule is a GiST exclusion constraint.
+- Better Auth for staff login.
+- React for the staff screens.
+
 ## Design rules
 
 - One transaction decides availability and booking.
@@ -20,6 +27,20 @@ Most booking systems are tied to a CRM, a point-of-sale system, or a single vend
 - The engine stores the minimum guest data a booking needs.
 - Erasure returns counts and keeps hashes, not personal values.
 - The contract and the conformance cases come before the implementation.
+
+## Development
+
+You need Node.js 22 or newer, pnpm, and Docker.
+
+```
+docker compose up -d
+pnpm install
+pnpm db:migrate
+pnpm test
+pnpm dev
+```
+
+`docker compose up -d` starts a local PostgreSQL. `pnpm dev` starts the API. The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 

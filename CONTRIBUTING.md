@@ -27,20 +27,23 @@ If a flag is too large, ask a maintainer to split it. Do not expand a flag into 
 
 ## Current phase
 
-The contract is defined in `docs/contract/`. The engine skeleton runs and has CI. Code flags are open.
+The contract is defined in `docs/contract/`. The engine runs against PostgreSQL with CI. Code flags are open.
 
 ## Development setup
 
-You need Node.js 22 or newer.
+You need Node.js 22 or newer, pnpm, and Docker.
 
 ```
-npm install
-npm run typecheck
-npm test
-npm run dev
+docker compose up -d
+pnpm install
+pnpm db:migrate
+pnpm test
+pnpm dev
 ```
 
-`npm run dev` starts a local Worker with the Durable Objects. `npm test` runs the tests inside the Workers runtime. `npm run typecheck` checks both the source and the tests.
+`docker compose up -d` starts a local PostgreSQL. `pnpm db:migrate` applies the schema. `pnpm test` runs the integration tests against that database. `pnpm dev` starts the API on port 3000.
+
+The API lives in `apps/api`. The staff frontend lives in `apps/web`; run `pnpm --filter @opencovers/web dev` to start it on port 5173.
 
 ## Pull requests
 
