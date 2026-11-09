@@ -6,16 +6,35 @@ OpenCovers is the working name. Trademark clearance is pending.
 
 **Status.** Pre-alpha. The engine runs locally with tests, but nothing is deployed. The contract, the write and read routes, the exclusion rule, availability, erasure, authentication, the staff screens, and the MCP server are implemented. The email confirmations and a deployment are not. See [ROADMAP.md](ROADMAP.md).
 
+## What it does
+
+- A Postgres-backed reservation engine with a database-enforced no-double-booking rule.
+- An HTTP API for platforms and agents: availability, agenda, search, create, modify, cancel, status, events, and erasure.
+- Staff login with per-venue roles, plus scoped API keys for agents.
+- A React staff app for the daily book: agenda, availability, reservations, tables, services, and settings.
+- An MCP server so AI assistants can operate a venue directly.
+
 ## Why
 
 Most booking systems are tied to a CRM, a point-of-sale system, or a single vendor. A venue that changes its front end or its messaging provider risks losing its reservation book. OpenCovers keeps the book independent. Any platform or AI agent can read availability, create a booking, modify it, or cancel it through the same contract.
 
 ## Stack
 
-- Node.js and Hono for the HTTP API.
-- PostgreSQL with Drizzle. The no-double-booking rule is a GiST exclusion constraint.
-- Better Auth for staff login.
-- React for the staff screens.
+- **API:** Node.js, Hono, Drizzle, PostgreSQL.
+- **Staff app:** React, Vite, Tailwind CSS, shadcn/ui, react-hook-form, TanStack Query, Zustand.
+- **Auth:** Better Auth for staff sessions, scoped API keys for agents.
+- **MCP:** `@modelcontextprotocol/sdk`.
+
+The no-double-booking rule is a GiST exclusion constraint in PostgreSQL, so it holds for any number of concurrent writers.
+
+## Repository layout
+
+```
+apps/api   the reservation engine and the HTTP API
+apps/web   the staff app
+apps/mcp   the MCP server
+docs/      the contract, ADRs, and requirements
+```
 
 ## Design rules
 
@@ -41,6 +60,8 @@ pnpm dev
 ```
 
 `docker compose up -d` starts a local PostgreSQL. `pnpm dev` starts both the API on port 3000 and the staff app on port 5173. Open <http://localhost:5173> and sign up. The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+To run the MCP server, see [apps/mcp](apps/mcp/README.md). Create an agent key from the staff app under **Setup → API keys**.
 
 ## Contributing
 
