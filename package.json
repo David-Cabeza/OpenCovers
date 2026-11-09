@@ -1,19 +1,14 @@
 {
   "name": "opencovers",
-  "version": "0.1.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
-    "test": "vitest run"
+    "dev": "pnpm --filter @opencovers/api dev",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @opencovers/api db:generate",
+    "db:migrate": "pnpm --filter @opencovers/api db:migrate"
   },
-  "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.6.0",
-    "@cloudflare/workers-types": "^5.20261108.1",
-    "typescript": "^7.0.2",
-    "vitest": "^5.1.0",
-    "wrangler": "^4.158.0"
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
   }
 }
