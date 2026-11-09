@@ -4,7 +4,7 @@ OpenCovers is an open-source reservations engine for restaurants. It covers avai
 
 OpenCovers is the working name. Trademark clearance is pending.
 
-**Status.** Pre-alpha. The engine runs locally with tests, but nothing is deployed. The contract, the write and read routes, the exclusion rule, availability, erasure, and authentication are implemented. The staff screens, the email confirmations, and a deployment are not. See [ROADMAP.md](ROADMAP.md).
+**Status.** Pre-alpha. The engine runs locally with tests, but nothing is deployed. The contract, the write and read routes, the exclusion rule, availability, erasure, authentication, and the staff screens are implemented. The email confirmations and a deployment are not. See [ROADMAP.md](ROADMAP.md).
 
 ## Why
 
