@@ -1,0 +1,74 @@
+name: Flag
+description: Propose a scoped task that another contributor can claim.
+title: "[flag] "
+labels: ["flag", "status:needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A flag is a scoped task with acceptance criteria and dependencies. Read CONTRIBUTING.md before you open one.
+        Do not include confidential third-party documentation, API keys, or guest data.
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: What must exist when this flag is done?
+      placeholder: One or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What stays blocked or what breaks if this flag is not done?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Files, modules, or documents in scope. State what is out of scope.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: A checklist a reviewer can verify.
+      value: |
+        - [ ] 
+        - [ ] 
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Flags, decisions, or documents that must land first. Write "None" if there are none.
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      options:
+        - S (one session)
+        - M (a few days)
+        - L (a week or more, split it)
+    validations:
+      required: true
+  - type: checkboxes
+    id: claim
+    attributes:
+      label: Claim
+      options:
+        - label: I want to claim this flag.
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I did not include confidential third-party material, API keys, or guest data.
+          required: true
+        - label: I read CONTRIBUTING.md and CODE_OF_CONDUCT.md.
+          required: true

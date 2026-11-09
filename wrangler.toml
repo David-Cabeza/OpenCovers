@@ -1,0 +1,22 @@
+name = "opencovers"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+
+[[durable_objects.bindings]]
+name = "VENUE"
+class_name = "Venue"
+
+[[durable_objects.bindings]]
+name = "AUTH"
+class_name = "Auth"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Venue"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Auth"]
+
+[vars]
+VENUE_JURISDICTION = "eu"

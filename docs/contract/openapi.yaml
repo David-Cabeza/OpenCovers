@@ -1,0 +1,605 @@
+openapi: 3.0.3
+info:
+  title: OpenCovers Reservations API
+  version: 0.1.0
+  description: |
+    OpenCovers is an independent reservations engine for restaurants.
+    This contract defines the HTTP API. The MCP server exposes the same
+    operations with the tool ids in docs/contract/mcp.md.
+    Every write carries an `Idempotency-Key` header and produces a monotonic
+    version. See docs/contract/errors.md for the error vocabulary.
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /venues/{venueId}/availability:
+    get:
+      operationId: reservation.availability
+      summary: List bookable slots for a venue, date, and party size, grouped by service
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: partySize
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: service
+          in: query
+          required: false
+          description: Filter to one service. When omitted, the response is grouped by service.
+          schema: { type: string }
+      responses:
+        "200":
+          description: The bookable slots, keyed by service name
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [availability]
+                properties:
+                  availability:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items: { $ref: "#/components/schemas/AvailabilitySlot" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/agenda:
+    get:
+      operationId: reservation.agenda
+      summary: List the reservations for a venue on one day, grouped by service
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: service
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: The day's reservations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reservations]
+                properties:
+                  reservations:
+                    type: array
+                    items: { $ref: "#/components/schemas/Reservation" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/reservations:
+    get:
+      operationId: reservation.list
+      summary: List the reservations of the authenticated guest
+      description: |
+        The guest is derived from the authenticated principal of the channel.
+        A caller with no guest principal gets an empty list.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The guest's reservations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reservations]
+                properties:
+                  reservations:
+                    type: array
+                    items: { $ref: "#/components/schemas/Reservation" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: reservation.create
+      summary: Create a reservation
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReservationCreate" }
+      responses:
+        "200":
+          description: The created reservation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/reservations/search:
+    get:
+      operationId: reservation.search
+      summary: Search reservations across a date range
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: dateStart
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: dateEnd
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: array
+            items: { $ref: "#/components/schemas/ReservationStatus" }
+      responses:
+        "200":
+          description: Matching reservations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reservations]
+                properties:
+                  reservations:
+                    type: array
+                    items: { $ref: "#/components/schemas/Reservation" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/reservations/{reservationId}:
+    get:
+      operationId: reservation.get
+      summary: Read one reservation
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/reservationId"
+      responses:
+        "200":
+          description: The reservation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/reservations/{reservationId}/modify:
+    post:
+      operationId: reservation.modify
+      summary: Modify a reservation, producing a new version
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/reservationId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReservationModify" }
+      responses:
+        "200":
+          description: The modified reservation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/reservations/{reservationId}/cancel:
+    post:
+      operationId: reservation.cancel
+      summary: Cancel a reservation
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/reservationId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      responses:
+        "200":
+          description: The cancelled reservation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/reservations/{reservationId}/status:
+    post:
+      operationId: reservation.status
+      summary: Move a reservation to a new status
+      description: |
+        The engine enforces the allowed transitions. An invalid transition
+        fails with `invalid_transition`.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/reservationId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [seated, attended, no_show]
+      responses:
+        "200":
+          description: The reservation in its new status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/config:
+    get:
+      operationId: venue.getConfig
+      summary: Read the venue configuration
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The venue configuration
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VenueConfig" }
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: venue.setConfig
+      summary: Update the venue configuration
+      description: |
+        Enabling the venue without a notice address fails with
+        `notice_address_required`. Clearing the notice address while the
+        venue is enabled fails the same way.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VenueConfig" }
+      responses:
+        "200":
+          description: The updated venue configuration
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VenueConfig" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/events:
+    get:
+      operationId: reservation.events
+      summary: Poll the event feed from a cursor
+      description: |
+        The cursor is scoped to the venue. Events are retained for the venue's
+        retention period. A cursor older than the retention period fails with
+        `expired_cursor`.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 1000 }
+      responses:
+        "200":
+          description: Events after the cursor
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events, nextCursor]
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: "#/components/schemas/Event" }
+                  nextCursor:
+                    type: string
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/erasure:
+    post:
+      operationId: reservation.erasure
+      summary: Erase personal data by guest id or by principal
+      description: |
+        Erasure returns counts. For each erased reservation the event feed
+        emits an `erased` event carrying a tombstone hash.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                guestId:
+                  type: string
+                principal:
+                  type: string
+      responses:
+        "200":
+          description: The erasure counts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErasureResult" }
+        default:
+          $ref: "#/components/responses/Error"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: apikey
+      description: The key that identifies the caller and the channel.
+
+  parameters:
+    venueId:
+      name: venueId
+      in: path
+      required: true
+      schema: { type: string }
+      description: The venue slug.
+    reservationId:
+      name: reservationId
+      in: path
+      required: true
+      schema: { type: string }
+    idempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string }
+      description: A client-generated key. Repeating it returns the original result.
+
+  responses:
+    Error:
+      description: An error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    ReservationStatus:
+      type: string
+      enum: [booked, seated, attended, no_show, cancelled]
+
+    ReservationType:
+      type: string
+      enum: [free, prepaid]
+
+    AvailabilitySlot:
+      type: object
+      required: [time, available, type]
+      properties:
+        time:
+          type: string
+          example: "21:30"
+        available:
+          type: boolean
+        type:
+          $ref: "#/components/schemas/ReservationType"
+        requiresConfirmation:
+          type: boolean
+          default: false
+
+    Guest:
+      type: object
+      required: [name, contact]
+      properties:
+        guestId:
+          type: string
+          description: The engine's own guest record id, when one exists. Used for erasure.
+        name:
+          type: string
+        contact:
+          type: string
+          description: An email or a phone with its country code.
+        principalReference:
+          type: string
+          description: An opaque reference to the authenticated channel, set by the engine.
+
+    Reservation:
+      type: object
+      required:
+        - id
+        - venueId
+        - date
+        - time
+        - service
+        - partySize
+        - status
+        - version
+      properties:
+        id:
+          type: string
+        venueId:
+          type: string
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+        service:
+          type: string
+        partySize:
+          type: integer
+        durationMinutes:
+          type: integer
+        tables:
+          type: array
+          items: { type: string }
+        zone:
+          type: string
+        guest:
+          $ref: "#/components/schemas/Guest"
+        status:
+          $ref: "#/components/schemas/ReservationStatus"
+        type:
+          $ref: "#/components/schemas/ReservationType"
+        version:
+          type: integer
+          minimum: 1
+        basis:
+          type: string
+          description: Set by the engine from the authenticated channel.
+        ownerPrincipal:
+          type: string
+        bookedVia:
+          type: string
+        source:
+          type: string
+        commentary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ReservationCreate:
+      type: object
+      required: [date, time, partySize]
+      properties:
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+        partySize:
+          type: integer
+          minimum: 1
+        service:
+          type: string
+          description: When omitted, the engine derives it from the time.
+        zone:
+          type: string
+        tables:
+          type: array
+          description: |
+            When set, the engine must use these tables. When empty or omitted,
+            the engine assigns the tables. See the conformance cases for the
+            conflict behavior.
+          items: { type: string }
+        guest:
+          $ref: "#/components/schemas/Guest"
+        source:
+          type: string
+        commentary:
+          type: string
+
+    ReservationModify:
+      type: object
+      minProperties: 1
+      properties:
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+        partySize:
+          type: integer
+          minimum: 1
+        zone:
+          type: string
+        tables:
+          type: array
+          items: { type: string }
+        commentary:
+          type: string
+
+    Event:
+      type: object
+      required: [id, type, reservationId, version, occurredAt]
+      properties:
+        id:
+          type: string
+          description: Stable and monotonic within a venue.
+        type:
+          type: string
+          enum: [created, modified, cancelled, seated, attended, no_show, erased]
+        reservationId:
+          type: string
+        version:
+          type: integer
+        tombstoneHash:
+          type: string
+          description: Present on `erased` events. A hash of the reservation id, never a personal value.
+        occurredAt:
+          type: string
+          format: date-time
+
+    VenueConfig:
+      type: object
+      required: [enabled, noticeAddress]
+      properties:
+        enabled:
+          type: boolean
+        noticeAddress:
+          type: string
+          description: Required to enable the venue and cannot be cleared while enabled.
+
+    ErasureResult:
+      type: object
+      required: [erasedReservations, erasedGuests]
+      properties:
+        erasedReservations:
+          type: integer
+        erasedGuests:
+          type: integer
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+
+    ErrorCode:
+      type: string
+      enum:
+        - invalid_request
+        - venue_not_found
+        - reservation_not_found
+        - unauthorized
+        - forbidden
+        - slot_taken
+        - party_size_too_large
+        - no_suitable_table
+        - outside_hours
+        - lead_time_violation
+        - email_required
+        - confirmation_required
+        - approval_required
+        - already_cancelled
+        - invalid_transition
+        - idempotency_in_flight
+        - unknown_outcome
+        - transient
+        - notice_address_required
+        - stale_second_factor
+        - expired_cursor
