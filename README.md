@@ -40,7 +40,7 @@ pnpm test
 pnpm dev
 ```
 
-`docker compose up -d` starts a local PostgreSQL. `pnpm dev` starts the API. The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md).
+`docker compose up -d` starts a local PostgreSQL. `pnpm dev` starts both the API on port 3000 and the staff app on port 5173. Open <http://localhost:5173> and sign up. The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
