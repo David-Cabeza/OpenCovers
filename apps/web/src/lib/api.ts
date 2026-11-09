@@ -21,6 +21,11 @@ export interface Service {
   openEnd: string;
 }
 
+export interface VenueConfig {
+  enabled: boolean;
+  noticeAddress: string;
+}
+
 export interface Reservation {
   id: string;
   venueId: string;
@@ -122,6 +127,15 @@ export const api = {
       `/v1/venues/${venueId}/services/${encodeURIComponent(name)}`,
       { method: "DELETE" },
     ),
+
+  getConfig: (venueId: string) =>
+    request<VenueConfig>(`/v1/venues/${venueId}/config`),
+
+  setConfig: (venueId: string, body: { enabled?: boolean; noticeAddress?: string }) =>
+    request<VenueConfig>(`/v1/venues/${venueId}/config`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
 
   agenda: (venueId: string, date: string) =>
     request<{ reservations: Reservation[] }>(
