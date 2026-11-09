@@ -129,6 +129,26 @@ export const tombstones = pgTable("tombstones", {
     .defaultNow(),
 });
 
+export const waitlist = pgTable(
+  "waitlist",
+  {
+    id: text("id").primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id),
+    partySize: integer("party_size").notNull(),
+    zone: text("zone").notNull().default(""),
+    guestName: text("guest_name").notNull().default(""),
+    guestContact: text("guest_contact").notNull().default(""),
+    status: text("status").notNull().default("waiting"),
+    reservationId: text("reservation_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("idx_waitlist_venue_created").on(t.venueId, t.createdAt)],
+);
+
 export const apiKeys = pgTable("api_keys", {
   hash: text("hash").primaryKey(),
   principal: text("principal").notNull(),
