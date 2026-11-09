@@ -30,6 +30,7 @@ import {
   modifyReservation,
   searchReservations,
   setStatus,
+  walkIn,
 } from "./lib/reservations";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
 
@@ -180,6 +181,32 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
       durationMinutes: DEFAULT_DURATION_MINUTES,
       partySize: body.partySize,
       tableIds: body.tables,
+      zone: typeof body.zone === "string" ? body.zone : undefined,
+      guestName: body.guest?.name,
+      guestContact: body.guest?.contact,
+      bookedVia: c.get("principal") as string,
+      basis: "service",
+      ownerPrincipal: c.get("principal") as string,
+    },
+    key,
+  );
+  return writeResponse(c, result, venueId);
+});
+
+app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
+  const venueId = c.req.param("venueId");
+  const key = c.req.header("Idempotency-Key");
+  if (!key) return error(c, "invalid_request", 400);
+  const body = await c.req.json();
+  if (typeof body.partySize !== "number") return error(c, "invalid_request", 400);
+  const result = await walkIn(
+    db,
+    venueId,
+    {
+      date: typeof body.date === "string" ? body.date : undefined,
+      time: typeof body.time === "string" ? body.time : undefined,
+      partySize: body.partySize,
+      tableIds: Array.isArray(body.tables) ? body.tables : undefined,
       zone: typeof body.zone === "string" ? body.zone : undefined,
       guestName: body.guest?.name,
       guestContact: body.guest?.contact,

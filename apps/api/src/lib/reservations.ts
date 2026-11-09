@@ -11,7 +11,7 @@ import {
   venues,
 } from "../db/schema";
 import * as schema from "../db/schema";
-import { formatTime, generateSlots, toMinutes, toTimestamp } from "./time";
+import { formatTime, generateSlots, nowInTimezone, toMinutes, toTimestamp } from "./time";
 
 export type Db = NodePgDatabase<typeof schema>;
 type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -20,6 +20,20 @@ export interface CreateReservationInput {
   date: string;
   time: string;
   durationMinutes: number;
+  partySize: number;
+  tableIds?: string[];
+  zone?: string;
+  initialStatus?: "booked" | "seated";
+  guestName?: string;
+  guestContact?: string;
+  bookedVia?: string;
+  basis?: string;
+  ownerPrincipal?: string;
+}
+
+export interface WalkInInput {
+  date?: string;
+  time?: string;
   partySize: number;
   tableIds?: string[];
   zone?: string;
@@ -306,7 +320,7 @@ export async function createReservation(
         startsAt,
         endsAt,
         partySize: input.partySize,
-        status: "booked",
+        status: input.initialStatus ?? "booked",
         version: 1,
         bookedVia: input.bookedVia ?? "",
         basis: input.basis ?? "",
@@ -344,6 +358,36 @@ export async function createReservation(
     if (error instanceof ReservationError) return { ok: false, code: error.code };
     throw error;
   }
+}
+
+export async function walkIn(
+  db: Db,
+  venueId: string,
+  input: WalkInInput,
+  key: string,
+): Promise<WriteResult> {
+  const venue = await venueOf(db, venueId);
+  if (!venue) return { ok: false, code: "venue_not_found" };
+  const now = nowInTimezone(venue.timezone);
+  return createReservation(
+    db,
+    venueId,
+    {
+      date: input.date ?? now.date,
+      time: input.time ?? now.time,
+      durationMinutes: 120,
+      partySize: input.partySize,
+      tableIds: input.tableIds,
+      zone: input.zone,
+      initialStatus: "seated",
+      guestName: input.guestName,
+      guestContact: input.guestContact,
+      bookedVia: input.bookedVia,
+      basis: input.basis,
+      ownerPrincipal: input.ownerPrincipal,
+    },
+    key,
+  );
 }
 
 export async function modifyReservation(

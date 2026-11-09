@@ -185,6 +185,47 @@ export function createServer(): McpServer {
   );
 
   server.registerTool(
+    "reservation.walk_in",
+    {
+      title: "Walk-in",
+      description:
+        "Seat a guest who arrives without a reservation. Defaults the time to now in the venue timezone.",
+      annotations: { idempotentHint: true },
+      inputSchema: z.object({
+        venueId: z.string(),
+        partySize: z.number().int().positive(),
+        date: z.string().optional().describe("Date as YYYY-MM-DD. Defaults to today."),
+        time: z.string().optional().describe("Time as HH:MM. Defaults to now."),
+        tables: z.array(z.string()).optional().describe("Table ids. Omit to auto-assign."),
+        zone: z.string().optional(),
+        guestName: z.string().optional(),
+        guestContact: z.string().optional(),
+        idempotencyKey: z.string().optional(),
+      }),
+    },
+    async ({ venueId, partySize, date, time, tables, zone, guestName, guestContact, idempotencyKey: key }) => {
+      try {
+        return ok(
+          await request(`/v1/venues/${venueId}/reservations/walk-in`, {
+            method: "POST",
+            idempotencyKey: idempotencyKey(key),
+            body: {
+              date,
+              time,
+              partySize,
+              tables,
+              zone,
+              guest: { name: guestName, contact: guestContact },
+            },
+          }),
+        );
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
     "reservation.modify",
     {
       title: "Modify reservation",

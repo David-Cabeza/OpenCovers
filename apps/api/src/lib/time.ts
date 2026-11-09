@@ -28,6 +28,17 @@ export function toTime(minutes: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+export function nowInTimezone(timezone = "UTC"): { date: string; time: string } {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  return { date, time: formatTime(now, timezone) };
+}
+
 export function generateSlots(
   openStart: string,
   openEnd: string,
