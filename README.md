@@ -115,7 +115,7 @@ docs/      the contract, ADRs, and requirements
 
 ## Deploy
 
-The API ships as a Docker image (`apps/api/Dockerfile`) that applies migrations on boot. The staff app and site are static builds. See [docs/deploy.md](docs/deploy.md) for the full runbook, including Railway.
+The staff app and site deploy to Cloudflare Pages as static builds. The API ships as a Docker image (Node.js) and is being ported to Cloudflare Workers + Hyperdrive. See [docs/deploy.md](docs/deploy.md).
 
 ## Status
 
