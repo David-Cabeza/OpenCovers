@@ -9,6 +9,7 @@ import { AvailabilityView } from "./availability/availability-view";
 import { AppHeader } from "./layout/app-header";
 import { SetupView } from "./setup/setup-view";
 import { EmptyVenues } from "./venue/empty-venues";
+import { WaitlistView } from "./waitlist/waitlist-view";
 
 export function Dashboard() {
   const { data: session } = authClient.useSession();
@@ -44,6 +45,7 @@ export function Dashboard() {
             <TabsList>
               <TabsTrigger value="agenda">Agenda</TabsTrigger>
               <TabsTrigger value="availability">Availability</TabsTrigger>
+              <TabsTrigger value="waitlist">Waitlist</TabsTrigger>
               <TabsTrigger value="setup">Setup</TabsTrigger>
             </TabsList>
             <TabsContent value="agenda" className="pt-6">
@@ -51,6 +53,9 @@ export function Dashboard() {
             </TabsContent>
             <TabsContent value="availability" className="pt-6">
               <AvailabilityView venueId={venueId} />
+            </TabsContent>
+            <TabsContent value="waitlist" className="pt-6">
+              <WaitlistView venueId={venueId} />
             </TabsContent>
             <TabsContent value="setup" className="pt-6">
               <SetupView venueId={venueId} role={role} />

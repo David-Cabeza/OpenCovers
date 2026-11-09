@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { useAgenda } from "@/hooks/use-agenda";
 import { api, type Reservation } from "@/lib/api";
 import { todayIso } from "@/lib/date";
@@ -56,6 +57,7 @@ function rowActions(status: string): RowAction[] {
 
 export function AgendaView({ venueId }: { venueId: string }) {
   const [date, setDate] = useState(todayIso());
+  const [walkInOpen, setWalkInOpen] = useState(false);
   const queryClient = useQueryClient();
   const { data, isPending } = useAgenda(venueId, date);
   const reservations = data?.reservations ?? [];
@@ -90,12 +92,17 @@ export function AgendaView({ venueId }: { venueId: string }) {
             Reservations for the selected day.
           </p>
         </div>
-        <Input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="w-fit"
-        />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setWalkInOpen(true)}>
+            Walk-in
+          </Button>
+          <Input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-fit"
+          />
+        </div>
       </div>
 
       {isPending ? (
@@ -132,6 +139,8 @@ export function AgendaView({ venueId }: { venueId: string }) {
           </Table>
         </div>
       )}
+
+      <WalkInDialog venueId={venueId} open={walkInOpen} onOpenChange={setWalkInOpen} />
     </div>
   );
 }
