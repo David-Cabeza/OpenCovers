@@ -33,6 +33,12 @@ import {
   walkIn,
 } from "./lib/reservations";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
+import {
+  addWaitlist,
+  cancelWaitlist,
+  listWaitlist,
+  seatWaitlist,
+} from "./lib/waitlist";
 
 const DEFAULT_DURATION_MINUTES = 120;
 
@@ -41,6 +47,7 @@ const HTTP_STATUS: Record<string, number> = {
   unauthorized: 401,
   forbidden: 403,
   reservation_not_found: 404,
+  waitlist_entry_not_found: 404,
   venue_not_found: 404,
   slot_taken: 409,
   no_suitable_table: 409,
@@ -217,6 +224,48 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
     key,
   );
   return writeResponse(c, result, venueId);
+});
+
+app.get("/v1/venues/:venueId/waitlist", async (c) => {
+  const venueId = c.req.param("venueId");
+  const entries = await listWaitlist(db, venueId);
+  return c.json({ entries });
+});
+
+app.post("/v1/venues/:venueId/waitlist", async (c) => {
+  const venueId = c.req.param("venueId");
+  const body = await c.req.json();
+  if (typeof body.partySize !== "number") return error(c, "invalid_request", 400);
+  const result = await addWaitlist(db, venueId, {
+    partySize: body.partySize,
+    zone: typeof body.zone === "string" ? body.zone : undefined,
+    guestName: body.guest?.name,
+    guestContact: body.guest?.contact,
+  });
+  if (!result.ok) return mapError(c, result.code);
+  const entries = await listWaitlist(db, venueId);
+  return c.json({ entries }, 201);
+});
+
+app.post("/v1/venues/:venueId/waitlist/:id/seat", async (c) => {
+  const venueId = c.req.param("venueId");
+  const id = c.req.param("id");
+  const key = c.req.header("Idempotency-Key");
+  if (!key) return error(c, "invalid_request", 400);
+  const result = await seatWaitlist(db, venueId, id, key);
+  if (!result.ok) return mapError(c, result.code);
+  const reservation = await getReservation(db, venueId, result.reservationId);
+  if (!reservation) return mapError(c, "reservation_not_found");
+  return c.json(toApi(reservation, venueId), 200);
+});
+
+app.post("/v1/venues/:venueId/waitlist/:id/cancel", async (c) => {
+  const venueId = c.req.param("venueId");
+  const id = c.req.param("id");
+  const result = await cancelWaitlist(db, venueId, id);
+  if (!result.ok) return mapError(c, result.code);
+  const entries = await listWaitlist(db, venueId);
+  return c.json({ entries });
 });
 
 app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {

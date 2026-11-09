@@ -402,6 +402,101 @@ export function createServer(): McpServer {
     },
   );
 
+  server.registerTool(
+    "waitlist.list",
+    {
+      title: "List waitlist",
+      description: "List the guests currently waiting for a table.",
+      annotations: { readOnlyHint: true },
+      inputSchema: z.object({ venueId: z.string() }),
+    },
+    async ({ venueId }) => {
+      try {
+        return ok(await request(`/v1/venues/${venueId}/waitlist`));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "waitlist.add",
+    {
+      title: "Add to waitlist",
+      description: "Add a guest to the waitlist when no table is available.",
+      annotations: { idempotentHint: false },
+      inputSchema: z.object({
+        venueId: z.string(),
+        partySize: z.number().int().positive(),
+        zone: z.string().optional(),
+        guestName: z.string().optional(),
+        guestContact: z.string().optional(),
+      }),
+    },
+    async ({ venueId, partySize, zone, guestName, guestContact }) => {
+      try {
+        return ok(
+          await request(`/v1/venues/${venueId}/waitlist`, {
+            method: "POST",
+            body: { partySize, zone, guest: { name: guestName, contact: guestContact } },
+          }),
+        );
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "waitlist.seat",
+    {
+      title: "Seat a waitlist entry",
+      description: "Seat a waiting guest, turning the entry into a reservation.",
+      annotations: { idempotentHint: true },
+      inputSchema: z.object({
+        venueId: z.string(),
+        id: z.string(),
+        idempotencyKey: z.string().optional(),
+      }),
+    },
+    async ({ venueId, id, idempotencyKey: key }) => {
+      try {
+        return ok(
+          await request(`/v1/venues/${venueId}/waitlist/${id}/seat`, {
+            method: "POST",
+            idempotencyKey: idempotencyKey(key),
+          }),
+        );
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "waitlist.cancel",
+    {
+      title: "Cancel a waitlist entry",
+      description: "Remove a guest from the waitlist.",
+      annotations: { idempotentHint: true },
+      inputSchema: z.object({
+        venueId: z.string(),
+        id: z.string(),
+      }),
+    },
+    async ({ venueId, id }) => {
+      try {
+        return ok(
+          await request(`/v1/venues/${venueId}/waitlist/${id}/cancel`, {
+            method: "POST",
+          }),
+        );
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
   return server;
 }
 

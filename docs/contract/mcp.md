@@ -16,6 +16,10 @@ The MCP server implements this catalog. It wraps the HTTP API and is scoped per 
 | `reservation.status` | POST /venues/{venueId}/reservations/{id}/status | write | required |
 | `reservation.events` | GET /venues/{venueId}/events | read | none |
 | `reservation.erasure` | POST /venues/{venueId}/erasure | write | required |
+| `waitlist.list` | GET /venues/{venueId}/waitlist | read | none |
+| `waitlist.add` | POST /venues/{venueId}/waitlist | write | none |
+| `waitlist.seat` | POST /venues/{venueId}/waitlist/{id}/seat | write | required |
+| `waitlist.cancel` | POST /venues/{venueId}/waitlist/{id}/cancel | write | none |
 | `venue.getConfig` | GET /venues/{venueId}/config | read | none |
 | `venue.setConfig` | PUT /venues/{venueId}/config | write | required |
 

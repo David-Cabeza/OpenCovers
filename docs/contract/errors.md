@@ -7,6 +7,7 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 - `invalid_request`: the request is malformed or fails validation.
 - `venue_not_found`: the venue does not exist, or the caller cannot see it. Indistinguishable from not found.
 - `reservation_not_found`: the reservation does not exist, or the caller cannot see it.
+- `waitlist_entry_not_found`: the waitlist entry does not exist, or the caller cannot see it.
 
 ## Auth
 

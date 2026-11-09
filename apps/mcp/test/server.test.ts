@@ -16,6 +16,10 @@ const CONTRACT_TOOLS = [
   "reservation.status",
   "reservation.events",
   "reservation.erasure",
+  "waitlist.list",
+  "waitlist.add",
+  "waitlist.seat",
+  "waitlist.cancel",
   "venue.getConfig",
   "venue.setConfig",
 ];
