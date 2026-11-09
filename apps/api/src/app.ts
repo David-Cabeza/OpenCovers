@@ -2,6 +2,15 @@ import { Hono } from "hono";
 import { db } from "./db/client";
 import { addKey, authenticate, authenticateAdmin, listKeys, revokeKey } from "./lib/api-keys";
 import { auth } from "./lib/auth";
+import { getMembership, listVenuesForUser } from "./lib/memberships";
+import {
+  deleteService,
+  deleteTable,
+  listServices,
+  listTables,
+  upsertService,
+  upsertTable,
+} from "./lib/catalog";
 import {
   cancelReservation,
   createReservation,
@@ -13,7 +22,7 @@ import {
   searchReservations,
   setStatus,
 } from "./lib/reservations";
-import { erase, getConfig, setConfig } from "./lib/venue";
+import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
 
 const DEFAULT_DURATION_MINUTES = 120;
 
@@ -45,22 +54,59 @@ app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
 
 app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
 
-app.use("/v1/venues/*", async (c, next) => {
-  const venueId = c.req.path.split("/")[3];
+app.use("/v1/venues/:venueId/*", async (c, next) => {
+  const venueId = c.req.param("venueId");
   const key = c.req.header("apikey");
-  if (!key) return error(c, "unauthorized", 401);
-  const result = await authenticate(db, key, venueId);
-  if (!result.ok) {
-    return result.reason === "unauthorized"
-      ? error(c, "unauthorized", 401)
-      : error(c, "venue_not_found", 404);
+
+  let principal: string;
+  let role: string;
+
+  if (key) {
+    const result = await authenticate(db, key, venueId);
+    if (!result.ok) {
+      return result.reason === "unauthorized"
+        ? error(c, "unauthorized", 401)
+        : error(c, "venue_not_found", 404);
+    }
+    principal = result.principal;
+    role = result.role;
+  } else {
+    const user = await sessionUser(c);
+    if (!user) return error(c, "unauthorized", 401);
+    const membership = await getMembership(db, user.id, venueId);
+    if (!membership) return error(c, "venue_not_found", 404);
+    principal = user.email;
+    role = membership.role;
   }
-  const isWrite = c.req.method === "POST" || c.req.method === "PUT";
-  if (isWrite && result.role === "read") {
+
+  const isWrite = ["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method);
+  if (isWrite && role === "read") {
     return error(c, "forbidden", 403);
   }
-  c.set("principal", result.principal);
+  c.set("principal", principal);
   await next();
+});
+
+app.get("/v1/venues", async (c) => {
+  const user = await sessionUser(c);
+  if (!user) return error(c, "unauthorized", 401);
+  const venues = await listVenuesForUser(db, user.id);
+  return c.json({ venues });
+});
+
+app.post("/v1/venues", async (c) => {
+  const user = await sessionUser(c);
+  if (!user) return error(c, "unauthorized", 401);
+  const body = await c.req.json();
+  if (typeof body.name !== "string" || body.name.trim() === "") {
+    return error(c, "invalid_request", 400);
+  }
+  const { id } = await createVenue(db, user.id, {
+    id: typeof body.id === "string" ? body.id : undefined,
+    name: body.name,
+    timezone: typeof body.timezone === "string" ? body.timezone : undefined,
+  });
+  return c.json({ venue: { id, name: body.name } }, 201);
 });
 
 app.get("/v1/auth/keys", async (c) => {
@@ -242,6 +288,77 @@ app.get("/v1/venues/:venueId/availability", async (c) => {
   return c.json({ availability });
 });
 
+app.get("/v1/venues/:venueId/tables", async (c) => {
+  const venueId = c.req.param("venueId");
+  const tables = await listTables(db, venueId);
+  return c.json({ tables });
+});
+
+app.post("/v1/venues/:venueId/tables", async (c) => {
+  const venueId = c.req.param("venueId");
+  const body = await c.req.json();
+  if (
+    typeof body.id !== "string" ||
+    body.id === "" ||
+    typeof body.name !== "string" ||
+    typeof body.seats !== "number" ||
+    !Number.isInteger(body.seats) ||
+    body.seats < 1
+  ) {
+    return error(c, "invalid_request", 400);
+  }
+  await upsertTable(db, venueId, {
+    id: body.id,
+    name: body.name,
+    seats: body.seats,
+    zone: typeof body.zone === "string" ? body.zone : undefined,
+  });
+  const tables = await listTables(db, venueId);
+  return c.json({ tables });
+});
+
+app.delete("/v1/venues/:venueId/tables/:tableId", async (c) => {
+  const venueId = c.req.param("venueId");
+  const tableId = c.req.param("tableId");
+  await deleteTable(db, venueId, tableId);
+  const tables = await listTables(db, venueId);
+  return c.json({ tables });
+});
+
+app.get("/v1/venues/:venueId/services", async (c) => {
+  const venueId = c.req.param("venueId");
+  const services = await listServices(db, venueId);
+  return c.json({ services });
+});
+
+app.post("/v1/venues/:venueId/services", async (c) => {
+  const venueId = c.req.param("venueId");
+  const body = await c.req.json();
+  if (
+    typeof body.name !== "string" ||
+    body.name === "" ||
+    typeof body.openStart !== "string" ||
+    typeof body.openEnd !== "string"
+  ) {
+    return error(c, "invalid_request", 400);
+  }
+  await upsertService(db, venueId, {
+    name: body.name,
+    openStart: body.openStart,
+    openEnd: body.openEnd,
+  });
+  const services = await listServices(db, venueId);
+  return c.json({ services });
+});
+
+app.delete("/v1/venues/:venueId/services/:name", async (c) => {
+  const venueId = c.req.param("venueId");
+  const name = c.req.param("name");
+  await deleteService(db, venueId, name);
+  const services = await listServices(db, venueId);
+  return c.json({ services });
+});
+
 async function writeResponse(c: any, result: any, venueId: string) {
   if (!result.ok) return mapError(c, result.code);
   const reservation = await getReservation(db, venueId, result.id);
@@ -302,6 +419,12 @@ app.post("/v1/venues/:venueId/erasure", async (c) => {
   const result = await erase(db, venueId, body.guestId, body.principal);
   return c.json(result);
 });
+
+async function sessionUser(c: any) {
+  const result = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!result) return null;
+  return result.user ?? null;
+}
 
 async function authorizeAdmin(c: any): Promise<{ principal: string } | Response> {
   const key = c.req.header("apikey");
