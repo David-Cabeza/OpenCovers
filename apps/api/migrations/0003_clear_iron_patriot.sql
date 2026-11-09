@@ -1,0 +1,1 @@
+ALTER TABLE "reservations" ADD COLUMN "zone" text DEFAULT '' NOT NULL;

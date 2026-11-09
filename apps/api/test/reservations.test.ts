@@ -38,6 +38,22 @@ const input = {
   tableIds: ["1"],
 };
 
+async function seedZonedVenue(venueId: string) {
+  await db.insert(venues).values({ id: venueId, timezone: "Europe/Madrid" }).onConflictDoNothing();
+  await db
+    .insert(services)
+    .values([{ venueId, name: "dinner", openStart: "19:00", openEnd: "23:00" }])
+    .onConflictDoNothing();
+  await db
+    .insert(tables)
+    .values([
+      { id: "1", venueId, name: "T1", seats: 2, zone: "Terrace" },
+      { id: "2", venueId, name: "T2", seats: 4, zone: "Terrace" },
+      { id: "3", venueId, name: "T3", seats: 6, zone: "Lounge" },
+    ])
+    .onConflictDoNothing();
+}
+
 beforeAll(async () => {
   await migrateDb();
   await db.execute(
@@ -217,5 +233,55 @@ describe("auto-assign tables", () => {
       "k1",
     );
     expect(res).toEqual({ ok: false, code: "party_size_too_large" });
+  });
+});
+
+describe("zones", () => {
+  it("auto-assigns within the requested zone", async () => {
+    await seedZonedVenue("zone-auto");
+    const res = await createReservation(
+      db,
+      "zone-auto",
+      { ...input, partySize: 4, tableIds: undefined, zone: "Terrace" },
+      "k1",
+    );
+    if (!res.ok) throw new Error("create failed");
+    expect(await allocatedTableIds(res.id)).toEqual(["2"]);
+  });
+
+  it("combines tables within the zone", async () => {
+    await seedZonedVenue("zone-combo");
+    const res = await createReservation(
+      db,
+      "zone-combo",
+      { ...input, partySize: 6, tableIds: undefined, zone: "Terrace" },
+      "k1",
+    );
+    if (!res.ok) throw new Error("create failed");
+    expect(await allocatedTableIds(res.id)).toEqual(["1", "2"]);
+  });
+
+  it("rejects explicit tables outside the requested zone", async () => {
+    await seedZonedVenue("zone-mismatch");
+    const res = await createReservation(
+      db,
+      "zone-mismatch",
+      { ...input, tableIds: ["3"], zone: "Terrace" },
+      "k1",
+    );
+    expect(res).toEqual({ ok: false, code: "invalid_request" });
+  });
+
+  it("stores and returns the zone", async () => {
+    await seedZonedVenue("zone-store");
+    const res = await createReservation(
+      db,
+      "zone-store",
+      { ...input, tableIds: ["1"], zone: "Terrace" },
+      "k1",
+    );
+    if (!res.ok) throw new Error("create failed");
+    const r = await getReservation(db, "zone-store", res.id);
+    expect(r?.zone).toBe("Terrace");
   });
 });

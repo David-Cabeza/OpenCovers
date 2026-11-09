@@ -153,12 +153,16 @@ export function createServer(): McpServer {
           .array(z.string())
           .optional()
           .describe("Table ids to assign. Omit to auto-assign."),
+        zone: z
+          .string()
+          .optional()
+          .describe("Zone to prefer (e.g. Terrace). When set, tables come from this zone."),
         guestName: z.string().optional(),
         guestContact: z.string().optional(),
         idempotencyKey: z.string().optional(),
       }),
     },
-    async ({ venueId, date, time, partySize, tables, guestName, guestContact, idempotencyKey: key }) => {
+    async ({ venueId, date, time, partySize, tables, zone, guestName, guestContact, idempotencyKey: key }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/reservations`, {
@@ -169,6 +173,7 @@ export function createServer(): McpServer {
               time,
               partySize,
               tables,
+              zone,
               guest: { name: guestName, contact: guestContact },
             },
           }),

@@ -56,6 +56,7 @@ export const reservations = pgTable(
       .references(() => venues.id),
     date: date("date").notNull(),
     service: text("service").notNull().default(""),
+    zone: text("zone").notNull().default(""),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     partySize: integer("party_size").notNull(),
