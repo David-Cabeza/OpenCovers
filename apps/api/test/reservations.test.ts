@@ -9,6 +9,7 @@ import {
   getReservation,
   modifyReservation,
   setStatus,
+  walkIn,
 } from "../src/lib/reservations";
 
 async function seedVenue(venueId: string) {
@@ -283,5 +284,35 @@ describe("zones", () => {
     if (!res.ok) throw new Error("create failed");
     const r = await getReservation(db, "zone-store", res.id);
     expect(r?.zone).toBe("Terrace");
+  });
+});
+
+describe("walk-in", () => {
+  it("seats a guest immediately with explicit tables", async () => {
+    await seedVenue("walkin-explicit");
+    const res = await walkIn(
+      db,
+      "walkin-explicit",
+      { date: "2026-11-12", time: "21:00", partySize: 2, tableIds: ["1"] },
+      "k1",
+    );
+    if (!res.ok) throw new Error("walk-in failed");
+    const r = await getReservation(db, "walkin-explicit", res.id);
+    expect(r?.status).toBe("seated");
+    expect(await allocatedTableIds(res.id)).toEqual(["1"]);
+  });
+
+  it("auto-assigns tables when none are provided", async () => {
+    await seedVenue("walkin-auto");
+    const res = await walkIn(
+      db,
+      "walkin-auto",
+      { date: "2026-11-12", time: "21:00", partySize: 4 },
+      "k1",
+    );
+    if (!res.ok) throw new Error("walk-in failed");
+    const r = await getReservation(db, "walkin-auto", res.id);
+    expect(r?.status).toBe("seated");
+    expect(await allocatedTableIds(res.id)).toEqual(["2"]);
   });
 });

@@ -10,6 +10,7 @@ const CONTRACT_TOOLS = [
   "reservation.search",
   "reservation.get",
   "reservation.create",
+  "reservation.walk_in",
   "reservation.modify",
   "reservation.cancel",
   "reservation.status",
