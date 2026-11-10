@@ -26,6 +26,7 @@ import {
   getAvailability,
   getEvents,
   getEventsWatermark,
+  getFloorPlan,
   getReservation,
   listByDate,
   listByPrincipal,
@@ -401,6 +402,14 @@ app.get("/v1/venues/:venueId/availability", async (c) => {
   if (Number.isNaN(partySize)) return error(c, "invalid_request", 400);
   const availability = await getAvailability(db, venueId, date, partySize);
   return c.json({ availability });
+});
+
+app.get("/v1/venues/:venueId/floor", async (c) => {
+  const venueId = c.req.param("venueId");
+  const date = c.req.query("date");
+  const time = c.req.query("time");
+  const tables = await getFloorPlan(db, venueId, date, time);
+  return c.json({ tables });
 });
 
 app.get("/v1/venues/:venueId/tables", async (c) => {

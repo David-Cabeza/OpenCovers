@@ -6,6 +6,7 @@ import { services, tableAllocations, tables, venues } from "../src/db/schema";
 import {
   cancelReservation,
   createReservation,
+  getFloorPlan,
   getReservation,
   listByPrincipal,
   modifyReservation,
@@ -184,6 +185,19 @@ describe("reservations", () => {
     const mine = await listByPrincipal(db, "list-principal", "agent-a");
     expect(mine.map((r) => r.ownerPrincipal)).toEqual(["agent-a", "agent-a"]);
     expect(mine).toHaveLength(2);
+  });
+
+  it("reports table occupancy for a floor plan", async () => {
+    await seedVenue("floor");
+    await createReservation(db, "floor", { ...input, tableIds: ["1"], guestName: "Ana" }, "k1");
+
+    const during = await getFloorPlan(db, "floor", "2026-11-12", "21:30");
+    expect(during.find((t) => t.id === "1")?.occupied).toBe(true);
+    expect(during.find((t) => t.id === "1")?.guestName).toBe("Ana");
+    expect(during.find((t) => t.id === "2")?.occupied).toBe(false);
+
+    const after = await getFloorPlan(db, "floor", "2026-11-12", "23:00");
+    expect(after.find((t) => t.id === "1")?.occupied).toBe(false);
   });
 });
 

@@ -681,6 +681,68 @@ export async function runRetention(db: Db, now = new Date()): Promise<void> {
   }
 }
 
+export interface FloorTable {
+  id: string;
+  name: string;
+  seats: number;
+  zone: string;
+  occupied: boolean;
+  reservationId?: string;
+  partySize?: number;
+  guestName?: string;
+}
+
+export async function getFloorPlan(
+  db: Db,
+  venueId: string,
+  date?: string,
+  time?: string,
+): Promise<FloorTable[]> {
+  const venue = await venueOf(db, venueId);
+  if (!venue) return [];
+  const now = nowInTimezone(venue.timezone);
+  const point = toTimestamp(date ?? now.date, time ?? now.time, venue.timezone);
+  const allTables = await db
+    .select()
+    .from(tables)
+    .where(eq(tables.venueId, venueId))
+    .orderBy(tables.name);
+  const result: FloorTable[] = [];
+  for (const t of allTables) {
+    const alloc = (
+      await db
+        .select({
+          reservationId: tableAllocations.reservationId,
+          partySize: reservations.partySize,
+          guestName: reservations.guestName,
+        })
+        .from(tableAllocations)
+        .innerJoin(reservations, eq(tableAllocations.reservationId, reservations.id))
+        .where(
+          and(
+            eq(tableAllocations.venueId, venueId),
+            eq(tableAllocations.tableId, t.id),
+            inArray(reservations.status, ACTIVE_STATUSES),
+            lt(tableAllocations.startsAt, point),
+            gt(tableAllocations.endsAt, point),
+          ),
+        )
+        .limit(1)
+    )[0];
+    result.push({
+      id: t.id,
+      name: t.name,
+      seats: t.seats,
+      zone: t.zone,
+      occupied: alloc !== undefined,
+      reservationId: alloc?.reservationId,
+      partySize: alloc?.partySize,
+      guestName: alloc?.guestName,
+    });
+  }
+  return result;
+}
+
 export async function getAvailability(db: Db, venueId: string, date: string, partySize: number): Promise<Record<string, AvailabilitySlot[]>> {
   const venue = await venueOf(db, venueId);
   if (!venue) return {};
