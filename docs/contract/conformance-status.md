@@ -18,7 +18,7 @@ Status legend:
 | C5 Erasure | **PASS** | Returns counts, nulls personal fields, emits tombstones with a hash in the event feed. Test: erasure is idempotent. |
 | C6 Notice address | **PASS** | `notice_address_required` on enable-without-address and clear-while-enabled. Test covers both. |
 | C7 Party size | **PASS** | `party_size_too_large` (explicit and auto-assign) and `no_suitable_table`. Tests cover both. |
-| C8 Hours | **PARTIAL** | `outside_hours` is enforced and tested. "Off the slot grid", "after the last seating", and `lead_time_violation` are **GAP** (no booking rules yet). |
+| C8 Hours | **PASS** | `outside_hours` (hours, slot grid, last seating) and `lead_time_violation` are enforced and tested. Walk-ins bypass the slot grid and lead time. |
 | C9 Status transitions | **PASS** | `seated`/`attended`/`no_show` with events; `invalid_transition`; `already_cancelled`. Tests cover. |
 | C10 Venue isolation | **PASS** | Requests are scoped per venue; an ungranted venue returns `venue_not_found`. Covered by the key-grant tests. |
 | C11 Event feed | **PASS** | Bigserial ids and a cursor over the feed; replay re-emits the same ids. |
@@ -27,6 +27,5 @@ Status legend:
 
 ## Open gaps
 
-1. **C4 — confirmation once.** Needs the email layer (blocked on legal text and a delivery provider).
-2. **C8 — booking rules.** Lead time, maximum advance, slot grid, and last-seating offset are specified but not modelled. Requires adding these fields to the venue config and enforcing them in availability and create.
-3. **C13 — cursor expiry.** Requires an event retention/pruning job plus a low-water mark so an old cursor can be rejected with `expired_cursor`.
+1. **C4 — confirmation once.** Needs the email layer. Delivery will be Resend; the text and basis are still to be reviewed legally.
+2. **C13 — cursor expiry.** Requires an event retention/pruning job plus a low-water mark so an old cursor can be rejected with `expired_cursor`.

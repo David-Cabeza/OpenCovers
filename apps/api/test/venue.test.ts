@@ -45,7 +45,13 @@ describe("venue config and erasure", () => {
     const enableOk = await setConfig(db, "config", { enabled: true });
     expect(enableOk).toEqual({
       ok: true,
-      config: { enabled: true, noticeAddress: "owner@example.com" },
+      config: {
+        enabled: true,
+        noticeAddress: "owner@example.com",
+        slotIntervalMinutes: 15,
+        leadTimeMinutes: 0,
+        lastSeatingOffsetMinutes: 0,
+      },
     });
 
     const clear = await setConfig(db, "config", { noticeAddress: "" });
@@ -74,7 +80,13 @@ describe("venue config and erasure", () => {
     expect(res).toEqual({ erasedReservations: 1, erasedGuests: 1 });
 
     const config = await getConfig(db, "erase");
-    expect(config).toEqual({ enabled: false, noticeAddress: "" });
+    expect(config).toEqual({
+      enabled: false,
+      noticeAddress: "",
+      slotIntervalMinutes: 15,
+      leadTimeMinutes: 0,
+      lastSeatingOffsetMinutes: 0,
+    });
 
     const again = await erase(db, "erase", "carlos@example.com");
     expect(again).toEqual({ erasedReservations: 0, erasedGuests: 0 });

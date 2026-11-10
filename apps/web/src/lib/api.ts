@@ -24,6 +24,9 @@ export interface Service {
 export interface VenueConfig {
   enabled: boolean;
   noticeAddress: string;
+  slotIntervalMinutes: number;
+  leadTimeMinutes: number;
+  lastSeatingOffsetMinutes: number;
 }
 
 export interface ApiKey {
@@ -149,7 +152,16 @@ export const api = {
   getConfig: (venueId: string) =>
     request<VenueConfig>(`/v1/venues/${venueId}/config`),
 
-  setConfig: (venueId: string, body: { enabled?: boolean; noticeAddress?: string }) =>
+  setConfig: (
+    venueId: string,
+    body: {
+      enabled?: boolean;
+      noticeAddress?: string;
+      slotIntervalMinutes?: number;
+      leadTimeMinutes?: number;
+      lastSeatingOffsetMinutes?: number;
+    },
+  ) =>
     request<VenueConfig>(`/v1/venues/${venueId}/config`, {
       method: "PUT",
       body: JSON.stringify(body),
