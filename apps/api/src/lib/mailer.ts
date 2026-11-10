@@ -11,18 +11,26 @@ interface EmailContext {
   service: string;
 }
 
-export async function sendEmail(to: string, subject: string, text: string): Promise<void> {
-  if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) {
-    console.warn("email not sent: RESEND_API_KEY or RESEND_FROM_EMAIL is not set");
+export async function sendEmail(
+  apiKey: string,
+  from: string,
+  to: string,
+  subject: string,
+  text: string,
+): Promise<void> {
+  const key = apiKey || RESEND_API_KEY;
+  const fromAddress = from || RESEND_FROM_EMAIL;
+  if (!key || !fromAddress) {
+    console.warn("email not sent: missing Resend API key or from address");
     return;
   }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${RESEND_API_KEY}`,
+      Authorization: `Bearer ${key}`,
     },
-    body: JSON.stringify({ from: RESEND_FROM_EMAIL, to: [to], subject, text }),
+    body: JSON.stringify({ from: fromAddress, to: [to], subject, text }),
   });
   if (!res.ok) {
     throw new Error(`Resend ${res.status}: ${await res.text()}`);

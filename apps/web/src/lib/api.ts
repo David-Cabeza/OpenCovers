@@ -25,6 +25,8 @@ export interface VenueConfig {
   enabled: boolean;
   noticeAddress: string;
   notificationsEnabled: boolean;
+  resendConfigured: boolean;
+  fromEmail: string;
   slotIntervalMinutes: number;
   leadTimeMinutes: number;
   lastSeatingOffsetMinutes: number;
@@ -159,6 +161,8 @@ export const api = {
       enabled?: boolean;
       noticeAddress?: string;
       notificationsEnabled?: boolean;
+      resendApiKey?: string;
+      fromEmail?: string;
       slotIntervalMinutes?: number;
       leadTimeMinutes?: number;
       lastSeatingOffsetMinutes?: number;
