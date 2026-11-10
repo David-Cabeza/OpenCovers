@@ -6,6 +6,7 @@ import { services, tableAllocations, tables, venues } from "../src/db/schema";
 import {
   cancelReservation,
   createReservation,
+  getAvailability,
   getFloorPlan,
   getPacing,
   getReservation,
@@ -211,6 +212,22 @@ describe("reservations", () => {
     expect(dinner!.slots.find((s) => s.time === "19:00")?.covers).toBe(0);
     expect(dinner!.slots.find((s) => s.time === "21:00")?.covers).toBe(2);
     expect(dinner!.slots.find((s) => s.time === "21:00")?.capacity).toBe(12);
+  });
+
+  it("handles a service that crosses midnight", async () => {
+    await db.insert(venues).values({ id: "midnight", timezone: "UTC" }).onConflictDoNothing();
+    await db.insert(services).values([{ venueId: "midnight", name: "dinner", openStart: "18:00", openEnd: "01:00" }]).onConflictDoNothing();
+    await db.insert(tables).values([{ id: "1", venueId: "midnight", name: "T1", seats: 2 }]).onConflictDoNothing();
+
+    const pacing = await getPacing(db, "midnight", "2026-11-12");
+    const dinner = pacing.find((p) => p.service === "dinner");
+    expect(dinner).toBeDefined();
+    expect(dinner!.slots.length).toBeGreaterThan(0);
+    expect(dinner!.slots[0].time).toBe("18:00");
+
+    const availability = await getAvailability(db, "midnight", "2026-11-12", 2);
+    expect(availability.dinner).toBeDefined();
+    expect(availability.dinner.length).toBeGreaterThan(0);
   });
 });
 

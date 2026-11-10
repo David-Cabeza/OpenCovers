@@ -11,7 +11,7 @@ import {
   venues,
 } from "../db/schema";
 import * as schema from "../db/schema";
-import { formatTime, generateSlots, nowInTimezone, toMinutes, toTimestamp } from "./time";
+import { formatTime, normalizeMinute, nowInTimezone, serviceWindow, toMinutes, toTime, toTimestamp } from "./time";
 
 export type Db = NodePgDatabase<typeof schema>;
 type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -142,10 +142,9 @@ async function deriveService(
     .from(services)
     .where(eq(services.venueId, venueId));
   for (const service of rows) {
-    if (
-      minute >= toMinutes(service.openStart) &&
-      minute < toMinutes(service.openEnd)
-    ) {
+    const { start, end } = serviceWindow(service.openStart, service.openEnd);
+    const m = normalizeMinute(minute, start);
+    if (m >= start && m < end) {
       return {
         name: service.name,
         openStart: service.openStart,
@@ -277,14 +276,12 @@ export async function createReservation(
   const service = await deriveService(db, venueId, input.time);
   if (!service) return { ok: false, code: "outside_hours" };
   const isWalkIn = input.initialStatus === "seated";
-  const minute = toMinutes(input.time);
-  if (
-    !isWalkIn &&
-    (minute - toMinutes(service.openStart)) % venue.slotIntervalMinutes !== 0
-  ) {
+  const { start, end } = serviceWindow(service.openStart, service.openEnd);
+  const minute = normalizeMinute(toMinutes(input.time), start);
+  if (!isWalkIn && (minute - start) % venue.slotIntervalMinutes !== 0) {
     return { ok: false, code: "outside_hours" };
   }
-  if (minute > toMinutes(service.openEnd) - venue.lastSeatingOffsetMinutes) {
+  if (minute > end - venue.lastSeatingOffsetMinutes) {
     return { ok: false, code: "outside_hours" };
   }
   if (
@@ -782,13 +779,14 @@ export async function getPacing(
     );
   const result: PacingService[] = [];
   for (const service of servicesRows) {
+    const { start, end } = serviceWindow(service.openStart, service.openEnd);
     const slots: PacingSlot[] = [];
-    for (const time of generateSlots(service.openStart, service.openEnd, venue.slotIntervalMinutes)) {
-      const point = toTimestamp(date, time, venue.timezone);
+    for (let m = start; m < end; m += venue.slotIntervalMinutes) {
+      const point = slotTimestamp(date, m, venue.timezone);
       const covers = activeReservations
         .filter((r) => r.startsAt <= point && r.endsAt > point)
         .reduce((sum, r) => sum + r.partySize, 0);
-      slots.push({ time, capacity, covers });
+      slots.push({ time: toTime(m % (24 * 60)), capacity, covers });
     }
     result.push({ service: service.name, slots });
   }
@@ -801,21 +799,29 @@ export async function getAvailability(db: Db, venueId: string, date: string, par
   const rows = await db.select().from(services).where(eq(services.venueId, venueId));
   const result: Record<string, AvailabilitySlot[]> = {};
   for (const service of rows) {
-    const close = toTimestamp(date, service.openEnd, venue.timezone);
+    const { start, end } = serviceWindow(service.openStart, service.openEnd);
+    const close = slotTimestamp(date, end, venue.timezone);
     const slots: AvailabilitySlot[] = [];
-    for (const time of generateSlots(service.openStart, service.openEnd, venue.slotIntervalMinutes)) {
-      const start = toTimestamp(date, time, venue.timezone);
-      const end = new Date(start.getTime() + DEFAULT_DURATION_SECONDS * 1000);
-      if (end > close) continue;
+    for (let m = start; m < end; m += venue.slotIntervalMinutes) {
+      const startTs = slotTimestamp(date, m, venue.timezone);
+      const endTs = new Date(startTs.getTime() + DEFAULT_DURATION_SECONDS * 1000);
+      if (endTs > close) continue;
       slots.push({
-        time,
-        available: await hasFreeTable(db, venueId, start, end, partySize),
+        time: toTime(m % (24 * 60)),
+        available: await hasFreeTable(db, venueId, startTs, endTs, partySize),
         type: "free",
       });
     }
     result[service.name] = slots;
   }
   return result;
+}
+
+function slotTimestamp(date: string, minutes: number, timezone: string): Date {
+  const day = Math.floor(minutes / (24 * 60));
+  const minuteOfDay = minutes % (24 * 60);
+  const ts = toTimestamp(date, toTime(minuteOfDay), timezone);
+  return new Date(ts.getTime() + day * 86400000);
 }
 
 async function hasFreeTable(db: Db, venueId: string, start: Date, end: Date, partySize: number): Promise<boolean> {

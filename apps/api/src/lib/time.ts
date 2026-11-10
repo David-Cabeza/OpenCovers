@@ -28,6 +28,23 @@ export function toTime(minutes: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+// Returns a service window in absolute minutes where end > start, adding 24h
+// when the service crosses midnight (e.g. 18:00–01:00).
+export function serviceWindow(openStart: string, openEnd: string): { start: number; end: number } {
+  const start = toMinutes(openStart);
+  let end = toMinutes(openEnd);
+  if (end <= start) end += 24 * 60;
+  return { start, end };
+}
+
+// Maps a minute-of-day into the same frame as `start`, so a time after midnight
+// lands after the start (start <= m < start + 24h).
+export function normalizeMinute(minute: number, start: number): number {
+  let m = minute;
+  while (m < start) m += 24 * 60;
+  return m;
+}
+
 export function nowInTimezone(timezone = "UTC"): { date: string; time: string } {
   const now = new Date();
   const date = new Intl.DateTimeFormat("en-CA", {
@@ -44,11 +61,10 @@ export function generateSlots(
   openEnd: string,
   intervalMinutes: number,
 ): string[] {
-  const start = toMinutes(openStart);
-  const end = toMinutes(openEnd);
+  const { start, end } = serviceWindow(openStart, openEnd);
   const slots: string[] = [];
   for (let m = start; m < end; m += intervalMinutes) {
-    slots.push(toTime(m));
+    slots.push(toTime(m % (24 * 60)));
   }
   return slots;
 }
