@@ -1,4 +1,5 @@
 import {
+  bigint,
   bigserial,
   boolean,
   date,
@@ -23,6 +24,7 @@ export const venues = pgTable("venues", {
   slotIntervalMinutes: integer("slot_interval_minutes").notNull().default(15),
   leadTimeMinutes: integer("lead_time_minutes").notNull().default(0),
   lastSeatingOffsetMinutes: integer("last_seating_offset_minutes").notNull().default(0),
+  eventsWatermark: bigint("events_watermark", { mode: "number" }).notNull().default(0),
   retentionDays: integer("retention_days").notNull().default(400),
 });
 

@@ -25,6 +25,7 @@ import {
   createReservation,
   getAvailability,
   getEvents,
+  getEventsWatermark,
   getReservation,
   listByDate,
   listByPrincipal,
@@ -379,6 +380,10 @@ app.get("/v1/venues/:venueId/events", async (c) => {
     if (Number.isNaN(afterId)) return mapError(c, "invalid_request");
   }
   const limit = parseInt(c.req.query("limit") ?? "100", 10);
+  const watermark = await getEventsWatermark(db, venueId);
+  if (afterId > 0 && watermark > 0 && afterId < watermark) {
+    return mapError(c, "expired_cursor");
+  }
   const events = await getEvents(db, venueId, afterId, limit);
   const lastId = events.length > 0 ? events[events.length - 1].id : afterId;
   return c.json({
