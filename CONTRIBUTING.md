@@ -41,7 +41,7 @@ pnpm test
 pnpm dev
 ```
 
-`docker compose up -d` starts a local PostgreSQL. `pnpm db:migrate` applies the schema. `pnpm test` runs the integration tests against that database. `pnpm dev` starts both the API on port 3000 and the staff app on port 5173.
+`docker compose up -d` starts a local PostgreSQL with two databases: `opencovers` (dev) and `opencovers_test` (tests). `pnpm db:migrate` applies the schema to the dev database. `pnpm test` runs the integration tests against `opencovers_test`, so it never wipes your dev data. `pnpm dev` starts both the API on port 3000 and the staff app on port 5173.
 
 The API lives in `apps/api`. The staff frontend lives in `apps/web`; run `pnpm --filter @opencovers/web dev` to start only the frontend.
 
