@@ -226,6 +226,17 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  modifyReservation: (
+    venueId: string,
+    id: string,
+    body: { partySize?: number; tables?: string[] },
+  ) =>
+    request<Reservation>(`/v1/venues/${venueId}/reservations/${id}/modify`, {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify(body),
+    }),
+
   cancelReservation: (venueId: string, id: string) =>
     request<Reservation>(`/v1/venues/${venueId}/reservations/${id}/cancel`, {
       method: "POST",
