@@ -121,6 +121,28 @@ describe("reservations", () => {
     expect(m2).toEqual({ ok: true, id: created.id, version: 3 });
   });
 
+  it("does not bump the version on a no-op modify", async () => {
+    await seedVenue("modify-noop");
+    const created = await createReservation(db, "modify-noop", input, "k1");
+    if (!created.ok) throw new Error("create failed");
+    const changed = await modifyReservation(db, "modify-noop", created.id, { partySize: 3 }, "k2");
+    expect(changed).toEqual({ ok: true, id: created.id, version: 2 });
+    const noop = await modifyReservation(db, "modify-noop", created.id, { partySize: 3 }, "k3");
+    expect(noop).toEqual({ ok: true, id: created.id, version: 2 });
+  });
+
+  it("double-books at most once under concurrency", async () => {
+    await seedVenue("concurrent");
+    const results = await Promise.all([
+      createReservation(db, "concurrent", input, "c1"),
+      createReservation(db, "concurrent", input, "c2"),
+    ]);
+    const ok = results.filter((r) => r.ok);
+    const taken = results.filter((r) => !r.ok && r.code === "slot_taken");
+    expect(ok).toHaveLength(1);
+    expect(taken).toHaveLength(1);
+  });
+
   it("transitions status and rejects invalid transitions", async () => {
     await seedVenue("status");
     const created = await createReservation(db, "status", input, "k1");

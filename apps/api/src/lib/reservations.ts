@@ -415,15 +415,41 @@ export async function modifyReservation(
       if (!ACTIVE_STATUSES.includes(current.status)) {
         throw new ReservationError("invalid_transition");
       }
-      const nextVersion = current.version + 1;
-      if (input.partySize !== undefined) {
-        await tx.update(reservations).set({ partySize: input.partySize, version: nextVersion }).where(eq(reservations.id, id));
-      } else {
-        await tx.update(reservations).set({ version: nextVersion }).where(eq(reservations.id, id));
-      }
+
+      const partyChanged =
+        input.partySize !== undefined && input.partySize !== current.partySize;
+      let tablesChanged = false;
       if (input.tableIds !== undefined) {
+        const currentTables = await tx
+          .select({ tableId: tableAllocations.tableId })
+          .from(tableAllocations)
+          .where(eq(tableAllocations.reservationId, id));
+        const currentIds = currentTables.map((t) => t.tableId).sort();
+        const nextIds = [...input.tableIds].sort();
+        tablesChanged =
+          currentIds.length !== nextIds.length ||
+          currentIds.some((v, i) => v !== nextIds[i]);
+      }
+
+      if (!partyChanged && !tablesChanged) {
+        return current.version;
+      }
+
+      const nextVersion = current.version + 1;
+      if (partyChanged) {
+        await tx
+          .update(reservations)
+          .set({ partySize: input.partySize!, version: nextVersion })
+          .where(eq(reservations.id, id));
+      } else {
+        await tx
+          .update(reservations)
+          .set({ version: nextVersion })
+          .where(eq(reservations.id, id));
+      }
+      if (tablesChanged) {
         await tx.delete(tableAllocations).where(eq(tableAllocations.reservationId, id));
-        for (const tableId of input.tableIds) {
+        for (const tableId of input.tableIds!) {
           await tx.insert(tableAllocations).values({
             reservationId: id, venueId, tableId,
             startsAt: current.startsAt, endsAt: current.endsAt,
