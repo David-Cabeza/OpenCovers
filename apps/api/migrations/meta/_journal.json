@@ -50,6 +50,13 @@
       "when": 1794299158763,
       "tag": "0006_romantic_albert_cleary",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794304837731,
+      "tag": "0007_lyrical_bloodstorm",
+      "breakpoints": true
     }
   ]
 }

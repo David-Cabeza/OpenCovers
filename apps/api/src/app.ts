@@ -555,6 +555,8 @@ app.put("/v1/venues/:venueId/config", async (c) => {
     enabled: body.enabled,
     noticeAddress: body.noticeAddress,
     notificationsEnabled: typeof body.notificationsEnabled === "boolean" ? body.notificationsEnabled : undefined,
+    resendApiKey: typeof body.resendApiKey === "string" ? body.resendApiKey : undefined,
+    fromEmail: typeof body.fromEmail === "string" ? body.fromEmail : undefined,
     slotIntervalMinutes: isPosInt(body.slotIntervalMinutes) ? body.slotIntervalMinutes : undefined,
     leadTimeMinutes: isPosInt(body.leadTimeMinutes) ? body.leadTimeMinutes : undefined,
     lastSeatingOffsetMinutes: isPosInt(body.lastSeatingOffsetMinutes)

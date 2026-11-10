@@ -22,6 +22,9 @@ export function VenueSettings({ venueId }: { venueId: string }) {
   const [enabled, setEnabled] = useState(false);
   const [noticeAddress, setNoticeAddress] = useState("");
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [resendConfigured, setResendConfigured] = useState(false);
+  const [fromEmail, setFromEmail] = useState("");
+  const [resendApiKey, setResendApiKey] = useState("");
   const [slotIntervalMinutes, setSlotIntervalMinutes] = useState("15");
   const [leadTimeMinutes, setLeadTimeMinutes] = useState("0");
   const [lastSeatingOffsetMinutes, setLastSeatingOffsetMinutes] = useState("0");
@@ -31,6 +34,9 @@ export function VenueSettings({ venueId }: { venueId: string }) {
       setEnabled(data.enabled);
       setNoticeAddress(data.noticeAddress);
       setNotificationsEnabled(data.notificationsEnabled);
+      setResendConfigured(data.resendConfigured);
+      setFromEmail(data.fromEmail);
+      setResendApiKey("");
       setSlotIntervalMinutes(String(data.slotIntervalMinutes));
       setLeadTimeMinutes(String(data.leadTimeMinutes));
       setLastSeatingOffsetMinutes(String(data.lastSeatingOffsetMinutes));
@@ -43,12 +49,16 @@ export function VenueSettings({ venueId }: { venueId: string }) {
         enabled,
         noticeAddress,
         notificationsEnabled,
+        fromEmail,
+        resendApiKey: resendApiKey !== "" ? resendApiKey : undefined,
         slotIntervalMinutes: Number(slotIntervalMinutes) || 0,
         leadTimeMinutes: Number(leadTimeMinutes) || 0,
         lastSeatingOffsetMinutes: Number(lastSeatingOffsetMinutes) || 0,
       }),
     onSuccess: (config) => {
       queryClient.setQueryData(["config", venueId], config);
+      setResendConfigured(config.resendConfigured);
+      setResendApiKey("");
       toast.success("Settings saved");
     },
     onError: (err) => {
@@ -103,19 +113,47 @@ export function VenueSettings({ venueId }: { venueId: string }) {
               </p>
             </div>
 
-            <div className="flex items-center justify-between gap-4 border-t pt-6">
-              <div className="space-y-1">
-                <Label htmlFor="notifications">Email confirmations</Label>
-                <p className="text-sm text-muted-foreground">
-                  Send confirmations, cancellations, and booking notices by email.
-                  Delivery uses the platform's Resend account (set by the operator).
-                </p>
+            <div className="space-y-4 border-t pt-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="notifications">Email confirmations</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Send confirmations, cancellations, and booking notices by email.
+                  </p>
+                </div>
+                <Switch
+                  id="notifications"
+                  checked={notificationsEnabled}
+                  onCheckedChange={setNotificationsEnabled}
+                />
               </div>
-              <Switch
-                id="notifications"
-                checked={notificationsEnabled}
-                onCheckedChange={setNotificationsEnabled}
-              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="from-email">From address</Label>
+                  <Input
+                    id="from-email"
+                    type="email"
+                    placeholder="reservas@tu-restaurante.com"
+                    value={fromEmail}
+                    onChange={(e) => setFromEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="resend-key">Resend API key</Label>
+                  <Input
+                    id="resend-key"
+                    type="password"
+                    placeholder={resendConfigured ? "•••••• configured" : "re_..."}
+                    value={resendApiKey}
+                    onChange={(e) => setResendApiKey(e.target.value)}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Each venue uses its own Resend account. The key is never shown
+                    back; leave blank to keep the current one.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4 border-t pt-6">

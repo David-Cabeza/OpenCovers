@@ -57,7 +57,13 @@ export async function notifyReservation(
       guestName: reservation.guestName,
       service: reservation.service,
     });
-    await sendEmail(to, subject, text);
+    await sendEmail(
+      venue.resendApiKey ?? "",
+      venue.fromEmail,
+      to,
+      subject,
+      text,
+    );
     await db
       .insert(sentEmails)
       .values({ id: crypto.randomUUID(), venueId, reservationId, kind, version })

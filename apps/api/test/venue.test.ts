@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { migrateDb } from "../src/db/migrate";
 import { beforeAll, describe, expect, it } from "vitest";
 import app from "../src/app";
@@ -49,6 +49,8 @@ describe("venue config and erasure", () => {
         enabled: true,
         noticeAddress: "owner@example.com",
         notificationsEnabled: false,
+        resendConfigured: false,
+        fromEmail: "",
         slotIntervalMinutes: 15,
         leadTimeMinutes: 0,
         lastSeatingOffsetMinutes: 0,
@@ -57,6 +59,27 @@ describe("venue config and erasure", () => {
 
     const clear = await setConfig(db, "config", { noticeAddress: "" });
     expect(clear).toEqual({ ok: false, code: "notice_address_required" });
+  });
+
+  it("stores the Resend key without exposing it", async () => {
+    await seedVenue("resend");
+    const set = await setConfig(db, "resend", {
+      resendApiKey: "re_test_123",
+      fromEmail: "bookings@venue.com",
+    });
+    if (!set.ok) throw new Error("setConfig failed");
+    expect(set.config.resendConfigured).toBe(true);
+    expect(set.config.fromEmail).toBe("bookings@venue.com");
+    expect("resendApiKey" in set.config).toBe(false);
+
+    const config = await getConfig(db, "resend");
+    expect(config?.resendConfigured).toBe(true);
+    expect("resendApiKey" in (config ?? {})).toBe(false);
+
+    const row = (
+      await db.select().from(venues).where(eq(venues.id, "resend")).limit(1)
+    )[0];
+    expect(row.resendApiKey).toBe("re_test_123");
   });
 
   it("erases personal data and is idempotent", async () => {
@@ -85,6 +108,8 @@ describe("venue config and erasure", () => {
       enabled: false,
       noticeAddress: "",
       notificationsEnabled: false,
+      resendConfigured: false,
+      fromEmail: "",
       slotIntervalMinutes: 15,
       leadTimeMinutes: 0,
       lastSeatingOffsetMinutes: 0,

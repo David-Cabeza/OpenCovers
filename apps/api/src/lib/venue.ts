@@ -17,6 +17,8 @@ export interface VenueConfig {
   enabled: boolean;
   noticeAddress: string;
   notificationsEnabled: boolean;
+  resendConfigured: boolean;
+  fromEmail: string;
   slotIntervalMinutes: number;
   leadTimeMinutes: number;
   lastSeatingOffsetMinutes: number;
@@ -62,6 +64,8 @@ export async function getConfig(db: Db, venueId: string): Promise<VenueConfig | 
     enabled: venue.enabled,
     noticeAddress: venue.noticeAddress,
     notificationsEnabled: venue.notificationsEnabled,
+    resendConfigured: venue.resendApiKey != null,
+    fromEmail: venue.fromEmail,
     slotIntervalMinutes: venue.slotIntervalMinutes,
     leadTimeMinutes: venue.leadTimeMinutes,
     lastSeatingOffsetMinutes: venue.lastSeatingOffsetMinutes,
@@ -75,6 +79,8 @@ export async function setConfig(
     enabled?: boolean;
     noticeAddress?: string;
     notificationsEnabled?: boolean;
+    resendApiKey?: string;
+    fromEmail?: string;
     slotIntervalMinutes?: number;
     leadTimeMinutes?: number;
     lastSeatingOffsetMinutes?: number;
@@ -95,12 +101,21 @@ export async function setConfig(
   const lastSeatingOffsetMinutes =
     input.lastSeatingOffsetMinutes ?? venue.lastSeatingOffsetMinutes;
   const notificationsEnabled = input.notificationsEnabled ?? venue.notificationsEnabled;
+  const fromEmail = input.fromEmail !== undefined ? input.fromEmail : venue.fromEmail;
+  const resendApiKey =
+    input.resendApiKey !== undefined
+      ? input.resendApiKey === ""
+        ? null
+        : input.resendApiKey
+      : venue.resendApiKey;
   await db
     .update(venues)
     .set({
       enabled,
       noticeAddress,
       notificationsEnabled,
+      resendApiKey,
+      fromEmail,
       slotIntervalMinutes,
       leadTimeMinutes,
       lastSeatingOffsetMinutes,
@@ -112,6 +127,8 @@ export async function setConfig(
       enabled,
       noticeAddress,
       notificationsEnabled,
+      resendConfigured: resendApiKey != null,
+      fromEmail,
       slotIntervalMinutes,
       leadTimeMinutes,
       lastSeatingOffsetMinutes,
