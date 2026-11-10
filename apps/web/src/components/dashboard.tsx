@@ -6,6 +6,7 @@ import { useVenues } from "@/hooks/use-venues";
 import { useUiStore } from "@/stores/ui-store";
 import { AgendaView } from "./agenda/agenda-view";
 import { AvailabilityView } from "./availability/availability-view";
+import { FloorView } from "./floor/floor-view";
 import { AppHeader } from "./layout/app-header";
 import { SetupView } from "./setup/setup-view";
 import { EmptyVenues } from "./venue/empty-venues";
@@ -44,12 +45,16 @@ export function Dashboard() {
           <Tabs defaultValue="agenda">
             <TabsList>
               <TabsTrigger value="agenda">Agenda</TabsTrigger>
+              <TabsTrigger value="floor">Floor</TabsTrigger>
               <TabsTrigger value="availability">Availability</TabsTrigger>
               <TabsTrigger value="waitlist">Waitlist</TabsTrigger>
               <TabsTrigger value="setup">Setup</TabsTrigger>
             </TabsList>
             <TabsContent value="agenda" className="pt-6">
               <AgendaView venueId={venueId} />
+            </TabsContent>
+            <TabsContent value="floor" className="pt-6">
+              <FloorView venueId={venueId} />
             </TabsContent>
             <TabsContent value="availability" className="pt-6">
               <AvailabilityView venueId={venueId} />

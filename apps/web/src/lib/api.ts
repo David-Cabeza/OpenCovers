@@ -50,6 +50,17 @@ export interface WaitlistEntry {
   createdAt: string;
 }
 
+export interface FloorTable {
+  id: string;
+  name: string;
+  seats: number;
+  zone: string;
+  occupied: boolean;
+  reservationId?: string;
+  partySize?: number;
+  guestName?: string;
+}
+
 export interface Reservation {
   id: string;
   venueId: string;
@@ -124,6 +135,13 @@ export const api = {
 
   listTables: (venueId: string) =>
     request<{ tables: Table[] }>(`/v1/venues/${venueId}/tables`),
+
+  getFloorPlan: (venueId: string, date?: string, time?: string) =>
+    request<{ tables: FloorTable[] }>(
+      `/v1/venues/${venueId}/floor${
+        date && time ? `?date=${date}&time=${time}` : ""
+      }`,
+    ),
 
   upsertTable: (venueId: string, body: { id: string; name: string; seats: number; zone?: string }) =>
     request<{ tables: Table[] }>(`/v1/venues/${venueId}/tables`, {

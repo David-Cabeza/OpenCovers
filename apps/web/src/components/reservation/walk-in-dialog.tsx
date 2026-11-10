@@ -25,10 +25,14 @@ export function WalkInDialog({
   venueId,
   open,
   onOpenChange,
+  tableId,
+  tableName,
 }: {
   venueId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  tableId?: string;
+  tableName?: string;
 }) {
   const queryClient = useQueryClient();
   const {
@@ -46,6 +50,7 @@ export function WalkInDialog({
     try {
       await api.walkIn(venueId, {
         partySize: values.partySize,
+        tables: tableId ? [tableId] : undefined,
         guest: {
           name: values.name || undefined,
           contact: values.contact || undefined,
@@ -53,6 +58,7 @@ export function WalkInDialog({
       });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
+      await queryClient.invalidateQueries({ queryKey: ["floor", venueId] });
       toast.success("Guest seated");
       onOpenChange(false);
     } catch (err) {
@@ -64,9 +70,11 @@ export function WalkInDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Walk-in</DialogTitle>
+          <DialogTitle>{tableName ? `Seat at ${tableName}` : "Walk-in"}</DialogTitle>
           <DialogDescription>
-            Seat a guest who just arrived. The engine assigns a table.
+            {tableName
+              ? `Seat a guest who just arrived at ${tableName}.`
+              : "Seat a guest who just arrived. The engine assigns a table."}
           </DialogDescription>
         </DialogHeader>
 
