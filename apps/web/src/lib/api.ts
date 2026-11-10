@@ -24,6 +24,7 @@ export interface Service {
 export interface VenueConfig {
   enabled: boolean;
   noticeAddress: string;
+  notificationsEnabled: boolean;
   slotIntervalMinutes: number;
   leadTimeMinutes: number;
   lastSeatingOffsetMinutes: number;
@@ -157,6 +158,7 @@ export const api = {
     body: {
       enabled?: boolean;
       noticeAddress?: string;
+      notificationsEnabled?: boolean;
       slotIntervalMinutes?: number;
       leadTimeMinutes?: number;
       lastSeatingOffsetMinutes?: number;

@@ -8,6 +8,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const venues = pgTable("venues", {
@@ -16,6 +17,7 @@ export const venues = pgTable("venues", {
   timezone: text("timezone").notNull().default("UTC"),
   enabled: boolean("enabled").notNull().default(false),
   noticeAddress: text("notice_address").notNull().default(""),
+  notificationsEnabled: boolean("notifications_enabled").notNull().default(false),
   slotIntervalMinutes: integer("slot_interval_minutes").notNull().default(15),
   leadTimeMinutes: integer("lead_time_minutes").notNull().default(0),
   lastSeatingOffsetMinutes: integer("last_seating_offset_minutes").notNull().default(0),
@@ -149,6 +151,31 @@ export const waitlist = pgTable(
       .defaultNow(),
   },
   (t) => [index("idx_waitlist_venue_created").on(t.venueId, t.createdAt)],
+);
+
+export const sentEmails = pgTable(
+  "sent_emails",
+  {
+    id: text("id").primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id),
+    reservationId: text("reservation_id").notNull(),
+    kind: text("kind").notNull(),
+    version: integer("version").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_sent_emails_venue_reservation").on(t.venueId, t.reservationId),
+    uniqueIndex("uq_sent_emails_once").on(
+      t.venueId,
+      t.reservationId,
+      t.kind,
+      t.version,
+    ),
+  ],
 );
 
 export const apiKeys = pgTable("api_keys", {
