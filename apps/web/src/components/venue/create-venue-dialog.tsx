@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +14,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { browserTimeZone, TIMEZONES } from "@/lib/timezones";
 
 interface CreateVenueValues {
   name: string;
@@ -26,19 +34,27 @@ export function CreateVenueDialog({ triggerLabel = "New venue" }: { triggerLabel
   const queryClient = useQueryClient();
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<CreateVenueValues>();
+  } = useForm<CreateVenueValues>({
+    defaultValues: { name: "", timezone: browserTimeZone() },
+  });
+
+  const defaultTz = browserTimeZone();
+  const options = TIMEZONES.includes(defaultTz as (typeof TIMEZONES)[number])
+    ? [...TIMEZONES]
+    : [...TIMEZONES, defaultTz as (typeof TIMEZONES)[number]];
 
   async function onSubmit(values: CreateVenueValues) {
     try {
       await api.createVenue({
         name: values.name,
-        timezone: values.timezone || undefined,
+        timezone: values.timezone,
       });
       await queryClient.invalidateQueries({ queryKey: ["venues"] });
-      reset();
+      reset({ name: "", timezone: defaultTz });
       setOpen(false);
       toast.success("Venue created");
     } catch (err) {
@@ -72,15 +88,25 @@ export function CreateVenueDialog({ triggerLabel = "New venue" }: { triggerLabel
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="venue-timezone">Timezone</Label>
-            <Input
-              id="venue-timezone"
-              placeholder="Europe/Madrid"
-              {...register("timezone")}
+            <Label>Timezone</Label>
+            <Controller
+              name="timezone"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {options.map((tz) => (
+                      <SelectItem key={tz} value={tz}>
+                        {tz}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             />
-            <p className="text-sm text-muted-foreground">
-              Defaults to UTC when left blank.
-            </p>
           </div>
 
           <DialogFooter>
