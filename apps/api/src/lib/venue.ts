@@ -16,6 +16,9 @@ export type Db = NodePgDatabase<typeof schema>;
 export interface VenueConfig {
   enabled: boolean;
   noticeAddress: string;
+  slotIntervalMinutes: number;
+  leadTimeMinutes: number;
+  lastSeatingOffsetMinutes: number;
 }
 
 export type ConfigResult =
@@ -54,13 +57,25 @@ export async function getConfig(db: Db, venueId: string): Promise<VenueConfig | 
     await db.select().from(venues).where(eq(venues.id, venueId)).limit(1)
   )[0];
   if (!venue) return null;
-  return { enabled: venue.enabled, noticeAddress: venue.noticeAddress };
+  return {
+    enabled: venue.enabled,
+    noticeAddress: venue.noticeAddress,
+    slotIntervalMinutes: venue.slotIntervalMinutes,
+    leadTimeMinutes: venue.leadTimeMinutes,
+    lastSeatingOffsetMinutes: venue.lastSeatingOffsetMinutes,
+  };
 }
 
 export async function setConfig(
   db: Db,
   venueId: string,
-  input: { enabled?: boolean; noticeAddress?: string },
+  input: {
+    enabled?: boolean;
+    noticeAddress?: string;
+    slotIntervalMinutes?: number;
+    leadTimeMinutes?: number;
+    lastSeatingOffsetMinutes?: number;
+  },
 ): Promise<ConfigResult> {
   const venue = (
     await db.select().from(venues).where(eq(venues.id, venueId)).limit(1)
@@ -72,11 +87,30 @@ export async function setConfig(
   if (enabled && noticeAddress === "") {
     return { ok: false, code: "notice_address_required" };
   }
+  const slotIntervalMinutes = input.slotIntervalMinutes ?? venue.slotIntervalMinutes;
+  const leadTimeMinutes = input.leadTimeMinutes ?? venue.leadTimeMinutes;
+  const lastSeatingOffsetMinutes =
+    input.lastSeatingOffsetMinutes ?? venue.lastSeatingOffsetMinutes;
   await db
     .update(venues)
-    .set({ enabled, noticeAddress })
+    .set({
+      enabled,
+      noticeAddress,
+      slotIntervalMinutes,
+      leadTimeMinutes,
+      lastSeatingOffsetMinutes,
+    })
     .where(eq(venues.id, venueId));
-  return { ok: true, config: { enabled, noticeAddress } };
+  return {
+    ok: true,
+    config: {
+      enabled,
+      noticeAddress,
+      slotIntervalMinutes,
+      leadTimeMinutes,
+      lastSeatingOffsetMinutes,
+    },
+  };
 }
 
 export async function erase(

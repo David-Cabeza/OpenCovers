@@ -17,6 +17,8 @@ export const venues = pgTable("venues", {
   enabled: boolean("enabled").notNull().default(false),
   noticeAddress: text("notice_address").notNull().default(""),
   slotIntervalMinutes: integer("slot_interval_minutes").notNull().default(15),
+  leadTimeMinutes: integer("lead_time_minutes").notNull().default(0),
+  lastSeatingOffsetMinutes: integer("last_seating_offset_minutes").notNull().default(0),
   retentionDays: integer("retention_days").notNull().default(400),
 });
 

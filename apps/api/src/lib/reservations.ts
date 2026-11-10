@@ -91,6 +91,7 @@ export type WriteErrorCode =
   | "party_size_too_large"
   | "no_suitable_table"
   | "outside_hours"
+  | "lead_time_violation"
   | "venue_not_found";
 
 export type WriteResult =
@@ -130,7 +131,11 @@ async function venueOf(db: Db, venueId: string) {
   )[0];
 }
 
-async function deriveService(db: Db, venueId: string, time: string) {
+async function deriveService(
+  db: Db,
+  venueId: string,
+  time: string,
+): Promise<{ name: string; openStart: string; openEnd: string } | null> {
   const minute = toMinutes(time);
   const rows = await db
     .select()
@@ -141,10 +146,14 @@ async function deriveService(db: Db, venueId: string, time: string) {
       minute >= toMinutes(service.openStart) &&
       minute < toMinutes(service.openEnd)
     ) {
-      return service.name;
+      return {
+        name: service.name,
+        openStart: service.openStart,
+        openEnd: service.openEnd,
+      };
     }
   }
-  return "";
+  return null;
 }
 
 async function totalSeats(db: Db, venueId: string, tableIds: string[]) {
@@ -266,7 +275,25 @@ export async function createReservation(
   const startsAt = toTimestamp(input.date, input.time, timezone);
   const endsAt = new Date(startsAt.getTime() + input.durationMinutes * 60000);
   const service = await deriveService(db, venueId, input.time);
-  if (service === "") return { ok: false, code: "outside_hours" };
+  if (!service) return { ok: false, code: "outside_hours" };
+  const isWalkIn = input.initialStatus === "seated";
+  const minute = toMinutes(input.time);
+  if (
+    !isWalkIn &&
+    (minute - toMinutes(service.openStart)) % venue.slotIntervalMinutes !== 0
+  ) {
+    return { ok: false, code: "outside_hours" };
+  }
+  if (minute > toMinutes(service.openEnd) - venue.lastSeatingOffsetMinutes) {
+    return { ok: false, code: "outside_hours" };
+  }
+  if (
+    !isWalkIn &&
+    venue.leadTimeMinutes > 0 &&
+    startsAt.getTime() - Date.now() < venue.leadTimeMinutes * 60000
+  ) {
+    return { ok: false, code: "lead_time_violation" };
+  }
   const autoAssign = !input.tableIds || input.tableIds.length === 0;
   const zone = input.zone ?? "";
   if (
@@ -315,7 +342,7 @@ export async function createReservation(
         id,
         venueId,
         date: input.date,
-        service,
+        service: service.name,
         zone,
         startsAt,
         endsAt,

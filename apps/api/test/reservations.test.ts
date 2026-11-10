@@ -350,3 +350,57 @@ describe("walk-in", () => {
     expect(await allocatedTableIds(res.id)).toEqual(["2"]);
   });
 });
+
+describe("booking rules", () => {
+  it("rejects a time off the slot grid", async () => {
+    await seedVenue("rules-grid");
+    const res = await createReservation(
+      db,
+      "rules-grid",
+      { ...input, time: "19:10" },
+      "k1",
+    );
+    expect(res).toEqual({ ok: false, code: "outside_hours" });
+  });
+
+  it("rejects a time after the last seating", async () => {
+    await seedVenue("rules-seating");
+    await db
+      .update(venues)
+      .set({ lastSeatingOffsetMinutes: 30 })
+      .where(eq(venues.id, "rules-seating"));
+    const res = await createReservation(
+      db,
+      "rules-seating",
+      { ...input, time: "22:45" },
+      "k1",
+    );
+    expect(res).toEqual({ ok: false, code: "outside_hours" });
+  });
+
+  it("rejects a booking within the lead time", async () => {
+    await seedVenue("rules-lead");
+    await db
+      .update(venues)
+      .set({ leadTimeMinutes: 30 })
+      .where(eq(venues.id, "rules-lead"));
+    const res = await createReservation(
+      db,
+      "rules-lead",
+      { ...input, date: "2020-01-01" },
+      "k1",
+    );
+    expect(res).toEqual({ ok: false, code: "lead_time_violation" });
+  });
+
+  it("lets a walk-in bypass the slot grid", async () => {
+    await seedVenue("rules-walkin");
+    const res = await walkIn(
+      db,
+      "rules-walkin",
+      { date: "2026-11-12", time: "19:10", partySize: 2, tableIds: ["1"] },
+      "k1",
+    );
+    expect(res.ok).toBe(true);
+  });
+});

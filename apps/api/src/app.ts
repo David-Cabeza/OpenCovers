@@ -57,6 +57,7 @@ const HTTP_STATUS: Record<string, number> = {
   notice_address_required: 409,
   party_size_too_large: 400,
   outside_hours: 400,
+  lead_time_violation: 400,
   expired_cursor: 400,
   transient: 500,
 };
@@ -538,6 +539,11 @@ app.put("/v1/venues/:venueId/config", async (c) => {
   const result = await setConfig(db, venueId, {
     enabled: body.enabled,
     noticeAddress: body.noticeAddress,
+    slotIntervalMinutes: isPosInt(body.slotIntervalMinutes) ? body.slotIntervalMinutes : undefined,
+    leadTimeMinutes: isPosInt(body.leadTimeMinutes) ? body.leadTimeMinutes : undefined,
+    lastSeatingOffsetMinutes: isPosInt(body.lastSeatingOffsetMinutes)
+      ? body.lastSeatingOffsetMinutes
+      : undefined,
   });
   if (!result.ok) return mapError(c, result.code);
   return c.json(result.config);
@@ -570,6 +576,10 @@ async function authorizeAdmin(c: any): Promise<{ principal: string } | Response>
 
 function isRole(value: unknown): value is "read" | "write" | "admin" {
   return value === "read" || value === "write" || value === "admin";
+}
+
+function isPosInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
 export default app;
