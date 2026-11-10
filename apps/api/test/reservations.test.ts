@@ -7,6 +7,7 @@ import {
   cancelReservation,
   createReservation,
   getFloorPlan,
+  getPacing,
   getReservation,
   listByPrincipal,
   modifyReservation,
@@ -198,6 +199,18 @@ describe("reservations", () => {
 
     const after = await getFloorPlan(db, "floor", "2026-11-12", "23:00");
     expect(after.find((t) => t.id === "1")?.occupied).toBe(false);
+  });
+
+  it("reports pacing (covers vs capacity) per slot", async () => {
+    await seedVenue("pacing");
+    await createReservation(db, "pacing", { ...input, partySize: 2 }, "k1");
+
+    const pacing = await getPacing(db, "pacing", "2026-11-12");
+    const dinner = pacing.find((p) => p.service === "dinner");
+    expect(dinner).toBeDefined();
+    expect(dinner!.slots.find((s) => s.time === "19:00")?.covers).toBe(0);
+    expect(dinner!.slots.find((s) => s.time === "21:00")?.covers).toBe(2);
+    expect(dinner!.slots.find((s) => s.time === "21:00")?.capacity).toBe(12);
   });
 });
 

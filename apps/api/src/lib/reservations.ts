@@ -743,6 +743,58 @@ export async function getFloorPlan(
   return result;
 }
 
+export interface PacingSlot {
+  time: string;
+  capacity: number;
+  covers: number;
+}
+
+export interface PacingService {
+  service: string;
+  slots: PacingSlot[];
+}
+
+export async function getPacing(
+  db: Db,
+  venueId: string,
+  date: string,
+): Promise<PacingService[]> {
+  const venue = await venueOf(db, venueId);
+  if (!venue) return [];
+  const servicesRows = await db
+    .select()
+    .from(services)
+    .where(eq(services.venueId, venueId));
+  const tablesRows = await db
+    .select()
+    .from(tables)
+    .where(eq(tables.venueId, venueId));
+  const capacity = tablesRows.reduce((sum, t) => sum + t.seats, 0);
+  const activeReservations = await db
+    .select()
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.venueId, venueId),
+        eq(reservations.date, date),
+        inArray(reservations.status, ACTIVE_STATUSES),
+      ),
+    );
+  const result: PacingService[] = [];
+  for (const service of servicesRows) {
+    const slots: PacingSlot[] = [];
+    for (const time of generateSlots(service.openStart, service.openEnd, venue.slotIntervalMinutes)) {
+      const point = toTimestamp(date, time, venue.timezone);
+      const covers = activeReservations
+        .filter((r) => r.startsAt <= point && r.endsAt > point)
+        .reduce((sum, r) => sum + r.partySize, 0);
+      slots.push({ time, capacity, covers });
+    }
+    result.push({ service: service.name, slots });
+  }
+  return result;
+}
+
 export async function getAvailability(db: Db, venueId: string, date: string, partySize: number): Promise<Record<string, AvailabilitySlot[]>> {
   const venue = await venueOf(db, venueId);
   if (!venue) return {};

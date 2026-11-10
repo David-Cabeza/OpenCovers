@@ -61,6 +61,17 @@ export interface FloorTable {
   guestName?: string;
 }
 
+export interface PacingSlot {
+  time: string;
+  capacity: number;
+  covers: number;
+}
+
+export interface PacingService {
+  service: string;
+  slots: PacingSlot[];
+}
+
 export interface Reservation {
   id: string;
   venueId: string;
@@ -141,6 +152,11 @@ export const api = {
       `/v1/venues/${venueId}/floor${
         date && time ? `?date=${date}&time=${time}` : ""
       }`,
+    ),
+
+  getPacing: (venueId: string, date: string) =>
+    request<{ pacing: PacingService[] }>(
+      `/v1/venues/${venueId}/pacing?date=${date}`,
     ),
 
   upsertTable: (venueId: string, body: { id: string; name: string; seats: number; zone?: string }) =>

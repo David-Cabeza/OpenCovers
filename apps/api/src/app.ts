@@ -27,6 +27,7 @@ import {
   getEvents,
   getEventsWatermark,
   getFloorPlan,
+  getPacing,
   getReservation,
   listByDate,
   listByPrincipal,
@@ -410,6 +411,14 @@ app.get("/v1/venues/:venueId/floor", async (c) => {
   const time = c.req.query("time");
   const tables = await getFloorPlan(db, venueId, date, time);
   return c.json({ tables });
+});
+
+app.get("/v1/venues/:venueId/pacing", async (c) => {
+  const venueId = c.req.param("venueId");
+  const date = c.req.query("date");
+  if (!date) return error(c, "invalid_request", 400);
+  const pacing = await getPacing(db, venueId, date);
+  return c.json({ pacing });
 });
 
 app.get("/v1/venues/:venueId/tables", async (c) => {

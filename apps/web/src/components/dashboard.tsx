@@ -8,6 +8,7 @@ import { AgendaView } from "./agenda/agenda-view";
 import { AvailabilityView } from "./availability/availability-view";
 import { FloorView } from "./floor/floor-view";
 import { AppHeader } from "./layout/app-header";
+import { PacingView } from "./pacing/pacing-view";
 import { SetupView } from "./setup/setup-view";
 import { EmptyVenues } from "./venue/empty-venues";
 import { WaitlistView } from "./waitlist/waitlist-view";
@@ -46,6 +47,7 @@ export function Dashboard() {
             <TabsList>
               <TabsTrigger value="agenda">Agenda</TabsTrigger>
               <TabsTrigger value="floor">Floor</TabsTrigger>
+              <TabsTrigger value="pacing">Pacing</TabsTrigger>
               <TabsTrigger value="availability">Availability</TabsTrigger>
               <TabsTrigger value="waitlist">Waitlist</TabsTrigger>
               <TabsTrigger value="setup">Setup</TabsTrigger>
@@ -55,6 +57,9 @@ export function Dashboard() {
             </TabsContent>
             <TabsContent value="floor" className="pt-6">
               <FloorView venueId={venueId} />
+            </TabsContent>
+            <TabsContent value="pacing" className="pt-6">
+              <PacingView venueId={venueId} />
             </TabsContent>
             <TabsContent value="availability" className="pt-6">
               <AvailabilityView venueId={venueId} />
