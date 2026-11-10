@@ -1,0 +1,1 @@
+ALTER TABLE "venues" ADD COLUMN "events_watermark" bigint DEFAULT 0 NOT NULL;

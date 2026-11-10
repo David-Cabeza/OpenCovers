@@ -57,6 +57,13 @@
       "when": 1794304837731,
       "tag": "0007_lyrical_bloodstorm",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794306094068,
+      "tag": "0008_flimsy_loners",
+      "breakpoints": true
     }
   ]
 }

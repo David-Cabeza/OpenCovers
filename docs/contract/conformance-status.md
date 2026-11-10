@@ -23,11 +23,11 @@ Status legend:
 | C10 Venue isolation | **PASS** | Requests are scoped per venue; an ungranted venue returns `venue_not_found`. Covered by the key-grant tests. |
 | C11 Event feed | **PASS** | Bigserial ids and a cursor over the feed; replay re-emits the same ids. |
 | C12 Attribution | **PASS** | `basis`, `owner_principal`, `booked_via` are set from the authenticated channel; the request body cannot override them. |
-| C13 Cursor expiry | **GAP** | `expired_cursor` is in the vocabulary but no retention/pruning or expiry check exists yet. |
+| C13 Cursor expiry | **PASS** | `pruneEvents` advances a per-venue watermark; a cursor below it is rejected with `expired_cursor`. A scheduled job runs retention hourly. Tested. |
 
 ## Open gaps
 
-1. **C13 — cursor expiry.** Requires an event retention/pruning job plus a low-water mark so an old cursor can be rejected with `expired_cursor`.
+None. All 13 conformance cases pass.
 
 ## Notes
 

@@ -652,6 +652,35 @@ export async function getEvents(db: Db, venueId: string, afterId: number, limit:
   }));
 }
 
+export async function getEventsWatermark(db: Db, venueId: string): Promise<number> {
+  const venue = await venueOf(db, venueId);
+  return venue?.eventsWatermark ?? 0;
+}
+
+export async function pruneEvents(db: Db, venueId: string, cutoff: Date): Promise<void> {
+  const pruned = await db
+    .select({ id: events.id })
+    .from(events)
+    .where(and(eq(events.venueId, venueId), lt(events.occurredAt, cutoff)));
+  if (pruned.length === 0) return;
+  const maxId = Math.max(...pruned.map((e) => e.id));
+  await db
+    .delete(events)
+    .where(and(eq(events.venueId, venueId), lt(events.occurredAt, cutoff)));
+  await db
+    .update(venues)
+    .set({ eventsWatermark: maxId })
+    .where(eq(venues.id, venueId));
+}
+
+export async function runRetention(db: Db, now = new Date()): Promise<void> {
+  const all = await db.select().from(venues);
+  for (const venue of all) {
+    const cutoff = new Date(now.getTime() - venue.retentionDays * 86400000);
+    await pruneEvents(db, venue.id, cutoff);
+  }
+}
+
 export async function getAvailability(db: Db, venueId: string, date: string, partySize: number): Promise<Record<string, AvailabilitySlot[]>> {
   const venue = await venueOf(db, venueId);
   if (!venue) return {};
