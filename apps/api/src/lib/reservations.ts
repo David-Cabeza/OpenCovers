@@ -544,6 +544,23 @@ export async function listByDate(db: Db, venueId: string, date: string): Promise
   return rows.map((r) => toReservation(r, venue.timezone));
 }
 
+export async function listByPrincipal(
+  db: Db,
+  venueId: string,
+  principal: string,
+): Promise<Reservation[]> {
+  const venue = await venueOf(db, venueId);
+  if (!venue) return [];
+  const rows = await db
+    .select()
+    .from(reservations)
+    .where(
+      and(eq(reservations.venueId, venueId), eq(reservations.ownerPrincipal, principal)),
+    )
+    .orderBy(reservations.startsAt);
+  return rows.map((r) => toReservation(r, venue.timezone));
+}
+
 export async function searchReservations(
   db: Db,
   venueId: string,

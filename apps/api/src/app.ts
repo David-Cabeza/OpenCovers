@@ -27,6 +27,7 @@ import {
   getEvents,
   getReservation,
   listByDate,
+  listByPrincipal,
   modifyReservation,
   searchReservations,
   setStatus,
@@ -337,7 +338,10 @@ app.get("/v1/venues/:venueId/reservations/:id", async (c) => {
 });
 
 app.get("/v1/venues/:venueId/reservations", async (c) => {
-  return c.json({ reservations: [] });
+  const venueId = c.req.param("venueId");
+  const principal = c.get("principal") as string;
+  const reservations = await listByPrincipal(db, venueId, principal);
+  return c.json({ reservations: reservations.map((r) => toApi(r, venueId)) });
 });
 
 app.get("/v1/venues/:venueId/agenda", async (c) => {

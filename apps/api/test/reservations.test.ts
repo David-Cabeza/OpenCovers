@@ -7,6 +7,7 @@ import {
   cancelReservation,
   createReservation,
   getReservation,
+  listByPrincipal,
   modifyReservation,
   setStatus,
   walkIn,
@@ -150,6 +151,17 @@ describe("reservations", () => {
     expect(res?.service).toBe("dinner");
     expect(res?.time).toBe("21:00");
     expect(res?.status).toBe("booked");
+  });
+
+  it("lists a principal's reservations only", async () => {
+    await seedVenue("list-principal");
+    await createReservation(db, "list-principal", { ...input, ownerPrincipal: "agent-a", tableIds: ["1"] }, "k1");
+    await createReservation(db, "list-principal", { ...input, ownerPrincipal: "agent-a", tableIds: ["2"] }, "k2");
+    await createReservation(db, "list-principal", { ...input, ownerPrincipal: "agent-b", tableIds: ["3"] }, "k3");
+
+    const mine = await listByPrincipal(db, "list-principal", "agent-a");
+    expect(mine.map((r) => r.ownerPrincipal)).toEqual(["agent-a", "agent-a"]);
+    expect(mine).toHaveLength(2);
   });
 });
 
