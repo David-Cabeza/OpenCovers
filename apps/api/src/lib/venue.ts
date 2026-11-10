@@ -9,6 +9,7 @@ import {
   venues,
 } from "../db/schema";
 import * as schema from "../db/schema";
+import { normalizeTimeZone } from "./time";
 import { sha256Hex } from "./reservations";
 
 export type Db = NodePgDatabase<typeof schema>;
@@ -43,7 +44,7 @@ export async function createVenue(
     await tx.insert(venues).values({
       id,
       name: input.name,
-      timezone: input.timezone ?? "UTC",
+      timezone: normalizeTimeZone(input.timezone ?? "UTC"),
       enabled: false,
     });
     await tx.insert(venueMemberships).values({

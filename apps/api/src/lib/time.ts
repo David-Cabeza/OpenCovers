@@ -1,7 +1,17 @@
+export function normalizeTimeZone(timezone: string): string {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+    return timezone;
+  } catch {
+    return "UTC";
+  }
+}
+
 export function toTimestamp(date: string, time: string, timezone = "UTC"): Date {
+  const tz = normalizeTimeZone(timezone);
   const asUTC = Date.parse(`${date}T${time}:00Z`);
-  if (timezone === "UTC") return new Date(asUTC);
-  const offsetMinutes = getOffsetMinutes(asUTC, timezone);
+  if (tz === "UTC") return new Date(asUTC);
+  const offsetMinutes = getOffsetMinutes(asUTC, tz);
   return new Date(asUTC - offsetMinutes * 60000);
 }
 
@@ -12,7 +22,7 @@ export function toMinutes(time: string): number {
 
 export function formatTime(instant: Date, timezone = "UTC"): string {
   const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: timezone,
+    timeZone: normalizeTimeZone(timezone),
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -46,14 +56,15 @@ export function normalizeMinute(minute: number, start: number): number {
 }
 
 export function nowInTimezone(timezone = "UTC"): { date: string; time: string } {
+  const tz = normalizeTimeZone(timezone);
   const now = new Date();
   const date = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
+    timeZone: tz,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(now);
-  return { date, time: formatTime(now, timezone) };
+  return { date, time: formatTime(now, tz) };
 }
 
 export function generateSlots(
