@@ -45,7 +45,15 @@ Staff sign in with Better Auth and get a per-venue role. Platforms and AI agents
 
 ### 🤖 An MCP server
 
-The 13-tool catalog (`reservation.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly.
+The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly.
+
+### 🧭 The room, covered
+
+Walk-ins, a waitlist, zones, and automatic table assignment. The engine seats guests now, holds them in a queue, and assigns tables so platforms and agents never think about floor plans.
+
+### 📧 Email confirmations
+
+Confirmations, cancellations, and booking notices via Resend — one per reservation version, never duplicated. Each venue brings its own Resend account, and it's off until enabled.
 
 ### 🧹 Erasure built in
 
@@ -64,7 +72,7 @@ flowchart LR
         DOMAIN[Reservations · availability · erasure]
     end
     subgraph mcp["MCP server · stdio"]
-        TOOLS[13 tools]
+        TOOLS[18 tools]
     end
     DB[(PostgreSQL<br/>GiST exclusion)]
 
@@ -119,7 +127,7 @@ The staff app and site deploy to Cloudflare Pages as static builds. The API ship
 
 ## Status
 
-Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally, and a deployment is prepared (Dockerfile and runbook) but not yet live. Email confirmations remain blocked on legal review and a delivery provider. See [ROADMAP.md](ROADMAP.md).
+Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — all 13 conformance cases pass. A deployment is prepared (Dockerfile and runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
 
 ## Contributing
 
