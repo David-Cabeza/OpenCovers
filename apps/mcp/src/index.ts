@@ -386,12 +386,13 @@ export function createServer(): McpServer {
         venueId: z.string(),
         enabled: z.boolean().optional(),
         noticeAddress: z.string().optional(),
+        notificationsEnabled: z.boolean().optional(),
         slotIntervalMinutes: z.number().int().nonnegative().optional(),
         leadTimeMinutes: z.number().int().nonnegative().optional(),
         lastSeatingOffsetMinutes: z.number().int().nonnegative().optional(),
       }),
     },
-    async ({ venueId, enabled, noticeAddress, slotIntervalMinutes, leadTimeMinutes, lastSeatingOffsetMinutes }) => {
+    async ({ venueId, enabled, noticeAddress, notificationsEnabled, slotIntervalMinutes, leadTimeMinutes, lastSeatingOffsetMinutes }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/config`, {
@@ -399,6 +400,7 @@ export function createServer(): McpServer {
             body: {
               enabled,
               noticeAddress,
+              notificationsEnabled,
               slotIntervalMinutes,
               leadTimeMinutes,
               lastSeatingOffsetMinutes,

@@ -14,7 +14,7 @@ Status legend:
 | C1 One transaction | **PASS** | GiST exclusion constraint inside the create transaction. Tests: overlap rejected; a new concurrency test asserts two parallel creates yield one booking and one `slot_taken`. |
 | C2 Idempotent create | **PASS** | `idempotency_keys` keyed on `(venue_id, key)`. Test: replay returns the same id and version. |
 | C3 Snapshot is not a hold | **PASS** | Availability is advisory; create re-checks via the exclusion constraint and a failed create rolls back. |
-| C4 Modify bumps the version | **PARTIAL** | Version +1 on a change: pass. No-op produces no new version: pass (fixed). "Confirmation sent once" is **BLOCKED** on email. |
+| C4 Modify bumps the version | **PASS** | Version +1 on a change, no-op without a bump. A confirmation is sent once per (reservation, version) via Resend, idempotent by a unique constraint. |
 | C5 Erasure | **PASS** | Returns counts, nulls personal fields, emits tombstones with a hash in the event feed. Test: erasure is idempotent. |
 | C6 Notice address | **PASS** | `notice_address_required` on enable-without-address and clear-while-enabled. Test covers both. |
 | C7 Party size | **PASS** | `party_size_too_large` (explicit and auto-assign) and `no_suitable_table`. Tests cover both. |
@@ -27,5 +27,8 @@ Status legend:
 
 ## Open gaps
 
-1. **C4 — confirmation once.** Needs the email layer. Delivery will be Resend; the text and basis are still to be reviewed legally.
-2. **C13 — cursor expiry.** Requires an event retention/pruning job plus a low-water mark so an old cursor can be rejected with `expired_cursor`.
+1. **C13 — cursor expiry.** Requires an event retention/pruning job plus a low-water mark so an old cursor can be rejected with `expired_cursor`.
+
+## Notes
+
+- Email delivery is Resend. The templates in `apps/api/src/lib/mailer.ts` are placeholders pending legal review of the text and basis; sends are gated by `notificationsEnabled` (default off).

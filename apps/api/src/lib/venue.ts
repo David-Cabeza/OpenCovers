@@ -16,6 +16,7 @@ export type Db = NodePgDatabase<typeof schema>;
 export interface VenueConfig {
   enabled: boolean;
   noticeAddress: string;
+  notificationsEnabled: boolean;
   slotIntervalMinutes: number;
   leadTimeMinutes: number;
   lastSeatingOffsetMinutes: number;
@@ -60,6 +61,7 @@ export async function getConfig(db: Db, venueId: string): Promise<VenueConfig | 
   return {
     enabled: venue.enabled,
     noticeAddress: venue.noticeAddress,
+    notificationsEnabled: venue.notificationsEnabled,
     slotIntervalMinutes: venue.slotIntervalMinutes,
     leadTimeMinutes: venue.leadTimeMinutes,
     lastSeatingOffsetMinutes: venue.lastSeatingOffsetMinutes,
@@ -72,6 +74,7 @@ export async function setConfig(
   input: {
     enabled?: boolean;
     noticeAddress?: string;
+    notificationsEnabled?: boolean;
     slotIntervalMinutes?: number;
     leadTimeMinutes?: number;
     lastSeatingOffsetMinutes?: number;
@@ -91,11 +94,13 @@ export async function setConfig(
   const leadTimeMinutes = input.leadTimeMinutes ?? venue.leadTimeMinutes;
   const lastSeatingOffsetMinutes =
     input.lastSeatingOffsetMinutes ?? venue.lastSeatingOffsetMinutes;
+  const notificationsEnabled = input.notificationsEnabled ?? venue.notificationsEnabled;
   await db
     .update(venues)
     .set({
       enabled,
       noticeAddress,
+      notificationsEnabled,
       slotIntervalMinutes,
       leadTimeMinutes,
       lastSeatingOffsetMinutes,
@@ -106,6 +111,7 @@ export async function setConfig(
     config: {
       enabled,
       noticeAddress,
+      notificationsEnabled,
       slotIntervalMinutes,
       leadTimeMinutes,
       lastSeatingOffsetMinutes,

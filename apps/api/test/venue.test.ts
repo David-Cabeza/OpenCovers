@@ -48,6 +48,7 @@ describe("venue config and erasure", () => {
       config: {
         enabled: true,
         noticeAddress: "owner@example.com",
+        notificationsEnabled: false,
         slotIntervalMinutes: 15,
         leadTimeMinutes: 0,
         lastSeatingOffsetMinutes: 0,
@@ -83,6 +84,7 @@ describe("venue config and erasure", () => {
     expect(config).toEqual({
       enabled: false,
       noticeAddress: "",
+      notificationsEnabled: false,
       slotIntervalMinutes: 15,
       leadTimeMinutes: 0,
       lastSeatingOffsetMinutes: 0,

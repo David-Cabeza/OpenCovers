@@ -34,6 +34,7 @@ import {
   walkIn,
 } from "./lib/reservations";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
+import { notifyReservation } from "./lib/notifications";
 import {
   addWaitlist,
   cancelWaitlist,
@@ -199,6 +200,10 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
     },
     key,
   );
+  if (result.ok) {
+    void notifyReservation(db, venueId, result.id, result.version, "confirmation");
+    void notifyReservation(db, venueId, result.id, result.version, "notice");
+  }
   return writeResponse(c, result, venueId);
 });
 
@@ -225,6 +230,10 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
     },
     key,
   );
+  if (result.ok) {
+    void notifyReservation(db, venueId, result.id, result.version, "confirmation");
+    void notifyReservation(db, venueId, result.id, result.version, "notice");
+  }
   return writeResponse(c, result, venueId);
 });
 
@@ -258,6 +267,8 @@ app.post("/v1/venues/:venueId/waitlist/:id/seat", async (c) => {
   if (!result.ok) return mapError(c, result.code);
   const reservation = await getReservation(db, venueId, result.reservationId);
   if (!reservation) return mapError(c, "reservation_not_found");
+  void notifyReservation(db, venueId, result.reservationId, reservation.version, "confirmation");
+  void notifyReservation(db, venueId, result.reservationId, reservation.version, "notice");
   return c.json(toApi(reservation, venueId), 200);
 });
 
@@ -286,6 +297,9 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
     { partySize: body.partySize, tableIds: body.tables },
     key,
   );
+  if (result.ok) {
+    void notifyReservation(db, venueId, result.id, result.version, "confirmation");
+  }
   return writeResponse(c, result, venueId);
 });
 
@@ -298,6 +312,7 @@ app.post("/v1/venues/:venueId/reservations/:id/cancel", async (c) => {
   if (!result.ok) return mapError(c, result.code);
   const reservation = await getReservation(db, venueId, id);
   if (!reservation) return mapError(c, "reservation_not_found");
+  void notifyReservation(db, venueId, id, reservation.version, "cancellation");
   return c.json(toApi(reservation, venueId), 200);
 });
 
@@ -539,6 +554,7 @@ app.put("/v1/venues/:venueId/config", async (c) => {
   const result = await setConfig(db, venueId, {
     enabled: body.enabled,
     noticeAddress: body.noticeAddress,
+    notificationsEnabled: typeof body.notificationsEnabled === "boolean" ? body.notificationsEnabled : undefined,
     slotIntervalMinutes: isPosInt(body.slotIntervalMinutes) ? body.slotIntervalMinutes : undefined,
     leadTimeMinutes: isPosInt(body.leadTimeMinutes) ? body.leadTimeMinutes : undefined,
     lastSeatingOffsetMinutes: isPosInt(body.lastSeatingOffsetMinutes)
