@@ -21,16 +21,32 @@ export function VenueSettings({ venueId }: { venueId: string }) {
   const { data, isPending } = useVenueConfig(venueId);
   const [enabled, setEnabled] = useState(false);
   const [noticeAddress, setNoticeAddress] = useState("");
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [slotIntervalMinutes, setSlotIntervalMinutes] = useState("15");
+  const [leadTimeMinutes, setLeadTimeMinutes] = useState("0");
+  const [lastSeatingOffsetMinutes, setLastSeatingOffsetMinutes] = useState("0");
 
   useEffect(() => {
     if (data) {
       setEnabled(data.enabled);
       setNoticeAddress(data.noticeAddress);
+      setNotificationsEnabled(data.notificationsEnabled);
+      setSlotIntervalMinutes(String(data.slotIntervalMinutes));
+      setLeadTimeMinutes(String(data.leadTimeMinutes));
+      setLastSeatingOffsetMinutes(String(data.lastSeatingOffsetMinutes));
     }
   }, [data]);
 
   const save = useMutation({
-    mutationFn: () => api.setConfig(venueId, { enabled, noticeAddress }),
+    mutationFn: () =>
+      api.setConfig(venueId, {
+        enabled,
+        noticeAddress,
+        notificationsEnabled,
+        slotIntervalMinutes: Number(slotIntervalMinutes) || 0,
+        leadTimeMinutes: Number(leadTimeMinutes) || 0,
+        lastSeatingOffsetMinutes: Number(lastSeatingOffsetMinutes) || 0,
+      }),
     onSuccess: (config) => {
       queryClient.setQueryData(["config", venueId], config);
       toast.success("Settings saved");
@@ -51,7 +67,7 @@ export function VenueSettings({ venueId }: { venueId: string }) {
       <CardHeader>
         <CardTitle>Venue</CardTitle>
         <CardDescription>
-          Whether this venue accepts reservations, and where legal notices go.
+          Reservations, notifications, and the booking rules for this venue.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -85,6 +101,62 @@ export function VenueSettings({ venueId }: { venueId: string }) {
               <p className="text-sm text-muted-foreground">
                 Required before enabling. Used for legal and STOP notices.
               </p>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 border-t pt-6">
+              <div className="space-y-1">
+                <Label htmlFor="notifications">Email confirmations</Label>
+                <p className="text-sm text-muted-foreground">
+                  Send confirmations, cancellations, and booking notices by email.
+                  Delivery uses the platform's Resend account (set by the operator).
+                </p>
+              </div>
+              <Switch
+                id="notifications"
+                checked={notificationsEnabled}
+                onCheckedChange={setNotificationsEnabled}
+              />
+            </div>
+
+            <div className="space-y-4 border-t pt-6">
+              <div>
+                <h4 className="font-medium">Booking rules</h4>
+                <p className="text-sm text-muted-foreground">
+                  How the engine accepts bookings. Times are in minutes.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="slot-interval">Slot interval</Label>
+                  <Input
+                    id="slot-interval"
+                    type="number"
+                    min={5}
+                    value={slotIntervalMinutes}
+                    onChange={(e) => setSlotIntervalMinutes(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lead-time">Lead time</Label>
+                  <Input
+                    id="lead-time"
+                    type="number"
+                    min={0}
+                    value={leadTimeMinutes}
+                    onChange={(e) => setLeadTimeMinutes(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="last-seating">Last seating offset</Label>
+                  <Input
+                    id="last-seating"
+                    type="number"
+                    min={0}
+                    value={lastSeatingOffsetMinutes}
+                    onChange={(e) => setLastSeatingOffsetMinutes(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
 
             <Button onClick={() => save.mutate()} disabled={save.isPending}>
