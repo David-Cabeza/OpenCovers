@@ -51,6 +51,8 @@ export const tables = pgTable(
     name: text("name").notNull().default(""),
     seats: integer("seats").notNull(),
     zone: text("zone").notNull().default(""),
+    posX: integer("pos_x").notNull().default(0),
+    posY: integer("pos_y").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.venueId, t.id] })],
 );

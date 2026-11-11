@@ -683,6 +683,8 @@ export interface FloorTable {
   name: string;
   seats: number;
   zone: string;
+  posX: number;
+  posY: number;
   occupied: boolean;
   reservationId?: string;
   partySize?: number;
@@ -731,6 +733,8 @@ export async function getFloorPlan(
       name: t.name,
       seats: t.seats,
       zone: t.zone,
+      posX: t.posX,
+      posY: t.posY,
       occupied: alloc !== undefined,
       reservationId: alloc?.reservationId,
       partySize: alloc?.partySize,

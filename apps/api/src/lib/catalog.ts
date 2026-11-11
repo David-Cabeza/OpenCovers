@@ -10,6 +10,8 @@ export interface TableInfo {
   name: string;
   seats: number;
   zone: string;
+  posX: number;
+  posY: number;
 }
 
 export interface ServiceInfo {
@@ -29,6 +31,8 @@ export async function listTables(db: Db, venueId: string): Promise<TableInfo[]> 
     name: t.name,
     seats: t.seats,
     zone: t.zone,
+    posX: t.posX,
+    posY: t.posY,
   }));
 }
 
@@ -50,6 +54,19 @@ export async function upsertTable(
       target: [tables.venueId, tables.id],
       set: { name: input.name, seats: input.seats, zone: input.zone ?? "" },
     });
+}
+
+export async function setTablePosition(
+  db: Db,
+  venueId: string,
+  tableId: string,
+  x: number,
+  y: number,
+): Promise<void> {
+  await db
+    .update(tables)
+    .set({ posX: x, posY: y })
+    .where(and(eq(tables.venueId, venueId), eq(tables.id, tableId)));
 }
 
 export async function deleteTable(db: Db, venueId: string, tableId: string): Promise<void> {

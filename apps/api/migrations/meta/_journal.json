@@ -64,6 +64,13 @@
       "when": 1794306094068,
       "tag": "0008_flimsy_loners",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794383473849,
+      "tag": "0009_lazy_amazoness",
+      "breakpoints": true
     }
   ]
 }

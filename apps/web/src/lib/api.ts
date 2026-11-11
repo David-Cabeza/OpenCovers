@@ -13,6 +13,8 @@ export interface Table {
   name: string;
   seats: number;
   zone: string;
+  posX: number;
+  posY: number;
 }
 
 export interface Service {
@@ -55,6 +57,8 @@ export interface FloorTable {
   name: string;
   seats: number;
   zone: string;
+  posX: number;
+  posY: number;
   occupied: boolean;
   reservationId?: string;
   partySize?: number;
@@ -169,6 +173,12 @@ export const api = {
     request<{ tables: Table[] }>(
       `/v1/venues/${venueId}/tables/${encodeURIComponent(tableId)}`,
       { method: "DELETE" },
+    ),
+
+  setTablePosition: (venueId: string, tableId: string, x: number, y: number) =>
+    request<{ tables: Table[] }>(
+      `/v1/venues/${venueId}/tables/${encodeURIComponent(tableId)}/position`,
+      { method: "PATCH", body: JSON.stringify({ x, y }) },
     ),
 
   listServices: (venueId: string) =>

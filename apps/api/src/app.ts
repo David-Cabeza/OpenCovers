@@ -17,6 +17,7 @@ import {
   deleteTable,
   listServices,
   listTables,
+  setTablePosition,
   upsertService,
   upsertTable,
 } from "./lib/catalog";
@@ -454,6 +455,23 @@ app.delete("/v1/venues/:venueId/tables/:tableId", async (c) => {
   const venueId = c.req.param("venueId");
   const tableId = c.req.param("tableId");
   await deleteTable(db, venueId, tableId);
+  const tables = await listTables(db, venueId);
+  return c.json({ tables });
+});
+
+app.patch("/v1/venues/:venueId/tables/:tableId/position", async (c) => {
+  const venueId = c.req.param("venueId");
+  const tableId = c.req.param("tableId");
+  const body = await c.req.json();
+  if (
+    typeof body.x !== "number" ||
+    typeof body.y !== "number" ||
+    !Number.isInteger(body.x) ||
+    !Number.isInteger(body.y)
+  ) {
+    return error(c, "invalid_request", 400);
+  }
+  await setTablePosition(db, venueId, tableId, body.x, body.y);
   const tables = await listTables(db, venueId);
   return c.json({ tables });
 });
