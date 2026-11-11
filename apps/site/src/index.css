@@ -64,6 +64,8 @@ a { color: inherit; }
 .nav ul a { text-decoration: none; }
 .nav ul a:hover { text-decoration: underline; text-underline-offset: 6px; }
 .nav .btn { padding: 0.5em 1.2em; font-size: var(--small); }
+.btn.gh .stars { display: inline-flex; align-items: center; gap: 0.3em; padding-left: 0.7em; margin-left: 0.1em; background: rgba(255,255,255,0.18); border-radius: 999px; padding: 0.1em 0.6em; font-variant-numeric: tabular-nums; }
+.foot .last .btn.gh .stars { background: var(--surface); }
 @media (max-width: 860px) { .nav ul { display: none; } }
 
 /* ---------- hero: the table ---------- */
