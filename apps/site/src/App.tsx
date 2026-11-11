@@ -3,13 +3,17 @@ import {
   ArrowRightIcon,
   BotIcon,
   CalendarDaysIcon,
+  CodeXmlIcon,
   LayoutGridIcon,
+  LockOpenIcon,
   MailIcon,
   PlugZapIcon,
   ShieldCheckIcon,
   StarIcon,
+  StoreIcon,
   Table2Icon,
   UsersIcon,
+  WorkflowIcon,
 } from "lucide-react";
 
 function GithubMark({ className }: { className?: string }) {
@@ -97,6 +101,96 @@ const challenges = [
   { title: "App móvil del personal", tag: "producto", body: "Agenda y mesa en el bolsillo, fuera del escritorio." },
 ];
 
+const status = [
+  "Pre-alfa",
+  "Apache-2.0",
+  "13/13 casos de conformidad",
+  "61 tests de API",
+  "18 herramientas MCP",
+];
+
+const problems = [
+  {
+    title: "El SaaS cerrado",
+    body: "Tu libro de reservas vive dentro del CRM, el TPV o el proveedor de turno. Si cambias de front o de mensajería, arriesgas perder el histórico.",
+  },
+  {
+    title: "Construirlo tú",
+    body: "La regla de no-doble-reserva en el código de la aplicación acaba en condiciones de carrera. Y las integraciones se quedan en un parche.",
+  },
+];
+
+const pillars = [
+  {
+    icon: ShieldCheckIcon,
+    title: "Sin dobles reservas, garantizado",
+    body: "La regla la impone PostgreSQL con una restricción de exclusión GiST, no el código. Vale para cualquier número de escritores concurrentes.",
+  },
+  {
+    icon: WorkflowIcon,
+    title: "Humanos y máquinas, de primera",
+    body: "El personal entra con sesión; las plataformas y los agentes, con claves. Todos escriben por el mismo camino y emiten el mismo feed de eventos.",
+  },
+  {
+    icon: LockOpenIcon,
+    title: "Open source, sin lock-in",
+    body: "Apache-2.0. Auditable, extensible y tuyo: tu libro de reservas es independiente del front que uses encima.",
+  },
+];
+
+const audiences = [
+  {
+    icon: StoreIcon,
+    title: "Restaurantes",
+    lead: "Controla tu libro de reservas sin casarte con un SaaS.",
+    points: ["Plano de sala visual, con mesas y sillas", "Agenda, lista de espera y walk-ins", "Zonas y asignación automática de mesa"],
+    image: "/media/floor-plan.png",
+    alt: "Plano de sala de OpenCovers con mesas y sillas",
+  },
+  {
+    icon: CodeXmlIcon,
+    title: "Plataformas",
+    lead: "Integra un motor de reservas sin construirlo.",
+    points: ["Un único contrato: disponibilidad, crear, modificar, cancelar", "Claves con roles y permisos por local", "Feed de eventos con cursor, con webhooks en el roadmap"],
+    image: "/media/agenda.png",
+    alt: "Agenda de reservas del día en OpenCovers",
+  },
+  {
+    icon: BotIcon,
+    title: "Builders de agentes",
+    lead: "Un backend de reservas que tu agente de IA puede operar.",
+    points: ["Servidor MCP con 18 herramientas", "Funciona con Claude, Cursor y otros hosts", "Idempotencia y versión en cada escritura"],
+    code: `> ¿Hay mesa para 4 el viernes a las 21:00?\n\nreservation.availability\n  { date: "viernes", time: "21:00", party: 4 }\n\nreservation.create\n  { name: "Marta", party: 4, time: "21:00" }`,
+  },
+];
+
+const faqs = [
+  {
+    q: "¿Es un CRM o un TPV?",
+    a: "No. OpenCovers es solo el motor de reservas: disponibilidad, reservas, mesas y eventos. Sin CRM ni pagos dentro, para que puedas combinarlo con lo que ya usas.",
+  },
+  {
+    q: "¿En qué estado está?",
+    a: "Pre-alfa. Funciona y se prueba en local, con una batería de tests y casos de conformidad en verde. Todavía no hay un servicio gestionado en producción.",
+  },
+  {
+    q: "¿Puedo autohospedarlo?",
+    a: "Sí. Es Apache-2.0 y se arranca con Node.js, pnpm y Docker (PostgreSQL). Hay un Dockerfile y un runbook de despliegue en el repositorio.",
+  },
+  {
+    q: "¿Cómo lo opera un agente de IA?",
+    a: "Con el servidor MCP incluido: el mismo catálogo de 18 herramientas que la API (reservation.*, waitlist.*, venue.*), expuesto por stdio.",
+  },
+  {
+    q: "¿Y los depósitos y pagos con tarjeta?",
+    a: "Están en el roadmap como tipos de reserva en el contrato (libre frente a con depósito). El motor no procesa pagos.",
+  },
+  {
+    q: "¿Cuánto cuesta?",
+    a: "Nada: es open source. Si algún día hay hosting gestionado, se anunciará aparte.",
+  },
+];
+
 export default function App() {
   return (
     <div className="min-h-dvh bg-background text-foreground antialiased">
@@ -104,10 +198,15 @@ export default function App() {
 
       <main>
         <Hero />
+        <Problem />
+        <Pillars />
+        <Audiences />
         <Features />
         <HowItWorks />
         <Brigada />
+        <Faq />
         <QuickStart />
+        <FinalCta />
       </main>
 
       <Footer />
@@ -124,9 +223,11 @@ function Navbar() {
           <span className="font-semibold tracking-tight">OpenCovers</span>
         </a>
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground sm:flex">
+          <a href="#para-quien" className="hover:text-foreground">Para quién</a>
           <a href="#features" className="hover:text-foreground">Funcionalidades</a>
           <a href="#how" className="hover:text-foreground">Cómo funciona</a>
           <a href="#brigada" className="hover:text-foreground">La Brigada</a>
+          <a href="#faq" className="hover:text-foreground">FAQ</a>
         </nav>
         <a
           href={REPO}
@@ -142,14 +243,13 @@ function Navbar() {
 
 function Hero() {
   return (
-    <section className="mx-auto max-w-5xl px-6 py-20 text-center sm:py-28">
-      <img src="/logo.png" alt="OpenCovers" className="mx-auto mb-8 size-20" />
-      <h1 className="mx-auto max-w-2xl text-4xl font-semibold tracking-tight sm:text-6xl">
-        El motor de reservas <span className="text-primary">open source</span>
+    <section className="mx-auto max-w-5xl px-6 pb-12 pt-16 text-center sm:pt-24">
+      <h1 className="mx-auto max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
+        El libro de reservas de tu restaurante, <span className="text-primary">independiente</span>
       </h1>
-      <p className="mx-auto mt-5 max-w-xl text-lg text-muted-foreground">
-        Disponibilidad, reservas, mesas y el feed de eventos para restaurantes. Una API y un
-        servidor MCP para que cualquier plataforma o agente de IA opere tu local.
+      <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
+        Motor de reservas open source con una API y un servidor MCP. Cambia de front o de proveedor
+        sin perder tu histórico, y deja que plataformas y agentes de IA operen tu local.
       </p>
 
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -169,23 +269,108 @@ function Hero() {
         </a>
       </div>
 
-      <div className="mt-10 flex flex-wrap items-center justify-center gap-2 text-xs">
-        {[
-          ["TypeScript", "#3178C6"],
-          ["PostgreSQL", "#336791"],
-          ["Hono", "#ff5b35"],
-          ["React", "#61DAFB"],
-          ["Tailwind", "#38BDF8"],
-          ["MCP", "#7c3aed"],
-        ].map(([name, color]) => (
-          <span
-            key={name}
-            className="rounded-full border border-border px-3 py-1 font-medium"
-            style={{ color }}
-          >
-            {name}
-          </span>
+      <div className="mt-12 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <video
+          className="w-full"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          aria-label="Demo del plano de sala y la agenda de OpenCovers"
+        >
+          <source src="/media/opencovers-demo.mp4" type="video/mp4" />
+        </video>
+      </div>
+
+      <ul className="mt-8 flex flex-wrap items-center justify-center gap-2 text-xs">
+        {status.map((s) => (
+          <li key={s} className="rounded-full border border-border px-3 py-1 font-medium text-muted-foreground">
+            {s}
+          </li>
         ))}
+      </ul>
+    </section>
+  );
+}
+
+function Problem() {
+  return (
+    <section className="border-t bg-muted/40">
+      <div className="mx-auto max-w-5xl px-6 py-20">
+        <h2 className="max-w-2xl text-3xl font-semibold tracking-tight">
+          Tu libro de reservas no debería depender de un proveedor
+        </h2>
+        <div className="mt-10 grid gap-4 md:grid-cols-2">
+          {problems.map((p) => (
+            <div key={p.title} className="rounded-xl border border-border bg-card p-6">
+              <h3 className="font-semibold">{p.title}</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{p.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Pillars() {
+  return (
+    <section className="mx-auto max-w-5xl px-6 py-20">
+      <h2 className="max-w-2xl text-3xl font-semibold tracking-tight">
+        Un motor delgado y predecible, que vive donde debe: en la base de datos
+      </h2>
+      <div className="mt-10 grid gap-8 md:grid-cols-3">
+        {pillars.map((p) => (
+          <div key={p.title}>
+            <p.icon className="size-6 text-primary" />
+            <h3 className="mt-4 text-lg font-semibold">{p.title}</h3>
+            <p className="mt-2 text-sm text-muted-foreground">{p.body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Audiences() {
+  return (
+    <section id="para-quien" className="border-t bg-muted/40">
+      <div className="mx-auto max-w-5xl px-6 py-20">
+        <h2 className="text-3xl font-semibold tracking-tight">Pensado para quien reserva y para quien integra</h2>
+        <div className="mt-12 space-y-16">
+          {audiences.map((a, i) => (
+            <div key={a.title} className="grid items-center gap-8 md:grid-cols-2">
+              <div className={i % 2 === 1 ? "md:order-2" : ""}>
+                <a.icon className="size-6 text-primary" />
+                <h3 className="mt-3 text-2xl font-semibold tracking-tight">{a.title}</h3>
+                <p className="mt-2 text-muted-foreground">{a.lead}</p>
+                <ul className="mt-4 space-y-2 text-sm">
+                  {a.points.map((p) => (
+                    <li key={p} className="flex gap-2">
+                      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className={i % 2 === 1 ? "md:order-1" : ""}>
+                {a.image ? (
+                  <img
+                    src={a.image}
+                    alt={a.alt}
+                    loading="lazy"
+                    className="w-full rounded-xl border border-border bg-card shadow-sm"
+                  />
+                ) : (
+                  <pre className="overflow-x-auto rounded-xl border border-border bg-card p-5 text-sm leading-relaxed">
+                    <code>{a.code}</code>
+                  </pre>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -193,7 +378,7 @@ function Hero() {
 
 function Features() {
   return (
-    <section id="features" className="border-t bg-muted/40">
+    <section id="features">
       <div className="mx-auto max-w-5xl px-6 py-20">
         <h2 className="text-3xl font-semibold tracking-tight">Qué hace</h2>
         <p className="mt-3 max-w-2xl text-muted-foreground">
@@ -218,7 +403,8 @@ function Features() {
 
 function HowItWorks() {
   return (
-    <section id="how" className="mx-auto max-w-5xl px-6 py-20">
+    <section id="how" className="border-t bg-muted/40">
+      <div className="mx-auto max-w-5xl px-6 py-20">
       <h2 className="text-3xl font-semibold tracking-tight">Cómo funciona</h2>
       <div className="mt-10 grid gap-8 md:grid-cols-3">
         {steps.map((s) => (
@@ -229,13 +415,14 @@ function HowItWorks() {
           </div>
         ))}
       </div>
+      </div>
     </section>
   );
 }
 
 function Brigada() {
   return (
-    <section id="brigada" className="border-t bg-muted/40">
+    <section id="brigada" className="border-t">
       <div className="mx-auto max-w-5xl px-6 py-20">
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div>
@@ -279,7 +466,7 @@ function Brigada() {
 
 function QuickStart() {
   return (
-    <section className="mx-auto max-w-5xl px-6 py-20">
+    <section className="mx-auto max-w-5xl border-t px-6 py-20">
       <h2 className="text-3xl font-semibold tracking-tight">Arranca en local</h2>
       <p className="mt-3 max-w-xl text-muted-foreground">
         Necesitas Node.js 22+, pnpm y Docker.
@@ -292,6 +479,55 @@ function QuickStart() {
       <p className="mt-4 text-sm text-muted-foreground">
         Abre <span className="font-mono">http://localhost:5173</span>, crea una cuenta y monta tu primer local.
       </p>
+    </section>
+  );
+}
+
+function Faq() {
+  return (
+    <section id="faq" className="border-t bg-muted/40">
+      <div className="mx-auto max-w-3xl px-6 py-20">
+        <h2 className="text-3xl font-semibold tracking-tight">Preguntas frecuentes</h2>
+        <div className="mt-8 divide-y divide-border rounded-xl border border-border bg-card">
+          {faqs.map((f) => (
+            <details key={f.q} className="group px-6 py-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium">
+                {f.q}
+                <span className="text-muted-foreground transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-3 text-sm text-muted-foreground">{f.a}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FinalCta() {
+  return (
+    <section className="border-t">
+      <div className="mx-auto max-w-5xl px-6 py-20 text-center">
+        <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
+          Deja de alquilar tu libro de reservas. Hazlo tuyo.
+        </h2>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <a
+            href={`${REPO}#development`}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Empieza ahora
+            <ArrowRightIcon className="size-4" />
+          </a>
+          <a
+            href={REPO}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-2.5 text-sm font-medium hover:bg-accent"
+          >
+            <GithubMark className="size-4" />
+            Ver en GitHub
+          </a>
+        </div>
+      </div>
     </section>
   );
 }
