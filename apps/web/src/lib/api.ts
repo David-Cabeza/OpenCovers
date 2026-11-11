@@ -13,6 +13,7 @@ export interface Table {
   name: string;
   seats: number;
   zone: string;
+  shape: string;
   posX: number;
   posY: number;
 }
@@ -57,6 +58,7 @@ export interface FloorTable {
   name: string;
   seats: number;
   zone: string;
+  shape: string;
   posX: number;
   posY: number;
   occupied: boolean;
@@ -163,7 +165,7 @@ export const api = {
       `/v1/venues/${venueId}/pacing?date=${date}`,
     ),
 
-  upsertTable: (venueId: string, body: { id: string; name: string; seats: number; zone?: string }) =>
+  upsertTable: (venueId: string, body: { id: string; name: string; seats: number; zone?: string; shape?: string }) =>
     request<{ tables: Table[] }>(`/v1/venues/${venueId}/tables`, {
       method: "POST",
       body: JSON.stringify(body),

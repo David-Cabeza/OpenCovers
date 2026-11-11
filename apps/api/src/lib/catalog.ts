@@ -10,6 +10,7 @@ export interface TableInfo {
   name: string;
   seats: number;
   zone: string;
+  shape: string;
   posX: number;
   posY: number;
 }
@@ -31,6 +32,7 @@ export async function listTables(db: Db, venueId: string): Promise<TableInfo[]> 
     name: t.name,
     seats: t.seats,
     zone: t.zone,
+    shape: t.shape,
     posX: t.posX,
     posY: t.posY,
   }));
@@ -39,7 +41,7 @@ export async function listTables(db: Db, venueId: string): Promise<TableInfo[]> 
 export async function upsertTable(
   db: Db,
   venueId: string,
-  input: { id: string; name: string; seats: number; zone?: string },
+  input: { id: string; name: string; seats: number; zone?: string; shape?: string },
 ): Promise<void> {
   await db
     .insert(tables)
@@ -49,10 +51,16 @@ export async function upsertTable(
       name: input.name,
       seats: input.seats,
       zone: input.zone ?? "",
+      shape: input.shape ?? "round",
     })
     .onConflictDoUpdate({
       target: [tables.venueId, tables.id],
-      set: { name: input.name, seats: input.seats, zone: input.zone ?? "" },
+      set: {
+        name: input.name,
+        seats: input.seats,
+        zone: input.zone ?? "",
+        shape: input.shape ?? "round",
+      },
     });
 }
 

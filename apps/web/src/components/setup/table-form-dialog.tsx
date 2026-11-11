@@ -20,6 +20,7 @@ interface TableFormValues {
   name: string;
   seats: number;
   zone: string;
+  shape: string;
 }
 
 interface TableFormDialogProps {
@@ -52,6 +53,7 @@ export function TableFormDialog({
         name: initial?.name ?? "",
         seats: initial?.seats ?? 2,
         zone: initial?.zone ?? "",
+        shape: initial?.shape ?? "round",
       });
     }
   }, [open, initial, reset]);
@@ -63,6 +65,7 @@ export function TableFormDialog({
         name: values.name,
         seats: values.seats,
         zone: values.zone || undefined,
+        shape: values.shape,
       });
       await queryClient.invalidateQueries({ queryKey: ["tables", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
@@ -130,9 +133,22 @@ export function TableFormDialog({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="table-zone">Zone</Label>
-              <Input id="table-zone" placeholder="Main / Terrace" {...register("zone")} />
+              <Label htmlFor="table-shape">Shape</Label>
+              <select
+                id="table-shape"
+                {...register("shape")}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <option value="round">Round</option>
+                <option value="square">Square</option>
+                <option value="rectangle">Rectangle</option>
+              </select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="table-zone">Zone</Label>
+            <Input id="table-zone" placeholder="Main / Terrace" {...register("zone")} />
           </div>
 
           <DialogFooter>

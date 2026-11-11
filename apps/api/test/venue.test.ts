@@ -123,9 +123,9 @@ describe("venue config and erasure", () => {
     await seedVenue("tables-venue");
     const tables = await listTables(db, "tables-venue");
     expect(tables).toEqual([
-      { id: "1", name: "T1", seats: 2, zone: "", posX: 0, posY: 0 },
-      { id: "2", name: "T2", seats: 4, zone: "", posX: 0, posY: 0 },
-      { id: "3", name: "T3", seats: 6, zone: "", posX: 0, posY: 0 },
+      { id: "1", name: "T1", seats: 2, zone: "", shape: "round", posX: 0, posY: 0 },
+      { id: "2", name: "T2", seats: 4, zone: "", shape: "round", posX: 0, posY: 0 },
+      { id: "3", name: "T3", seats: 6, zone: "", shape: "round", posX: 0, posY: 0 },
     ]);
 
     await addKey(db, "tables-key", "tables-principal", ["tables-venue"], "read");

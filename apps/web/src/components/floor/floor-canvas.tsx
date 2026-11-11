@@ -7,13 +7,42 @@ export interface CanvasTable {
   seats: number;
   posX: number;
   posY: number;
+  shape?: string;
   occupied?: boolean;
   reservationId?: string;
   partySize?: number;
   guestName?: string;
 }
 
-const NODE_SIZE = 64;
+const NODE = 80;
+
+function tableSize(shape: string | undefined, seats: number): { w: number; h: number } {
+  if (shape === "rectangle") return { w: 56, h: 40 };
+  if (shape === "square") return { w: 44, h: 44 };
+  const d = Math.min(36 + seats * 4, 56);
+  return { w: d, h: d };
+}
+
+function chairPositions(shape: string | undefined, seats: number): { x: number; y: number }[] {
+  const pts: { x: number; y: number }[] = [];
+  if (shape === "rectangle") {
+    const perSide = Math.ceil(seats / 2);
+    for (let i = 0; i < seats; i++) {
+      if (i < perSide) {
+        pts.push({ x: -22 + ((i + 0.5) / perSide) * 44, y: -26 });
+      } else {
+        pts.push({ x: 22 - ((i - perSide + 0.5) / perSide) * 44, y: 26 });
+      }
+    }
+  } else {
+    const radius = shape === "square" ? 28 : Math.min(24 + seats * 2, 34);
+    for (let i = 0; i < seats; i++) {
+      const a = (i / seats) * 2 * Math.PI - Math.PI / 2;
+      pts.push({ x: Math.cos(a) * radius, y: Math.sin(a) * radius });
+    }
+  }
+  return pts;
+}
 
 export function FloorCanvas({
   tables,
@@ -73,11 +102,13 @@ export function FloorCanvas({
     >
       {tables.map((t) => {
         const pos = posOf(t);
+        const shape = t.shape ?? "round";
+        const size = tableSize(shape, t.seats);
         const movableInView = mode === "view" && t.occupied;
         return (
           <div
             key={t.id}
-            style={{ left: pos.x, top: pos.y, width: NODE_SIZE, height: NODE_SIZE }}
+            style={{ left: pos.x, top: pos.y, width: NODE, height: NODE }}
             className={cn(
               "absolute select-none",
               mode === "edit" ? "cursor-move touch-none" : movableInView ? "cursor-grab" : undefined,
@@ -109,20 +140,34 @@ export function FloorCanvas({
               if (mode === "view" && !t.occupied) onSeat?.(t.id);
             }}
           >
+            {chairPositions(shape, t.seats).map((c, i) => (
+              <div
+                key={i}
+                className="absolute size-2 rounded-full bg-muted-foreground/40"
+                style={{ left: NODE / 2 + c.x - 4, top: NODE / 2 + c.y - 4 }}
+              />
+            ))}
             <div
               className={cn(
-                "flex size-full flex-col items-center justify-center rounded-full border-2 text-center shadow-sm transition-colors",
+                "absolute flex flex-col items-center justify-center border-2 text-center shadow-sm transition-colors",
+                shape === "round" ? "rounded-full" : "rounded-lg",
                 t.occupied
                   ? "border-primary bg-primary/15"
                   : mode === "view"
                     ? "border-border bg-background hover:border-primary"
                     : "border-border bg-background",
               )}
+              style={{
+                left: NODE / 2 - size.w / 2,
+                top: NODE / 2 - size.h / 2,
+                width: size.w,
+                height: size.h,
+              }}
             >
-              <span className="px-1 text-xs font-semibold leading-tight">{t.name}</span>
+              <span className="px-1 text-[11px] font-semibold leading-tight">{t.name}</span>
               {t.occupied ? (
                 <>
-                  <span className="max-w-[56px] truncate text-[10px] font-medium">
+                  <span className="max-w-[52px] truncate text-[10px] font-medium">
                     {t.guestName || "—"}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
@@ -130,7 +175,7 @@ export function FloorCanvas({
                   </span>
                 </>
               ) : (
-                <span className="text-[10px] text-muted-foreground">{t.seats} seats</span>
+                <span className="text-[10px] text-muted-foreground">{t.seats}</span>
               )}
             </div>
           </div>

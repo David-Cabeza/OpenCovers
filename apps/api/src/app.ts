@@ -446,6 +446,7 @@ app.post("/v1/venues/:venueId/tables", async (c) => {
     name: body.name,
     seats: body.seats,
     zone: typeof body.zone === "string" ? body.zone : undefined,
+    shape: typeof body.shape === "string" ? body.shape : undefined,
   });
   const tables = await listTables(db, venueId);
   return c.json({ tables });

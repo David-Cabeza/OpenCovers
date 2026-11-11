@@ -71,6 +71,13 @@
       "when": 1794383473849,
       "tag": "0009_lazy_amazoness",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794385518466,
+      "tag": "0010_youthful_captain_stacy",
+      "breakpoints": true
     }
   ]
 }
