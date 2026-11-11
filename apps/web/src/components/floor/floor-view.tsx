@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
+import { EmptyState } from "@/components/empty-state";
 import { useFloor } from "@/hooks/use-floor";
 import { api, type FloorTable } from "@/lib/api";
 import { nowTime, todayIso } from "@/lib/date";
@@ -91,12 +92,11 @@ export function FloorView({ venueId }: { venueId: string }) {
       {isPending ? (
         <Skeleton className="h-64 w-full" />
       ) : tables.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-16 text-center">
-          <ArmchairIcon className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            No tables yet. Add them under Setup.
-          </p>
-        </div>
+        <EmptyState
+          icon={ArmchairIcon}
+          title="No tables yet"
+          description="Add tables under Settings, then seat guests from the floor plan."
+        />
       ) : (
         <div className="space-y-6">
           {zones.map(([zone, zoneTables]) => (

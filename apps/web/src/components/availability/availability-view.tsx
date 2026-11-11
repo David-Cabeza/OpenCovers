@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CalendarXIcon } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,12 +51,11 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
       {isPending ? (
         <Skeleton className="h-64 w-full" />
       ) : services.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-16 text-center">
-          <CalendarXIcon className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            No services configured for this venue.
-          </p>
-        </div>
+        <EmptyState
+          icon={CalendarXIcon}
+          title="No services configured"
+          description="Add services under Settings to see free tables."
+        />
       ) : (
         <div className="space-y-6">
           {services.map(([service, slots]) => (

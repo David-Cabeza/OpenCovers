@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { GaugeIcon } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePacing } from "@/hooks/use-pacing";
@@ -32,12 +33,11 @@ export function PacingView({ venueId }: { venueId: string }) {
       {isPending ? (
         <Skeleton className="h-64 w-full" />
       ) : pacing.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-16 text-center">
-          <GaugeIcon className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            No services configured for this venue.
-          </p>
-        </div>
+        <EmptyState
+          icon={GaugeIcon}
+          title="No services configured"
+          description="Add services under Settings to see covers versus capacity."
+        />
       ) : (
         <div className="space-y-6">
           {pacing.map((service) => (

@@ -22,9 +22,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
+import { EmptyState } from "@/components/empty-state";
 import { useAgenda } from "@/hooks/use-agenda";
 import { api, type Reservation } from "@/lib/api";
 import { todayIso } from "@/lib/date";
+import { guestInitials } from "@/lib/format";
 
 const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   booked: "default",
@@ -41,16 +43,6 @@ const statusLabel: Record<string, string> = {
   no_show: "No-show",
   cancelled: "Cancelled",
 };
-
-function guestInitials(name?: string): string {
-  if (!name) return "?";
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0].toUpperCase())
-    .join("");
-}
 
 type RowAction =
   | { kind: "status"; label: string; status: string }
@@ -127,12 +119,11 @@ export function AgendaView({ venueId }: { venueId: string }) {
       {isPending ? (
         <Skeleton className="h-64 w-full" />
       ) : reservations.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-16 text-center">
-          <CalendarPlusIcon className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            No reservations for this day.
-          </p>
-        </div>
+        <EmptyState
+          icon={CalendarPlusIcon}
+          title="No reservations"
+          description="Nothing booked for this day yet."
+        />
       ) : (
         <div className="rounded-lg border">
           <Table>
