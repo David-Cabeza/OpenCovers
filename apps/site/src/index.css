@@ -85,9 +85,9 @@ a { color: inherit; }
 /* ---------- intro: split, statement + video ---------- */
 .intro { background: var(--f1); display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; min-height: 72svh; }
 .intro p { align-self: center; padding: var(--gap) var(--m); font-size: var(--lead); line-height: 1.2; max-width: 38ch; font-weight: 600; }
-.intro .disc { position: relative; overflow: hidden; background: var(--f3); }
-.intro video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: left top; display: block; }
-@media (max-width: 760px) { .intro { grid-template-columns: 1fr; min-height: 0; } .intro p { padding-block: 72px 40px; } .intro .disc { aspect-ratio: 16 / 10; } }
+.intro .disc { display: grid; place-items: center; padding: var(--m); background: var(--f3); }
+.intro video { width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: contain; display: block; }
+@media (max-width: 760px) { .intro { grid-template-columns: 1fr; min-height: 0; } .intro p { padding-block: 72px 40px; } .intro .disc { padding: var(--m); } }
 
 /* ---------- features: sentences with switches ---------- */
 .sw { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; min-height: 20vh; padding: 28px var(--m); text-align: left; background: var(--bg); color: var(--muted); cursor: pointer; transition: background 0.5s var(--ease), color 0.4s; }
