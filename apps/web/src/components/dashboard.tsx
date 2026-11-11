@@ -1,13 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useVenues } from "@/hooks/use-venues";
 import { useUiStore } from "@/stores/ui-store";
 import { AgendaView } from "./agenda/agenda-view";
 import { AvailabilityView } from "./availability/availability-view";
 import { FloorView } from "./floor/floor-view";
-import { AppHeader } from "./layout/app-header";
+import { Sidebar, type ViewId } from "./layout/sidebar";
+import { Topbar } from "./layout/topbar";
 import { PacingView } from "./pacing/pacing-view";
 import { SetupView } from "./setup/setup-view";
 import { EmptyVenues } from "./venue/empty-venues";
@@ -18,6 +18,7 @@ export function Dashboard() {
   const { data, isPending } = useVenues();
   const venueId = useUiStore((s) => s.venueId);
   const setVenue = useUiStore((s) => s.setVenue);
+  const [active, setActive] = useState<ViewId>("agenda");
 
   const venues = data?.venues ?? [];
   const role = venues.find((v) => v.id === venueId)?.role;
@@ -32,47 +33,30 @@ export function Dashboard() {
   }, [venues, venueId, setVenue]);
 
   return (
-    <div className="min-h-dvh">
-      <AppHeader email={session?.user.email} />
-      <main className="mx-auto max-w-5xl px-6 py-8">
-        {isPending ? (
-          <div className="space-y-4">
-            <Skeleton className="h-9 w-56" />
-            <Skeleton className="h-64 w-full" />
-          </div>
-        ) : venues.length === 0 ? (
-          <EmptyVenues />
-        ) : venueId ? (
-          <Tabs defaultValue="agenda">
-            <TabsList>
-              <TabsTrigger value="agenda">Agenda</TabsTrigger>
-              <TabsTrigger value="floor">Floor</TabsTrigger>
-              <TabsTrigger value="pacing">Pacing</TabsTrigger>
-              <TabsTrigger value="availability">Availability</TabsTrigger>
-              <TabsTrigger value="waitlist">Waitlist</TabsTrigger>
-              <TabsTrigger value="setup">Setup</TabsTrigger>
-            </TabsList>
-            <TabsContent value="agenda" className="pt-6">
-              <AgendaView venueId={venueId} />
-            </TabsContent>
-            <TabsContent value="floor" className="pt-6">
-              <FloorView venueId={venueId} />
-            </TabsContent>
-            <TabsContent value="pacing" className="pt-6">
-              <PacingView venueId={venueId} />
-            </TabsContent>
-            <TabsContent value="availability" className="pt-6">
-              <AvailabilityView venueId={venueId} />
-            </TabsContent>
-            <TabsContent value="waitlist" className="pt-6">
-              <WaitlistView venueId={venueId} />
-            </TabsContent>
-            <TabsContent value="setup" className="pt-6">
-              <SetupView venueId={venueId} role={role} />
-            </TabsContent>
-          </Tabs>
-        ) : null}
-      </main>
+    <div className="flex min-h-dvh">
+      <Sidebar active={active} onSelect={setActive} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Topbar email={session?.user.email} />
+        <main className="flex-1 p-6 lg:p-8">
+          {isPending ? (
+            <div className="space-y-4">
+              <Skeleton className="h-9 w-56" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+          ) : venues.length === 0 ? (
+            <EmptyVenues />
+          ) : venueId ? (
+            <>
+              {active === "agenda" && <AgendaView venueId={venueId} />}
+              {active === "floor" && <FloorView venueId={venueId} />}
+              {active === "availability" && <AvailabilityView venueId={venueId} />}
+              {active === "waitlist" && <WaitlistView venueId={venueId} />}
+              {active === "pacing" && <PacingView venueId={venueId} />}
+              {active === "setup" && <SetupView venueId={venueId} role={role} />}
+            </>
+          ) : null}
+        </main>
+      </div>
     </div>
   );
 }
