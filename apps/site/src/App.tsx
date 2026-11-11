@@ -266,7 +266,13 @@ function Intro() {
         Tu libro de reservas vive dentro del CRM o del proveedor, y cambiar es arriesgar el histórico.
         OpenCovers lo separa de todo.
       </p>
-      <div className="disc rv" style={d(120)}>
+      <div className="win rv" style={d(120)} data-ui>
+        <div className="bar" aria-hidden>
+          <i style={{ background: "#ff5f57" }} />
+          <i style={{ background: "#febc2e" }} />
+          <i style={{ background: "#28c840" }} />
+          <b>OpenCovers — Demo Bistro</b>
+        </div>
         <video autoPlay muted loop playsInline preload="metadata" poster="/media/floor-plan.png" aria-label="Demo del plano de sala y la agenda de OpenCovers">
           <source src="/media/opencovers-demo.mp4" type="video/mp4" />
         </video>
