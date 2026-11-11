@@ -40,6 +40,12 @@ import {
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
 import { notifyReservation } from "./lib/notifications";
 import {
+  addFloorItem,
+  deleteFloorItem,
+  listFloorItems,
+  setFloorItemPosition,
+} from "./lib/floor-items";
+import {
   addWaitlist,
   cancelWaitlist,
   listWaitlist,
@@ -420,6 +426,55 @@ app.get("/v1/venues/:venueId/pacing", async (c) => {
   if (!date) return error(c, "invalid_request", 400);
   const pacing = await getPacing(db, venueId, date);
   return c.json({ pacing });
+});
+
+app.get("/v1/venues/:venueId/floor-items", async (c) => {
+  const venueId = c.req.param("venueId");
+  const items = await listFloorItems(db, venueId);
+  return c.json({ items });
+});
+
+app.post("/v1/venues/:venueId/floor-items", async (c) => {
+  const venueId = c.req.param("venueId");
+  const body = await c.req.json();
+  if (typeof body.type !== "string" || body.type === "") {
+    return error(c, "invalid_request", 400);
+  }
+  const item = await addFloorItem(db, venueId, {
+    type: body.type,
+    label: typeof body.label === "string" ? body.label : undefined,
+    posX: typeof body.posX === "number" ? body.posX : undefined,
+    posY: typeof body.posY === "number" ? body.posY : undefined,
+    width: typeof body.width === "number" ? body.width : undefined,
+    height: typeof body.height === "number" ? body.height : undefined,
+  });
+  const items = await listFloorItems(db, venueId);
+  return c.json({ items, item }, 201);
+});
+
+app.delete("/v1/venues/:venueId/floor-items/:itemId", async (c) => {
+  const venueId = c.req.param("venueId");
+  const itemId = c.req.param("itemId");
+  await deleteFloorItem(db, venueId, itemId);
+  const items = await listFloorItems(db, venueId);
+  return c.json({ items });
+});
+
+app.patch("/v1/venues/:venueId/floor-items/:itemId/position", async (c) => {
+  const venueId = c.req.param("venueId");
+  const itemId = c.req.param("itemId");
+  const body = await c.req.json();
+  if (
+    typeof body.x !== "number" ||
+    typeof body.y !== "number" ||
+    !Number.isInteger(body.x) ||
+    !Number.isInteger(body.y)
+  ) {
+    return error(c, "invalid_request", 400);
+  }
+  await setFloorItemPosition(db, venueId, itemId, body.x, body.y);
+  const items = await listFloorItems(db, venueId);
+  return c.json({ items });
 });
 
 app.get("/v1/venues/:venueId/tables", async (c) => {

@@ -185,6 +185,23 @@ export const sentEmails = pgTable(
   ],
 );
 
+export const floorItems = pgTable(
+  "floor_items",
+  {
+    id: text("id").primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id),
+    type: text("type").notNull(),
+    label: text("label").notNull().default(""),
+    posX: integer("pos_x").notNull().default(0),
+    posY: integer("pos_y").notNull().default(0),
+    width: integer("width").notNull().default(80),
+    height: integer("height").notNull().default(40),
+  },
+  (t) => [index("idx_floor_items_venue").on(t.venueId)],
+);
+
 export const apiKeys = pgTable("api_keys", {
   hash: text("hash").primaryKey(),
   principal: text("principal").notNull(),

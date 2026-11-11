@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { cn } from "cn";
+import { FLOOR_ITEM_TYPES } from "@/lib/floor-item-types";
 
 export interface CanvasTable {
   id: string;
@@ -12,6 +13,16 @@ export interface CanvasTable {
   reservationId?: string;
   partySize?: number;
   guestName?: string;
+}
+
+export interface CanvasItem {
+  id: string;
+  type: string;
+  label: string;
+  posX: number;
+  posY: number;
+  width: number;
+  height: number;
 }
 
 const NODE = 80;
@@ -44,34 +55,43 @@ function chairPositions(shape: string | undefined, seats: number): { x: number; 
   return pts;
 }
 
+type DragTarget = { kind: "table" | "item"; id: string; offsetX: number; offsetY: number };
+
 export function FloorCanvas({
   tables,
+  items = [],
   mode,
   onSeat,
   onMove,
   onPosition,
+  onItemPosition,
+  onDeleteItem,
 }: {
   tables: CanvasTable[];
+  items?: CanvasItem[];
   mode: "view" | "edit";
   onSeat?: (tableId: string) => void;
   onMove?: (reservationId: string, targetTableId: string) => void;
   onPosition?: (tableId: string, x: number, y: number) => void;
+  onItemPosition?: (itemId: string, x: number, y: number) => void;
+  onDeleteItem?: (itemId: string) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [overrides, setOverrides] = useState<Record<string, { x: number; y: number }>>({});
-  const dragRef = useRef<{ tableId: string; offsetX: number; offsetY: number } | null>(null);
+  const dragRef = useRef<DragTarget | null>(null);
 
-  const posOf = (t: CanvasTable) => overrides[t.id] ?? { x: t.posX, y: t.posY };
+  const posOf = (kind: "table" | "item", id: string, x: number, y: number) =>
+    overrides[`${kind}:${id}`] ?? { x, y };
 
-  function onPointerDown(e: React.PointerEvent, t: CanvasTable) {
+  function startDrag(e: React.PointerEvent, kind: "table" | "item", id: string, x: number, y: number) {
     if (mode !== "edit") return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const pos = posOf(t);
     dragRef.current = {
-      tableId: t.id,
-      offsetX: e.clientX - rect.left - pos.x,
-      offsetY: e.clientY - rect.top - pos.y,
+      kind,
+      id,
+      offsetX: e.clientX - rect.left - x,
+      offsetY: e.clientY - rect.top - y,
     };
     e.currentTarget.setPointerCapture(e.pointerId);
   }
@@ -83,14 +103,17 @@ export function FloorCanvas({
     if (!rect) return;
     const x = Math.max(0, Math.round(e.clientX - rect.left - drag.offsetX));
     const y = Math.max(0, Math.round(e.clientY - rect.top - drag.offsetY));
-    setOverrides((prev) => ({ ...prev, [drag.tableId]: { x, y } }));
+    setOverrides((prev) => ({ ...prev, [`${drag.kind}:${drag.id}`]: { x, y } }));
   }
 
   function onPointerUp() {
     const drag = dragRef.current;
     if (!drag) return;
-    const pos = overrides[drag.tableId];
-    if (pos) onPosition?.(drag.tableId, pos.x, pos.y);
+    const pos = overrides[`${drag.kind}:${drag.id}`];
+    if (pos) {
+      if (drag.kind === "table") onPosition?.(drag.id, pos.x, pos.y);
+      else onItemPosition?.(drag.id, pos.x, pos.y);
+    }
     dragRef.current = null;
   }
 
@@ -100,8 +123,45 @@ export function FloorCanvas({
       className="relative h-[480px] w-full overflow-hidden rounded-lg border bg-muted/30"
       onDragOver={(e) => e.preventDefault()}
     >
+      {items.map((item) => {
+        const config =
+          FLOOR_ITEM_TYPES[item.type] ??
+          { label: item.label || item.type, className: "bg-foreground/20" };
+        const pos = posOf("item", item.id, item.posX, item.posY);
+        return (
+          <div
+            key={item.id}
+            style={{ left: pos.x, top: pos.y, width: item.width, height: item.height }}
+            className={cn("absolute select-none", mode === "edit" && "cursor-move touch-none")}
+            onPointerDown={(e) => startDrag(e, "item", item.id, item.posX, item.posY)}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+          >
+            <div
+              className={cn(
+                "flex size-full items-center justify-center text-xs font-medium",
+                config.className,
+              )}
+            >
+              {config.label || item.label || item.type}
+            </div>
+            {mode === "edit" && (
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => onDeleteItem?.(item.id)}
+                className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-destructive hover:text-white"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        );
+      })}
+
       {tables.map((t) => {
-        const pos = posOf(t);
+        const pos = posOf("table", t.id, t.posX, t.posY);
         const shape = t.shape ?? "round";
         const size = tableSize(shape, t.seats);
         const movableInView = mode === "view" && t.occupied;
@@ -122,7 +182,7 @@ export function FloorCanvas({
                   }
                 : undefined
             }
-            onPointerDown={(e) => onPointerDown(e, t)}
+            onPointerDown={(e) => startDrag(e, "table", t.id, t.posX, t.posY)}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}

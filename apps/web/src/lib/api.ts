@@ -78,6 +78,17 @@ export interface PacingService {
   slots: PacingSlot[];
 }
 
+export interface FloorItem {
+  id: string;
+  venueId: string;
+  type: string;
+  label: string;
+  posX: number;
+  posY: number;
+  width: number;
+  height: number;
+}
+
 export interface Reservation {
   id: string;
   venueId: string;
@@ -180,6 +191,30 @@ export const api = {
   setTablePosition: (venueId: string, tableId: string, x: number, y: number) =>
     request<{ tables: Table[] }>(
       `/v1/venues/${venueId}/tables/${encodeURIComponent(tableId)}/position`,
+      { method: "PATCH", body: JSON.stringify({ x, y }) },
+    ),
+
+  listFloorItems: (venueId: string) =>
+    request<{ items: FloorItem[] }>(`/v1/venues/${venueId}/floor-items`),
+
+  addFloorItem: (
+    venueId: string,
+    body: { type: string; label?: string; width?: number; height?: number },
+  ) =>
+    request<{ items: FloorItem[] }>(`/v1/venues/${venueId}/floor-items`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  deleteFloorItem: (venueId: string, itemId: string) =>
+    request<{ items: FloorItem[] }>(
+      `/v1/venues/${venueId}/floor-items/${encodeURIComponent(itemId)}`,
+      { method: "DELETE" },
+    ),
+
+  setFloorItemPosition: (venueId: string, itemId: string, x: number, y: number) =>
+    request<{ items: FloorItem[] }>(
+      `/v1/venues/${venueId}/floor-items/${encodeURIComponent(itemId)}/position`,
       { method: "PATCH", body: JSON.stringify({ x, y }) },
     ),
 

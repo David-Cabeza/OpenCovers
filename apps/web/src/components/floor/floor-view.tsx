@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { FloorCanvas } from "@/components/floor/floor-canvas";
 import { useFloor } from "@/hooks/use-floor";
+import { useFloorItems } from "@/hooks/use-floor-items";
 import { api, type FloorTable } from "@/lib/api";
 import { nowTime, todayIso } from "@/lib/date";
 
@@ -18,8 +19,10 @@ export function FloorView({ venueId }: { venueId: string }) {
   const [seatTable, setSeatTable] = useState<FloorTable | null>(null);
   const queryClient = useQueryClient();
   const { data, isPending } = useFloor(venueId, date, time);
+  const { data: itemsData } = useFloorItems(venueId);
 
   const tables = data?.tables ?? [];
+  const items = itemsData?.items ?? [];
 
   const move = useMutation({
     mutationFn: ({ reservationId, targetTableId }: { reservationId: string; targetTableId: string }) =>
@@ -78,6 +81,7 @@ export function FloorView({ venueId }: { venueId: string }) {
       ) : (
         <FloorCanvas
           tables={tables}
+          items={items}
           mode="view"
           onSeat={(tableId) => {
             const table = tables.find((t) => t.id === tableId);
