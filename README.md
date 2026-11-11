@@ -51,6 +51,10 @@ The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over s
 
 Walk-ins, a waitlist, zones, and automatic table assignment. The engine seats guests now, holds them in a queue, and assigns tables so platforms and agents never think about floor plans.
 
+### 🪑 A visual floor plan
+
+Drag tables and room elements onto a floor, snap them to a grid, rotate them, and resize them. Tables come in round, square, and rectangle shapes with chairs; room elements (bar, kitchen, wall, window, door, plant, counter, entrance) are drawn as architectural symbols on a wood floor — so the plan reads like a plan, not a list.
+
 ### 📧 Email confirmations
 
 Confirmations, cancellations, and booking notices via Resend — one per reservation version, never duplicated. Each venue brings its own Resend account, and it's off until enabled.
@@ -99,6 +103,18 @@ pnpm dev               # API :3000 · staff app :5173 · site :5174
 Open <http://localhost:5173>, sign up, and create a venue. The public site is at <http://localhost:5174>. The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 To run the MCP server, see [apps/mcp](apps/mcp/README.md). Create an agent key from the staff app under **Setup → API keys**.
+
+## Screenshots
+
+The staff app in action — the agenda, the floor plan, and the floor editor.
+
+<p align="center">
+  <img src="docs/assets/agenda.png" alt="Agenda" width="420">
+  <img src="docs/assets/floor-plan.png" alt="Floor plan" width="420">
+</p>
+<p align="center">
+  <img src="docs/assets/floor-editor.png" alt="Floor editor" width="700">
+</p>
 
 ## Repository layout
 
