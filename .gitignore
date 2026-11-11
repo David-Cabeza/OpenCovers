@@ -12,3 +12,4 @@ coverage/
 .opencode/
 opencode.json
 .audit/
+.taste-skill/
