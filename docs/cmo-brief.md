@@ -168,7 +168,7 @@ Objetivo de esta fase: **construir señal en la comunidad técnica y captar earl
 
 Orden sugerido (sin fechas comprometidas):
 
-1. **Despliegue de referencia** — el primer "corre en un sitio real" con Postgres gestionado (Cloudflare).
+1. **Despliegue de referencia** — el primer "corre en un sitio real" con Postgres, sin depender de un proveedor concreto.
 2. **Webhooks firmados** — push con firma HMAC encima del feed con cursor.
 3. **Depósitos y tarjetas** — tipos de reserva (libre vs. con depósito) en el contrato.
 4. **Marca y dominio** — resolver el nombre, la revisión de marca y comprar el dominio (ver §12).

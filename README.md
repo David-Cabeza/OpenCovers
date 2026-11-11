@@ -149,7 +149,7 @@ docs/      the contract, ADRs, and requirements
 
 ## Deploy
 
-The site deploys to GitHub Pages at [opencovers.dev](https://opencovers.dev); the staff app deploys to Cloudflare Pages as a static build. The API ships as a Docker image (Node.js) and is being ported to Cloudflare Workers + Hyperdrive. See [docs/deploy.md](docs/deploy.md).
+OpenCovers has no hosting vendor dependency. It needs PostgreSQL and a Node.js process. The API ships as a Docker image, and the staff app is a static build that any web server can serve. Whoever forks it for a venue decides where the database lives. The project's own site is on GitHub Pages at [opencovers.dev](https://opencovers.dev). See [docs/deploy.md](docs/deploy.md).
 
 ## Status
 

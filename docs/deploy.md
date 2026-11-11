@@ -1,48 +1,48 @@
 # Deployment
 
-OpenCovers runs on Cloudflare.
+OpenCovers does not depend on a hosting vendor. The engine needs PostgreSQL and a Node.js process. Whoever forks it for a venue chooses where the database and the processes live.
 
-## What goes where
+## What you run
 
-| Part | Where | How |
+| Part | What it is | Needs |
 | --- | --- | --- |
-| Site (`apps/site`) | GitHub Pages | Static Vite build at **opencovers.dev** (`.github/workflows/deploy-site.yml`). |
-| Staff app (`apps/web`) | Cloudflare Pages | Static Vite build; proxies `/api` and `/v1` to the API. |
-| API (`apps/api`) | Cloudflare Workers (planned) or a container | See below. |
-| MCP server (`apps/mcp`) | Not deployed | Runs locally, talks to the API over HTTPS. |
+| API (`apps/api`) | Node.js process (Hono) | PostgreSQL 16 or newer, Node.js 22 |
+| Staff app (`apps/web`) | Static Vite build | Any static host or web server |
+| MCP server (`apps/mcp`) | stdio process that talks to the API over HTTPS | Node.js 22, an API key |
+| Site (`apps/site`) | Static Vite build | Any static host. The project's own copy is on GitHub Pages at opencovers.dev. |
 
-## Public site — opencovers.dev
+## Database
 
-The marketing site is served from GitHub Pages at `opencovers.dev`. The workflow in `.github/workflows/deploy-site.yml` builds `apps/site` and publishes `apps/site/dist` on every push to `main`. The `CNAME` file in `apps/site/public/` pins the custom domain.
-
-DNS at the registrar (apex domain, `.dev` forces HTTPS):
-
-- `opencovers.dev` → `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153` (A records)
-- `www.opencovers.dev` → `David-Cabeza.github.io` (CNAME)
-
-GitHub issues the HTTPS certificate automatically once the custom domain is verified in **Settings → Pages**.
-
-## Frontends — Cloudflare Pages
-
-The site ships on GitHub Pages (see above); Cloudflare Pages is the alternative host for it, and the host for the staff app.
+Any PostgreSQL 16+ works: self-hosted, a container, or a managed service. The no-double-booking rule is a GiST exclusion constraint, so the database must be a real PostgreSQL. Set `DATABASE_URL` and run the migrations:
 
 ```sh
-pnpm --filter @opencovers/site build   # → apps/site/dist
-pnpm --filter @opencovers/web build    # → apps/web/dist
-wrangler pages deploy apps/site/dist
-wrangler pages deploy apps/web/dist
+pnpm db:migrate
 ```
 
-The staff app calls `/api/*` (Better Auth) and `/v1/*` (the API) relative to its own origin. On Pages, add a rewrite or a Pages Function that forwards those two paths to the API origin, and add the staff app's origin to `TRUSTED_ORIGINS` on the API.
+`compose.yaml` starts a local PostgreSQL for development.
 
 ## API
 
-The API is Node.js + `pg` + Better Auth today, which does not run on Cloudflare Workers as-is. Two options:
+Build and run the Docker image in `apps/api/Dockerfile` on any host that runs containers: a VPS, Kubernetes, Fly.io, Railway, or your own machine. The image applies migrations on boot. Without Docker, run the Node.js process directly.
 
-1. **Cloudflare Workers + Hyperdrive + Postgres** (Cloudflare-native). Requires porting the database layer from the `pg` driver to a Worker-compatible one (Drizzle over Hyperdrive), plus serving the Hono app as a Worker instead of `@hono/node-server`. This keeps the PostgreSQL decision and moves everything onto Cloudflare.
-2. **Keep the Node.js API on a container or VPS** and put it behind Cloudflare for DNS and proxying. The `apps/api/Dockerfile` is ready for this; it applies migrations on boot.
+Put the API behind a reverse proxy with HTTPS. Set the variables in the table below.
 
-Option 1 is the Cloudflare-native path and is the recommended next step. It is a code change, not just configuration.
+## Staff app
+
+```sh
+pnpm --filter @opencovers/web build   # apps/web/dist
+```
+
+Serve `apps/web/dist` from any static host. The app calls `/api/*` (Better Auth) and `/v1/*` (the API) relative to its own origin. Forward those two paths to the API with your reverse proxy, or serve both from one origin. Add the staff app's origin to `TRUSTED_ORIGINS` on the API.
+
+## Public site
+
+The project's site is built by `.github/workflows/deploy-site.yml` and published to GitHub Pages at **opencovers.dev**. The `CNAME` file in `apps/site/public/` pins the custom domain. A fork has no need for this workflow. Build with `pnpm --filter @opencovers/site build` and serve `apps/site/dist` wherever you like.
+
+DNS for the project's apex domain, for reference:
+
+- `opencovers.dev` has four A records: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
+- `www.opencovers.dev` is a CNAME to `David-Cabeza.github.io`.
 
 ## Environment
 

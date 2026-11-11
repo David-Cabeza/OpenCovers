@@ -51,11 +51,10 @@ Exit criterion: the legal review is complete and the conformance cases still pas
 
 Status: next.
 
-- Ship the API. Two routes are on the table in [docs/deploy.md](docs/deploy.md): the Docker image on a container host, or a port to Cloudflare Workers with Hyperdrive.
-- Deploy the staff app to Cloudflare Pages with `/api` and `/v1` forwarded to the API.
-- Set the production environment variables and the trusted origins.
+- Keep the engine host-agnostic: PostgreSQL and a Node.js process, with no vendor-specific code. Each fork chooses where its database lives.
+- Document one reference deployment of the Docker image in [docs/deploy.md](docs/deploy.md), with the staff app served as a static build and `/api` and `/v1` forwarded to the API.
 
-Exit criterion: the staff app signs in and books a table against a live API.
+Exit criterion: the staff app signs in and books a table against an API running from the Docker image.
 
 ### Phase 0: Publication readiness
 
@@ -83,4 +82,3 @@ Exit criterion: the launch venue runs on OpenCovers.
 - Standalone or internal-only product.
 - The first-venue route.
 - Legal review of guest data, retention, confirmation text, and reminder text.
-- Where the API runs: a container or Cloudflare Workers.
