@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { cn } from "cn";
 
 export interface CanvasTable {
@@ -29,40 +29,72 @@ export function FloorCanvas({
   onPosition?: (tableId: string, x: number, y: number) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [overrides, setOverrides] = useState<Record<string, { x: number; y: number }>>({});
+  const dragRef = useRef<{ tableId: string; offsetX: number; offsetY: number } | null>(null);
 
-  function handleCanvasDrop(e: React.DragEvent) {
+  const posOf = (t: CanvasTable) => overrides[t.id] ?? { x: t.posX, y: t.posY };
+
+  function onPointerDown(e: React.PointerEvent, t: CanvasTable) {
     if (mode !== "edit") return;
-    e.preventDefault();
-    const tableId = e.dataTransfer.getData("text/plain");
-    if (!tableId || !canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.round(e.clientX - rect.left - NODE_SIZE / 2));
-    const y = Math.max(0, Math.round(e.clientY - rect.top - NODE_SIZE / 2));
-    onPosition?.(tableId, x, y);
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const pos = posOf(t);
+    dragRef.current = {
+      tableId: t.id,
+      offsetX: e.clientX - rect.left - pos.x,
+      offsetY: e.clientY - rect.top - pos.y,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = Math.max(0, Math.round(e.clientX - rect.left - drag.offsetX));
+    const y = Math.max(0, Math.round(e.clientY - rect.top - drag.offsetY));
+    setOverrides((prev) => ({ ...prev, [drag.tableId]: { x, y } }));
+  }
+
+  function onPointerUp() {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const pos = overrides[drag.tableId];
+    if (pos) onPosition?.(drag.tableId, pos.x, pos.y);
+    dragRef.current = null;
   }
 
   return (
     <div
       ref={canvasRef}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={handleCanvasDrop}
       className="relative h-[480px] w-full overflow-hidden rounded-lg border bg-muted/30"
+      onDragOver={(e) => e.preventDefault()}
     >
       {tables.map((t) => {
-        const draggable = mode === "edit" || (mode === "view" && t.occupied);
+        const pos = posOf(t);
+        const movableInView = mode === "view" && t.occupied;
         return (
           <div
             key={t.id}
-            style={{ left: t.posX, top: t.posY, width: NODE_SIZE, height: NODE_SIZE }}
-            className="absolute"
-            draggable={draggable}
-            onDragStart={(e) => {
-              e.dataTransfer.setData(
-                "text/plain",
-                mode === "edit" ? t.id : (t.reservationId ?? t.id),
-              );
-              e.dataTransfer.effectAllowed = "move";
-            }}
+            style={{ left: pos.x, top: pos.y, width: NODE_SIZE, height: NODE_SIZE }}
+            className={cn(
+              "absolute select-none",
+              mode === "edit" ? "cursor-move touch-none" : movableInView ? "cursor-grab" : undefined,
+            )}
+            draggable={movableInView}
+            onDragStart={
+              movableInView
+                ? (e) => {
+                    e.dataTransfer.setData("text/plain", t.reservationId ?? t.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }
+                : undefined
+            }
+            onPointerDown={(e) => onPointerDown(e, t)}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
             onDragOver={(e) => {
               if (mode === "view" && !t.occupied) e.preventDefault();
             }}
@@ -79,7 +111,7 @@ export function FloorCanvas({
           >
             <div
               className={cn(
-                "flex size-full cursor-grab flex-col items-center justify-center rounded-full border-2 text-center shadow-sm transition-colors active:cursor-grabbing",
+                "flex size-full flex-col items-center justify-center rounded-full border-2 text-center shadow-sm transition-colors",
                 t.occupied
                   ? "border-primary bg-primary/15"
                   : mode === "view"
