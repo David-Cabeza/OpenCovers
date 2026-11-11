@@ -1,105 +1,79 @@
 # Roadmap
 
-OpenCovers is in the design phase. The roadmap is a sequence of phases, not a promise of dates. Each phase has an exit criterion. Flags are the unit of work. See [CONTRIBUTING.md](CONTRIBUTING.md).
+OpenCovers is pre-alpha. The engine, the staff app, and the MCP server run locally and pass their tests. Nothing is deployed except the public site. The roadmap is a sequence of phases, not a promise of dates. Each phase has an exit criterion. Flags are the unit of work. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+The storage decision changed from Cloudflare Durable Objects to PostgreSQL. See [ADR-0002](docs/adr/0002-port-to-postgresql.md).
+
+## Done
+
+### Phase 2: Contract and conformance
+
+The OpenAPI contract, the MCP tool catalog, the error vocabulary, and 13 conformance cases are merged under [docs/contract](docs/contract).
+
+### Phase 3: Runnable skeleton
+
+Node.js, Hono, and PostgreSQL run locally with `pnpm dev`. CI runs typecheck and tests against PostgreSQL 16.
+
+### Phase 4: Schema and exclusion
+
+Venues, hours, tables, services, reservations, and versions are in the schema with 13 migrations. A GiST exclusion constraint rejects overlapping table allocations. A concurrency test shows two parallel creates yield one booking and one `slot_taken`.
+
+### Phase 5: Write routes
+
+Create, modify, cancel, seat, attend, and no-show. Idempotency keys and monotonic versions apply to every write. The engine sets `basis`, `owner_principal`, and `booked_via` from the authenticated channel.
+
+### Phase 6: Read side and event feed
+
+Availability, agenda, list, pacing, and an event feed with a cursor and a retention watermark. See [conformance status](docs/contract/conformance-status.md): all 13 cases pass.
+
+### Beyond the original plan
+
+- Walk-ins, a waitlist, zones, and automatic table assignment.
+- Staff sign-in with Better Auth and per-venue roles. Scoped API keys for platforms and agents.
+- An MCP server with 18 tools over stdio.
+- A staff app with an agenda, availability, a visual floor plan and editor, a waitlist, and setup screens.
+- The public site at [opencovers.dev](https://opencovers.dev).
 
 ## Now
+
+### Phase 7: Notices, consent, and erasure
+
+Status: partly built, blocked on legal review.
+
+- Done: restaurant notice address, erasure with counts and hashes, tombstones, and an hourly retention job.
+- Done: email confirmations and cancellations through Resend, one per reservation version, off by default.
+- Pending: legal review of the email text, the consent basis, and retention periods.
+- Pending: guest reminders and STOP handling.
+
+Exit criterion: the legal review is complete and the conformance cases still pass.
+
+### Phase 8: Deployment
+
+Status: next.
+
+- Ship the API. Two routes are on the table in [docs/deploy.md](docs/deploy.md): the Docker image on a container host, or a port to Cloudflare Workers with Hyperdrive.
+- Deploy the staff app to Cloudflare Pages with `/api` and `/v1` forwarded to the API.
+- Set the production environment variables and the trusted origins.
+
+Exit criterion: the staff app signs in and books a table against a live API.
 
 ### Phase 0: Publication readiness
 
 Status: in progress.
 
-- Apache-2.0 license.
-- Public README, contribution guide, code of conduct, security policy, and governance.
-- Flag and pull request templates.
-- Clean public history without private reference material.
-- Private vulnerability reporting enabled.
-- A monitored private contact for the code of conduct.
+- Done: Apache-2.0 license, README, contribution guide, code of conduct, security policy, governance, and the flag and pull request templates.
+- Pending: confirm the repository history holds no private reference material. Run `scripts/check-publication.sh`.
+- Pending: private vulnerability reporting enabled and a monitored private contact for the code of conduct.
 
 Exit criterion: the repository can be made public without confidential or proprietary material, and every reporting channel is live.
 
-### Phase R: Reference research
-
-Status: next. Private.
-
-- Study authorized reference products with synthetic data.
-- Record the domain model, API surface, states, flows, and edge cases in private notes.
-- Derive OpenCovers requirements and conformance cases. Do not copy third-party material.
-
-Exit criterion: the requirements are written from findings, with no copied documentation or code.
-
-### Phase 1: Decisions and ADR
-
-Status: blocked on the product decisions.
-
-- Confirm the name and the trademark check.
-- Decide whether the engine is standalone or internal.
-- Choose the first-venue route.
-- Write and accept the architecture decision record.
-
-Exit criterion: the ADR is merged with the open decisions recorded.
-
-### Phase 2: Contract and conformance
-
-Status: next.
-
-- Write the OpenAPI contract for availability, list, create, modify, cancel, and the event feed.
-- Write the MCP tool catalog over the same operations.
-- Define the error vocabulary.
-- Write the conformance cases for the booking boundary.
-- Define the erasure call and the event cursor.
-
-Exit criterion: the contract and the conformance cases are merged. No engine code is required.
-
 ## Next
 
-### Phase 3: Runnable skeleton
+### Phase 9: First venue
 
-- TypeScript, Cloudflare Workers, Durable Objects, and one SQLite database per venue.
-- A health endpoint and a test that runs in CI.
-- A local development command.
-
-Exit criterion: CI is green on the skeleton.
-
-### Phase 4: Schema and exclusion
-
-- Venue, hours, tables, combinations, services, reservations, and versions.
-- The database exclusion rule for overlapping table allocations.
-- Tests for overlap, concurrent writes, version monotonicity, and tombstones.
-
-Exit criterion: concurrent writes cannot double-book a table.
-
-### Phase 5: Write routes
-
-- Create, modify, and cancel.
-- Idempotency keys and monotonic versions.
-- `basis`, `owner_principal`, and `booked_via` set by the engine.
-- The staff write path uses the same operations.
-
-Exit criterion: the write conformance cases pass.
-
-### Phase 6: Read side and event feed
-
-- Availability, agenda, list, and search across days.
-- Event feed with a cursor, including staff-typed bookings.
-
-Exit criterion: the read and feed conformance cases pass.
-
-## Later
-
-### Phase 7: Notices, consent, and erasure
-
-- Restaurant notice address.
-- Guest confirmation and reminder, off by default until legal review.
-- STOP handling.
-- Erasure with counts and hashes.
-- Retention job.
-
-Exit criterion: the legal review is complete and the conformance cases pass.
-
-### Phase 8: Staff screens and migration
-
-- Staff screens with role checks.
+- Staff screens hardened with role checks and accessibility review.
 - Migration from the launch venue's current system.
+- Test coverage for the staff app and the public site, which have none today.
 
 Exit criterion: the launch venue runs on OpenCovers.
 
@@ -109,4 +83,4 @@ Exit criterion: the launch venue runs on OpenCovers.
 - Standalone or internal-only product.
 - The first-venue route.
 - Legal review of guest data, retention, confirmation text, and reminder text.
-- Cloudflare's written answers on Durable Object SQLite restore and jurisdiction.
+- Where the API runs: a container or Cloudflare Workers.
