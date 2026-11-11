@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarPlusIcon, MoreHorizontalIcon } from "lucide-react";
 import { toast } from "sonner";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +33,24 @@ const statusVariant: Record<string, "default" | "secondary" | "outline" | "destr
   no_show: "destructive",
   cancelled: "destructive",
 };
+
+const statusLabel: Record<string, string> = {
+  booked: "Booked",
+  seated: "Seated",
+  attended: "Attended",
+  no_show: "No-show",
+  cancelled: "Cancelled",
+};
+
+function guestInitials(name?: string): string {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join("");
+}
 
 type RowAction =
   | { kind: "status"; label: string; status: string }
@@ -158,19 +177,30 @@ function ReservationRow({
 
   return (
     <TableRow>
-      <TableCell className="font-medium">{reservation.time}</TableCell>
+      <TableCell className="font-medium tabular-nums">{reservation.time}</TableCell>
       <TableCell>
-        <div className="font-medium">{reservation.guest.name ?? "—"}</div>
-        {reservation.guest.contact && (
-          <div className="text-xs text-muted-foreground">
-            {reservation.guest.contact}
+        <div className="flex items-center gap-3">
+          <Avatar className="size-8">
+            <AvatarFallback className="text-xs">
+              {guestInitials(reservation.guest.name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <div className="truncate font-medium">
+              {reservation.guest.name || "—"}
+            </div>
+            {reservation.guest.contact && (
+              <div className="truncate text-xs text-muted-foreground">
+                {reservation.guest.contact}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </TableCell>
       <TableCell>{reservation.partySize}</TableCell>
       <TableCell>
         <Badge variant={statusVariant[reservation.status] ?? "outline"}>
-          {reservation.status}
+          {statusLabel[reservation.status] ?? reservation.status}
         </Badge>
       </TableCell>
       <TableCell>
