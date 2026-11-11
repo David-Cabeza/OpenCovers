@@ -29,17 +29,22 @@ export function FloorEditor({ venueId }: { venueId: string }) {
   const items = itemsData?.items ?? [];
 
   const positionTable = useMutation({
-    mutationFn: ({ tableId, x, y }: { tableId: string; x: number; y: number }) =>
-      api.setTablePosition(venueId, tableId, x, y),
+    mutationFn: ({ tableId, layout }: { tableId: string; layout: { x?: number; y?: number; rotation?: number } }) =>
+      api.updateTableLayout(venueId, tableId, layout),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tables", venueId] });
       void queryClient.invalidateQueries({ queryKey: ["floor", venueId] });
     },
   });
 
-  const positionItem = useMutation({
-    mutationFn: ({ itemId, x, y }: { itemId: string; x: number; y: number }) =>
-      api.setFloorItemPosition(venueId, itemId, x, y),
+  const updateItem = useMutation({
+    mutationFn: ({
+      itemId,
+      layout,
+    }: {
+      itemId: string;
+      layout: { x?: number; y?: number; rotation?: number; width?: number; height?: number };
+    }) => api.updateFloorItemLayout(venueId, itemId, layout),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["floor-items", venueId] });
     },
@@ -96,8 +101,8 @@ export function FloorEditor({ venueId }: { venueId: string }) {
             tables={tables}
             items={items}
             mode="edit"
-            onPosition={(tableId, x, y) => positionTable.mutate({ tableId, x, y })}
-            onItemPosition={(itemId, x, y) => positionItem.mutate({ itemId, x, y })}
+            onTableUpdate={(tableId, layout) => positionTable.mutate({ tableId, layout })}
+            onItemUpdate={(itemId, layout) => updateItem.mutate({ itemId, layout })}
             onDeleteItem={(itemId) => deleteItem.mutate(itemId)}
           />
         )}

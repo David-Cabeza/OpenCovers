@@ -54,6 +54,7 @@ export const tables = pgTable(
     shape: text("shape").notNull().default("round"),
     posX: integer("pos_x").notNull().default(0),
     posY: integer("pos_y").notNull().default(0),
+    rotation: integer("rotation").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.venueId, t.id] })],
 );
@@ -198,6 +199,7 @@ export const floorItems = pgTable(
     posY: integer("pos_y").notNull().default(0),
     width: integer("width").notNull().default(80),
     height: integer("height").notNull().default(40),
+    rotation: integer("rotation").notNull().default(0),
   },
   (t) => [index("idx_floor_items_venue").on(t.venueId)],
 );

@@ -686,6 +686,7 @@ export interface FloorTable {
   shape: string;
   posX: number;
   posY: number;
+  rotation: number;
   occupied: boolean;
   reservationId?: string;
   partySize?: number;
@@ -737,6 +738,7 @@ export async function getFloorPlan(
       shape: t.shape,
       posX: t.posX,
       posY: t.posY,
+      rotation: t.rotation,
       occupied: alloc !== undefined,
       reservationId: alloc?.reservationId,
       partySize: alloc?.partySize,

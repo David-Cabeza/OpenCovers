@@ -16,6 +16,7 @@ export interface Table {
   shape: string;
   posX: number;
   posY: number;
+  rotation: number;
 }
 
 export interface Service {
@@ -61,6 +62,7 @@ export interface FloorTable {
   shape: string;
   posX: number;
   posY: number;
+  rotation: number;
   occupied: boolean;
   reservationId?: string;
   partySize?: number;
@@ -87,6 +89,7 @@ export interface FloorItem {
   posY: number;
   width: number;
   height: number;
+  rotation: number;
 }
 
 export interface Reservation {
@@ -188,10 +191,14 @@ export const api = {
       { method: "DELETE" },
     ),
 
-  setTablePosition: (venueId: string, tableId: string, x: number, y: number) =>
+  updateTableLayout: (
+    venueId: string,
+    tableId: string,
+    body: { x?: number; y?: number; rotation?: number },
+  ) =>
     request<{ tables: Table[] }>(
-      `/v1/venues/${venueId}/tables/${encodeURIComponent(tableId)}/position`,
-      { method: "PATCH", body: JSON.stringify({ x, y }) },
+      `/v1/venues/${venueId}/tables/${encodeURIComponent(tableId)}`,
+      { method: "PATCH", body: JSON.stringify(body) },
     ),
 
   listFloorItems: (venueId: string) =>
@@ -212,10 +219,14 @@ export const api = {
       { method: "DELETE" },
     ),
 
-  setFloorItemPosition: (venueId: string, itemId: string, x: number, y: number) =>
+  updateFloorItemLayout: (
+    venueId: string,
+    itemId: string,
+    body: { x?: number; y?: number; rotation?: number; width?: number; height?: number },
+  ) =>
     request<{ items: FloorItem[] }>(
-      `/v1/venues/${venueId}/floor-items/${encodeURIComponent(itemId)}/position`,
-      { method: "PATCH", body: JSON.stringify({ x, y }) },
+      `/v1/venues/${venueId}/floor-items/${encodeURIComponent(itemId)}`,
+      { method: "PATCH", body: JSON.stringify(body) },
     ),
 
   listServices: (venueId: string) =>

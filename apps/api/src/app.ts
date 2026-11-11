@@ -17,7 +17,7 @@ import {
   deleteTable,
   listServices,
   listTables,
-  setTablePosition,
+  updateTableLayout,
   upsertService,
   upsertTable,
 } from "./lib/catalog";
@@ -43,7 +43,7 @@ import {
   addFloorItem,
   deleteFloorItem,
   listFloorItems,
-  setFloorItemPosition,
+  updateFloorItemLayout,
 } from "./lib/floor-items";
 import {
   addWaitlist,
@@ -460,19 +460,17 @@ app.delete("/v1/venues/:venueId/floor-items/:itemId", async (c) => {
   return c.json({ items });
 });
 
-app.patch("/v1/venues/:venueId/floor-items/:itemId/position", async (c) => {
+app.patch("/v1/venues/:venueId/floor-items/:itemId", async (c) => {
   const venueId = c.req.param("venueId");
   const itemId = c.req.param("itemId");
   const body = await c.req.json();
-  if (
-    typeof body.x !== "number" ||
-    typeof body.y !== "number" ||
-    !Number.isInteger(body.x) ||
-    !Number.isInteger(body.y)
-  ) {
-    return error(c, "invalid_request", 400);
-  }
-  await setFloorItemPosition(db, venueId, itemId, body.x, body.y);
+  await updateFloorItemLayout(db, venueId, itemId, {
+    x: typeof body.x === "number" ? body.x : undefined,
+    y: typeof body.y === "number" ? body.y : undefined,
+    rotation: typeof body.rotation === "number" ? body.rotation : undefined,
+    width: typeof body.width === "number" ? body.width : undefined,
+    height: typeof body.height === "number" ? body.height : undefined,
+  });
   const items = await listFloorItems(db, venueId);
   return c.json({ items });
 });
@@ -515,19 +513,15 @@ app.delete("/v1/venues/:venueId/tables/:tableId", async (c) => {
   return c.json({ tables });
 });
 
-app.patch("/v1/venues/:venueId/tables/:tableId/position", async (c) => {
+app.patch("/v1/venues/:venueId/tables/:tableId", async (c) => {
   const venueId = c.req.param("venueId");
   const tableId = c.req.param("tableId");
   const body = await c.req.json();
-  if (
-    typeof body.x !== "number" ||
-    typeof body.y !== "number" ||
-    !Number.isInteger(body.x) ||
-    !Number.isInteger(body.y)
-  ) {
-    return error(c, "invalid_request", 400);
-  }
-  await setTablePosition(db, venueId, tableId, body.x, body.y);
+  await updateTableLayout(db, venueId, tableId, {
+    x: typeof body.x === "number" ? body.x : undefined,
+    y: typeof body.y === "number" ? body.y : undefined,
+    rotation: typeof body.rotation === "number" ? body.rotation : undefined,
+  });
   const tables = await listTables(db, venueId);
   return c.json({ tables });
 });

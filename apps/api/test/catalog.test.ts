@@ -28,17 +28,17 @@ describe("catalog", () => {
     await upsertTable(db, "cat", { id: "1", name: "T1", seats: 2 });
     await upsertTable(db, "cat", { id: "2", name: "T2", seats: 4 });
     expect(await listTables(db, "cat")).toEqual([
-      { id: "1", name: "T1", seats: 2, zone: "", shape: "round", posX: 0, posY: 0 },
-      { id: "2", name: "T2", seats: 4, zone: "", shape: "round", posX: 0, posY: 0 },
+      { id: "1", name: "T1", seats: 2, zone: "", shape: "round", posX: 0, posY: 0, rotation: 0 },
+      { id: "2", name: "T2", seats: 4, zone: "", shape: "round", posX: 0, posY: 0, rotation: 0 },
     ]);
 
     await upsertTable(db, "cat", { id: "1", name: "T1 Big", seats: 6 });
     const updated = await listTables(db, "cat");
-    expect(updated[0]).toEqual({ id: "1", name: "T1 Big", seats: 6, zone: "", shape: "round", posX: 0, posY: 0 });
+    expect(updated[0]).toEqual({ id: "1", name: "T1 Big", seats: 6, zone: "", shape: "round", posX: 0, posY: 0, rotation: 0 });
 
     await deleteTable(db, "cat", "2");
     expect(await listTables(db, "cat")).toEqual([
-      { id: "1", name: "T1 Big", seats: 6, zone: "", shape: "round", posX: 0, posY: 0 },
+      { id: "1", name: "T1 Big", seats: 6, zone: "", shape: "round", posX: 0, posY: 0, rotation: 0 },
     ]);
   });
 

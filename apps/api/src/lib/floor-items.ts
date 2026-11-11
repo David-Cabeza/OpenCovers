@@ -14,6 +14,7 @@ export interface FloorItem {
   posY: number;
   width: number;
   height: number;
+  rotation: number;
 }
 
 export async function listFloorItems(db: Db, venueId: string): Promise<FloorItem[]> {
@@ -30,6 +31,7 @@ export async function listFloorItems(db: Db, venueId: string): Promise<FloorItem
     posY: r.posY,
     width: r.width,
     height: r.height,
+    rotation: r.rotation,
   }));
 }
 
@@ -54,6 +56,7 @@ export async function addFloorItem(
     posY: input.posY ?? 0,
     width: input.width ?? 80,
     height: input.height ?? 40,
+    rotation: 0,
   };
   await db.insert(floorItems).values({
     id: item.id,
@@ -64,6 +67,7 @@ export async function addFloorItem(
     posY: item.posY,
     width: item.width,
     height: item.height,
+    rotation: item.rotation,
   });
   return item;
 }
@@ -74,15 +78,21 @@ export async function deleteFloorItem(db: Db, venueId: string, id: string): Prom
     .where(and(eq(floorItems.venueId, venueId), eq(floorItems.id, id)));
 }
 
-export async function setFloorItemPosition(
+export async function updateFloorItemLayout(
   db: Db,
   venueId: string,
   id: string,
-  x: number,
-  y: number,
+  input: { x?: number; y?: number; rotation?: number; width?: number; height?: number },
 ): Promise<void> {
+  const set: Record<string, number> = {};
+  if (input.x !== undefined) set.posX = input.x;
+  if (input.y !== undefined) set.posY = input.y;
+  if (input.rotation !== undefined) set.rotation = input.rotation;
+  if (input.width !== undefined) set.width = input.width;
+  if (input.height !== undefined) set.height = input.height;
+  if (Object.keys(set).length === 0) return;
   await db
     .update(floorItems)
-    .set({ posX: x, posY: y })
+    .set(set)
     .where(and(eq(floorItems.venueId, venueId), eq(floorItems.id, id)));
 }

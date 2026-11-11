@@ -13,6 +13,7 @@ export interface TableInfo {
   shape: string;
   posX: number;
   posY: number;
+  rotation: number;
 }
 
 export interface ServiceInfo {
@@ -35,6 +36,7 @@ export async function listTables(db: Db, venueId: string): Promise<TableInfo[]> 
     shape: t.shape,
     posX: t.posX,
     posY: t.posY,
+    rotation: t.rotation,
   }));
 }
 
@@ -64,16 +66,20 @@ export async function upsertTable(
     });
 }
 
-export async function setTablePosition(
+export async function updateTableLayout(
   db: Db,
   venueId: string,
   tableId: string,
-  x: number,
-  y: number,
+  input: { x?: number; y?: number; rotation?: number },
 ): Promise<void> {
+  const set: Record<string, number> = {};
+  if (input.x !== undefined) set.posX = input.x;
+  if (input.y !== undefined) set.posY = input.y;
+  if (input.rotation !== undefined) set.rotation = input.rotation;
+  if (Object.keys(set).length === 0) return;
   await db
     .update(tables)
-    .set({ posX: x, posY: y })
+    .set(set)
     .where(and(eq(tables.venueId, venueId), eq(tables.id, tableId)));
 }
 
