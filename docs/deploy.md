@@ -6,12 +6,25 @@ OpenCovers runs on Cloudflare.
 
 | Part | Where | How |
 | --- | --- | --- |
-| Site (`apps/site`) | Cloudflare Pages | Static Vite build. |
+| Site (`apps/site`) | GitHub Pages | Static Vite build at **opencovers.dev** (`.github/workflows/deploy-site.yml`). |
 | Staff app (`apps/web`) | Cloudflare Pages | Static Vite build; proxies `/api` and `/v1` to the API. |
 | API (`apps/api`) | Cloudflare Workers (planned) or a container | See below. |
 | MCP server (`apps/mcp`) | Not deployed | Runs locally, talks to the API over HTTPS. |
 
+## Public site — opencovers.dev
+
+The marketing site is served from GitHub Pages at `opencovers.dev`. The workflow in `.github/workflows/deploy-site.yml` builds `apps/site` and publishes `apps/site/dist` on every push to `main`. The `CNAME` file in `apps/site/public/` pins the custom domain.
+
+DNS at the registrar (apex domain, `.dev` forces HTTPS):
+
+- `opencovers.dev` → `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153` (A records)
+- `www.opencovers.dev` → `David-Cabeza.github.io` (CNAME)
+
+GitHub issues the HTTPS certificate automatically once the custom domain is verified in **Settings → Pages**.
+
 ## Frontends — Cloudflare Pages
+
+The site ships on GitHub Pages (see above); Cloudflare Pages is the alternative host for it, and the host for the staff app.
 
 ```sh
 pnpm --filter @opencovers/site build   # → apps/site/dist

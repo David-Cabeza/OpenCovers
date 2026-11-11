@@ -133,6 +133,7 @@ TypeScript, Node.js, Hono (API), PostgreSQL (base de datos), React + Tailwind (i
 
 | Activo | Ruta | Uso |
 | --- | --- | --- |
+| Dominio | `opencovers.dev` | Web pública |
 | Logo | `docs/logo.png`, `docs/logo.svg` | Marca en cabeceras y perfiles |
 | Captura — agenda | `docs/assets/agenda.png` | Post de producto |
 | Captura — plano (vista) | `docs/assets/floor-plan.png` | Post visual |
@@ -178,7 +179,7 @@ Orden sugerido (sin fechas comprometidas):
 ## 12. Riesgos y puntos abiertos
 
 1. **Marca.** Existe **OpenCover** (`opencover.com`), una empresa de seguros cripto activa y financiada. El nombre "OpenCovers" es casi idéntico: **riesgo de confusión/conflicto**. Antes de difundir con fuerza, conviene decidir si mantener el nombre o cambiarlo, y hacer la revisión de marca.
-2. **Dominio.** `opencovers.com` sin confirmar disponibilidad; `.org` no encaja (producto, no ONG). Alternativas: `getopencovers.com`, `opencovers.dev`, `opencovers.io`.
+2. **Dominio.** Resuelto: comprado **`opencovers.dev`** (`.io` descartado por precio). Queda apuntar el DNS y activar el despliegue (GitHub Pages, ya configurado).
 3. **Legal del correo.** Plantillas pendientes de revisión de texto y base de consentimiento.
 4. **Sin deploy.** Todo el storytelling visual depende de un entorno local; el vídeo/GIF ya lo cubre, pero el "pruébalo tú" llega con el despliegue.
 
@@ -187,7 +188,7 @@ Orden sugerido (sin fechas comprometidas):
 ## 13. Próximos pasos (para el CMO)
 
 1. Decidir la posición sobre el **nombre** (¿mantenemos "OpenCovers" o proponemos alternativas?) — es lo primero, porque condiciona dominio, logo y mensajes.
-2. Confirmar disponibilidad de **dominio** y reservar el elegido.
+2. ~~Dominio~~ — comprado `opencovers.dev`; queda apuntar el DNS y activar el despliegue.
 3. Validar el **plan de canales** (§10) y priorizar los 2–3 primeros.
 4. Aprobar los **mensajes clave** (§5) antes de publicar.
 5. Coordinar la **secuencia de publicación**: README → logo/capturas → hilo X/LinkedIn con el GIF → HN/PH cuando haya deploy.

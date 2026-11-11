@@ -6,7 +6,7 @@
 
 **The open-source reservations engine for restaurants — availability, bookings, tables, and the event feed, with an API and an MCP server.**
 
-<sub>OpenCovers is the working name. Trademark clearance is pending. Pre-alpha: it runs locally with tests, nothing is deployed yet.</sub>
+<sub>OpenCovers is the working name. Trademark clearance is pending. Pre-alpha: it runs locally with tests, nothing is deployed yet. Public site: <a href="https://opencovers.dev">opencovers.dev</a>.</sub>
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=node.js&logoColor=white)
@@ -149,7 +149,7 @@ docs/      the contract, ADRs, and requirements
 
 ## Deploy
 
-The staff app and site deploy to Cloudflare Pages as static builds. The API ships as a Docker image (Node.js) and is being ported to Cloudflare Workers + Hyperdrive. See [docs/deploy.md](docs/deploy.md).
+The site deploys to GitHub Pages at [opencovers.dev](https://opencovers.dev); the staff app deploys to Cloudflare Pages as a static build. The API ships as a Docker image (Node.js) and is being ported to Cloudflare Workers + Hyperdrive. See [docs/deploy.md](docs/deploy.md).
 
 ## Status
 
