@@ -52,7 +52,8 @@ Exit criterion: the legal review is complete and the conformance cases still pas
 Status: next.
 
 - Keep the engine host-agnostic: PostgreSQL and a Node.js process, with no vendor-specific code. Each fork chooses where its database lives.
-- Document one reference deployment of the Docker image in [docs/deploy.md](docs/deploy.md), with the staff app served as a static build and `/api` and `/v1` forwarded to the API.
+- Done: `compose.prod.yaml` brings up PostgreSQL, the API, and the staff app behind Caddy with one command, documented in [docs/deploy.md](docs/deploy.md). Checked on 2026-11-11 with Docker Compose: `config`, `up --build`, migrations on boot, sign-up and sign-in through the single origin, a table booking, a rejected overlapping booking (`slot_taken`), an idempotent replay, and data surviving a restart.
+- Pending: automatic HTTPS on a real domain, and a click-through of the staff screens in a browser. The checks above used HTTP calls to the same origin.
 
 Exit criterion: the staff app signs in and books a table against an API running from the Docker image.
 

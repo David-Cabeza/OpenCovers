@@ -21,19 +21,25 @@ pnpm db:migrate
 
 `compose.yaml` starts a local PostgreSQL for development.
 
-## API
+## Quick start with Docker Compose
 
-Build and run the Docker image in `apps/api/Dockerfile` on any host that runs containers: a VPS, Kubernetes, Fly.io, Railway, or your own machine. The image applies migrations on boot. Without Docker, run the Node.js process directly.
-
-Put the API behind a reverse proxy with HTTPS. Set the variables in the table below.
-
-## Staff app
+`compose.prod.yaml` runs the whole engine on any machine with Docker. It starts PostgreSQL, the API, and Caddy, which serves the staff app and forwards `/api/*` and `/v1/*` to the API. Everything shares one origin.
 
 ```sh
-pnpm --filter @opencovers/web build   # apps/web/dist
+cp .env.prod.example .env.prod
+openssl rand -base64 32   # paste into BETTER_AUTH_SECRET
+docker compose -f compose.prod.yaml --env-file .env.prod up -d --build
 ```
 
-Serve `apps/web/dist` from any static host. The app calls `/api/*` (Better Auth) and `/v1/*` (the API) relative to its own origin. Forward those two paths to the API with your reverse proxy, or serve both from one origin. Add the staff app's origin to `TRUSTED_ORIGINS` on the API.
+Set `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` in `.env.prod`. The stack refuses to start without them. Use only letters and digits in the database password, because it goes inside the database URL. Open `http://localhost` and sign up.
+
+To serve a real domain, set `SITE_ADDRESS=app.example.com` and `PUBLIC_URL=https://app.example.com`. Caddy then gets a certificate on its own. Ports 80 and 443 must reach the machine. Use `HTTP_PORT` and `HTTPS_PORT` to publish other ports.
+
+The API image applies migrations on boot. PostgreSQL is not published to the host.
+
+To use an external PostgreSQL instead, remove the `db` service and its `depends_on` entry, and set `DATABASE_URL` on the `api` service to your connection string.
+
+Without Docker, build the staff app with `pnpm --filter @opencovers/web build`, serve `apps/web/dist` from any static host, and forward `/api/*` and `/v1/*` to the API. Add the staff app's origin to `TRUSTED_ORIGINS`.
 
 ## Public site
 
