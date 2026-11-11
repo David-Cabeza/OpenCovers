@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { RotateCwIcon } from "lucide-react";
 import { cn } from "cn";
-import { FLOOR_ITEM_TYPES } from "@/lib/floor-item-types";
+import { FloorItemShape } from "./floor-item-shape";
+import { WoodFloor } from "./wood-floor";
 
 export interface CanvasTable {
   id: string;
@@ -167,12 +168,11 @@ export function FloorCanvas({
   return (
     <div
       ref={canvasRef}
-      className="relative h-[480px] w-full overflow-hidden rounded-lg border bg-muted/30"
+      className="relative h-[480px] w-full overflow-hidden rounded-lg border bg-[#eedcc0]"
       onDragOver={(e) => e.preventDefault()}
     >
+      <WoodFloor />
       {items.map((item) => {
-        const config =
-          FLOOR_ITEM_TYPES[item.type] ?? { label: item.label || item.type, className: "bg-foreground/20" };
         const pos = posOf("item", item.id, item.posX, item.posY);
         const size = sizeOf(item.id, item.width, item.height);
         const rotation = item.rotation ?? 0;
@@ -186,14 +186,8 @@ export function FloorCanvas({
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
           >
-            <div
-              className={cn(
-                "flex size-full items-center justify-center text-xs font-medium",
-                config.className,
-              )}
-              style={{ transform: `rotate(${rotation}deg)` }}
-            >
-              {config.label || item.label || item.type}
+            <div className="absolute inset-0" style={{ transform: `rotate(${rotation}deg)` }}>
+              <FloorItemShape type={item.type} />
             </div>
             {mode === "edit" && (
               <>
@@ -292,19 +286,24 @@ export function FloorCanvas({
                   height: size.h,
                 }}
               >
-                <span className="px-1 text-[11px] font-semibold leading-tight">{t.name}</span>
-                {t.occupied ? (
-                  <>
-                    <span className="max-w-[52px] truncate text-[10px] font-medium">
-                      {t.guestName || "—"}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {t.partySize ?? "?"} pax
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground">{t.seats}</span>
-                )}
+                <div
+                  className="flex flex-col items-center justify-center"
+                  style={{ transform: `rotate(${-rotation}deg)` }}
+                >
+                  <span className="px-1 text-[11px] font-semibold leading-tight">{t.name}</span>
+                  {t.occupied ? (
+                    <>
+                      <span className="max-w-[52px] truncate text-[10px] font-medium">
+                        {t.guestName || "—"}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {t.partySize ?? "?"} pax
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">{t.seats}</span>
+                  )}
+                </div>
               </div>
             </div>
             {mode === "edit" && (
