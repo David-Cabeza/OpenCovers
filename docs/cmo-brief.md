@@ -134,7 +134,7 @@ TypeScript, Node.js, Hono (API), PostgreSQL (base de datos), React + Tailwind (i
 | Activo | Ruta | Uso |
 | --- | --- | --- |
 | Dominio | `opencovers.dev` | Web pública |
-| Logo | `docs/logo.png`, `docs/logo.svg` | Marca en cabeceras y perfiles |
+| Logo y marca | `docs/logo.png`, `docs/logo.svg`, `docs/brand/` | Marca en cabeceras y perfiles; kit completo (SVG, iconos, OG, banners) en `docs/brand/` |
 | Captura — agenda | `docs/assets/agenda.png` | Post de producto |
 | Captura — plano (vista) | `docs/assets/floor-plan.png` | Post visual |
 | Captura — editor de plano | `docs/assets/floor-editor.png` | Post visual |

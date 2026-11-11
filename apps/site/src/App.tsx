@@ -249,7 +249,7 @@ function Nav() {
     <header className="nav">
       <div className="in">
         <a href="#" className="brand">
-          <img src="/logo.png" alt="" />
+          <img src="/mark.svg" alt="" />
           OpenCovers
         </a>
         <ul>
