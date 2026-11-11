@@ -1,7 +1,10 @@
 import {
+  ArmchairIcon,
   ArrowRightIcon,
   BotIcon,
   CalendarDaysIcon,
+  LayoutGridIcon,
+  MailIcon,
   PlugZapIcon,
   ShieldCheckIcon,
   StarIcon,
@@ -31,19 +34,34 @@ const features = [
     body: "Una restricción de exclusión GiST en PostgreSQL rechaza solapamientos de mesa. Vale para cualquier número de escritores concurrentes, sin bloqueos en la aplicación.",
   },
   {
+    icon: LayoutGridIcon,
+    title: "Plano de sala visual",
+    body: "Mesas redondas, cuadradas y rectangulares con sillas, y elementos dibujados (barra, cocina, puerta, planta…). Arrastra, rota y redimensiona con ajuste a rejilla sobre un suelo de madera.",
+  },
+  {
+    icon: UsersIcon,
+    title: "App de sala para el equipo",
+    body: "Agenda, disponibilidad, plano, lista de espera, walk-ins y ritmo de servicio. Login del personal con roles por local. React, Tailwind y shadcn/ui.",
+  },
+  {
+    icon: ArmchairIcon,
+    title: "Zonas y asignación automática",
+    body: "Disponibilidad por zona (terraza, salón…) y asignación automática de mesa cuando el cliente solo indica hora y número de personas.",
+  },
+  {
     icon: PlugZapIcon,
     title: "API para plataformas y agentes",
     body: "Disponibilidad, agenda, búsqueda, crear, modificar, cancelar, estado, eventos y borrado, a través de un único contrato. Claves con roles y permisos por local.",
   },
   {
-    icon: UsersIcon,
-    title: "App de sala para el equipo",
-    body: "Login del personal con roles por local, agenda, disponibilidad, gestión de mesas y servicios, y claves de agente. React, Tailwind y shadcn/ui.",
-  },
-  {
     icon: BotIcon,
     title: "Servidor MCP",
-    body: "El catálogo de 13 herramientas (reservation.* y venue.*) expuesto por stdio, para que Claude, Cursor y otros hosts operen un local directamente.",
+    body: "El catálogo de 18 herramientas (reservation.*, waitlist.* y venue.*) expuesto por stdio, para que Claude, Cursor y otros hosts operen un local directamente.",
+  },
+  {
+    icon: MailIcon,
+    title: "Correo de confirmación",
+    body: "Confirmaciones, cancelaciones y avisos vía Resend, una por versión de reserva. Cada local trae su propia cuenta y está desactivado hasta habilitarse.",
   },
   {
     icon: Table2Icon,
@@ -71,12 +89,12 @@ const steps = [
 ];
 
 const challenges = [
-  { title: "Asignación automática de mesas", tag: "motor", body: "Que el motor elija la mesa cuando el cliente dice solo hora y personas." },
-  { title: "Tipos de reserva y depósito", tag: "motor", body: "Reserva libre frente a reserva con depósito o tarjeta, en el contrato." },
-  { title: "Zonas como ciudadano de primera", tag: "motor", body: "Disponibilidad y preferencia por zona (terraza, salón…)." },
-  { title: "Lista de espera y walk-in", tag: "motor", body: "Los dos flujos físicos más comunes en sala, como operaciones propias." },
   { title: "Webhooks firmados", tag: "integración", body: "Push con firma HMAC encima del feed con cursor." },
   { title: "Despliegue de referencia", tag: "infra", body: "El primer 'corre en un sitio real', con Postgres gestionado." },
+  { title: "Depósitos y tarjetas", tag: "motor", body: "Reserva libre frente a reserva con depósito o tarjeta, en el contrato." },
+  { title: "Marca y dominio", tag: "marca", body: "Resolución del nombre, revisión de marca y compra del dominio." },
+  { title: "Informes y analítica", tag: "producto", body: "Ocupación, no-shows y rendimiento por servicio y zona." },
+  { title: "App móvil del personal", tag: "producto", body: "Agenda y mesa en el bolsillo, fuera del escritorio." },
 ];
 
 export default function App() {
