@@ -168,6 +168,7 @@ export function FloorCanvas({
   return (
     <div
       ref={canvasRef}
+      data-testid="floor-canvas"
       className="relative h-[480px] w-full overflow-hidden rounded-lg border bg-[#eedcc0]"
       onDragOver={(e) => e.preventDefault()}
     >
@@ -193,6 +194,7 @@ export function FloorCanvas({
               <>
                 <button
                   type="button"
+                  aria-label="Rotate"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => rotate(item.id, rotation, "item")}
                   className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-accent"
@@ -201,6 +203,7 @@ export function FloorCanvas({
                 </button>
                 <button
                   type="button"
+                  aria-label="Delete"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => onDeleteItem?.(item.id)}
                   className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-destructive hover:text-white"
@@ -208,6 +211,7 @@ export function FloorCanvas({
                   ×
                 </button>
                 <div
+                  aria-label="Resize"
                   onPointerDown={(e) => startResize(e, item)}
                   onPointerMove={onResizeMove}
                   onPointerUp={onResizeUp}
@@ -309,6 +313,7 @@ export function FloorCanvas({
             {mode === "edit" && (
               <button
                 type="button"
+                aria-label="Rotate"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => rotate(t.id, rotation, "table")}
                 className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-accent"

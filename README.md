@@ -104,6 +104,16 @@ Open <http://localhost:5173>, sign up, and create a venue. The public site is at
 
 To run the MCP server, see [apps/mcp](apps/mcp/README.md). Create an agent key from the staff app under **Setup → API keys**.
 
+## Demo
+
+A quick walkthrough of the agenda and the floor plan.
+
+<p align="center">
+  <img src="docs/assets/opencovers-demo.gif" alt="OpenCovers demo" width="720">
+</p>
+
+> [Download the full-resolution demo (MP4)](https://raw.githubusercontent.com/David-Cabeza/OpenCovers/main/docs/assets/opencovers-demo.mp4)
+
 ## Screenshots
 
 The staff app in action — the agenda, the floor plan, and the floor editor.
