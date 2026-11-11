@@ -82,12 +82,12 @@ a { color: inherit; }
   .table-art { order: 2; position: relative; right: auto; top: auto; width: 120vw; height: 120vw; margin: 40px 0 -40vw 22vw; }
 }
 
-/* ---------- intro: statement + video in the circle ---------- */
-.intro { padding: var(--gap) var(--m); background: var(--f1); display: grid; grid-template-columns: 8fr 4fr; gap: var(--m); align-items: center; }
-.intro p { font-size: var(--lead); line-height: 1.2; max-width: 36ch; font-weight: 600; }
-.intro .disc { aspect-ratio: 1; border-radius: 50%; overflow: hidden; background: var(--f3); }
-.intro video { width: 100%; height: 100%; object-fit: cover; display: block; }
-@media (max-width: 760px) { .intro { grid-template-columns: 1fr; } }
+/* ---------- intro: split, statement + video ---------- */
+.intro { background: var(--f1); display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; min-height: 72svh; }
+.intro p { align-self: center; padding: var(--gap) var(--m); font-size: var(--lead); line-height: 1.2; max-width: 38ch; font-weight: 600; }
+.intro .disc { position: relative; overflow: hidden; background: var(--f3); }
+.intro video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: left top; display: block; }
+@media (max-width: 760px) { .intro { grid-template-columns: 1fr; min-height: 0; } .intro p { padding-block: 72px 40px; } .intro .disc { aspect-ratio: 16 / 10; } }
 
 /* ---------- features: sentences with switches ---------- */
 .sw { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; min-height: 20vh; padding: 28px var(--m); text-align: left; background: var(--bg); color: var(--muted); cursor: pointer; transition: background 0.5s var(--ease), color 0.4s; }
@@ -138,8 +138,8 @@ a { color: inherit; }
 @media (max-width: 860px) { .tiles { grid-template-columns: 1fr; } .tile { min-height: 0 !important; } }
 
 /* ---------- list: sticky disc + active list ---------- */
-.mod { display: grid; grid-template-columns: 5fr 1fr 5fr; padding: var(--gap) var(--m); gap: 0; align-items: start; }
-.mod .pic { grid-column: 1; grid-row: 1 / span 2; position: sticky; top: 12vh; aspect-ratio: 1; border-radius: 50%; overflow: hidden; background: var(--surface); width: min(100%, 34vw); }
+.mod { display: grid; grid-template-columns: 7fr 1fr 4fr; padding: var(--gap) var(--m); gap: 0; align-items: start; }
+.mod .pic { grid-column: 1; grid-row: 1 / span 2; position: sticky; top: 12vh; aspect-ratio: 16 / 10; overflow: hidden; background: var(--surface); width: 100%; }
 .mod .pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.35s ease; }
 .mod .pic img.on { opacity: 1; }
 .mod h2 { grid-column: 3; grid-row: 1; font-size: var(--head); margin-bottom: 48px; align-self: start; }
@@ -155,7 +155,7 @@ a { color: inherit; }
 @media (max-width: 860px) {
   .mod { grid-template-columns: 1fr; padding-top: var(--gap); }
   .mod h2, .mod ul { grid-column: 1; grid-row: auto; }
-  .mod .pic { grid-column: 1; grid-row: auto; position: sticky; top: 62px; z-index: 2; width: 100%; aspect-ratio: 4 / 3; border-radius: 0 0 50% 50% / 0 0 100% 100%; margin: 0 calc(var(--m) * -1); width: calc(100% + var(--m) * 2); max-height: 38svh; }
+  .mod .pic { grid-column: 1; grid-row: auto; position: sticky; top: 62px; z-index: 2; width: 100%; aspect-ratio: 16 / 10; margin: 0 calc(var(--m) * -1); width: calc(100% + var(--m) * 2); }
   .mod ul { padding-top: 32px; }
 }
 

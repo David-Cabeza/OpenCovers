@@ -424,7 +424,7 @@ function Modules() {
             alt={m.alt}
             loading="lazy"
             className={i === active ? "on" : ""}
-            style={{ objectPosition: m.pos }}
+           
           />
         ))}
       </div>
