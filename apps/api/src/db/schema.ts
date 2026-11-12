@@ -103,6 +103,7 @@ export const tableAllocations = pgTable(
     tableId: text("table_id").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    active: boolean("active").notNull().default(true),
   },
   (t) => [
     primaryKey({ columns: [t.reservationId, t.tableId] }),

@@ -201,12 +201,11 @@ async function autoAssignTables(
     const busy = await tx
       .select()
       .from(tableAllocations)
-      .innerJoin(reservations, eq(tableAllocations.reservationId, reservations.id))
       .where(
         and(
           eq(tableAllocations.venueId, venueId),
           eq(tableAllocations.tableId, t.id),
-          inArray(reservations.status, ACTIVE_STATUSES),
+          eq(tableAllocations.active, true),
           lt(tableAllocations.startsAt, endsAt),
           gt(tableAllocations.endsAt, startsAt),
         ),
@@ -596,6 +595,9 @@ export async function setStatus(
       }
       const nextVersion = current.version + 1;
       await tx.update(reservations).set({ status, version: nextVersion }).where(eq(reservations.id, id));
+      if (!ACTIVE_STATUSES.includes(status)) {
+        await tx.update(tableAllocations).set({ active: false }).where(eq(tableAllocations.reservationId, id));
+      }
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "status", version: nextVersion });
       await tx.insert(events).values({ venueId, type: status, reservationId: id, version: nextVersion });
       return nextVersion;
@@ -757,7 +759,7 @@ export async function getFloorPlan(
           and(
             eq(tableAllocations.venueId, venueId),
             eq(tableAllocations.tableId, t.id),
-            inArray(reservations.status, ACTIVE_STATUSES),
+            eq(tableAllocations.active, true),
             lt(tableAllocations.startsAt, point),
             gt(tableAllocations.endsAt, point),
           ),
@@ -875,12 +877,11 @@ async function hasFreeTable(db: Db, venueId: string, start: Date, end: Date, par
     const busy = await db
       .select()
       .from(tableAllocations)
-      .innerJoin(reservations, eq(tableAllocations.reservationId, reservations.id))
       .where(
         and(
           eq(tableAllocations.venueId, venueId),
           eq(tableAllocations.tableId, t.id),
-          inArray(reservations.status, ACTIVE_STATUSES),
+          eq(tableAllocations.active, true),
           lt(tableAllocations.startsAt, end),
           gt(tableAllocations.endsAt, start),
         ),

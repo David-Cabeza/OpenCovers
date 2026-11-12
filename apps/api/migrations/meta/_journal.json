@@ -113,6 +113,13 @@
       "when": 1794505290505,
       "tag": "0015_flimsy_gravity",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1794517310723,
+      "tag": "0016_condemned_gauntlet",
+      "breakpoints": true
     }
   ]
 }
