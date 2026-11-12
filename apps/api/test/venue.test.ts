@@ -101,7 +101,7 @@ describe("venue config and erasure", () => {
     if (!created.ok) throw new Error("create failed");
 
     const res = await erase(db, "erase", "carlos@example.com");
-    expect(res).toEqual({ erasedReservations: 1, erasedGuests: 1 });
+    expect(res).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0 });
 
     const config = await getConfig(db, "erase");
     expect(config).toEqual({
@@ -116,7 +116,7 @@ describe("venue config and erasure", () => {
     });
 
     const again = await erase(db, "erase", "carlos@example.com");
-    expect(again).toEqual({ erasedReservations: 0, erasedGuests: 0 });
+    expect(again).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0 });
   });
 
   it("lists tables for a venue over the API", async () => {

@@ -413,7 +413,8 @@ paths:
         Erasure returns counts. For each erased reservation the event feed
         emits an `erased` event carrying a tombstone hash. Erasure also resets
         the reservation's consent to `unknown` and its rating to null. The counts still report
-        reservations and guests erased, not consent values.
+        reservations and guests erased, not consent values. Erasure by guest id also
+        deletes the venue's waitlist entries with that contact and counts them.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -753,11 +754,13 @@ components:
 
     ErasureResult:
       type: object
-      required: [erasedReservations, erasedGuests]
+      required: [erasedReservations, erasedGuests, erasedWaitlistEntries]
       properties:
         erasedReservations:
           type: integer
         erasedGuests:
+          type: integer
+        erasedWaitlistEntries:
           type: integer
 
     Error:

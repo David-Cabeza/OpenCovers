@@ -23,7 +23,7 @@ The MCP server implements this catalog. It wraps the HTTP API and is scoped per 
 | `venue.getConfig` | GET /venues/{venueId}/config | read | none |
 | `venue.setConfig` | PUT /venues/{venueId}/config | write | required |
 
-Reservation writes carry an idempotency key and return the reservation. Erasure returns the counts. Reads never mutate.
+Reservation writes carry an idempotency key and return the reservation. Erasure returns the counts of erased reservations, guests, and waitlist entries. Reads never mutate.
 
 `reservation.create`, `reservation.walk_in`, and `reservation.modify` accept an optional `consent` of `unknown`, `granted`, or `denied`. Reads return it as `guest.consent`, with `guest.consentRecordedAt` once a guest has answered.
 

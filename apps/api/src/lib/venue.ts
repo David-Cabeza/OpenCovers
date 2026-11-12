@@ -7,6 +7,7 @@ import {
   tombstones,
   venueMemberships,
   venues,
+  waitlist,
 } from "../db/schema";
 import * as schema from "../db/schema";
 import { consentColumns } from "./consent";
@@ -34,6 +35,7 @@ export type ConfigResult =
 export interface ErasureResult {
   erasedReservations: number;
   erasedGuests: number;
+  erasedWaitlistEntries: number;
 }
 
 export async function createVenue(
@@ -168,10 +170,7 @@ export async function erase(
             ),
           )
       : [];
-  if (matches.length === 0) {
-    return { erasedReservations: 0, erasedGuests: 0 };
-  }
-  await db.transaction(async (tx) => {
+  const erasedWaitlistEntries = await db.transaction(async (tx) => {
     for (const m of matches) {
       const hash = await sha256Hex(m.id);
       await tx
@@ -191,6 +190,13 @@ export async function erase(
         tombstoneHash: hash,
       });
     }
+    if (!guestId) return 0;
+    const removed = await tx
+      .delete(waitlist)
+      .where(and(eq(waitlist.venueId, venueId), eq(waitlist.guestContact, guestId)))
+      .returning({ id: waitlist.id });
+    return removed.length;
   });
-  return { erasedReservations: matches.length, erasedGuests: 1 };
+  const erasedGuests = matches.length > 0 || erasedWaitlistEntries > 0 ? 1 : 0;
+  return { erasedReservations: matches.length, erasedGuests, erasedWaitlistEntries };
 }

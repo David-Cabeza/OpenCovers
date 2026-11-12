@@ -24,7 +24,7 @@ A modify that changes only consent or rating is allowed on `booked`, `seated` an
 
 ## C5. Erasure
 
-Erasure by guest id returns the counts of erased reservations and guests, and no personal value remains for that guest. Each tombstone it emits carries a hash of the reservation id, visible in the event feed.
+Erasure by guest id returns the counts of erased reservations, guests, and waitlist entries, and no personal value remains for that guest. It deletes the venue's waitlist entries with that contact and leaves other venues and other guests untouched. Each tombstone it emits carries a hash of the reservation id, visible in the event feed.
 
 ## C6. Notice address
 

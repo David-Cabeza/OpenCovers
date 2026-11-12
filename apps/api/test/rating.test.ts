@@ -175,7 +175,7 @@ describe("per-reservation guest rating", () => {
     ).json();
 
     const res = await post("/erasure", { guestId: "eva@example.com" });
-    expect(await res.json()).toEqual({ erasedReservations: 1, erasedGuests: 1 });
+    expect(await res.json()).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0 });
 
     const after = await get(`/reservations/${created.id}`);
     expect(after.rating).toBeNull();

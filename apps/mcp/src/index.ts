@@ -358,7 +358,7 @@ export function createServer(): McpServer {
     {
       title: "Erase personal data",
       description:
-        "Erase guest data for a venue, by guest contact or owner principal. Returns counts.",
+        "Erase guest data for a venue, by guest contact or owner principal. A guest contact also removes its waitlist entries. Returns counts of erased reservations, guests, and waitlist entries.",
       annotations: { destructiveHint: true },
       inputSchema: z.object({
         venueId: z.string(),

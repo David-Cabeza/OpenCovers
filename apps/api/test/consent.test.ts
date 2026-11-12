@@ -156,14 +156,14 @@ describe("per-reservation contact consent", () => {
     ).json();
 
     const res = await post("/erasure", { guestId: "eva@example.com" });
-    expect(await res.json()).toEqual({ erasedReservations: 1, erasedGuests: 1 });
+    expect(await res.json()).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0 });
 
     const after = await get(`/reservations/${created.id}`);
     expect(after.guest.consent).toBe("unknown");
     expect(after.guest.consentRecordedAt).toBeUndefined();
 
     const again = await post("/erasure", { guestId: "eva@example.com" });
-    expect(await again.json()).toEqual({ erasedReservations: 0, erasedGuests: 0 });
+    expect(await again.json()).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0 });
   });
 
   it("refuses to record consent on an erased reservation", async () => {
