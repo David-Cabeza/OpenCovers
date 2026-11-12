@@ -7,8 +7,8 @@ export const phases: Phase[] = [
     title: "Clientes y disponibilidad",
     summary: "El cliente pasa a ser una ficha propia y la disponibilidad aprende a explicarse.",
     items: [
-      "Un ADR sobre la identidad del cliente, antes de que se acumulen datos.",
-      "Ficha de cliente con notas, alergias e historial de visitas.",
+      "Decidido: un cliente pertenece a un local, se empareja por email o teléfono y se fusiona a mano con auditoría.",
+      "Ficha de cliente con notas e historial de visitas. Las alergias como campo propio esperan a la revisión legal.",
       "Tiempo de mesa según el tamaño del grupo.",
       "Un endpoint que explica por qué un hueco está cerrado.",
     ],

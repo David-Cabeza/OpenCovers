@@ -101,7 +101,7 @@ The phases below follow dependencies. Phase 10 comes first because later phases 
 
 The guest becomes a first-class record, and availability becomes a set of rules that can explain themselves.
 
-Design first. Write an ADR on guest identity before any guest data accumulates. The open question is the scope of a guest, per venue or per group. A starting point is a guest matched by normalized email or phone, with a merge tool and an audit trail. [M]
+Design settled. [ADR-0003](docs/adr/0003-guest-identity.md) is accepted. A guest belongs to one venue, is matched by normalized email or phone, and merges are manual with an audit trail. A group can share guests by opt-in in Phase 15. Allergies as a structured field wait for the legal review.
 
 Guests
 - A guest entity separate from the reservation, with notes, allergies and diet, occasions, and visit history. [L, split it]
@@ -220,4 +220,4 @@ Some capabilities of large platforms depend on things an open-source engine cann
 - Standalone or internal-only product.
 - The first-venue route.
 - Legal review of guest data, retention, confirmation text, and reminder text.
-- The guest identity scope, per venue or per group, recorded in an ADR at the start of Phase 10.
+- The data controller of a shared guest book in a group, decided in Phase 15.

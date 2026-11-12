@@ -96,7 +96,7 @@ const modules = [
 ];
 
 const challenges = [
-  { title: "ADR de identidad del cliente", tag: "diseño", body: "Decide si un cliente es de un local o de un grupo, antes de que se acumulen datos." },
+  { title: "Ficha de cliente", tag: "motor", body: "Un cliente por local, emparejado por email o teléfono, con fusión manual y auditoría. El diseño ya está decidido." },
   { title: "Disponibilidad que se explica", tag: "motor", body: "Un endpoint que dice por qué un hueco está cerrado." },
   { title: "Widget de reservas", tag: "producto", body: "Una página de reservas para la web del local, sin marca de OpenCovers." },
   { title: "Temas declarativos", tag: "producto", body: "Paquetes solo de datos para cambiar colores, tipos y logo." },

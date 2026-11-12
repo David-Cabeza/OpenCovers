@@ -1,6 +1,6 @@
 # ADR-0003: A guest belongs to one venue
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-12
 - Deciders: David Cabeza
 
@@ -42,9 +42,9 @@ The project is pre-alpha and nothing is deployed, so the reservation data a migr
 
 ## Decision
 
-This section is a recommendation. The maintainer decides.
+The maintainer accepted this decision on 2026-11-12. The answers to the open questions are recorded at the end.
 
-We recommend option C. A guest belongs to exactly one venue now, and the shape leaves room for a group to share guests by opt-in later.
+We choose option C. A guest belongs to exactly one venue now, and the shape leaves room for a group to share guests by opt-in later.
 
 1. **Scope.** A `guests` row carries a `venue_id` and is readable only through that venue, like every other row. Its id is a random UUID, never derived from the contact. No query joins guests across venues.
 2. **Matching.** A booking links to a guest by an exact match on a normalized email or a normalized phone, within the venue. The name never takes part in matching. A booking whose contact does not normalize creates no guest and still succeeds.
@@ -99,7 +99,7 @@ One guest record serves every venue in a group. Staff at one venue see notes typ
 
 ### C. A guest per venue, shareable by opt-in later
 
-This is the recommendation above.
+This is the decision above.
 
 ### Matching alternatives
 
@@ -117,15 +117,19 @@ This is the recommendation above.
 - Move consent to the guest. Rejected because consent is recorded per visit with a time, and REQ-N4 and the contract define it there. A guest-level "latest consent" is a read over reservations.
 - Move rating to the guest. Rejected because a rating is about one visit.
 
-## Open decisions
+## Resolved questions
 
-These need David, and some need a lawyer.
+The maintainer settled these on 2026-11-12.
 
-- Who is the data controller in a group, each venue or the group? The answer decides whether Phase 15 sharing is opted into by the venue or by the guest.
-- Should the engine store allergies and diet on the guest, given they can reveal health information? The alternative keeps them as a note on each reservation and never on a lasting record.
-- How long does a guest record live? `venues.retention_days` (default 400) prunes only events today. One option deletes a guest a fixed time after their last visit.
-- Should a walk-in with no contact create a guest? This ADR says no.
-- Does changing `guestId` in the erasure call to mean the guest record id need a contract version bump, or is the fallback to a contact enough?
-- Which role can merge and unmerge, admin only or any key with `write`?
-- Do guest changes enter the event feed in Phase 10, or wait for a consumer that needs them?
-- Is the per-venue default country for phone numbers a new venue setting, or derived from the venue's time zone?
+- Allergies and diet. Phase 10 does not store them as a structured field on the guest record. A guest has a free-text note, with an on-screen warning not to record health details. Allergies stay as a note on each reservation. A structured field waits for the legal review of Phase 7, because allergies can reveal health information. That reading is general knowledge and a lawyer must confirm it.
+- Guest record lifetime. A guest record reuses `venues.retention_days` (default 400). That many days after the last visit, the guest's personal fields are cleared and the visits stay as anonymous rows. The default is a starting value, and the legal review may change it.
+- `guestId` in erasure. It becomes the guest record id, which is what the contract already says. The contact match stays as a fallback for one version and is documented as deprecated. No contract version bump, because the project is pre-alpha with no stable version. Known consumers are told when the change ships.
+- A walk-in with no contact does not create a guest.
+- Only an admin can merge and unmerge. Opening it to `write` keys can come later.
+- Guest changes stay out of the event feed until a consumer needs them.
+- The default country for phone numbers is a venue setting. The time zone only supplies its initial value.
+
+## Still open
+
+- Who is the data controller in a group, each venue or the group. This is decided in Phase 15, before any sharing.
+- The legal review of retention periods and of health-related notes.
