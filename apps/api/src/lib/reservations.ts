@@ -75,6 +75,7 @@ export interface Reservation {
   consentRecordedAt: string | null;
   rating: Rating | null;
   ratingRecordedAt: string | null;
+  tableIds: string[];
 }
 
 export interface Event {
@@ -256,7 +257,11 @@ function pickCombination(
   return state.best ? state.best.map((t) => t.id) : null;
 }
 
-function toReservation(row: typeof reservations.$inferSelect, timezone: string): Reservation {
+function toReservation(
+  row: typeof reservations.$inferSelect,
+  timezone: string,
+  tableIds: string[],
+): Reservation {
   return {
     id: row.id,
     date: row.date,
@@ -275,7 +280,27 @@ function toReservation(row: typeof reservations.$inferSelect, timezone: string):
     consentRecordedAt: row.consentRecordedAt ? row.consentRecordedAt.toISOString() : null,
     rating: row.rating,
     ratingRecordedAt: row.ratingRecordedAt ? row.ratingRecordedAt.toISOString() : null,
+    tableIds,
   };
+}
+
+async function withTables(
+  db: Db,
+  rows: (typeof reservations.$inferSelect)[],
+  timezone: string,
+): Promise<Reservation[]> {
+  if (rows.length === 0) return [];
+  const allocations = await db
+    .select({ reservationId: tableAllocations.reservationId, tableId: tableAllocations.tableId })
+    .from(tableAllocations)
+    .where(inArray(tableAllocations.reservationId, rows.map((r) => r.id)));
+  const byReservation = new Map<string, string[]>();
+  for (const a of allocations) {
+    const held = byReservation.get(a.reservationId) ?? [];
+    held.push(a.tableId);
+    byReservation.set(a.reservationId, held);
+  }
+  return rows.map((r) => toReservation(r, timezone, (byReservation.get(r.id) ?? []).sort()));
 }
 
 export async function createReservation(
@@ -616,7 +641,7 @@ export async function getReservation(db: Db, venueId: string, id: string): Promi
     await db.select().from(reservations).where(and(eq(reservations.id, id), eq(reservations.venueId, venueId))).limit(1)
   )[0];
   if (!row) return null;
-  return toReservation(row, venue.timezone);
+  return (await withTables(db, [row], venue.timezone))[0];
 }
 
 export async function listByDate(db: Db, venueId: string, date: string): Promise<Reservation[]> {
@@ -627,7 +652,7 @@ export async function listByDate(db: Db, venueId: string, date: string): Promise
     .from(reservations)
     .where(and(eq(reservations.venueId, venueId), eq(reservations.date, date)))
     .orderBy(reservations.startsAt);
-  return rows.map((r) => toReservation(r, venue.timezone));
+  return withTables(db, rows, venue.timezone);
 }
 
 export async function listByPrincipal(
@@ -644,7 +669,7 @@ export async function listByPrincipal(
       and(eq(reservations.venueId, venueId), eq(reservations.ownerPrincipal, principal)),
     )
     .orderBy(reservations.startsAt);
-  return rows.map((r) => toReservation(r, venue.timezone));
+  return withTables(db, rows, venue.timezone);
 }
 
 export async function searchReservations(
@@ -665,7 +690,7 @@ export async function searchReservations(
     conditions.push(inArray(reservations.status, statuses));
   }
   const rows = await db.select().from(reservations).where(and(...conditions)).orderBy(reservations.startsAt);
-  return rows.map((r) => toReservation(r, venue.timezone));
+  return withTables(db, rows, venue.timezone);
 }
 
 export async function getEvents(db: Db, venueId: string, afterId: number, limit: number) {

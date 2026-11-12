@@ -572,6 +572,10 @@ components:
           type: integer
         tables:
           type: array
+          description: |
+            The ids of the tables the reservation holds, sorted ascending. It
+            keeps the tables of an attended or no-show visit and is empty once
+            the reservation is cancelled.
           items: { type: string }
         zone:
           type: string

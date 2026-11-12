@@ -648,6 +648,7 @@ function toApi(reservation: any, venueId: string) {
     },
     rating: reservation.rating ?? null,
     ratingRecordedAt: reservation.ratingRecordedAt ?? null,
+    tables: reservation.tableIds,
   };
 }
 
