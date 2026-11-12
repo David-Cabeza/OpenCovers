@@ -6,7 +6,7 @@
 
 **The open-source reservations engine for restaurants — availability, bookings, tables, and the event feed, with an API and an MCP server.**
 
-<sub>OpenCovers is the working name. Trademark clearance is pending. Pre-alpha: it runs locally with tests, nothing is deployed yet. Public site: <a href="https://opencovers.dev">opencovers.dev</a>.</sub>
+<sub>Pre-alpha: it runs locally with tests, nothing is deployed yet. Public site: <a href="https://opencovers.dev">opencovers.dev</a>.</sub>
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=node.js&logoColor=white)

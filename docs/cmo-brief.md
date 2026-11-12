@@ -10,7 +10,7 @@ OpenCovers es el **motor de reservas open source para restaurantes**: disponibil
 
 La idea central es una sola: **el libro de reservas debe ser independiente**. Hoy la mayoría de sistemas de reservas están atados a un CRM, a un TPV o a un único proveedor. Si el restaurante cambia de front, de proveedor de mensajería o de plataforma, arriesga perder su libro de reservas. OpenCovers separa el motor de todo lo demás.
 
-Estado actual: **pre-alfa**. Funciona en local, con tests (61 de API + 2 del MCP) y 13/13 casos de conformidad en verde. Aún no hay despliegue público ni dominio definitivo. El nombre es provisional y está pendiente de revisión de marca.
+Estado actual: **pre-alfa**. Funciona en local, con tests (61 de API + 2 del MCP) y 13/13 casos de conformidad en verde. Aún no hay despliegue público de la API.
 
 ---
 
@@ -119,7 +119,6 @@ Borrado de datos del cliente por contacto o por principal, con recuentos. Las l�
 - **Calidad:** 13/13 casos de conformidad en verde; 61 tests de API + 2 del MCP; typecheck en todos los paquetes.
 - **Despliegue:** preparado (Dockerfile y runbook) pero **sin deploy en vivo**.
 - **Correo:** cableado vía Resend; plantillas pendientes de revisión legal (texto y base de consentimiento).
-- **Marca:** "OpenCovers" es nombre provisional; revisión de marca pendiente.
 
 ---
 
@@ -171,27 +170,24 @@ Orden sugerido (sin fechas comprometidas):
 1. **Despliegue de referencia** — el primer "corre en un sitio real" con Postgres, sin depender de un proveedor concreto.
 2. **Webhooks firmados** — ya construidos. Push con firma HMAC encima del feed con cursor.
 3. **Depósitos y tarjetas** — tipos de reserva (libre vs. con depósito) en el contrato.
-4. **Marca y dominio** — resolver el nombre, la revisión de marca y comprar el dominio (ver §12).
-5. **App móvil / más superficie de sala** — posterior.
+4. **App móvil / más superficie de sala** — posterior.
 
 ---
 
 ## 12. Riesgos y puntos abiertos
 
-1. **Marca.** Existe **OpenCover** (`opencover.com`), una empresa de seguros cripto activa y financiada. El nombre "OpenCovers" es casi idéntico: **riesgo de confusión/conflicto**. Antes de difundir con fuerza, conviene decidir si mantener el nombre o cambiarlo, y hacer la revisión de marca.
-2. **Dominio.** Resuelto: comprado **`opencovers.dev`** (`.io` descartado por precio). Queda apuntar el DNS y activar el despliegue (GitHub Pages, ya configurado).
-3. **Legal del correo.** Plantillas pendientes de revisión de texto y base de consentimiento.
-4. **Sin deploy.** Todo el storytelling visual depende de un entorno local; el vídeo/GIF ya lo cubre, pero el "pruébalo tú" llega con el despliegue.
+1. **Dominio.** Resuelto: comprado **`opencovers.dev`** (`.io` descartado por precio). Queda apuntar el DNS y activar el despliegue (GitHub Pages, ya configurado).
+2. **Legal del correo.** Plantillas pendientes de revisión de texto y base de consentimiento.
+3. **Sin deploy.** Todo el storytelling visual depende de un entorno local; el vídeo/GIF ya lo cubre, pero el "pruébalo tú" llega con el despliegue.
 
 ---
 
 ## 13. Próximos pasos (para el CMO)
 
-1. Decidir la posición sobre el **nombre** (¿mantenemos "OpenCovers" o proponemos alternativas?) — es lo primero, porque condiciona dominio, logo y mensajes.
-2. ~~Dominio~~ — comprado `opencovers.dev`; queda apuntar el DNS y activar el despliegue.
-3. Validar el **plan de canales** (§10) y priorizar los 2–3 primeros.
-4. Aprobar los **mensajes clave** (§5) antes de publicar.
-5. Coordinar la **secuencia de publicación**: README → logo/capturas → hilo X/LinkedIn con el GIF → HN/PH cuando haya deploy.
+1. ~~Dominio~~ — comprado `opencovers.dev`; queda apuntar el DNS y activar el despliegue.
+2. Validar el **plan de canales** (§10) y priorizar los 2–3 primeros.
+3. Aprobar los **mensajes clave** (§5) antes de publicar.
+4. Coordinar la **secuencia de publicación**: README → logo/capturas → hilo X/LinkedIn con el GIF → HN/PH cuando haya deploy.
 
 ---
 

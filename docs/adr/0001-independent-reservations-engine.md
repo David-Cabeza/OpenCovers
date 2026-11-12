@@ -42,7 +42,6 @@ What becomes harder: the Durable Object schema-migration mechanism and scaling a
 
 These block parts of the plan and need David or a lawyer.
 
-- The project name and trademark clearance.
 - Whether the product is offered standalone or only internally.
 - The first-venue route.
 - Legal review of guest data, retention, and the confirmation and reminder text.
