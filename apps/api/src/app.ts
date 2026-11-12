@@ -47,6 +47,12 @@ import {
   updateFloorItemLayout,
 } from "./lib/floor-items";
 import {
+  createWebhook,
+  deleteWebhook,
+  listWebhooks,
+  webhookPolicyFromEnv,
+} from "./lib/webhooks";
+import {
   addWaitlist,
   cancelWaitlist,
   listWaitlist,
@@ -71,6 +77,9 @@ const HTTP_STATUS: Record<string, number> = {
   outside_hours: 400,
   lead_time_violation: 400,
   expired_cursor: 400,
+  webhook_not_found: 404,
+  webhook_url_rejected: 400,
+  webhook_limit_reached: 409,
   transient: 500,
 };
 
@@ -670,6 +679,29 @@ app.put("/v1/venues/:venueId/config", async (c) => {
   });
   if (!result.ok) return mapError(c, result.code);
   return c.json(result.config);
+});
+
+app.get("/v1/venues/:venueId/webhooks", async (c) => {
+  if (c.get("role") === "read") return error(c, "forbidden", 403);
+  const webhooks = await listWebhooks(db, c.req.param("venueId"));
+  return c.json({ webhooks });
+});
+
+app.post("/v1/venues/:venueId/webhooks", async (c) => {
+  const venueId = c.req.param("venueId");
+  const body = await c.req.json().catch(() => null);
+  if (typeof body?.url !== "string") return error(c, "invalid_request", 400);
+  const result = await createWebhook(db, venueId, body.url, webhookPolicyFromEnv());
+  if (!result.ok) return mapError(c, result.code);
+  return c.json(result.webhook, 201);
+});
+
+app.delete("/v1/venues/:venueId/webhooks/:webhookId", async (c) => {
+  const venueId = c.req.param("venueId");
+  const deleted = await deleteWebhook(db, venueId, c.req.param("webhookId"));
+  if (!deleted) return mapError(c, "webhook_not_found");
+  const webhooks = await listWebhooks(db, venueId);
+  return c.json({ webhooks });
 });
 
 app.post("/v1/venues/:venueId/erasure", async (c) => {

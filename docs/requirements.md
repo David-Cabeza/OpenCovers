@@ -154,6 +154,12 @@ Staff and employee writes use the same operations and emit the same events.
 
 Acceptance: a staff-typed booking and an employee booking produce the same event shape.
 
+### REQ-F3 Signed webhooks
+
+A venue can register up to 5 HTTPS endpoints that receive its feed events as signed POSTs, so a platform learns about a reservation change without polling. The feed stays the source of truth. Each endpoint is a cursor over it. The payload carries ids only, and the receiver reads the reservation, including its consent, with a normal GET. Webhook management is HTTP only and is not part of MCP parity. The full rules are in [webhooks.md](contract/webhooks.md).
+
+Acceptance: conformance case C15. Events arrive in id order, at least once, signed with HMAC-SHA256 under a secret shown only at registration. A failure stops the endpoint and retries with capped exponential backoff. A URL that reaches a loopback, private, link-local, or metadata address is refused at registration and at delivery.
+
 ## API and MCP
 
 ### REQ-C1 Public contract

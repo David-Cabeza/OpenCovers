@@ -47,3 +47,9 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 ## Feed
 
 - `expired_cursor`: the event cursor is older than the venue's retention period.
+
+## Webhooks
+
+- `webhook_not_found`: the webhook does not exist, or belongs to another venue. Indistinguishable from not found.
+- `webhook_url_rejected`: the URL is not https, carries credentials, cannot be resolved, or resolves to a blocked address. The message does not say which.
+- `webhook_limit_reached`: the venue already has the maximum of 5 webhook endpoints.

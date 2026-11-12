@@ -59,6 +59,10 @@ Drag tables and room elements onto a floor, snap them to a grid, rotate them, an
 
 Confirmations, cancellations, and booking notices via Resend — one per reservation version, never duplicated. Each venue brings its own Resend account, and it's off until enabled.
 
+### 🔔 Signed webhooks
+
+Register an HTTPS endpoint and the engine pushes every reservation event to it: created, modified, cancelled, seated, attended, no_show, and erased. Each POST is signed with HMAC-SHA256, arrives in order, and is retried with backoff until acknowledged. Private and metadata addresses are refused. See [docs/contract/webhooks.md](docs/contract/webhooks.md).
+
 ### 🧹 Erasure built in
 
 Erase guest data by contact or principal, and get back counts. Tombstones keep the hashes, never the personal values.
@@ -153,7 +157,7 @@ OpenCovers has no hosting vendor dependency. It needs PostgreSQL and a Node.js p
 
 ## Status
 
-Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — all 14 conformance cases pass. A deployment is prepared (Dockerfile and runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
+Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — all 15 conformance cases pass, signed webhooks included. A deployment is prepared (Dockerfile and runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
 
 ## Contributing
 

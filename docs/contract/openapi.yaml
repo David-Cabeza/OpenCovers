@@ -315,6 +315,90 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/webhooks:
+    get:
+      operationId: webhook.list
+      summary: List the venue's webhook endpoints
+      description: |
+        Needs the same role as `venue.setConfig`. A `read` key fails with
+        `forbidden`. The secret is never returned. Not exposed through MCP.
+        See docs/contract/webhooks.md.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The venue's endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [webhooks]
+                properties:
+                  webhooks:
+                    type: array
+                    items: { $ref: "#/components/schemas/Webhook" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: webhook.create
+      summary: Register a webhook endpoint
+      description: |
+        The URL must be https, carry no credentials, and resolve only to
+        public addresses, otherwise it fails with `webhook_url_rejected`. A
+        venue has at most 5 endpoints, and a sixth fails with
+        `webhook_limit_reached`. The endpoint receives only events written
+        after it was registered, each as a signed POST of `WebhookPayload`.
+        The secret appears only in this response.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+      responses:
+        "201":
+          description: The registered endpoint and its signing secret
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WebhookCreated" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/webhooks/{webhookId}:
+    delete:
+      operationId: webhook.delete
+      summary: Remove a webhook endpoint
+      description: |
+        An id that belongs to another venue fails with `webhook_not_found`,
+        the same as an unknown id.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: webhookId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The remaining endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [webhooks]
+                properties:
+                  webhooks:
+                    type: array
+                    items: { $ref: "#/components/schemas/Webhook" }
+        default:
+          $ref: "#/components/responses/Error"
+
   /venues/{venueId}/erasure:
     post:
       operationId: reservation.erasure
@@ -575,6 +659,61 @@ components:
           type: string
           format: date-time
 
+    Webhook:
+      type: object
+      required: [id, url, enabled, failures, lastError, nextAttemptAt]
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          format: uri
+        enabled:
+          type: boolean
+        failures:
+          type: integer
+          minimum: 0
+          description: Consecutive failed attempts. Reset to 0 by a successful delivery.
+        lastError:
+          type: string
+          nullable: true
+          description: The most recent delivery error, or the range of events dropped by retention.
+        nextAttemptAt:
+          type: string
+          format: date-time
+
+    WebhookCreated:
+      type: object
+      required: [id, url, enabled, secret]
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          format: uri
+        enabled:
+          type: boolean
+        secret:
+          type: string
+          description: |
+            32 random bytes, base64url. The HMAC-SHA256 key for
+            `OpenCovers-Signature`. Returned only once, in this response.
+
+    WebhookPayload:
+      description: |
+        The body of each webhook POST. It is the `Event` plus `venueId`. The
+        request carries `OpenCovers-Event-Id` (the event id) and
+        `OpenCovers-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of
+        "<t>.<raw body>" keyed by the secret>`. Delivery is at least once and
+        in event id order. Deduplicate on `id`.
+      allOf:
+        - $ref: "#/components/schemas/Event"
+        - type: object
+          required: [venueId]
+          properties:
+            venueId:
+              type: string
+
     VenueConfig:
       type: object
       required: [enabled, noticeAddress]
@@ -627,3 +766,6 @@ components:
         - notice_address_required
         - stale_second_factor
         - expired_cursor
+        - webhook_not_found
+        - webhook_url_rejected
+        - webhook_limit_reached

@@ -25,10 +25,11 @@ Status legend:
 | C12 Attribution | **PASS** | `basis`, `owner_principal`, `booked_via` are set from the authenticated channel; the request body cannot override them. |
 | C13 Cursor expiry | **PASS** | `pruneEvents` advances a per-venue watermark; a cursor below it is rejected with `expired_cursor`. A scheduled job runs retention hourly. Tested. |
 | C14 Consent | **PASS** | `guest.consent` tri-state with `consentRecordedAt`. Tests in `apps/api/test/consent.test.ts` cover default, grant, invalid value, modify bump and event, same-value no-op, reads, walk-in, and erasure reset. |
+| C15 Webhooks | **PASS** | `webhook_endpoints` holds one cursor per endpoint over the event feed. A single-statement `FOR UPDATE SKIP LOCKED` claim leases an endpoint to one worker. Tests in `apps/api/test/webhooks.test.ts` cover signature, order, backoff, resume, independence, settle window, new-endpoint start, watermark jump, concurrent workers, SSRF ranges, DNS rebinding, cap, isolation, and secret exposure. `apps/api/test/webhooks-e2e.test.ts` delivers to a real local receiver and verifies with the snippet in `webhooks.md`. |
 
 ## Open gaps
 
-None. All 14 conformance cases pass.
+None. All 15 conformance cases pass.
 
 ## Notes
 

@@ -135,6 +135,32 @@ export const events = pgTable(
   (t) => [index("idx_events_venue_occurred").on(t.venueId, t.occurredAt)],
 );
 
+export const webhookEndpoints = pgTable(
+  "webhook_endpoints",
+  {
+    id: text("id").primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id),
+    url: text("url").notNull(),
+    secret: text("secret").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    lastEventId: bigint("last_event_id", { mode: "number" }).notNull(),
+    failures: integer("failures").notNull().default(0),
+    lastError: text("last_error"),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_webhook_endpoints_venue").on(t.venueId),
+    index("idx_webhook_endpoints_due").on(t.nextAttemptAt),
+  ],
+);
+
 export const tombstones = pgTable("tombstones", {
   reservationId: text("reservation_id").primaryKey(),
   venueId: text("venue_id").notNull(),
