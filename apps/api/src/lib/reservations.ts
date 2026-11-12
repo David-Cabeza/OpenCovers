@@ -115,6 +115,7 @@ export type CancelResult =
   | { ok: false; code: "reservation_not_found" | "already_cancelled" | "invalid_request" | "venue_not_found" };
 
 const ACTIVE_STATUSES = ["booked", "seated"];
+const MODIFIABLE_STATUSES = [...ACTIVE_STATUSES, "attended"];
 const ALLOWED_TRANSITIONS: Record<StatusTransition, string[]> = {
   seated: ["booked"],
   attended: ["seated"],
@@ -456,7 +457,7 @@ export async function modifyReservation(
         await tx.select().from(reservations).where(and(eq(reservations.id, id), eq(reservations.venueId, venueId))).limit(1)
       )[0];
       if (!current) throw new ReservationError("reservation_not_found");
-      if (!ACTIVE_STATUSES.includes(current.status)) {
+      if (!MODIFIABLE_STATUSES.includes(current.status)) {
         throw new ReservationError("invalid_transition");
       }
 
@@ -473,6 +474,13 @@ export async function modifyReservation(
         tablesChanged =
           currentIds.length !== nextIds.length ||
           currentIds.some((v, i) => v !== nextIds[i]);
+      }
+
+      if (
+        (partyChanged || tablesChanged) &&
+        !ACTIVE_STATUSES.includes(current.status)
+      ) {
+        throw new ReservationError("invalid_transition");
       }
 
       const consentChanged =

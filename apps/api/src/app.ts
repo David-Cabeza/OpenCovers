@@ -331,7 +331,7 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
     { partySize: body.partySize, tableIds: body.tables, consent: body.guest?.consent, rating: body.rating },
     key,
   );
-  if (result.ok) {
+  if (result.ok && (body.partySize !== undefined || body.tables !== undefined)) {
     void notifyReservation(db, venueId, result.id, result.version, "confirmation");
   }
   return writeResponse(c, result, venueId);

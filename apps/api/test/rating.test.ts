@@ -1,9 +1,9 @@
-import { sql } from "drizzle-orm";
-import { beforeAll, describe, expect, it } from "vitest";
+import { eq, sql } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import app from "../src/app";
 import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
-import { services, tables, venues } from "../src/db/schema";
+import { sentEmails, services, tables, venues } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
 
 const VENUE = "rating";
@@ -189,5 +189,108 @@ describe("per-reservation guest rating", () => {
     await post("/erasure", { guestId: "fer@example.com" });
     const res = await post(`/reservations/${created.id}/modify`, { rating: 5 });
     expect(res.status).toBe(400);
+  });
+});
+
+async function attended(extra: Record<string, unknown> = {}) {
+  const created = await (await post("/reservations", booking(extra))).json();
+  expect((await post(`/reservations/${created.id}/status`, { status: "seated" })).status).toBe(200);
+  const res = await post(`/reservations/${created.id}/status`, { status: "attended" });
+  expect(res.status).toBe(200);
+  return res.json();
+}
+
+describe("modify after the visit", () => {
+  it("sets a rating on an attended reservation with one version bump and one modified event", async () => {
+    const visit = await attended();
+    const before = (await events()).filter((e) => e.reservationId === visit.id);
+
+    const res = await post(`/reservations/${visit.id}/modify`, { rating: 5 });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("attended");
+    expect(body.rating).toBe(5);
+    expect(body.version).toBe(visit.version + 1);
+
+    const after = (await events()).filter((e) => e.reservationId === visit.id);
+    expect(after.length - before.length).toBe(1);
+    expect(after[after.length - 1]).toMatchObject({ type: "modified", version: body.version });
+  });
+
+  it("sets consent on an attended reservation", async () => {
+    const visit = await attended();
+    const res = await post(`/reservations/${visit.id}/modify`, { guest: { consent: "granted" } });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.guest.consent).toBe("granted");
+    expect(body.version).toBe(visit.version + 1);
+  });
+
+  it("still refuses a party size change on an attended reservation", async () => {
+    const visit = await attended();
+    const res = await post(`/reservations/${visit.id}/modify`, { partySize: 3 });
+    expect((await res.json()).code).toBe("invalid_transition");
+    expect((await get(`/reservations/${visit.id}`)).partySize).toBe(2);
+  });
+
+  it("refuses a table change on an attended reservation", async () => {
+    const visit = await attended();
+    const res = await post(`/reservations/${visit.id}/modify`, { tables: ["40"] });
+    expect((await res.json()).code).toBe("invalid_transition");
+  });
+
+  it("refuses a rating on a cancelled reservation", async () => {
+    const created = await (await post("/reservations", booking())).json();
+    await post(`/reservations/${created.id}/cancel`, {});
+    const res = await post(`/reservations/${created.id}/modify`, { rating: 4 });
+    expect((await res.json()).code).toBe("invalid_transition");
+  });
+
+  it("refuses a rating on a no-show reservation", async () => {
+    const created = await (await post("/reservations", booking())).json();
+    await post(`/reservations/${created.id}/status`, { status: "no_show" });
+    const res = await post(`/reservations/${created.id}/modify`, { rating: 4 });
+    expect((await res.json()).code).toBe("invalid_transition");
+  });
+});
+
+describe("modify emails", () => {
+  beforeAll(async () => {
+    await db.update(venues).set({ notificationsEnabled: true }).where(eq(venues.id, VENUE));
+  });
+  afterAll(async () => {
+    await db.update(venues).set({ notificationsEnabled: false }).where(eq(venues.id, VENUE));
+  });
+
+  async function confirmationVersions(id: string): Promise<number[]> {
+    const rows = await db.select().from(sentEmails).where(eq(sentEmails.reservationId, id));
+    return rows.filter((r) => r.kind === "confirmation").map((r) => r.version).sort();
+  }
+
+  async function settled(id: string, version: number) {
+    for (let i = 0; i < 50; i++) {
+      if ((await confirmationVersions(id)).includes(version)) return;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`no confirmation recorded for version ${version}`);
+  }
+
+  it("sends no email for a rating or consent only modify and sends one for a party size change", async () => {
+    const created = await (
+      await post("/reservations", booking({ guest: { name: "Eva", contact: "eva-mail@example.com" } }))
+    ).json();
+    await settled(created.id, created.version);
+
+    const rated = await (await post(`/reservations/${created.id}/modify`, { rating: 4 })).json();
+    const consented = await (
+      await post(`/reservations/${created.id}/modify`, { guest: { consent: "granted" } })
+    ).json();
+    expect(consented.version).toBe(rated.version + 1);
+
+    const resized = await (await post(`/reservations/${created.id}/modify`, { partySize: 3 })).json();
+    expect(resized.version).toBe(consented.version + 1);
+    await settled(created.id, resized.version);
+
+    expect(await confirmationVersions(created.id)).toEqual([created.version, resized.version]);
   });
 });

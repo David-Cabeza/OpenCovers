@@ -187,6 +187,6 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C1: two concurrent creates for the same table and time produce one booking and one conflict.
 - C2: replaying a create with the same idempotency key returns the original id, not a second booking.
 - C3: availability shows a free slot, then a create for that slot either fails with a defined conflict or assigns a different eligible table, and never double-books. A snapshot is not a hold.
-- C4: a modify bumps the version, and the confirmation is sent once for the new version.
+- C4: a modify bumps the version, and the confirmation is sent once for the new version when it carries party size or tables. A consent or rating only modify sends no email and is allowed on attended reservations.
 - C5: erasure returns counts and leaves no personal value.
 - C6: turning the engine on without a notice address fails, and clearing the address while on fails.

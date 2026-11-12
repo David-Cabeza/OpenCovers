@@ -18,7 +18,9 @@ Availability returns a free slot. A create for that slot then either fails with 
 
 ## C4. Modify bumps the version
 
-A modify that changes a field produces a version one greater than before. A no-op modify produces no new version. The confirmation is sent once for the new version.
+A modify that changes a field produces a version one greater than before. A no-op modify produces no new version. The confirmation is sent once for the new version when the modify carries `partySize` or `tables`. A modify with only consent or rating sends no email.
+
+A modify that changes only consent or rating is allowed on `booked`, `seated` and `attended`. A change to party size or tables is allowed only on `booked` and `seated`, and fails with `invalid_transition` otherwise. `cancelled` and `no_show` reject every modify.
 
 ## C5. Erasure
 

@@ -176,6 +176,12 @@ paths:
     post:
       operationId: reservation.modify
       summary: Modify a reservation, producing a new version
+      description: >
+        Party size and tables can change on `booked` and `seated` reservations.
+        A modify that changes only `guest.consent` and/or `rating` is also
+        accepted on `attended`. `cancelled` and `no_show` reject every modify
+        with `invalid_transition`. A body with only consent or rating sends no
+        email to the guest.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/reservationId"
