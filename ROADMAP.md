@@ -158,6 +158,8 @@ Exit criterion: a venue takes a deposit or a card guarantee, charges a no-show, 
 Messages run as consumers of the event feed and respect consent.
 
 - A messaging provider interface with email, SMS, and WhatsApp adapters. Providers need paid accounts, so each is optional. [L, split it]
+- A rating per reservation: `rating`, an integer from 1 to 5 that is absent when not given, and `ratingRecordedAt`. Staff and platforms with a write key set it first. The guest sets it through a link once Phase 11 ships the self-service link. It is returned on reads and on the `modified` event, and it follows the shape of per-reservation consent. [S]
+- Optional rating dimensions (food, service, ambience) and a free-text comment, if venues ask for them. [M]
 - Enforcement of contact consent before any proactive message, and STOP handling. [M]
 - Automations: reminder, thank-you, win-back after 30, 60, and 90 days. [M]
 - A post-visit survey, sent only to guests with granted consent. [M]
