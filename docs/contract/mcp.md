@@ -25,4 +25,6 @@ The MCP server implements this catalog. It wraps the HTTP API and is scoped per 
 
 Reservation writes carry an idempotency key and return the reservation. Erasure returns the counts. Reads never mutate.
 
+`reservation.create`, `reservation.walk_in`, and `reservation.modify` accept an optional `consent` of `unknown`, `granted`, or `denied`. Reads return it as `guest.consent`, with `guest.consentRecordedAt` once a guest has answered.
+
 The MCP server is scoped per agent key. A key sees only the venues it is granted, and the grant limits which tool ids it may call.

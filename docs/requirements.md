@@ -118,6 +118,14 @@ A STOP from the guest closes proactive messages for that contact across the engi
 
 Acceptance: after a STOP, the engine sends no proactive message to that contact, and the booking itself still works.
 
+### REQ-N4 Per-reservation contact consent
+
+Each reservation records whether the guest allows being contacted after the visit. The value is `unknown` (never asked, the default), `granted`, or `denied`, with the time it was recorded. It can be set on create and walk-in and changed on modify. Erasure resets it to `unknown`. The engine does not gate its own emails on it. Integrations read it.
+
+Acceptance: a reservation created without consent reads back `unknown`. A create with `granted` reads back `granted` with a recorded time. A modify that changes consent bumps the version once and emits one `modified` event, and the same value changes nothing. Erasure leaves `unknown` and no recorded time.
+
+The legal basis and the consent text shown to guests are pending review. This requirement defines the stored signal only.
+
 ## Erasure
 
 ### REQ-E1 Erasure by id or principal

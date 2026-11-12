@@ -55,3 +55,7 @@ The engine sets `basis`, `owner_principal`, and `booked_via` from the authentica
 ## C13. Cursor expiry
 
 Polling the event feed with a cursor older than the venue's retention period fails with `expired_cursor`. A cursor within the retention period returns no gap in the event ids.
+
+## C14. Consent
+
+A reservation carries `guest.consent`, one of `unknown`, `granted`, or `denied`. A create or walk-in without it returns `unknown` and no `consentRecordedAt`. A value outside the three fails with `invalid_request`. A modify that changes consent bumps the version by one and emits one `modified` event. A modify that sets the same value changes nothing. Consent changing to `granted` or `denied` sets `consentRecordedAt`. Reads through get, list, search, and agenda return the stored value. Erasure resets consent to `unknown` and clears `consentRecordedAt`, and its counts still report reservations and guests erased.

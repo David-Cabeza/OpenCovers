@@ -9,6 +9,7 @@ import {
   venues,
 } from "../db/schema";
 import * as schema from "../db/schema";
+import { consentColumns } from "./consent";
 import { normalizeTimeZone } from "./time";
 import { sha256Hex } from "./reservations";
 
@@ -174,7 +175,7 @@ export async function erase(
       const hash = await sha256Hex(m.id);
       await tx
         .update(reservations)
-        .set({ guestName: "", guestContact: "", erased: true })
+        .set({ guestName: "", guestContact: "", ...consentColumns("unknown"), erased: true })
         .where(eq(reservations.id, m.id));
       await tx.insert(tombstones).values({
         reservationId: m.id,

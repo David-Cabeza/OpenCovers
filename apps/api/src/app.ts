@@ -37,6 +37,7 @@ import {
   setStatus,
   walkIn,
 } from "./lib/reservations";
+import { isConsent } from "./lib/consent";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
 import { notifyReservation } from "./lib/notifications";
 import {
@@ -182,6 +183,9 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
   const key = c.req.header("Idempotency-Key");
   if (!key) return error(c, "invalid_request", 400);
   const body = await c.req.json();
+  if (hasInvalidConsent(body)) {
+    return error(c, "invalid_request", 400);
+  }
   if (
     typeof body.date !== "string" ||
     typeof body.time !== "string" ||
@@ -204,6 +208,7 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
       zone: typeof body.zone === "string" ? body.zone : undefined,
       guestName: body.guest?.name,
       guestContact: body.guest?.contact,
+      consent: body.guest?.consent,
       bookedVia: c.get("principal") as string,
       basis: "service",
       ownerPrincipal: c.get("principal") as string,
@@ -223,6 +228,9 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
   if (!key) return error(c, "invalid_request", 400);
   const body = await c.req.json();
   if (typeof body.partySize !== "number") return error(c, "invalid_request", 400);
+  if (hasInvalidConsent(body)) {
+    return error(c, "invalid_request", 400);
+  }
   const result = await walkIn(
     db,
     venueId,
@@ -234,6 +242,7 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
       zone: typeof body.zone === "string" ? body.zone : undefined,
       guestName: body.guest?.name,
       guestContact: body.guest?.contact,
+      consent: body.guest?.consent,
       bookedVia: c.get("principal") as string,
       basis: "service",
       ownerPrincipal: c.get("principal") as string,
@@ -300,11 +309,14 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
   if (typeof body !== "object" || Object.keys(body).length === 0) {
     return error(c, "invalid_request", 400);
   }
+  if (hasInvalidConsent(body)) {
+    return error(c, "invalid_request", 400);
+  }
   const result = await modifyReservation(
     db,
     venueId,
     id,
-    { partySize: body.partySize, tableIds: body.tables },
+    { partySize: body.partySize, tableIds: body.tables, consent: body.guest?.consent },
     key,
   );
   if (result.ok) {
@@ -619,6 +631,8 @@ function toApi(reservation: any, venueId: string) {
     guest: {
       name: reservation.guestName || undefined,
       contact: reservation.guestContact || undefined,
+      consent: reservation.consent,
+      consentRecordedAt: reservation.consentRecordedAt ?? undefined,
     },
   };
 }
@@ -681,6 +695,11 @@ async function authorizeAdmin(c: any): Promise<{ principal: string } | Response>
       : error(c, "forbidden", 403);
   }
   return { principal: admin.principal };
+}
+
+function hasInvalidConsent(body: any): boolean {
+  const consent = body?.guest?.consent;
+  return consent !== undefined && !isConsent(consent);
 }
 
 function isRole(value: unknown): value is "read" | "write" | "admin" {

@@ -321,7 +321,9 @@ paths:
       summary: Erase personal data by guest id or by principal
       description: |
         Erasure returns counts. For each erased reservation the event feed
-        emits an `erased` event carrying a tombstone hash.
+        emits an `erased` event carrying a tombstone hash. Erasure also resets
+        the reservation's consent to `unknown`. The counts still report
+        reservations and guests erased, not consent values.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -419,6 +421,26 @@ components:
         principalReference:
           type: string
           description: An opaque reference to the authenticated channel, set by the engine.
+        consent:
+          $ref: "#/components/schemas/Consent"
+        consentRecordedAt:
+          type: string
+          format: date-time
+          description: When consent last changed to `granted` or `denied`. Omitted while consent is `unknown`.
+
+    Consent:
+      type: string
+      enum: [unknown, granted, denied]
+      default: unknown
+      description: |
+        Whether the guest allows being contacted after the reservation.
+        `unknown` means the guest was never asked. Erasure resets it to `unknown`.
+
+    GuestModify:
+      type: object
+      properties:
+        consent:
+          $ref: "#/components/schemas/Consent"
 
     Reservation:
       type: object
@@ -527,6 +549,8 @@ components:
         tables:
           type: array
           items: { type: string }
+        guest:
+          $ref: "#/components/schemas/GuestModify"
         commentary:
           type: string
 

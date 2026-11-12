@@ -63,4 +63,14 @@ describe("opencovers MCP server", () => {
 
     expect(byName.get("reservation.erasure")?.annotations?.destructiveHint).toBe(true);
   });
+
+  it("accepts the closed consent set on create, walk-in and modify", async () => {
+    const { tools } = await client.listTools();
+    for (const name of ["reservation.create", "reservation.walk_in", "reservation.modify"]) {
+      const schema = tools.find((t) => t.name === name)?.inputSchema as {
+        properties: Record<string, { enum?: string[] }>;
+      };
+      expect(schema.properties.consent.enum).toEqual(["unknown", "granted", "denied"]);
+    }
+  });
 });

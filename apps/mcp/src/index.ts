@@ -24,6 +24,11 @@ function fail(err: unknown): ToolResult {
   return { isError: true, content: [{ type: "text", text: message }] };
 }
 
+const consentSchema = z
+  .enum(["unknown", "granted", "denied"])
+  .optional()
+  .describe("Whether the guest allows being contacted after the visit. Omit if never asked.");
+
 const idempotencyKey = (key?: string) => key ?? crypto.randomUUID();
 
 export function createServer(): McpServer {
@@ -159,10 +164,11 @@ export function createServer(): McpServer {
           .describe("Zone to prefer (e.g. Terrace). When set, tables come from this zone."),
         guestName: z.string().optional(),
         guestContact: z.string().optional(),
+        consent: consentSchema,
         idempotencyKey: z.string().optional(),
       }),
     },
-    async ({ venueId, date, time, partySize, tables, zone, guestName, guestContact, idempotencyKey: key }) => {
+    async ({ venueId, date, time, partySize, tables, zone, guestName, guestContact, consent, idempotencyKey: key }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/reservations`, {
@@ -174,7 +180,7 @@ export function createServer(): McpServer {
               partySize,
               tables,
               zone,
-              guest: { name: guestName, contact: guestContact },
+              guest: { name: guestName, contact: guestContact, consent },
             },
           }),
         );
@@ -200,10 +206,11 @@ export function createServer(): McpServer {
         zone: z.string().optional(),
         guestName: z.string().optional(),
         guestContact: z.string().optional(),
+        consent: consentSchema,
         idempotencyKey: z.string().optional(),
       }),
     },
-    async ({ venueId, partySize, date, time, tables, zone, guestName, guestContact, idempotencyKey: key }) => {
+    async ({ venueId, partySize, date, time, tables, zone, guestName, guestContact, consent, idempotencyKey: key }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/reservations/walk-in`, {
@@ -215,7 +222,7 @@ export function createServer(): McpServer {
               partySize,
               tables,
               zone,
-              guest: { name: guestName, contact: guestContact },
+              guest: { name: guestName, contact: guestContact, consent },
             },
           }),
         );
@@ -229,23 +236,24 @@ export function createServer(): McpServer {
     "reservation.modify",
     {
       title: "Modify reservation",
-      description: "Modify a reservation's party size and/or tables.",
+      description: "Modify a reservation's party size, tables, and/or contact consent.",
       annotations: { idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         id: z.string(),
         partySize: z.number().int().positive().optional(),
         tables: z.array(z.string()).min(1).optional(),
+        consent: consentSchema,
         idempotencyKey: z.string().optional(),
       }),
     },
-    async ({ venueId, id, partySize, tables, idempotencyKey: key }) => {
+    async ({ venueId, id, partySize, tables, consent, idempotencyKey: key }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/reservations/${id}/modify`, {
             method: "POST",
             idempotencyKey: idempotencyKey(key),
-            body: { partySize, tables },
+            body: { partySize, tables, guest: consent ? { consent } : undefined },
           }),
         );
       } catch (err) {

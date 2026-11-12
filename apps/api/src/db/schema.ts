@@ -1,3 +1,4 @@
+import type { Consent } from "../lib/consent";
 import {
   bigint,
   bigserial,
@@ -79,6 +80,8 @@ export const reservations = pgTable(
     ownerPrincipal: text("owner_principal").notNull().default(""),
     guestName: text("guest_name").notNull().default(""),
     guestContact: text("guest_contact").notNull().default(""),
+    consent: text("consent").$type<Consent>().notNull().default("unknown"),
+    consentRecordedAt: timestamp("consent_recorded_at", { withTimezone: true }),
     erased: boolean("erased").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

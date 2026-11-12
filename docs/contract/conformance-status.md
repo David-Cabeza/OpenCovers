@@ -24,10 +24,11 @@ Status legend:
 | C11 Event feed | **PASS** | Bigserial ids and a cursor over the feed; replay re-emits the same ids. |
 | C12 Attribution | **PASS** | `basis`, `owner_principal`, `booked_via` are set from the authenticated channel; the request body cannot override them. |
 | C13 Cursor expiry | **PASS** | `pruneEvents` advances a per-venue watermark; a cursor below it is rejected with `expired_cursor`. A scheduled job runs retention hourly. Tested. |
+| C14 Consent | **PASS** | `guest.consent` tri-state with `consentRecordedAt`. Tests in `apps/api/test/consent.test.ts` cover default, grant, invalid value, modify bump and event, same-value no-op, reads, walk-in, and erasure reset. |
 
 ## Open gaps
 
-None. All 13 conformance cases pass.
+None. All 14 conformance cases pass.
 
 ## Notes
 

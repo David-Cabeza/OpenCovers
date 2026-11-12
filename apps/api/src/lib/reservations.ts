@@ -11,6 +11,7 @@ import {
   venues,
 } from "../db/schema";
 import * as schema from "../db/schema";
+import { consentColumns, type Consent } from "./consent";
 import { formatTime, normalizeMinute, nowInTimezone, serviceWindow, toMinutes, toTime, toTimestamp } from "./time";
 
 export type Db = NodePgDatabase<typeof schema>;
@@ -26,6 +27,7 @@ export interface CreateReservationInput {
   initialStatus?: "booked" | "seated";
   guestName?: string;
   guestContact?: string;
+  consent?: Consent;
   bookedVia?: string;
   basis?: string;
   ownerPrincipal?: string;
@@ -39,6 +41,7 @@ export interface WalkInInput {
   zone?: string;
   guestName?: string;
   guestContact?: string;
+  consent?: Consent;
   bookedVia?: string;
   basis?: string;
   ownerPrincipal?: string;
@@ -47,6 +50,7 @@ export interface WalkInInput {
 export interface ModifyReservationInput {
   partySize?: number;
   tableIds?: string[];
+  consent?: Consent;
 }
 
 export interface Reservation {
@@ -63,6 +67,8 @@ export interface Reservation {
   ownerPrincipal: string;
   guestName: string;
   guestContact: string;
+  consent: Consent;
+  consentRecordedAt: string | null;
 }
 
 export interface Event {
@@ -259,6 +265,8 @@ function toReservation(row: typeof reservations.$inferSelect, timezone: string):
     ownerPrincipal: row.ownerPrincipal,
     guestName: row.guestName,
     guestContact: row.guestContact,
+    consent: row.consent,
+    consentRecordedAt: row.consentRecordedAt ? row.consentRecordedAt.toISOString() : null,
   };
 }
 
@@ -351,6 +359,7 @@ export async function createReservation(
         ownerPrincipal: input.ownerPrincipal ?? "",
         guestName: input.guestName ?? "",
         guestContact: input.guestContact ?? "",
+        ...consentColumns(input.consent ?? "unknown"),
       });
       for (const tableId of tableIds) {
         await tx.insert(tableAllocations).values({
@@ -406,6 +415,7 @@ export async function walkIn(
       initialStatus: "seated",
       guestName: input.guestName,
       guestContact: input.guestContact,
+      consent: input.consent,
       bookedVia: input.bookedVia,
       basis: input.basis,
       ownerPrincipal: input.ownerPrincipal,
@@ -455,22 +465,25 @@ export async function modifyReservation(
           currentIds.some((v, i) => v !== nextIds[i]);
       }
 
-      if (!partyChanged && !tablesChanged) {
+      const consentChanged =
+        input.consent !== undefined && input.consent !== current.consent;
+      if (consentChanged && current.erased) {
+        throw new ReservationError("invalid_request");
+      }
+
+      if (!partyChanged && !tablesChanged && !consentChanged) {
         return current.version;
       }
 
       const nextVersion = current.version + 1;
-      if (partyChanged) {
-        await tx
-          .update(reservations)
-          .set({ partySize: input.partySize!, version: nextVersion })
-          .where(eq(reservations.id, id));
-      } else {
-        await tx
-          .update(reservations)
-          .set({ version: nextVersion })
-          .where(eq(reservations.id, id));
-      }
+      await tx
+        .update(reservations)
+        .set({
+          version: nextVersion,
+          ...(partyChanged ? { partySize: input.partySize! } : {}),
+          ...(consentChanged ? consentColumns(input.consent!) : {}),
+        })
+        .where(eq(reservations.id, id));
       if (tablesChanged) {
         await tx.delete(tableAllocations).where(eq(tableAllocations.reservationId, id));
         for (const tableId of input.tableIds!) {
