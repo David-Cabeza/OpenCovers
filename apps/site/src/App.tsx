@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { notPlanned, phases, today, type Phase, type Today } from "./roadmap";
 
 const REPO = "https://github.com/David-Cabeza/OpenCovers";
 const REPO_API = "https://api.github.com/repos/David-Cabeza/OpenCovers";
@@ -95,18 +96,19 @@ const modules = [
 ];
 
 const challenges = [
-  { title: "Despliegue de referencia", tag: "infra", body: "El primer «corre en un sitio real», con Postgres gestionado." },
-  { title: "Depósitos y tarjetas", tag: "motor", body: "Reserva libre frente a reserva con depósito o tarjeta, en el contrato." },
-  { title: "Informes y analítica", tag: "producto", body: "Ocupación, no-shows y rendimiento por servicio y zona." },
-  { title: "App móvil del personal", tag: "producto", body: "Agenda y mesa en el bolsillo, fuera del escritorio." },
-  { title: "Marca y dominio", tag: "marca", body: "Revisión de marca del nombre antes de difundir con fuerza." },
+  { title: "ADR de identidad del cliente", tag: "diseño", body: "Decide si un cliente es de un local o de un grupo, antes de que se acumulen datos." },
+  { title: "Disponibilidad que se explica", tag: "motor", body: "Un endpoint que dice por qué un hueco está cerrado." },
+  { title: "Widget de reservas", tag: "producto", body: "Una página de reservas para la web del local, sin marca de OpenCovers." },
+  { title: "Temas declarativos", tag: "producto", body: "Paquetes solo de datos para cambiar colores, tipos y logo." },
+  { title: "Primer adaptador de TPV", tag: "integración", body: "Leer la reserva de una mesa, enviar la cuenta y liberar la mesa." },
+  { title: "Pagos con Stripe y Redsys", tag: "motor", body: "Depósitos y garantías con la cuenta de pago de cada local." },
 ];
 
 const faqs = [
   {
     t: "Alcance",
     q: "¿Es un CRM o un TPV?",
-    a: "No. OpenCovers es solo el motor de reservas: disponibilidad, reservas, mesas y eventos. Sin CRM ni pagos dentro, para que lo combines con lo que ya usas.",
+    a: "No. OpenCovers es el motor de reservas: disponibilidad, reservas, mesas y eventos. No sustituye a tu TPV ni a tu CRM. Más adelante tendrá ficha de cliente y conexión con tu propia cuenta de pago, siempre abiertas a combinarse con lo que ya usas.",
   },
   {
     t: "Estado",
@@ -126,7 +128,7 @@ const faqs = [
   {
     t: "Pagos",
     q: "¿Y los depósitos y pagos con tarjeta?",
-    a: "Están en el roadmap como tipos de reserva dentro del contrato (libre frente a con depósito). El motor no procesa pagos.",
+    a: "Están en la hoja de ruta (fase 12). Cada local conectará su propia cuenta de pago, con Stripe primero y Redsys para España. OpenCovers no cobra comisión ni guarda datos de tarjeta.",
   },
   {
     t: "Precio",
@@ -181,6 +183,7 @@ export default function App() {
         <Showcase />
         <How />
         <Modules />
+        <Roadmap />
         <Brigada />
         <Faq />
         <Cta />
@@ -255,6 +258,7 @@ function Nav() {
           <li><a href="#features">Por qué</a></li>
           <li><a href="#prueba">Pruébalo</a></li>
           <li><a href="#motor">Dentro</a></li>
+          <li><a href="#hoja-de-ruta">Hoja de ruta</a></li>
           <li><a href="#brigada">La Brigada</a></li>
           <li><a href="#faq">Preguntas</a></li>
         </ul>
@@ -500,6 +504,98 @@ function Modules() {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+const ROADMAP_URL = `${REPO}/blob/main/ROADMAP.md`;
+
+function PhaseItem({ p, i }: { p: Phase; i: number }) {
+  return (
+    <li className="ph rv" style={{ ...d((i % 2) * 80), "--c": cardColors[i % cardColors.length] } as CSSProperties}>
+      <span className="n" aria-hidden>{p.n}</span>
+      <div className="main">
+        <h3><span className="sr">Fase {p.n}. </span>{p.title}</h3>
+        <p>{p.summary}</p>
+        <p className="exit"><small>Meta</small> {p.exit}</p>
+      </div>
+      <div className="side">
+        <ul>
+          {p.items.map((it) => (
+            <li key={it}>{it}</li>
+          ))}
+        </ul>
+        <a href={ROADMAP_URL}>Ver todas las tareas</a>
+      </div>
+    </li>
+  );
+}
+
+function TodayRow({ r }: { r: Today }) {
+  return (
+    <tr>
+      <th scope="row">{r.area}</th>
+      <td>{r.now}</td>
+      <td className="tgt">{r.target}</td>
+      <td className="ph-n">{r.phase}</td>
+    </tr>
+  );
+}
+
+function NotPlannedItem({ s }: { s: string }) {
+  const at = s.indexOf(". ");
+  return (
+    <li>
+      <b>{s.slice(0, at + 1)}</b> {s.slice(at + 2)}
+    </li>
+  );
+}
+
+function Roadmap() {
+  return (
+    <section id="hoja-de-ruta" className="road" aria-labelledby="road-h">
+      <div className="top">
+        <h2 id="road-h" className="rv">Hoja de ruta</h2>
+        <p className="rv" style={d(90)}>
+          De un motor que funciona a la madurez de una plataforma completa. Elige una fase y ponte a trabajar.
+        </p>
+      </div>
+      <ol className="phases">
+        {phases.map((p, i) => (
+          <PhaseItem key={p.n} p={p} i={i} />
+        ))}
+      </ol>
+      <div className="now">
+        <h3 className="rv">Dónde estamos hoy</h3>
+        <table className="rv">
+          <caption className="sr">Estado actual por área, objetivo y fase</caption>
+          <thead>
+            <tr>
+              <th scope="col">Área</th>
+              <th scope="col">Hoy</th>
+              <th scope="col" className="tgt">Objetivo</th>
+              <th scope="col">Fase</th>
+            </tr>
+          </thead>
+          <tbody>
+            {today.map((r) => (
+              <TodayRow key={r.area} r={r} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="never">
+        <h3 className="rv">No haremos</h3>
+        <ul>
+          {notPlanned.map((s) => (
+            <NotPlannedItem key={s} s={s} />
+          ))}
+        </ul>
+      </div>
+      <div className="acts rv">
+        <a className="btn accent" href={ROADMAP_URL}>Ver la hoja de ruta completa</a>
+        <a className="btn ghost" href={`${REPO}/issues`}>Ver tareas abiertas</a>
+      </div>
     </section>
   );
 }
