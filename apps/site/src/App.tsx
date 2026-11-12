@@ -95,7 +95,6 @@ const modules = [
 ];
 
 const challenges = [
-  { title: "Webhooks firmados", tag: "integración", body: "Push con firma HMAC encima del feed con cursor." },
   { title: "Despliegue de referencia", tag: "infra", body: "El primer «corre en un sitio real», con Postgres gestionado." },
   { title: "Depósitos y tarjetas", tag: "motor", body: "Reserva libre frente a reserva con depósito o tarjeta, en el contrato." },
   { title: "Informes y analítica", tag: "producto", body: "Ocupación, no-shows y rendimiento por servicio y zona." },
