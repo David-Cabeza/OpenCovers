@@ -126,6 +126,12 @@ Acceptance: a reservation created without consent reads back `unknown`. A create
 
 The legal basis and the consent text shown to guests are pending review. This requirement defines the stored signal only.
 
+### REQ-N5 Per-reservation guest rating
+
+Each reservation can record the guest's rating of the visit, an integer from 1 to 5, with the time it was recorded. Absent means not given. Staff or a key with `write` can set it on create and walk-in and change or clear it on modify. Erasure resets it. Integrations read it, for example to triage a visit after the fact.
+
+Acceptance: a reservation created without a rating reads back null. A create with `5` reads back `5` with a recorded time. A modify that changes the rating bumps the version once and emits one `modified` event, and the same value changes nothing. Null clears the rating and its time. A value outside 1 to 5 fails with `invalid_request`. Erasure leaves null and no recorded time.
+
 ## Erasure
 
 ### REQ-E1 Erasure by id or principal

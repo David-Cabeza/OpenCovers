@@ -2,7 +2,7 @@
 
 A webhook pushes each event of a venue's feed to an HTTPS endpoint, so a platform learns about a reservation change without polling. The event feed stays the source of truth. A webhook is a cursor over that feed that the engine advances for you.
 
-The payload is thin. It names the event and the reservation, never the guest. To get the reservation, including `guest.consent`, the receiver calls `GET /v1/venues/{venueId}/reservations/{reservationId}` with its own key.
+The payload is thin. It names the event and the reservation, never the guest. To get the reservation, including `guest.consent` and `rating`, the receiver calls `GET /v1/venues/{venueId}/reservations/{reservationId}` with its own key.
 
 ## Registering an endpoint
 

@@ -12,6 +12,7 @@ import {
 } from "../db/schema";
 import * as schema from "../db/schema";
 import { consentColumns, type Consent } from "./consent";
+import { ratingColumns, type Rating } from "./rating";
 import { formatTime, normalizeMinute, nowInTimezone, serviceWindow, toMinutes, toTime, toTimestamp } from "./time";
 
 export type Db = NodePgDatabase<typeof schema>;
@@ -28,6 +29,7 @@ export interface CreateReservationInput {
   guestName?: string;
   guestContact?: string;
   consent?: Consent;
+  rating?: Rating | null;
   bookedVia?: string;
   basis?: string;
   ownerPrincipal?: string;
@@ -42,6 +44,7 @@ export interface WalkInInput {
   guestName?: string;
   guestContact?: string;
   consent?: Consent;
+  rating?: Rating | null;
   bookedVia?: string;
   basis?: string;
   ownerPrincipal?: string;
@@ -51,6 +54,7 @@ export interface ModifyReservationInput {
   partySize?: number;
   tableIds?: string[];
   consent?: Consent;
+  rating?: Rating | null;
 }
 
 export interface Reservation {
@@ -69,6 +73,8 @@ export interface Reservation {
   guestContact: string;
   consent: Consent;
   consentRecordedAt: string | null;
+  rating: Rating | null;
+  ratingRecordedAt: string | null;
 }
 
 export interface Event {
@@ -267,6 +273,8 @@ function toReservation(row: typeof reservations.$inferSelect, timezone: string):
     guestContact: row.guestContact,
     consent: row.consent,
     consentRecordedAt: row.consentRecordedAt ? row.consentRecordedAt.toISOString() : null,
+    rating: row.rating,
+    ratingRecordedAt: row.ratingRecordedAt ? row.ratingRecordedAt.toISOString() : null,
   };
 }
 
@@ -360,6 +368,7 @@ export async function createReservation(
         guestName: input.guestName ?? "",
         guestContact: input.guestContact ?? "",
         ...consentColumns(input.consent ?? "unknown"),
+        ...ratingColumns(input.rating ?? null),
       });
       for (const tableId of tableIds) {
         await tx.insert(tableAllocations).values({
@@ -416,6 +425,7 @@ export async function walkIn(
       guestName: input.guestName,
       guestContact: input.guestContact,
       consent: input.consent,
+      rating: input.rating,
       bookedVia: input.bookedVia,
       basis: input.basis,
       ownerPrincipal: input.ownerPrincipal,
@@ -467,11 +477,13 @@ export async function modifyReservation(
 
       const consentChanged =
         input.consent !== undefined && input.consent !== current.consent;
-      if (consentChanged && current.erased) {
+      const ratingChanged =
+        input.rating !== undefined && input.rating !== current.rating;
+      if ((consentChanged || ratingChanged) && current.erased) {
         throw new ReservationError("invalid_request");
       }
 
-      if (!partyChanged && !tablesChanged && !consentChanged) {
+      if (!partyChanged && !tablesChanged && !consentChanged && !ratingChanged) {
         return current.version;
       }
 
@@ -482,6 +494,7 @@ export async function modifyReservation(
           version: nextVersion,
           ...(partyChanged ? { partySize: input.partySize! } : {}),
           ...(consentChanged ? consentColumns(input.consent!) : {}),
+          ...(ratingChanged ? ratingColumns(input.rating!) : {}),
         })
         .where(eq(reservations.id, id));
       if (tablesChanged) {

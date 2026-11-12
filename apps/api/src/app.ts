@@ -38,6 +38,7 @@ import {
   walkIn,
 } from "./lib/reservations";
 import { isConsent } from "./lib/consent";
+import { isRating } from "./lib/rating";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
 import { notifyReservation } from "./lib/notifications";
 import {
@@ -192,7 +193,7 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
   const key = c.req.header("Idempotency-Key");
   if (!key) return error(c, "invalid_request", 400);
   const body = await c.req.json();
-  if (hasInvalidConsent(body)) {
+  if (hasInvalidConsent(body) || hasInvalidRating(body)) {
     return error(c, "invalid_request", 400);
   }
   if (
@@ -218,6 +219,7 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
       guestName: body.guest?.name,
       guestContact: body.guest?.contact,
       consent: body.guest?.consent,
+      rating: body.rating,
       bookedVia: c.get("principal") as string,
       basis: "service",
       ownerPrincipal: c.get("principal") as string,
@@ -237,7 +239,7 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
   if (!key) return error(c, "invalid_request", 400);
   const body = await c.req.json();
   if (typeof body.partySize !== "number") return error(c, "invalid_request", 400);
-  if (hasInvalidConsent(body)) {
+  if (hasInvalidConsent(body) || hasInvalidRating(body)) {
     return error(c, "invalid_request", 400);
   }
   const result = await walkIn(
@@ -252,6 +254,7 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
       guestName: body.guest?.name,
       guestContact: body.guest?.contact,
       consent: body.guest?.consent,
+      rating: body.rating,
       bookedVia: c.get("principal") as string,
       basis: "service",
       ownerPrincipal: c.get("principal") as string,
@@ -318,14 +321,14 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
   if (typeof body !== "object" || Object.keys(body).length === 0) {
     return error(c, "invalid_request", 400);
   }
-  if (hasInvalidConsent(body)) {
+  if (hasInvalidConsent(body) || hasInvalidRating(body)) {
     return error(c, "invalid_request", 400);
   }
   const result = await modifyReservation(
     db,
     venueId,
     id,
-    { partySize: body.partySize, tableIds: body.tables, consent: body.guest?.consent },
+    { partySize: body.partySize, tableIds: body.tables, consent: body.guest?.consent, rating: body.rating },
     key,
   );
   if (result.ok) {
@@ -643,6 +646,8 @@ function toApi(reservation: any, venueId: string) {
       consent: reservation.consent,
       consentRecordedAt: reservation.consentRecordedAt ?? undefined,
     },
+    rating: reservation.rating ?? null,
+    ratingRecordedAt: reservation.ratingRecordedAt ?? null,
   };
 }
 
@@ -732,6 +737,11 @@ async function authorizeAdmin(c: any): Promise<{ principal: string } | Response>
 function hasInvalidConsent(body: any): boolean {
   const consent = body?.guest?.consent;
   return consent !== undefined && !isConsent(consent);
+}
+
+function hasInvalidRating(body: any): boolean {
+  const rating = body?.rating;
+  return rating !== undefined && rating !== null && !isRating(rating);
 }
 
 function isRole(value: unknown): value is "read" | "write" | "admin" {

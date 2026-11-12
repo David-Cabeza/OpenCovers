@@ -27,4 +27,6 @@ Reservation writes carry an idempotency key and return the reservation. Erasure 
 
 `reservation.create`, `reservation.walk_in`, and `reservation.modify` accept an optional `consent` of `unknown`, `granted`, or `denied`. Reads return it as `guest.consent`, with `guest.consentRecordedAt` once a guest has answered.
 
+The same three tools accept an optional `rating`, an integer from 1 to 5, or null on modify to clear it. Reads return it as `rating` and `ratingRecordedAt`.
+
 The MCP server is scoped per agent key. A key sees only the venues it is granted, and the grant limits which tool ids it may call.

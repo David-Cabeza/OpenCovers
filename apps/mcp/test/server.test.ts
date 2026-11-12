@@ -73,4 +73,17 @@ describe("opencovers MCP server", () => {
       expect(schema.properties.consent.enum).toEqual(["unknown", "granted", "denied"]);
     }
   });
+
+  it("accepts a rating from 1 to 5 on create, walk-in and modify", async () => {
+    const { tools } = await client.listTools();
+    for (const name of ["reservation.create", "reservation.walk_in", "reservation.modify"]) {
+      const schema = tools.find((t) => t.name === name)?.inputSchema as {
+        properties: Record<string, { minimum?: number; maximum?: number; type?: unknown; anyOf?: unknown }>;
+      };
+      const rating = schema.properties.rating;
+      expect(rating).toBeDefined();
+      expect(JSON.stringify(rating)).toContain('"minimum":1');
+      expect(JSON.stringify(rating)).toContain('"maximum":5');
+    }
+  });
 });

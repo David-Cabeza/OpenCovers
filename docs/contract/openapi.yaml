@@ -406,7 +406,7 @@ paths:
       description: |
         Erasure returns counts. For each erased reservation the event feed
         emits an `erased` event carrying a tombstone hash. Erasure also resets
-        the reservation's consent to `unknown`. The counts still report
+        the reservation's consent to `unknown` and its rating to null. The counts still report
         reservations and guests erased, not consent values.
       parameters:
         - $ref: "#/components/parameters/venueId"
@@ -520,6 +520,16 @@ components:
         Whether the guest allows being contacted after the reservation.
         `unknown` means the guest was never asked. Erasure resets it to `unknown`.
 
+    Rating:
+      type: integer
+      minimum: 1
+      maximum: 5
+      nullable: true
+      description: |
+        The guest's rating of the visit. Null means not given. Set by staff or
+        a key with `write` on create, walk-in and modify. Null on modify clears
+        it. Erasure resets it to null.
+
     GuestModify:
       type: object
       properties:
@@ -560,6 +570,13 @@ components:
           type: string
         guest:
           $ref: "#/components/schemas/Guest"
+        rating:
+          $ref: "#/components/schemas/Rating"
+        ratingRecordedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the rating last changed. Null while `rating` is null.
         status:
           $ref: "#/components/schemas/ReservationStatus"
         type:
@@ -611,6 +628,8 @@ components:
           items: { type: string }
         guest:
           $ref: "#/components/schemas/Guest"
+        rating:
+          $ref: "#/components/schemas/Rating"
         source:
           type: string
         commentary:
@@ -635,6 +654,8 @@ components:
           items: { type: string }
         guest:
           $ref: "#/components/schemas/GuestModify"
+        rating:
+          $ref: "#/components/schemas/Rating"
         commentary:
           type: string
 

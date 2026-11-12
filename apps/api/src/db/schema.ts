@@ -1,4 +1,5 @@
 import type { Consent } from "../lib/consent";
+import type { Rating } from "../lib/rating";
 import {
   bigint,
   bigserial,
@@ -82,6 +83,8 @@ export const reservations = pgTable(
     guestContact: text("guest_contact").notNull().default(""),
     consent: text("consent").$type<Consent>().notNull().default("unknown"),
     consentRecordedAt: timestamp("consent_recorded_at", { withTimezone: true }),
+    rating: integer("rating").$type<Rating>(),
+    ratingRecordedAt: timestamp("rating_recorded_at", { withTimezone: true }),
     erased: boolean("erased").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
