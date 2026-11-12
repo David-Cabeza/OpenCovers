@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,12 +13,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api } from "@/lib/api";
+import { ConsentSelect } from "@/components/reservation/consent-select";
+import { api, type Consent } from "@/lib/api";
 
 interface WalkInValues {
   partySize: number;
   name: string;
   contact: string;
+  consent: Consent;
 }
 
 export function WalkInDialog({
@@ -37,13 +39,14 @@ export function WalkInDialog({
   const queryClient = useQueryClient();
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<WalkInValues>({ defaultValues: { partySize: 2, name: "", contact: "" } });
+  } = useForm<WalkInValues>({ defaultValues: { partySize: 2, name: "", contact: "", consent: "unknown" } });
 
   useEffect(() => {
-    if (open) reset({ partySize: 2, name: "", contact: "" });
+    if (open) reset({ partySize: 2, name: "", contact: "", consent: "unknown" });
   }, [open, reset]);
 
   async function onSubmit(values: WalkInValues) {
@@ -54,6 +57,7 @@ export function WalkInDialog({
         guest: {
           name: values.name || undefined,
           contact: values.contact || undefined,
+          consent: values.consent,
         },
       });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
@@ -105,6 +109,17 @@ export function WalkInDialog({
               <Label htmlFor="walkin-contact">Contact</Label>
               <Input id="walkin-contact" placeholder="jane@example.com" {...register("contact")} />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Contact consent</Label>
+            <Controller
+              name="consent"
+              control={control}
+              render={({ field }) => (
+                <ConsentSelect value={field.value} onChange={field.onChange} />
+              )}
+            />
           </div>
 
           <DialogFooter>

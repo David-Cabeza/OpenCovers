@@ -92,6 +92,8 @@ export interface FloorItem {
   rotation: number;
 }
 
+export type Consent = "unknown" | "granted" | "denied";
+
 export interface Reservation {
   id: string;
   venueId: string;
@@ -105,7 +107,9 @@ export interface Reservation {
   guest: {
     name?: string;
     contact?: string;
+    consent?: Consent;
   };
+  rating?: number | null;
 }
 
 export interface AvailabilitySlot {
@@ -303,7 +307,12 @@ export const api = {
   modifyReservation: (
     venueId: string,
     id: string,
-    body: { partySize?: number; tables?: string[] },
+    body: {
+      partySize?: number;
+      tables?: string[];
+      guest?: { consent?: Consent };
+      rating?: number | null;
+    },
   ) =>
     request<Reservation>(`/v1/venues/${venueId}/reservations/${id}/modify`, {
       method: "POST",
@@ -326,7 +335,12 @@ export const api = {
 
   walkIn: (
     venueId: string,
-    body: { partySize: number; tables?: string[]; zone?: string; guest?: { name?: string; contact?: string } },
+    body: {
+      partySize: number;
+      tables?: string[];
+      zone?: string;
+      guest?: { name?: string; contact?: string; consent?: Consent };
+    },
   ) =>
     request<Reservation>(`/v1/venues/${venueId}/reservations/walk-in`, {
       method: "POST",

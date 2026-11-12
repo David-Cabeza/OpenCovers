@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useAgenda } from "@/hooks/use-agenda";
@@ -69,6 +70,7 @@ function rowActions(status: string): RowAction[] {
 export function AgendaView({ venueId }: { venueId: string }) {
   const [date, setDate] = useState(todayIso());
   const [walkInOpen, setWalkInOpen] = useState(false);
+  const [editing, setEditing] = useState<Reservation | null>(null);
   const queryClient = useQueryClient();
   const { data, isPending } = useAgenda(venueId, date);
   const reservations = data?.reservations ?? [];
@@ -143,6 +145,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
                   reservation={r}
                   onCancel={() => cancel.mutate(r.id)}
                   onStatus={(status) => setStatus.mutate({ id: r.id, status })}
+                  onEdit={() => setEditing(r)}
                 />
               ))}
             </TableBody>
@@ -151,6 +154,13 @@ export function AgendaView({ venueId }: { venueId: string }) {
       )}
 
       <WalkInDialog venueId={venueId} open={walkInOpen} onOpenChange={setWalkInOpen} />
+      <EditReservationDialog
+        venueId={venueId}
+        reservation={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+      />
     </div>
   );
 }
@@ -159,12 +169,15 @@ function ReservationRow({
   reservation,
   onCancel,
   onStatus,
+  onEdit,
 }: {
   reservation: Reservation;
   onCancel: () => void;
   onStatus: (status: string) => void;
+  onEdit: () => void;
 }) {
   const actions = rowActions(reservation.status);
+  const canEdit = ["booked", "seated", "attended"].includes(reservation.status);
 
   return (
     <TableRow>
@@ -195,7 +208,7 @@ function ReservationRow({
         </Badge>
       </TableCell>
       <TableCell>
-        {actions.length > 0 && (
+        {(actions.length > 0 || canEdit) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -215,6 +228,9 @@ function ReservationRow({
                   {action.label}
                 </DropdownMenuItem>
               ))}
+              {canEdit && (
+                <DropdownMenuItem onSelect={onEdit}>Edit consent and rating</DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

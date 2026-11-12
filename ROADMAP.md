@@ -76,7 +76,7 @@ Status: next.
 - Done: `compose.prod.yaml` brings up PostgreSQL, the API, and the staff app behind Caddy with one command. It was checked end to end over HTTP, including a booking and a rejected overlap.
 - Pending: automatic HTTPS on a real domain. [S]
 - Done: a click-through of the staff screens in a browser. All six screens load, and a walk-in seats a guest against the migrated database.
-- Pending: consent and rating fields in the staff app. Today they are set only through the API and the MCP server. [S]
+- Done: consent at walk-in and an edit dialog for consent and rating in the staff app. Rating and consent can be set on an attended visit.
 - Pending: the React warning about an inline script, probably from the theme library. [S]
 - Pending: a hardening guide for self-hosters. [M]
 - Pending: automated tests for the staff app and the public site, which have none today. [M]
