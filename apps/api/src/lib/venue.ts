@@ -20,7 +20,7 @@ import { normalizeTimeZone } from "./time";
 import { sha256Hex } from "./reservations";
 
 export type Db = NodePgDatabase<typeof schema>;
-type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+export type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 export interface VenueConfig {
   enabled: boolean;
@@ -213,28 +213,7 @@ export async function erase(
             .for("update")
         : [];
     const family = await withMerged(tx, venueId, linkedGuests);
-    for (const m of matches) {
-      const hash = await sha256Hex(m.id);
-      await tx
-        .update(reservations)
-        .set({
-          guestName: "",
-          guestContact: "",
-          guestId: null,
-          ...consentColumns("unknown"),
-          ...ratingColumns(null),
-          erased: true,
-        })
-        .where(eq(reservations.id, m.id));
-      await tx.insert(tombstones).values({ reservationId: m.id, venueId, hash });
-      await tx.insert(events).values({
-        venueId,
-        type: "erased",
-        reservationId: m.id,
-        version: m.version,
-        tombstoneHash: hash,
-      });
-    }
+    await eraseReservations(tx, venueId, matches);
 
     const targets = guestId ? byGuest : await unreferenced(tx, venueId, family);
     const targetIds = targets.map((g) => g.id);
@@ -260,9 +239,38 @@ export async function erase(
   });
 }
 
+export async function eraseReservations(
+  tx: DbTx,
+  venueId: string,
+  rows: { id: string; version: number }[],
+): Promise<void> {
+  for (const m of rows) {
+    const hash = await sha256Hex(m.id);
+    await tx
+      .update(reservations)
+      .set({
+        guestName: "",
+        guestContact: "",
+        guestId: null,
+        ...consentColumns("unknown"),
+        ...ratingColumns(null),
+        erased: true,
+      })
+      .where(and(eq(reservations.venueId, venueId), eq(reservations.id, m.id)));
+    await tx.insert(tombstones).values({ reservationId: m.id, venueId, hash });
+    await tx.insert(events).values({
+      venueId,
+      type: "erased",
+      reservationId: m.id,
+      version: m.version,
+      tombstoneHash: hash,
+    });
+  }
+}
+
 type Guest = typeof guests.$inferSelect;
 
-async function withMerged(tx: DbTx, venueId: string, roots: Guest[]): Promise<Guest[]> {
+export async function withMerged(tx: DbTx, venueId: string, roots: Guest[]): Promise<Guest[]> {
   const found = new Map(roots.map((g) => [g.id, g]));
   let frontier = [...found.keys()];
   while (frontier.length > 0) {

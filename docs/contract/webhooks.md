@@ -87,6 +87,8 @@ Delivery is at least once. The same event can arrive more than once, for example
 
 Events are kept for the venue's retention period. If an endpoint stays down longer than that, the oldest undelivered events are pruned before they can be sent. The engine then jumps the endpoint to the oldest event still retained and records the dropped range in `lastError`. Resynchronize by reading the affected reservations.
 
+A guest record also expires after the venue's retention period, counted from the guest's latest visit. A guest with a visit that ends inside the period, or a future booking, stays. On expiry the engine clears the record's email, phone, and name, and blanks every reservation linked to it the same way erasure does. Each of those reservations emits one `erased` event with its tombstone hash, so a receiver learns of it as it learns of an erasure. Waitlist entries older than the period are deleted. The job runs hourly in bounded batches, so a large backlog clears over several runs.
+
 ## Allowed URLs
 
 A webhook makes the engine send requests on the venue's behalf, so the engine refuses targets inside its own network.

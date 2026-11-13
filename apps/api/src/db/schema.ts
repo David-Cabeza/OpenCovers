@@ -14,6 +14,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+export const DEFAULT_RETENTION_DAYS = 400;
+
 export const venues = pgTable("venues", {
   id: text("id").primaryKey(),
   name: text("name").notNull().default(""),
@@ -27,7 +29,7 @@ export const venues = pgTable("venues", {
   leadTimeMinutes: integer("lead_time_minutes").notNull().default(0),
   lastSeatingOffsetMinutes: integer("last_seating_offset_minutes").notNull().default(0),
   eventsWatermark: bigint("events_watermark", { mode: "number" }).notNull().default(0),
-  retentionDays: integer("retention_days").notNull().default(400),
+  retentionDays: integer("retention_days").notNull().default(DEFAULT_RETENTION_DAYS),
   phoneCountry: text("phone_country"),
 });
 
@@ -81,6 +83,7 @@ export const guests = pgTable(
   (t) => [
     uniqueIndex("uq_guests_venue_email").on(t.venueId, t.email),
     uniqueIndex("uq_guests_venue_phone").on(t.venueId, t.phone),
+    index("idx_guests_venue_last_visit").on(t.venueId, t.lastVisitAt),
   ],
 );
 
@@ -92,7 +95,7 @@ export const guestAudit = pgTable(
       .notNull()
       .references(() => venues.id),
     guestId: text("guest_id").notNull(),
-    action: text("action").$type<"created" | "erased">().notNull(),
+    action: text("action").$type<"created" | "erased" | "expired">().notNull(),
     principal: text("principal").notNull().default(""),
     occurredAt: timestamp("occurred_at", { withTimezone: true })
       .notNull()

@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import app from "./app";
 import { db } from "./db/client";
-import { runRetention } from "./lib/reservations";
+import { runRetention } from "./lib/retention";
 import { runWebhookDeliveries, webhookDepsFromEnv } from "./lib/webhooks";
 
 const port = Number(process.env.PORT ?? 3000);

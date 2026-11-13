@@ -1,0 +1,1 @@
+CREATE INDEX "idx_guests_venue_last_visit" ON "guests" USING btree ("venue_id","last_visit_at");

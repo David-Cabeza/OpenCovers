@@ -740,14 +740,6 @@ export async function pruneEvents(db: Db, venueId: string, cutoff: Date): Promis
     .where(eq(venues.id, venueId));
 }
 
-export async function runRetention(db: Db, now = new Date()): Promise<void> {
-  const all = await db.select().from(venues);
-  for (const venue of all) {
-    const cutoff = new Date(now.getTime() - venue.retentionDays * 86400000);
-    await pruneEvents(db, venue.id, cutoff);
-  }
-}
-
 export interface FloorTable {
   id: string;
   name: string;

@@ -438,6 +438,10 @@ paths:
         guest still has a reservation that is not erased. A guest with a
         visit owned by another principal stays. It does not touch the
         waitlist. `erasedGuests` counts the guest records deleted.
+
+        A guest record also expires on its own after the venue's retention
+        period, counted from its latest visit. Its reservations are blanked
+        the same way and emit the same `erased` events.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
