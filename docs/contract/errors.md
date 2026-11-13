@@ -18,12 +18,13 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 ## Availability and allocation
 
 - `slot_taken`: the requested time is no longer available and no other eligible table remains.
-- `party_size_too_large`: the party exceeds the venue's maximum.
+- `party_size_too_large`: the party exceeds the venue's capacity, or the maximum of the service that covers the time.
+- `party_size_too_small`: the party is below the minimum of the service that covers the time.
 - `no_suitable_table`: no table combination fits the party.
 - `outside_hours`: the time is outside the venue's hours, off the slot grid, or after the last seating.
 - `lead_time_violation`: the booking is too close to the requested time.
 
-`GET /availability/explain` returns `outside_hours`, `lead_time_violation`, `party_size_too_large`, and `no_suitable_table` as reason codes in a `200` answer, with the same meaning.
+`GET /availability/explain` returns `outside_hours`, `lead_time_violation`, `party_size_too_small`, `party_size_too_large`, and `no_suitable_table` as reason codes in a `200` answer, with the same meaning.
 
 ## Guest
 

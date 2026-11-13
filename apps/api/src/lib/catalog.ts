@@ -20,6 +20,16 @@ export interface ServiceInfo {
   name: string;
   openStart: string;
   openEnd: string;
+  minPartySize?: number;
+  maxPartySize?: number;
+}
+
+export interface ServiceInput {
+  name: string;
+  openStart: string;
+  openEnd: string;
+  minPartySize?: number | null;
+  maxPartySize?: number | null;
 }
 
 export async function listTables(db: Db, venueId: string): Promise<TableInfo[]> {
@@ -99,26 +109,34 @@ export async function listServices(db: Db, venueId: string): Promise<ServiceInfo
     name: s.name,
     openStart: s.openStart,
     openEnd: s.openEnd,
+    ...(s.minPartySize !== null ? { minPartySize: s.minPartySize } : {}),
+    ...(s.maxPartySize !== null ? { maxPartySize: s.maxPartySize } : {}),
   }));
 }
 
 export async function upsertService(
   db: Db,
   venueId: string,
-  input: { name: string; openStart: string; openEnd: string },
-): Promise<void> {
+  input: ServiceInput,
+): Promise<{ ok: true } | { ok: false; code: "invalid_request" }> {
+  const current = (
+    await db
+      .select()
+      .from(services)
+      .where(and(eq(services.venueId, venueId), eq(services.name, input.name)))
+      .limit(1)
+  )[0];
+  const minPartySize = input.minPartySize !== undefined ? input.minPartySize : current?.minPartySize ?? null;
+  const maxPartySize = input.maxPartySize !== undefined ? input.maxPartySize : current?.maxPartySize ?? null;
+  if (minPartySize !== null && maxPartySize !== null && minPartySize > maxPartySize) {
+    return { ok: false, code: "invalid_request" };
+  }
+  const row = { openStart: input.openStart, openEnd: input.openEnd, minPartySize, maxPartySize };
   await db
     .insert(services)
-    .values({
-      venueId,
-      name: input.name,
-      openStart: input.openStart,
-      openEnd: input.openEnd,
-    })
-    .onConflictDoUpdate({
-      target: [services.venueId, services.name],
-      set: { openStart: input.openStart, openEnd: input.openEnd },
-    });
+    .values({ venueId, name: input.name, ...row })
+    .onConflictDoUpdate({ target: [services.venueId, services.name], set: row });
+  return { ok: true };
 }
 
 export async function deleteService(db: Db, venueId: string, name: string): Promise<void> {

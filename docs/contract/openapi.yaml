@@ -60,8 +60,10 @@ paths:
         list shows the time as free. Every blocking reason is returned, in
         the order of `ExplainReason`, and a create fails with the code of the
         first. A blocked time returns up to 3 nearest available times on the
-        same date, nearest first. The answer holds no personal data and no
-        table ids. Readable by any key or session that can read the venue.
+        same date, nearest first. The tables are checked for the turn time
+        of the party size, as a create holds them. The answer holds no
+        personal data and no table ids. Readable by any key or session that
+        can read the venue.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - name: date
@@ -145,6 +147,13 @@ paths:
     post:
       operationId: reservation.create
       summary: Create a reservation
+      description: |
+        The reservation holds its tables for the venue's turn time for the
+        party size, or 120 minutes when the venue has none. A party outside
+        the limits of the service that covers the time fails with
+        `party_size_too_small` or `party_size_too_large`. A walk-in is not
+        held to the service limits, as it is not held to the slot grid or
+        the lead time.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -311,7 +320,8 @@ paths:
         `notice_address_required`. Clearing the notice address while the
         venue is enabled fails the same way. A `phoneCountry` that is not a
         supported ISO 3166 alpha-2 code in upper case fails with
-        `invalid_request`. Null clears it.
+        `invalid_request`. Null clears it. Malformed `turnTimes` fail with
+        `invalid_request`, and an empty array clears them.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -326,6 +336,65 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/VenueConfig" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/services:
+    get:
+      operationId: venue.listServices
+      summary: List the venue's services
+      description: Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The services, by opening time
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [services]
+                properties:
+                  services:
+                    type: array
+                    items: { $ref: "#/components/schemas/Service" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: venue.upsertService
+      summary: Create or update a service by name
+      description: |
+        A limit left out keeps its stored value, and null clears it. A limit
+        that is not an integer of at least 1, or a minimum above the maximum
+        after the update, fails with `invalid_request`. A `read` key fails
+        with `forbidden`. Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, openStart, openEnd]
+              properties:
+                name: { type: string, minLength: 1 }
+                openStart: { type: string, example: "19:00" }
+                openEnd: { type: string, example: "23:00" }
+                minPartySize: { type: integer, minimum: 1, nullable: true }
+                maxPartySize: { type: integer, minimum: 1, nullable: true }
+      responses:
+        "200":
+          description: The venue's services after the update
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [services]
+                properties:
+                  services:
+                    type: array
+                    items: { $ref: "#/components/schemas/Service" }
         default:
           $ref: "#/components/responses/Error"
 
@@ -747,14 +816,16 @@ components:
       description: |
         One rule that blocks the time. Reasons come in this fixed order:
         `outside_hours` with rule `hours`, then rule `slot_grid`, then rule
-        `last_seating`, then `lead_time_violation`, then
-        `party_size_too_large` or `no_suitable_table`. The codes are the
-        error codes a create returns for the same rule.
+        `last_seating`, then `lead_time_violation`, then the service limit
+        as `party_size_too_small` or `party_size_too_large` with rule
+        `service_limit`, then `party_size_too_large` for capacity or
+        `no_suitable_table`. The codes are the error codes a create returns
+        for the same rule.
       required: [code, message, details]
       properties:
         code:
           type: string
-          enum: [outside_hours, lead_time_violation, party_size_too_large, no_suitable_table]
+          enum: [outside_hours, lead_time_violation, party_size_too_small, party_size_too_large, no_suitable_table]
         message:
           type: string
           description: Human-readable. May change.
@@ -764,6 +835,8 @@ components:
             - $ref: "#/components/schemas/ExplainSlotGrid"
             - $ref: "#/components/schemas/ExplainLastSeating"
             - $ref: "#/components/schemas/ExplainLeadTime"
+            - $ref: "#/components/schemas/ExplainServiceMinimum"
+            - $ref: "#/components/schemas/ExplainServiceMaximum"
             - $ref: "#/components/schemas/ExplainPartySize"
             - $ref: "#/components/schemas/ExplainTables"
 
@@ -824,9 +897,29 @@ components:
             date: { type: string, format: date }
             time: { type: string }
 
+    ExplainServiceMinimum:
+      type: object
+      description: Details of `party_size_too_small` when the party is below the minimum of the service.
+      required: [rule, service, partySize, minPartySize]
+      properties:
+        rule: { type: string, enum: [service_limit] }
+        service: { type: string }
+        partySize: { type: integer }
+        minPartySize: { type: integer }
+
+    ExplainServiceMaximum:
+      type: object
+      description: Details of `party_size_too_large` when the party is above the maximum of the service.
+      required: [rule, service, partySize, maxPartySize]
+      properties:
+        rule: { type: string, enum: [service_limit] }
+        service: { type: string }
+        partySize: { type: integer }
+        maxPartySize: { type: integer }
+
     ExplainPartySize:
       type: object
-      description: Details of `party_size_too_large`.
+      description: Details of `party_size_too_large` when the party is above the capacity.
       required: [partySize, largestParty]
       properties:
         partySize: { type: integer }
@@ -1180,6 +1273,42 @@ components:
           description: |
             ISO 3166 alpha-2 country used to read a guest phone without a
             country code. Null means the country of the venue's time zone.
+        turnTimes:
+          type: array
+          maxItems: 10
+          description: |
+            How long a booking holds its tables, by party size. A party uses
+            the first row whose `upTo` is at least its size, or the last row
+            when it is larger. `upTo` strictly increases from row to row.
+            Absent when the venue has none, and then a booking holds its
+            tables for 120 minutes. An empty array clears it.
+          items:
+            type: object
+            required: [upTo, minutes]
+            additionalProperties: false
+            properties:
+              upTo: { type: integer, minimum: 1 }
+              minutes: { type: integer, minimum: 15, maximum: 480 }
+          example:
+            - { upTo: 2, minutes: 90 }
+            - { upTo: 4, minutes: 120 }
+            - { upTo: 8, minutes: 150 }
+
+    Service:
+      type: object
+      required: [name, openStart, openEnd]
+      properties:
+        name: { type: string }
+        openStart: { type: string, example: "19:00" }
+        openEnd: { type: string, example: "23:00" }
+        minPartySize:
+          type: integer
+          minimum: 1
+          description: The smallest party the service takes. Absent when there is no minimum.
+        maxPartySize:
+          type: integer
+          minimum: 1
+          description: The largest party the service takes. Absent when there is no maximum.
 
     ErasureResult:
       type: object
@@ -1216,6 +1345,7 @@ components:
         - forbidden
         - slot_taken
         - party_size_too_large
+        - party_size_too_small
         - no_suitable_table
         - outside_hours
         - lead_time_violation

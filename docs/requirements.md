@@ -46,6 +46,12 @@ A caller that can read a venue can ask why a time is or is not bookable for a pa
 
 Acceptance: the answer lists every reason that blocks the time, in a fixed order, each with a code from the error vocabulary and the facts that decided it. A blocked time also returns up to 3 nearest available times that day. The answer holds no personal data. Conformance case C20.
 
+### REQ-A5 Turn time and party limits
+
+How long a booking holds its tables depends on its party size, from a table of turn times the venue sets. A service can take only parties between a minimum and a maximum size. Availability, booking, and the explanation apply both rules the same way.
+
+Acceptance: a larger party holds its tables longer and a smaller one frees them sooner, a venue without turn times keeps one fixed duration, and a party outside the limits of a service cannot book it and sees its times as unavailable. A walk-in is not held to the limits. Conformance case C21.
+
 ## Booking
 
 ### REQ-B1 One transaction

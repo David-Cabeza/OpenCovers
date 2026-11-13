@@ -26,6 +26,7 @@ import {
   toTime,
   toTimestamp,
 } from "./time";
+import { turnMinutes } from "./turn-times";
 
 export type Db = NodePgDatabase<typeof schema>;
 type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -33,7 +34,7 @@ type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 export interface CreateReservationInput {
   date: string;
   time: string;
-  durationMinutes: number;
+  durationMinutes?: number;
   partySize: number;
   tableIds?: string[];
   zone?: string;
@@ -142,6 +143,16 @@ export type Reason =
       details: { leadTimeMinutes: number; earliest: { date: string; time: string } };
     }
   | {
+      code: "party_size_too_small";
+      message: string;
+      details: { rule: "service_limit"; service: string; partySize: number; minPartySize: number };
+    }
+  | {
+      code: "party_size_too_large";
+      message: string;
+      details: { rule: "service_limit"; service: string; partySize: number; maxPartySize: number };
+    }
+  | {
       code: "party_size_too_large";
       message: string;
       details: { partySize: number; largestParty: number; zone?: string };
@@ -178,6 +189,7 @@ export type WriteErrorCode =
   | "already_cancelled"
   | "invalid_request"
   | "party_size_too_large"
+  | "party_size_too_small"
   | "no_suitable_table"
   | "outside_hours"
   | "lead_time_violation"
@@ -198,7 +210,6 @@ const ALLOWED_TRANSITIONS: Record<StatusTransition, string[]> = {
   attended: ["seated"],
   no_show: ["booked"],
 };
-export const DEFAULT_DURATION_MINUTES = 120;
 
 class ReservationError extends Error {
   constructor(readonly code: WriteErrorCode) {
@@ -230,12 +241,13 @@ interface SlotRequest {
   partySize: number;
   zone: string;
   walkIn: boolean;
-  durationMinutes: number;
+  durationMinutes?: number;
 }
 
-function bookingWindow(venue: VenueRow, date: string, time: string, durationMinutes: number) {
-  const startsAt = toTimestamp(date, time, venue.timezone);
-  return { startsAt, endsAt: new Date(startsAt.getTime() + durationMinutes * 60000) };
+function bookingWindow(venue: VenueRow, request: SlotRequest) {
+  const minutes = request.durationMinutes ?? turnMinutes(venue.turnTimes, request.partySize);
+  const startsAt = toTimestamp(request.date, request.time, venue.timezone);
+  return { startsAt, endsAt: new Date(startsAt.getTime() + minutes * 60000) };
 }
 
 function serviceAt(serviceRows: ServiceRow[], time: string): ServiceRow | null {
@@ -319,6 +331,30 @@ function timeReasons(
   return { service, reasons };
 }
 
+function serviceReasons(service: ServiceRow | null, request: SlotRequest): Reason[] {
+  if (!service || request.walkIn) return [];
+  const { partySize } = request;
+  if (service.minPartySize !== null && partySize < service.minPartySize) {
+    return [
+      {
+        code: "party_size_too_small",
+        message: "The party is smaller than the service minimum.",
+        details: { rule: "service_limit", service: service.name, partySize, minPartySize: service.minPartySize },
+      },
+    ];
+  }
+  if (service.maxPartySize !== null && partySize > service.maxPartySize) {
+    return [
+      {
+        code: "party_size_too_large",
+        message: "The party is larger than the service maximum.",
+        details: { rule: "service_limit", service: service.name, partySize, maxPartySize: service.maxPartySize },
+      },
+    ];
+  }
+  return [];
+}
+
 async function tableReasons(
   exec: Db | DbTx,
   venueId: string,
@@ -381,8 +417,9 @@ async function evaluateSlot(
   serviceRows: ServiceRow[],
   request: SlotRequest,
 ): Promise<Reason[]> {
-  const { startsAt, endsAt } = bookingWindow(venue, request.date, request.time, request.durationMinutes);
-  const { reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
+  const { startsAt, endsAt } = bookingWindow(venue, request);
+  const { service, reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
+  reasons.push(...serviceReasons(service, request));
   const fit = await tableReasons(db, venue.id, startsAt, endsAt, request.partySize, request.zone);
   return fit.ok ? reasons : [...reasons, fit.reason];
 }
@@ -498,8 +535,9 @@ export async function createReservation(
     walkIn: input.initialStatus === "seated",
     durationMinutes: input.durationMinutes,
   };
-  const { startsAt, endsAt } = bookingWindow(venue, input.date, input.time, input.durationMinutes);
+  const { startsAt, endsAt } = bookingWindow(venue, request);
   const { service, reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
+  reasons.push(...serviceReasons(service, request));
   if (reasons.length > 0) return { ok: false, code: reasons[0].code };
   if (!service) return { ok: false, code: "outside_hours" };
   const autoAssign = !input.tableIds || input.tableIds.length === 0;
@@ -611,7 +649,6 @@ export async function walkIn(
     {
       date: input.date ?? now.date,
       time: input.time ?? now.time,
-      durationMinutes: DEFAULT_DURATION_MINUTES,
       partySize: input.partySize,
       tableIds: input.tableIds,
       zone: input.zone,
@@ -1048,7 +1085,6 @@ async function gridAvailability(
         partySize,
         zone,
         walkIn: false,
-        durationMinutes: DEFAULT_DURATION_MINUTES,
       };
       const reasons = await evaluateSlot(db, venue, serviceRows, request);
       if (reasons.some((r) => r.code === "outside_hours")) continue;
@@ -1086,7 +1122,6 @@ export async function explainSlot(
     partySize: query.partySize,
     zone,
     walkIn: false,
-    durationMinutes: DEFAULT_DURATION_MINUTES,
   });
   const nearest: string[] = [];
   if (reasons.length > 0) {

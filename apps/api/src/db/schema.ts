@@ -1,10 +1,12 @@
 import { sql } from "drizzle-orm";
 import type { Consent } from "../lib/consent";
 import type { Rating } from "../lib/rating";
+import type { TurnTime } from "../lib/turn-times";
 import {
   bigint,
   bigserial,
   boolean,
+  check,
   date,
   index,
   integer,
@@ -33,6 +35,7 @@ export const venues = pgTable("venues", {
   eventsWatermark: bigint("events_watermark", { mode: "number" }).notNull().default(0),
   retentionDays: integer("retention_days").notNull().default(DEFAULT_RETENTION_DAYS),
   phoneCountry: text("phone_country"),
+  turnTimes: jsonb("turn_times").$type<TurnTime[]>().notNull().default([]),
 });
 
 export const services = pgTable(
@@ -44,8 +47,16 @@ export const services = pgTable(
     name: text("name").notNull(),
     openStart: text("open_start").notNull(),
     openEnd: text("open_end").notNull(),
+    minPartySize: integer("min_party_size"),
+    maxPartySize: integer("max_party_size"),
   },
-  (t) => [primaryKey({ columns: [t.venueId, t.name] })],
+  (t) => [
+    primaryKey({ columns: [t.venueId, t.name] }),
+    check(
+      "services_party_size_limits",
+      sql`(${t.minPartySize} IS NULL OR ${t.minPartySize} >= 1) AND (${t.maxPartySize} IS NULL OR ${t.maxPartySize} >= 1) AND (${t.minPartySize} IS NULL OR ${t.maxPartySize} IS NULL OR ${t.minPartySize} <= ${t.maxPartySize})`,
+    ),
+  ],
 );
 
 export const tables = pgTable(

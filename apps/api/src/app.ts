@@ -24,7 +24,6 @@ import {
 import {
   cancelReservation,
   createReservation,
-  DEFAULT_DURATION_MINUTES,
   explainSlot,
   getAvailability,
   getEvents,
@@ -53,6 +52,7 @@ import {
   type GuestWrite,
 } from "./lib/guests";
 import { toCountryCode } from "./lib/contact";
+import { parseTurnTimes } from "./lib/turn-times";
 import { notifyReservation } from "./lib/notifications";
 import {
   addFloorItem,
@@ -90,6 +90,7 @@ const HTTP_STATUS: Record<string, number> = {
   already_cancelled: 409,
   notice_address_required: 409,
   party_size_too_large: 400,
+  party_size_too_small: 400,
   outside_hours: 400,
   lead_time_violation: 400,
   expired_cursor: 400,
@@ -227,7 +228,6 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
     {
       date: body.date,
       time: body.time,
-      durationMinutes: DEFAULT_DURATION_MINUTES,
       partySize: body.partySize,
       tableIds: body.tables,
       zone: typeof body.zone === "string" ? body.zone : undefined,
@@ -597,15 +597,20 @@ app.post("/v1/venues/:venueId/services", async (c) => {
     typeof body.name !== "string" ||
     body.name === "" ||
     typeof body.openStart !== "string" ||
-    typeof body.openEnd !== "string"
+    typeof body.openEnd !== "string" ||
+    !isPartyLimit(body.minPartySize) ||
+    !isPartyLimit(body.maxPartySize)
   ) {
     return error(c, "invalid_request", 400);
   }
-  await upsertService(db, venueId, {
+  const upserted = await upsertService(db, venueId, {
     name: body.name,
     openStart: body.openStart,
     openEnd: body.openEnd,
+    minPartySize: body.minPartySize,
+    maxPartySize: body.maxPartySize,
   });
+  if (!upserted.ok) return mapError(c, upserted.code);
   const services = await listServices(db, venueId);
   return c.json({ services });
 });
@@ -766,6 +771,8 @@ app.put("/v1/venues/:venueId/config", async (c) => {
   if (body.phoneCountry != null && !toCountryCode(body.phoneCountry)) {
     return error(c, "invalid_request", 400);
   }
+  const turnTimes = body.turnTimes === undefined ? undefined : parseTurnTimes(body.turnTimes);
+  if (turnTimes === null) return error(c, "invalid_request", 400);
   const result = await setConfig(db, venueId, {
     enabled: body.enabled,
     noticeAddress: body.noticeAddress,
@@ -778,6 +785,7 @@ app.put("/v1/venues/:venueId/config", async (c) => {
       ? body.lastSeatingOffsetMinutes
       : undefined,
     phoneCountry: body.phoneCountry === null ? null : toCountryCode(body.phoneCountry) ?? undefined,
+    turnTimes,
   });
   if (!result.ok) return mapError(c, result.code);
   return c.json(result.config);
@@ -848,6 +856,10 @@ function isRole(value: unknown): value is "read" | "write" | "admin" {
 function isDate(value: string): boolean {
   const ms = Date.parse(`${value}T00:00:00Z`);
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(ms) && new Date(ms).toISOString().startsWith(value);
+}
+
+function isPartyLimit(value: unknown): boolean {
+  return value === undefined || value === null || (Number.isInteger(value) && (value as number) >= 1);
 }
 
 function isPosInt(value: unknown): value is number {

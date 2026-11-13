@@ -19,6 +19,7 @@ import { forgetMergeState, movedAtMerge } from "./guests";
 import { ratingColumns } from "./rating";
 import { normalizeTimeZone } from "./time";
 import { sha256Hex } from "./reservations";
+import type { TurnTime } from "./turn-times";
 
 export type Db = NodePgDatabase<typeof schema>;
 export type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -33,6 +34,7 @@ export interface VenueConfig {
   leadTimeMinutes: number;
   lastSeatingOffsetMinutes: number;
   phoneCountry: string | null;
+  turnTimes?: TurnTime[];
 }
 
 export type ConfigResult =
@@ -82,7 +84,12 @@ export async function getConfig(db: Db, venueId: string): Promise<VenueConfig | 
     leadTimeMinutes: venue.leadTimeMinutes,
     lastSeatingOffsetMinutes: venue.lastSeatingOffsetMinutes,
     phoneCountry: venue.phoneCountry,
+    ...turnTimesField(venue.turnTimes),
   };
+}
+
+function turnTimesField(turnTimes: TurnTime[]): { turnTimes?: TurnTime[] } {
+  return turnTimes.length > 0 ? { turnTimes } : {};
 }
 
 export async function setConfig(
@@ -98,6 +105,7 @@ export async function setConfig(
     leadTimeMinutes?: number;
     lastSeatingOffsetMinutes?: number;
     phoneCountry?: CountryCode | null;
+    turnTimes?: TurnTime[];
   },
 ): Promise<ConfigResult> {
   const venue = (
@@ -117,6 +125,7 @@ export async function setConfig(
   const notificationsEnabled = input.notificationsEnabled ?? venue.notificationsEnabled;
   const fromEmail = input.fromEmail !== undefined ? input.fromEmail : venue.fromEmail;
   const phoneCountry = input.phoneCountry !== undefined ? input.phoneCountry : venue.phoneCountry;
+  const turnTimes = input.turnTimes ?? venue.turnTimes;
   const resendApiKey =
     input.resendApiKey !== undefined
       ? input.resendApiKey === ""
@@ -135,6 +144,7 @@ export async function setConfig(
       leadTimeMinutes,
       lastSeatingOffsetMinutes,
       phoneCountry,
+      turnTimes,
     })
     .where(eq(venues.id, venueId));
   return {
@@ -149,6 +159,7 @@ export async function setConfig(
       leadTimeMinutes,
       lastSeatingOffsetMinutes,
       phoneCountry,
+      ...turnTimesField(turnTimes),
     },
   };
 }

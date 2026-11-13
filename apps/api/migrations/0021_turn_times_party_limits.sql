@@ -1,0 +1,4 @@
+ALTER TABLE "services" ADD COLUMN "min_party_size" integer;--> statement-breakpoint
+ALTER TABLE "services" ADD COLUMN "max_party_size" integer;--> statement-breakpoint
+ALTER TABLE "venues" ADD COLUMN "turn_times" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "services" ADD CONSTRAINT "services_party_size_limits" CHECK (("services"."min_party_size" IS NULL OR "services"."min_party_size" >= 1) AND ("services"."max_party_size" IS NULL OR "services"."max_party_size" >= 1) AND ("services"."min_party_size" IS NULL OR "services"."max_party_size" IS NULL OR "services"."min_party_size" <= "services"."max_party_size"));
