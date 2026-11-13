@@ -150,7 +150,7 @@ Acceptance: a downstream consumer that missed the erasure can still learn, from 
 
 ### REQ-E3 Guest retention
 
-A guest record lasts the venue's retention period, `retention_days`, counted from its latest visit. The default is 400 days, a starting value until the legal review. After that the engine clears the guest's email, phone, and name, and erases each reservation linked to it with the same tombstone and `erased` event as REQ-E1. Each visit keeps its date, party size, and status. A guest with a visit inside the period, or a future booking, stays. Waitlist entries older than the period are deleted. The same setting bounds the event feed.
+A guest record lasts the venue's retention period, `retention_days`, counted from its latest visit. The default is 400 days, a starting value until the legal review. After that the engine clears the guest's email, phone, and name, and erases each reservation linked to it with the same tombstone and `erased` event as REQ-E1. Each visit keeps its date, party size, and status. A guest with a visit inside the period, or a future booking, stays. A reservation with no guest record, because its contact did not normalize or it had a name and no contact, expires by the same period, counted from its end time, and is erased the same way. One that is booked or seated and not yet over stays. Waitlist entries older than the period are deleted. The same setting bounds the event feed.
 
 Acceptance: conformance case C18. After expiry no personal value of that guest remains in the venue. A second run changes nothing, and other venues are untouched.
 

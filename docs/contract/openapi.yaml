@@ -441,7 +441,9 @@ paths:
 
         A guest record also expires on its own after the venue's retention
         period, counted from its latest visit. Its reservations are blanked
-        the same way and emit the same `erased` events.
+        the same way and emit the same `erased` events. A reservation with no
+        guest record that holds a name or contact also expires, once its end
+        is older than the retention period. It is blanked the same way.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"

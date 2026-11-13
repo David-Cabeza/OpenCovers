@@ -1,0 +1,1 @@
+CREATE INDEX "idx_reservations_unlinked_retention" ON "reservations" USING btree ("venue_id","ends_at","id") WHERE "reservations"."guest_id" is null and "reservations"."erased" = false and ("reservations"."guest_name" <> '' or "reservations"."guest_contact" <> '');

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import type { Consent } from "../lib/consent";
 import type { Rating } from "../lib/rating";
 import {
@@ -137,6 +138,9 @@ export const reservations = pgTable(
   (t) => [
     index("idx_reservations_venue_date").on(t.venueId, t.date),
     index("idx_reservations_venue_guest").on(t.venueId, t.guestId),
+    index("idx_reservations_unlinked_retention")
+      .on(t.venueId, t.endsAt, t.id)
+      .where(sql`${t.guestId} is null and ${t.erased} = false and (${t.guestName} <> '' or ${t.guestContact} <> '')`),
   ],
 );
 

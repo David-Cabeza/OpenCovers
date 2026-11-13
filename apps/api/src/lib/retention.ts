@@ -22,6 +22,7 @@ export async function runRetention(
     const cutoff = new Date(now.getTime() - venue.retentionDays * DAY_MS);
     await pruneEvents(db, venue.id, cutoff);
     await inBatches(batch, (limit) => expireGuests(db, venue.id, cutoff, limit));
+    await inBatches(batch, (limit) => expireUnlinkedReservations(db, venue.id, cutoff, limit));
     await inBatches(batch, (limit) => expireWaitlist(db, venue.id, cutoff, limit));
   }
 }
@@ -83,6 +84,33 @@ async function expireGuests(db: Db, venueId: string, cutoff: Date, limit: number
       .insert(guestAudit)
       .values(ids.map((id) => ({ venueId, guestId: id, action: "expired" as const, principal: "retention" })));
     return roots.length;
+  });
+}
+
+async function expireUnlinkedReservations(
+  db: Db,
+  venueId: string,
+  cutoff: Date,
+  limit: number,
+): Promise<number> {
+  return db.transaction(async (tx) => {
+    const due = await tx
+      .select({ id: reservations.id, version: reservations.version })
+      .from(reservations)
+      .where(
+        and(
+          eq(reservations.venueId, venueId),
+          isNull(reservations.guestId),
+          eq(reservations.erased, false),
+          lt(reservations.endsAt, cutoff),
+          or(ne(reservations.guestName, ""), ne(reservations.guestContact, "")),
+        ),
+      )
+      .orderBy(reservations.endsAt, reservations.id)
+      .limit(limit)
+      .for("update", { skipLocked: true });
+    await eraseReservations(tx, venueId, due);
+    return due.length;
   });
 }
 
