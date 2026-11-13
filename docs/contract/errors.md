@@ -23,6 +23,8 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 - `outside_hours`: the time is outside the venue's hours, off the slot grid, or after the last seating.
 - `lead_time_violation`: the booking is too close to the requested time.
 
+`GET /availability/explain` returns `outside_hours`, `lead_time_violation`, `party_size_too_large`, and `no_suitable_table` as reason codes in a `200` answer, with the same meaning.
+
 ## Guest
 
 - `email_required`: the operation needs a guest contact and none was given.

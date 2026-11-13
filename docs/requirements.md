@@ -40,6 +40,12 @@ An availability read is a snapshot. It reserves nothing.
 
 Acceptance: two clients can both see a slot free and race to book it. The write transaction resolves the race. Conformance case C3 proves this.
 
+### REQ-A4 Availability explanation
+
+A caller that can read a venue can ask why a time is or is not bookable for a party size, optionally in one zone. The answer comes from the same rules that decide availability and booking, so it cannot disagree with them.
+
+Acceptance: the answer lists every reason that blocks the time, in a fixed order, each with a code from the error vocabulary and the facts that decided it. A blocked time also returns up to 3 nearest available times that day. The answer holds no personal data. Conformance case C20.
+
 ## Booking
 
 ### REQ-B1 One transaction

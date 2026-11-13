@@ -15,7 +15,17 @@ import { consentColumns, type Consent } from "./consent";
 import { normalizeContact, venueCountry } from "./contact";
 import { linkGuest } from "./guests";
 import { ratingColumns, type Rating } from "./rating";
-import { formatTime, normalizeMinute, nowInTimezone, serviceWindow, toMinutes, toTime, toTimestamp } from "./time";
+import {
+  addDays,
+  formatTime,
+  localDateTime,
+  normalizeMinute,
+  nowInTimezone,
+  serviceWindow,
+  toMinutes,
+  toTime,
+  toTimestamp,
+} from "./time";
 
 export type Db = NodePgDatabase<typeof schema>;
 type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -96,6 +106,69 @@ export interface AvailabilitySlot {
   type: string;
 }
 
+export type Reason =
+  | {
+      code: "outside_hours";
+      message: string;
+      details: { rule: "hours"; services: { name: string; openStart: string; openEnd: string }[] };
+    }
+  | {
+      code: "outside_hours";
+      message: string;
+      details: {
+        rule: "slot_grid";
+        service: string;
+        openStart: string;
+        openEnd: string;
+        slotIntervalMinutes: number;
+        previous: string;
+        next: string | null;
+      };
+    }
+  | {
+      code: "outside_hours";
+      message: string;
+      details: {
+        rule: "last_seating";
+        service: string;
+        openEnd: string;
+        lastSeatingOffsetMinutes: number;
+        lastSeating: string;
+      };
+    }
+  | {
+      code: "lead_time_violation";
+      message: string;
+      details: { leadTimeMinutes: number; earliest: { date: string; time: string } };
+    }
+  | {
+      code: "party_size_too_large";
+      message: string;
+      details: { partySize: number; largestParty: number; zone?: string };
+    }
+  | {
+      code: "no_suitable_table";
+      message: string;
+      details: {
+        partySize: number;
+        tablesFree: number;
+        tablesTotal: number;
+        seatsFree: number;
+        largestFreeTable: number;
+        zone?: string;
+      };
+    };
+
+export interface Explanation {
+  date: string;
+  time: string;
+  partySize: number;
+  zone?: string;
+  available: boolean;
+  reasons: Reason[];
+  nearest: string[];
+}
+
 export type StatusTransition = "seated" | "attended" | "no_show";
 
 export type WriteErrorCode =
@@ -125,7 +198,7 @@ const ALLOWED_TRANSITIONS: Record<StatusTransition, string[]> = {
   attended: ["seated"],
   no_show: ["booked"],
 };
-const DEFAULT_DURATION_SECONDS = 120 * 60;
+export const DEFAULT_DURATION_MINUTES = 120;
 
 class ReservationError extends Error {
   constructor(readonly code: WriteErrorCode) {
@@ -148,28 +221,170 @@ async function venueOf(db: Db, venueId: string) {
   )[0];
 }
 
-async function deriveService(
-  db: Db,
-  venueId: string,
-  time: string,
-): Promise<{ name: string; openStart: string; openEnd: string } | null> {
+type VenueRow = typeof venues.$inferSelect;
+type ServiceRow = typeof services.$inferSelect;
+
+interface SlotRequest {
+  date: string;
+  time: string;
+  partySize: number;
+  zone: string;
+  walkIn: boolean;
+  durationMinutes: number;
+}
+
+function bookingWindow(venue: VenueRow, date: string, time: string, durationMinutes: number) {
+  const startsAt = toTimestamp(date, time, venue.timezone);
+  return { startsAt, endsAt: new Date(startsAt.getTime() + durationMinutes * 60000) };
+}
+
+function serviceAt(serviceRows: ServiceRow[], time: string): ServiceRow | null {
   const minute = toMinutes(time);
-  const rows = await db
-    .select()
-    .from(services)
-    .where(eq(services.venueId, venueId));
-  for (const service of rows) {
+  for (const service of serviceRows) {
     const { start, end } = serviceWindow(service.openStart, service.openEnd);
     const m = normalizeMinute(minute, start);
-    if (m >= start && m < end) {
-      return {
-        name: service.name,
-        openStart: service.openStart,
-        openEnd: service.openEnd,
-      };
-    }
+    if (m >= start && m < end) return service;
   }
   return null;
+}
+
+function timeReasons(
+  venue: VenueRow,
+  serviceRows: ServiceRow[],
+  request: SlotRequest,
+  startsAt: Date,
+  now: number,
+): { service: ServiceRow | null; reasons: Reason[] } {
+  const reasons: Reason[] = [];
+  const service = serviceAt(serviceRows, request.time);
+  if (!service) {
+    reasons.push({
+      code: "outside_hours",
+      message: "The time is outside every service.",
+      details: {
+        rule: "hours",
+        services: [...serviceRows]
+          .sort((a, b) => a.openStart.localeCompare(b.openStart))
+          .map((s) => ({ name: s.name, openStart: s.openStart, openEnd: s.openEnd })),
+      },
+    });
+  } else {
+    const { start, end } = serviceWindow(service.openStart, service.openEnd);
+    const minute = normalizeMinute(toMinutes(request.time), start);
+    const interval = venue.slotIntervalMinutes;
+    const lastSeating = end - venue.lastSeatingOffsetMinutes;
+    if (!request.walkIn && (minute - start) % interval !== 0) {
+      const previous = minute - ((minute - start) % interval);
+      const next = previous + interval;
+      reasons.push({
+        code: "outside_hours",
+        message: "The time is not on the slot grid.",
+        details: {
+          rule: "slot_grid",
+          service: service.name,
+          openStart: service.openStart,
+          openEnd: service.openEnd,
+          slotIntervalMinutes: interval,
+          previous: toTime(previous % (24 * 60)),
+          next: next < end && next <= lastSeating ? toTime(next % (24 * 60)) : null,
+        },
+      });
+    }
+    if (minute > lastSeating) {
+      reasons.push({
+        code: "outside_hours",
+        message: "The time is after the last seating.",
+        details: {
+          rule: "last_seating",
+          service: service.name,
+          openEnd: service.openEnd,
+          lastSeatingOffsetMinutes: venue.lastSeatingOffsetMinutes,
+          lastSeating: toTime(lastSeating % (24 * 60)),
+        },
+      });
+    }
+  }
+  const leadMs = venue.leadTimeMinutes * 60000;
+  if (!request.walkIn && venue.leadTimeMinutes > 0 && startsAt.getTime() - now < leadMs) {
+    const earliest = new Date(Math.ceil((now + leadMs) / 60000) * 60000);
+    reasons.push({
+      code: "lead_time_violation",
+      message: "The time is within the lead time.",
+      details: {
+        leadTimeMinutes: venue.leadTimeMinutes,
+        earliest: localDateTime(earliest, venue.timezone),
+      },
+    });
+  }
+  return { service, reasons };
+}
+
+async function tableReasons(
+  exec: Db | DbTx,
+  venueId: string,
+  startsAt: Date,
+  endsAt: Date,
+  partySize: number,
+  zone: string,
+): Promise<{ ok: true; tableIds: string[] } | { ok: false; reason: Reason }> {
+  const allTables = await exec
+    .select({ id: tables.id, seats: tables.seats })
+    .from(tables)
+    .where(zone ? and(eq(tables.venueId, venueId), eq(tables.zone, zone)) : eq(tables.venueId, venueId));
+  const zoneDetail = zone ? { zone } : {};
+  const totalCapacity = allTables.reduce((sum, t) => sum + t.seats, 0);
+  if (partySize > totalCapacity) {
+    return {
+      ok: false,
+      reason: {
+        code: "party_size_too_large",
+        message: "The party is larger than the bookable capacity.",
+        details: { partySize, largestParty: totalCapacity, ...zoneDetail },
+      },
+    };
+  }
+  const busy = await exec
+    .selectDistinct({ tableId: tableAllocations.tableId })
+    .from(tableAllocations)
+    .where(
+      and(
+        eq(tableAllocations.venueId, venueId),
+        eq(tableAllocations.active, true),
+        lt(tableAllocations.startsAt, endsAt),
+        gt(tableAllocations.endsAt, startsAt),
+      ),
+    );
+  const busyIds = new Set(busy.map((b) => b.tableId));
+  const free = allTables.filter((t) => !busyIds.has(t.id));
+  const picked = pickCombination(free, partySize);
+  if (picked !== null) return { ok: true, tableIds: picked };
+  return {
+    ok: false,
+    reason: {
+      code: "no_suitable_table",
+      message: "No free table combination fits the party.",
+      details: {
+        partySize,
+        tablesFree: free.length,
+        tablesTotal: allTables.length,
+        seatsFree: free.reduce((sum, t) => sum + t.seats, 0),
+        largestFreeTable: free.reduce((max, t) => Math.max(max, t.seats), 0),
+        ...zoneDetail,
+      },
+    },
+  };
+}
+
+async function evaluateSlot(
+  db: Db,
+  venue: VenueRow,
+  serviceRows: ServiceRow[],
+  request: SlotRequest,
+): Promise<Reason[]> {
+  const { startsAt, endsAt } = bookingWindow(venue, request.date, request.time, request.durationMinutes);
+  const { reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
+  const fit = await tableReasons(db, venue.id, startsAt, endsAt, request.partySize, request.zone);
+  return fit.ok ? reasons : [...reasons, fit.reason];
 }
 
 async function totalSeats(db: Db, venueId: string, tableIds: string[]) {
@@ -179,48 +394,6 @@ async function totalSeats(db: Db, venueId: string, tableIds: string[]) {
     .from(tables)
     .where(and(eq(tables.venueId, venueId), inArray(tables.id, tableIds)));
   return rows.reduce((sum, r) => sum + r.seats, 0);
-}
-
-async function autoAssignTables(
-  tx: DbTx,
-  venueId: string,
-  startsAt: Date,
-  endsAt: Date,
-  partySize: number,
-  zone?: string,
-): Promise<string[]> {
-  const allTables = await tx
-    .select()
-    .from(tables)
-    .where(
-      zone
-        ? and(eq(tables.venueId, venueId), eq(tables.zone, zone))
-        : eq(tables.venueId, venueId),
-    );
-  const totalCapacity = allTables.reduce((sum, t) => sum + t.seats, 0);
-  if (partySize > totalCapacity) throw new ReservationError("party_size_too_large");
-
-  const free: { id: string; seats: number }[] = [];
-  for (const t of allTables) {
-    const busy = await tx
-      .select()
-      .from(tableAllocations)
-      .where(
-        and(
-          eq(tableAllocations.venueId, venueId),
-          eq(tableAllocations.tableId, t.id),
-          eq(tableAllocations.active, true),
-          lt(tableAllocations.startsAt, endsAt),
-          gt(tableAllocations.endsAt, startsAt),
-        ),
-      )
-      .limit(1);
-    if (busy.length === 0) free.push({ id: t.id, seats: t.seats });
-  }
-
-  const picked = pickCombination(free, partySize);
-  if (picked === null) throw new ReservationError("no_suitable_table");
-  return picked;
 }
 
 function pickCombination(
@@ -315,29 +488,21 @@ export async function createReservation(
 ): Promise<WriteResult> {
   const venue = await venueOf(db, venueId);
   if (!venue) return { ok: false, code: "venue_not_found" };
-  const timezone = venue.timezone;
-  const startsAt = toTimestamp(input.date, input.time, timezone);
-  const endsAt = new Date(startsAt.getTime() + input.durationMinutes * 60000);
-  const service = await deriveService(db, venueId, input.time);
-  if (!service) return { ok: false, code: "outside_hours" };
-  const isWalkIn = input.initialStatus === "seated";
-  const { start, end } = serviceWindow(service.openStart, service.openEnd);
-  const minute = normalizeMinute(toMinutes(input.time), start);
-  if (!isWalkIn && (minute - start) % venue.slotIntervalMinutes !== 0) {
-    return { ok: false, code: "outside_hours" };
-  }
-  if (minute > end - venue.lastSeatingOffsetMinutes) {
-    return { ok: false, code: "outside_hours" };
-  }
-  if (
-    !isWalkIn &&
-    venue.leadTimeMinutes > 0 &&
-    startsAt.getTime() - Date.now() < venue.leadTimeMinutes * 60000
-  ) {
-    return { ok: false, code: "lead_time_violation" };
-  }
-  const autoAssign = !input.tableIds || input.tableIds.length === 0;
+  const serviceRows = await db.select().from(services).where(eq(services.venueId, venueId));
   const zone = input.zone ?? "";
+  const request: SlotRequest = {
+    date: input.date,
+    time: input.time,
+    partySize: input.partySize,
+    zone,
+    walkIn: input.initialStatus === "seated",
+    durationMinutes: input.durationMinutes,
+  };
+  const { startsAt, endsAt } = bookingWindow(venue, input.date, input.time, input.durationMinutes);
+  const { service, reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
+  if (reasons.length > 0) return { ok: false, code: reasons[0].code };
+  if (!service) return { ok: false, code: "outside_hours" };
+  const autoAssign = !input.tableIds || input.tableIds.length === 0;
   if (
     !autoAssign &&
     input.partySize > (await totalSeats(db, venueId, input.tableIds as string[]))
@@ -372,14 +537,9 @@ export async function createReservation(
       }
       let tableIds = input.tableIds ?? [];
       if (autoAssign) {
-        tableIds = await autoAssignTables(
-          tx,
-          venueId,
-          startsAt,
-          endsAt,
-          input.partySize,
-          zone,
-        );
+        const fit = await tableReasons(tx, venueId, startsAt, endsAt, input.partySize, zone);
+        if (!fit.ok) throw new ReservationError(fit.reason.code);
+        tableIds = fit.tableIds;
       }
       const guest = contactKey
         ? await linkGuest(tx, venueId, contactKey, input.guestName ?? "", startsAt, input.ownerPrincipal ?? "")
@@ -451,7 +611,7 @@ export async function walkIn(
     {
       date: input.date ?? now.date,
       time: input.time ?? now.time,
-      durationMinutes: 120,
+      durationMinutes: DEFAULT_DURATION_MINUTES,
       partySize: input.partySize,
       tableIds: input.tableIds,
       zone: input.zone,
@@ -863,28 +1023,95 @@ export async function getPacing(
   return result;
 }
 
-export async function getAvailability(db: Db, venueId: string, date: string, partySize: number): Promise<Record<string, AvailabilitySlot[]>> {
-  const venue = await venueOf(db, venueId);
-  if (!venue) return {};
-  const rows = await db.select().from(services).where(eq(services.venueId, venueId));
-  const result: Record<string, AvailabilitySlot[]> = {};
-  for (const service of rows) {
+interface GridSlot {
+  date: string;
+  time: string;
+  available: boolean;
+}
+
+async function gridAvailability(
+  db: Db,
+  venue: VenueRow,
+  serviceRows: ServiceRow[],
+  date: string,
+  partySize: number,
+  zone: string,
+): Promise<Record<string, GridSlot[]>> {
+  const result: Record<string, GridSlot[]> = {};
+  for (const service of serviceRows) {
     const { start, end } = serviceWindow(service.openStart, service.openEnd);
-    const close = slotTimestamp(date, end, venue.timezone);
-    const slots: AvailabilitySlot[] = [];
+    const slots: GridSlot[] = [];
     for (let m = start; m < end; m += venue.slotIntervalMinutes) {
-      const startTs = slotTimestamp(date, m, venue.timezone);
-      const endTs = new Date(startTs.getTime() + DEFAULT_DURATION_SECONDS * 1000);
-      if (endTs > close) continue;
-      slots.push({
+      const request: SlotRequest = {
+        date: addDays(date, Math.floor(m / (24 * 60))),
         time: toTime(m % (24 * 60)),
-        available: await hasFreeTable(db, venueId, startTs, endTs, partySize),
-        type: "free",
-      });
+        partySize,
+        zone,
+        walkIn: false,
+        durationMinutes: DEFAULT_DURATION_MINUTES,
+      };
+      const reasons = await evaluateSlot(db, venue, serviceRows, request);
+      if (reasons.some((r) => r.code === "outside_hours")) continue;
+      slots.push({ date: request.date, time: request.time, available: reasons.length === 0 });
     }
     result[service.name] = slots;
   }
   return result;
+}
+
+export async function getAvailability(db: Db, venueId: string, date: string, partySize: number): Promise<Record<string, AvailabilitySlot[]>> {
+  const venue = await venueOf(db, venueId);
+  if (!venue) return {};
+  const serviceRows = await db.select().from(services).where(eq(services.venueId, venueId));
+  const grid = await gridAvailability(db, venue, serviceRows, date, partySize, "");
+  const result: Record<string, AvailabilitySlot[]> = {};
+  for (const [name, slots] of Object.entries(grid)) {
+    result[name] = slots.map((s) => ({ time: s.time, available: s.available, type: "free" }));
+  }
+  return result;
+}
+
+export async function explainSlot(
+  db: Db,
+  venueId: string,
+  query: { date: string; time: string; partySize: number; zone?: string },
+): Promise<Explanation | null> {
+  const venue = await venueOf(db, venueId);
+  if (!venue) return null;
+  const serviceRows = await db.select().from(services).where(eq(services.venueId, venueId));
+  const zone = query.zone ?? "";
+  const reasons = await evaluateSlot(db, venue, serviceRows, {
+    date: query.date,
+    time: query.time,
+    partySize: query.partySize,
+    zone,
+    walkIn: false,
+    durationMinutes: DEFAULT_DURATION_MINUTES,
+  });
+  const nearest: string[] = [];
+  if (reasons.length > 0) {
+    const grid = await gridAvailability(db, venue, serviceRows, query.date, query.partySize, zone);
+    const asked = toMinutes(query.time);
+    const times = new Set(
+      Object.values(grid)
+        .flat()
+        .filter((s) => s.available && s.date === query.date)
+        .map((s) => s.time),
+    );
+    const byDistance = [...times].sort(
+      (a, b) => Math.abs(toMinutes(a) - asked) - Math.abs(toMinutes(b) - asked) || a.localeCompare(b),
+    );
+    nearest.push(...byDistance.slice(0, 3));
+  }
+  return {
+    date: query.date,
+    time: query.time,
+    partySize: query.partySize,
+    ...(zone ? { zone } : {}),
+    available: reasons.length === 0,
+    reasons,
+    nearest,
+  };
 }
 
 function slotTimestamp(date: string, minutes: number, timezone: string): Date {
@@ -892,30 +1119,6 @@ function slotTimestamp(date: string, minutes: number, timezone: string): Date {
   const minuteOfDay = minutes % (24 * 60);
   const ts = toTimestamp(date, toTime(minuteOfDay), timezone);
   return new Date(ts.getTime() + day * 86400000);
-}
-
-async function hasFreeTable(db: Db, venueId: string, start: Date, end: Date, partySize: number): Promise<boolean> {
-  const fitting = await db
-    .select({ id: tables.id })
-    .from(tables)
-    .where(and(eq(tables.venueId, venueId), gte(tables.seats, partySize)));
-  for (const t of fitting) {
-    const busy = await db
-      .select()
-      .from(tableAllocations)
-      .where(
-        and(
-          eq(tableAllocations.venueId, venueId),
-          eq(tableAllocations.tableId, t.id),
-          eq(tableAllocations.active, true),
-          lt(tableAllocations.startsAt, end),
-          gt(tableAllocations.endsAt, start),
-        ),
-      )
-      .limit(1);
-    if (busy.length === 0) return true;
-  }
-  return false;
 }
 
 export async function sha256Hex(input: string): Promise<string> {

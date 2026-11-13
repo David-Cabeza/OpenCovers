@@ -24,6 +24,8 @@ import {
 import {
   cancelReservation,
   createReservation,
+  DEFAULT_DURATION_MINUTES,
+  explainSlot,
   getAvailability,
   getEvents,
   getEventsWatermark,
@@ -70,8 +72,6 @@ import {
   listWaitlist,
   seatWaitlist,
 } from "./lib/waitlist";
-
-const DEFAULT_DURATION_MINUTES = 120;
 
 const HTTP_STATUS: Record<string, number> = {
   invalid_request: 400,
@@ -451,6 +451,25 @@ app.get("/v1/venues/:venueId/availability", async (c) => {
   return c.json({ availability });
 });
 
+app.get("/v1/venues/:venueId/availability/explain", async (c) => {
+  const venueId = c.req.param("venueId");
+  const date = c.req.query("date") ?? "";
+  const time = c.req.query("time") ?? "";
+  const partySizeRaw = c.req.query("partySize") ?? "";
+  const zone = c.req.query("zone");
+  if (!isDate(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time) || !/^[1-9]\d*$/.test(partySizeRaw)) {
+    return error(c, "invalid_request", 400);
+  }
+  const explanation = await explainSlot(db, venueId, {
+    date,
+    time,
+    partySize: Number(partySizeRaw),
+    zone: zone || undefined,
+  });
+  if (!explanation) return mapError(c, "venue_not_found");
+  return c.json(explanation);
+});
+
 app.get("/v1/venues/:venueId/floor", async (c) => {
   const venueId = c.req.param("venueId");
   const date = c.req.query("date");
@@ -824,6 +843,11 @@ function hasInvalidRating(body: any): boolean {
 
 function isRole(value: unknown): value is "read" | "write" | "admin" {
   return value === "read" || value === "write" || value === "admin";
+}
+
+function isDate(value: string): boolean {
+  const ms = Date.parse(`${value}T00:00:00Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(ms) && new Date(ms).toISOString().startsWith(value);
 }
 
 function isPosInt(value: unknown): value is number {

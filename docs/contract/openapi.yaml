@@ -49,6 +49,47 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/availability/explain:
+    get:
+      operationId: reservation.availability_explain
+      summary: Explain why a time is or is not bookable for a party size
+      description: |
+        Evaluates the request with the same rules that decide availability
+        and create. `available` is true exactly when a create for the same
+        date, time, party size, and zone would succeed and the availability
+        list shows the time as free. Every blocking reason is returned, in
+        the order of `ExplainReason`, and a create fails with the code of the
+        first. A blocked time returns up to 3 nearest available times on the
+        same date, nearest first. The answer holds no personal data and no
+        table ids. Readable by any key or session that can read the venue.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: time
+          in: query
+          required: true
+          schema: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "21:30" }
+        - name: partySize
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: zone
+          in: query
+          required: false
+          description: Only tables in this zone count, as in a create with `zone`.
+          schema: { type: string }
+      responses:
+        "200":
+          description: The explanation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AvailabilityExplanation" }
+        default:
+          $ref: "#/components/responses/Error"
+
   /venues/{venueId}/agenda:
     get:
       operationId: reservation.agenda
@@ -678,6 +719,131 @@ components:
         requiresConfirmation:
           type: boolean
           default: false
+
+    AvailabilityExplanation:
+      type: object
+      required: [date, time, partySize, available, reasons, nearest]
+      properties:
+        date: { type: string, format: date }
+        time: { type: string, example: "21:30" }
+        partySize: { type: integer }
+        zone:
+          type: string
+          description: Present when the request named a zone.
+        available:
+          type: boolean
+        reasons:
+          type: array
+          description: Empty when the time is bookable.
+          items: { $ref: "#/components/schemas/ExplainReason" }
+        nearest:
+          type: array
+          maxItems: 3
+          description: Available times on the same date, nearest first. Empty when the time is bookable.
+          items: { type: string, example: "21:45" }
+
+    ExplainReason:
+      type: object
+      description: |
+        One rule that blocks the time. Reasons come in this fixed order:
+        `outside_hours` with rule `hours`, then rule `slot_grid`, then rule
+        `last_seating`, then `lead_time_violation`, then
+        `party_size_too_large` or `no_suitable_table`. The codes are the
+        error codes a create returns for the same rule.
+      required: [code, message, details]
+      properties:
+        code:
+          type: string
+          enum: [outside_hours, lead_time_violation, party_size_too_large, no_suitable_table]
+        message:
+          type: string
+          description: Human-readable. May change.
+        details:
+          oneOf:
+            - $ref: "#/components/schemas/ExplainHours"
+            - $ref: "#/components/schemas/ExplainSlotGrid"
+            - $ref: "#/components/schemas/ExplainLastSeating"
+            - $ref: "#/components/schemas/ExplainLeadTime"
+            - $ref: "#/components/schemas/ExplainPartySize"
+            - $ref: "#/components/schemas/ExplainTables"
+
+    ExplainHours:
+      type: object
+      description: Details of `outside_hours` when no service covers the time.
+      required: [rule, services]
+      properties:
+        rule: { type: string, enum: [hours] }
+        services:
+          type: array
+          items:
+            type: object
+            required: [name, openStart, openEnd]
+            properties:
+              name: { type: string }
+              openStart: { type: string }
+              openEnd: { type: string }
+
+    ExplainSlotGrid:
+      type: object
+      description: Details of `outside_hours` when the time is off the slot grid.
+      required: [rule, service, openStart, openEnd, slotIntervalMinutes, previous, next]
+      properties:
+        rule: { type: string, enum: [slot_grid] }
+        service: { type: string }
+        openStart: { type: string }
+        openEnd: { type: string }
+        slotIntervalMinutes: { type: integer }
+        previous: { type: string, description: The grid time before the requested time. }
+        next:
+          type: string
+          nullable: true
+          description: The grid time after the requested time, or null when it is past the last seating.
+
+    ExplainLastSeating:
+      type: object
+      description: Details of `outside_hours` when the time is after the last seating.
+      required: [rule, service, openEnd, lastSeatingOffsetMinutes, lastSeating]
+      properties:
+        rule: { type: string, enum: [last_seating] }
+        service: { type: string }
+        openEnd: { type: string }
+        lastSeatingOffsetMinutes: { type: integer }
+        lastSeating: { type: string }
+
+    ExplainLeadTime:
+      type: object
+      description: Details of `lead_time_violation`.
+      required: [leadTimeMinutes, earliest]
+      properties:
+        leadTimeMinutes: { type: integer }
+        earliest:
+          type: object
+          description: The earliest bookable moment in the venue's time zone, rounded up to the minute.
+          required: [date, time]
+          properties:
+            date: { type: string, format: date }
+            time: { type: string }
+
+    ExplainPartySize:
+      type: object
+      description: Details of `party_size_too_large`.
+      required: [partySize, largestParty]
+      properties:
+        partySize: { type: integer }
+        largestParty: { type: integer, description: Total seats of the venue, or of the zone when one was named. }
+        zone: { type: string }
+
+    ExplainTables:
+      type: object
+      description: Details of `no_suitable_table`. Counts only, never table ids.
+      required: [partySize, tablesFree, tablesTotal, seatsFree, largestFreeTable]
+      properties:
+        partySize: { type: integer }
+        tablesFree: { type: integer }
+        tablesTotal: { type: integer }
+        seatsFree: { type: integer }
+        largestFreeTable: { type: integer }
+        zone: { type: string }
 
     Guest:
       type: object

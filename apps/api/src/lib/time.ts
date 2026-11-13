@@ -56,15 +56,22 @@ export function normalizeMinute(minute: number, start: number): number {
 }
 
 export function nowInTimezone(timezone = "UTC"): { date: string; time: string } {
+  return localDateTime(new Date(), timezone);
+}
+
+export function localDateTime(instant: Date, timezone = "UTC"): { date: string; time: string } {
   const tz = normalizeTimeZone(timezone);
-  const now = new Date();
   const date = new Intl.DateTimeFormat("en-CA", {
     timeZone: tz,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(now);
-  return { date, time: formatTime(now, tz) };
+  }).format(instant);
+  return { date, time: formatTime(instant, tz) };
+}
+
+export function addDays(date: string, days: number): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 }
 
 export function generateSlots(
