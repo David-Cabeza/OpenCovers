@@ -358,11 +358,14 @@ export function createServer(): McpServer {
     {
       title: "Erase personal data",
       description:
-        "Erase guest data for a venue, by guest contact or owner principal. A guest contact also removes its waitlist entries. Returns counts of erased reservations, guests, and waitlist entries.",
+        "Erase guest data for a venue, by guest id or owner principal. A guest id erases the guest record, every reservation linked to it, and the venue's waitlist entries with the same contact. An owner principal erases the reservations it owns and the guest records left with no other visit. A guest id that is not a record is read as a contact, which is deprecated. Returns counts of erased reservations, guest records, and waitlist entries.",
       annotations: { destructiveHint: true },
       inputSchema: z.object({
         venueId: z.string(),
-        guestId: z.string().optional().describe("Guest contact to erase."),
+        guestId: z
+          .string()
+          .optional()
+          .describe("Guest record id from a reservation's guest.guestId. A contact still works for one version and is deprecated."),
         principal: z.string().optional().describe("Owner principal to erase."),
       }),
     },
@@ -414,9 +417,14 @@ export function createServer(): McpServer {
         slotIntervalMinutes: z.number().int().nonnegative().optional(),
         leadTimeMinutes: z.number().int().nonnegative().optional(),
         lastSeatingOffsetMinutes: z.number().int().nonnegative().optional(),
+        phoneCountry: z
+          .string()
+          .nullable()
+          .optional()
+          .describe("ISO 3166 alpha-2 country for phone numbers without a country code. Null follows the venue time zone."),
       }),
     },
-    async ({ venueId, enabled, noticeAddress, notificationsEnabled, resendApiKey, fromEmail, slotIntervalMinutes, leadTimeMinutes, lastSeatingOffsetMinutes }) => {
+    async ({ venueId, enabled, noticeAddress, notificationsEnabled, resendApiKey, fromEmail, slotIntervalMinutes, leadTimeMinutes, lastSeatingOffsetMinutes, phoneCountry }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/config`, {
@@ -430,6 +438,7 @@ export function createServer(): McpServer {
               slotIntervalMinutes,
               leadTimeMinutes,
               lastSeatingOffsetMinutes,
+              phoneCountry,
             },
           }),
         );

@@ -82,15 +82,17 @@ Acceptance: the engine refuses a status it does not define, and a transition tha
 
 ### REQ-G1 Minimum data
 
-The engine stores only the guest data a booking needs: name, a contact, party size, notes, and a principal reference. It stores no guest profile beyond that.
+The engine stores only the guest data a booking needs: name, a contact, party size, notes, and a principal reference. Beyond the booking it keeps one guest record per person per venue, as decided in [ADR-0003](adr/0003-guest-identity.md). Today that record holds the normalized email or phone, a display name, and the time of the latest visit. It holds nothing a booking does not already carry. A booking never depends on it.
 
-Acceptance: a booking can be made and honoured without a persistent guest profile.
+Acceptance: a booking can be made and honoured without a guest record. A booking with no contact, or with a contact that does not normalize, creates none. Erasure removes the guest record with the reservations linked to it.
 
 ### REQ-G2 Reuse by rule
 
 The engine decides when a booking reuses an existing guest record and when it creates one, by an explicit matching rule on its own fields, such as the contact. Identity across channels belongs to the memory platform, not to the engine.
 
-Acceptance: the matching rule is documented and tested, and a booking that matches an existing record updates that record rather than duplicating it.
+The rule is an exact match on the normalized contact within one venue. An email is trimmed, Unicode-normalized to NFC, and lowercased, keeping dots and `+` tags. Anything else is a phone, parsed to E.164 with the venue's default country when it has no country code. The name never takes part.
+
+Acceptance: the matching rule is documented and tested, and a booking that matches an existing record updates that record rather than duplicating it. Conformance case C17.
 
 ### REQ-G3 The engine sets the basis
 

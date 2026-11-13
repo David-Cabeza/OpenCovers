@@ -268,7 +268,9 @@ paths:
       description: |
         Enabling the venue without a notice address fails with
         `notice_address_required`. Clearing the notice address while the
-        venue is enabled fails the same way.
+        venue is enabled fails the same way. A `phoneCountry` that is not a
+        supported ISO 3166 alpha-2 code in upper case fails with
+        `invalid_request`. Null clears it.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -412,9 +414,30 @@ paths:
       description: |
         Erasure returns counts. For each erased reservation the event feed
         emits an `erased` event carrying a tombstone hash. Erasure also resets
-        the reservation's consent to `unknown` and its rating to null. The counts still report
-        reservations and guests erased, not consent values. Erasure by guest id also
-        deletes the venue's waitlist entries with that contact and counts them.
+        the reservation's consent to `unknown` and its rating to null.
+
+        `guestId` is the guest record id, as returned in `guest.guestId`.
+        Erasure by guest id blanks every reservation linked to that guest and
+        to any guest merged into it, unlinks them, and deletes those guest
+        records. Each erased reservation keeps its date, party size, and
+        status, so cover counts survive. It also deletes the venue's waitlist
+        entries whose contact normalizes to one of the guest's keys.
+
+        Deprecated: a `guestId` that is not a guest record of the venue is
+        read as a contact. The contact is normalized and erases the guest it
+        matches, plus any reservation and waitlist entry whose contact equals
+        it exactly. This fallback is kept for one version.
+
+        `erasedGuests` counts the guest records deleted. A contact that
+        matches no guest record reports 0, even when it erased reservations
+        or waitlist entries.
+
+        Erasure by principal blanks and unlinks every reservation owned by
+        that principal. It then deletes each guest record of the venue that
+        was linked to one of them, with any guest merged into it, unless that
+        guest still has a reservation that is not erased. A guest with a
+        visit owned by another principal stays. It does not touch the
+        waitlist. `erasedGuests` counts the guest records deleted.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -428,6 +451,7 @@ paths:
               properties:
                 guestId:
                   type: string
+                  description: The guest record id. A contact is accepted as a deprecated fallback.
                 principal:
                   type: string
       responses:
@@ -503,7 +527,15 @@ components:
       properties:
         guestId:
           type: string
-          description: The engine's own guest record id, when one exists. Used for erasure.
+          description: |
+            The engine's own guest record id, when one exists. Used for erasure.
+            A booking links to a guest of the same venue by an exact match on
+            its normalized contact. An email is trimmed, Unicode-normalized to
+            NFC, and lowercased, keeping dots and `+` tags. Anything without
+            `@` is read as a phone and parsed to E.164, using the venue's
+            `phoneCountry` when it has no country code. The name never takes
+            part. A contact that does not normalize links no guest, and the
+            booking still succeeds. Omitted when no guest is linked.
         name:
           type: string
         contact:
@@ -755,6 +787,13 @@ components:
         noticeAddress:
           type: string
           description: Required to enable the venue and cannot be cleared while enabled.
+        phoneCountry:
+          type: string
+          nullable: true
+          example: ES
+          description: |
+            ISO 3166 alpha-2 country used to read a guest phone without a
+            country code. Null means the country of the venue's time zone.
 
     ErasureResult:
       type: object
@@ -764,6 +803,7 @@ components:
           type: integer
         erasedGuests:
           type: integer
+          description: Guest records deleted.
         erasedWaitlistEntries:
           type: integer
 

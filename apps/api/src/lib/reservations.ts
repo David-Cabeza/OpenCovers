@@ -12,6 +12,8 @@ import {
 } from "../db/schema";
 import * as schema from "../db/schema";
 import { consentColumns, type Consent } from "./consent";
+import { normalizeContact, venueCountry } from "./contact";
+import { linkGuest } from "./guests";
 import { ratingColumns, type Rating } from "./rating";
 import { formatTime, normalizeMinute, nowInTimezone, serviceWindow, toMinutes, toTime, toTimestamp } from "./time";
 
@@ -71,6 +73,7 @@ export interface Reservation {
   ownerPrincipal: string;
   guestName: string;
   guestContact: string;
+  guestId: string | null;
   consent: Consent;
   consentRecordedAt: string | null;
   rating: Rating | null;
@@ -276,6 +279,7 @@ function toReservation(
     ownerPrincipal: row.ownerPrincipal,
     guestName: row.guestName,
     guestContact: row.guestContact,
+    guestId: row.guestId,
     consent: row.consent,
     consentRecordedAt: row.consentRecordedAt ? row.consentRecordedAt.toISOString() : null,
     rating: row.rating,
@@ -356,6 +360,7 @@ export async function createReservation(
     }
   }
   const id = crypto.randomUUID();
+  const contactKey = input.guestContact != null ? normalizeContact(String(input.guestContact), venueCountry(venue)) : null;
   try {
     const result = await db.transaction(async (tx) => {
       const existing = (
@@ -376,6 +381,9 @@ export async function createReservation(
           zone,
         );
       }
+      const guest = contactKey
+        ? await linkGuest(tx, venueId, contactKey, input.guestName ?? "", startsAt, input.ownerPrincipal ?? "")
+        : null;
       await tx.insert(reservations).values({
         id,
         venueId,
@@ -392,6 +400,7 @@ export async function createReservation(
         ownerPrincipal: input.ownerPrincipal ?? "",
         guestName: input.guestName ?? "",
         guestContact: input.guestContact ?? "",
+        guestId: guest?.id ?? null,
         ...consentColumns(input.consent ?? "unknown"),
         ...ratingColumns(input.rating ?? null),
       });

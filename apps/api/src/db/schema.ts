@@ -28,6 +28,7 @@ export const venues = pgTable("venues", {
   lastSeatingOffsetMinutes: integer("last_seating_offset_minutes").notNull().default(0),
   eventsWatermark: bigint("events_watermark", { mode: "number" }).notNull().default(0),
   retentionDays: integer("retention_days").notNull().default(400),
+  phoneCountry: text("phone_country"),
 });
 
 export const services = pgTable(
@@ -61,6 +62,45 @@ export const tables = pgTable(
   (t) => [primaryKey({ columns: [t.venueId, t.id] })],
 );
 
+export const guests = pgTable(
+  "guests",
+  {
+    id: text("id").primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id),
+    email: text("email"),
+    phone: text("phone"),
+    name: text("name").notNull().default(""),
+    mergedInto: text("merged_into"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastVisitAt: timestamp("last_visit_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("uq_guests_venue_email").on(t.venueId, t.email),
+    uniqueIndex("uq_guests_venue_phone").on(t.venueId, t.phone),
+  ],
+);
+
+export const guestAudit = pgTable(
+  "guest_audit",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id),
+    guestId: text("guest_id").notNull(),
+    action: text("action").$type<"created" | "erased">().notNull(),
+    principal: text("principal").notNull().default(""),
+    occurredAt: timestamp("occurred_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("idx_guest_audit_venue_guest").on(t.venueId, t.guestId)],
+);
+
 export const reservations = pgTable(
   "reservations",
   {
@@ -81,6 +121,7 @@ export const reservations = pgTable(
     ownerPrincipal: text("owner_principal").notNull().default(""),
     guestName: text("guest_name").notNull().default(""),
     guestContact: text("guest_contact").notNull().default(""),
+    guestId: text("guest_id").references(() => guests.id),
     consent: text("consent").$type<Consent>().notNull().default("unknown"),
     consentRecordedAt: timestamp("consent_recorded_at", { withTimezone: true }),
     rating: integer("rating").$type<Rating>(),
@@ -90,7 +131,10 @@ export const reservations = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("idx_reservations_venue_date").on(t.venueId, t.date)],
+  (t) => [
+    index("idx_reservations_venue_date").on(t.venueId, t.date),
+    index("idx_reservations_venue_guest").on(t.venueId, t.guestId),
+  ],
 );
 
 export const tableAllocations = pgTable(

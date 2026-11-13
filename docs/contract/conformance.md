@@ -24,7 +24,7 @@ A modify that changes only consent or rating is allowed on `booked`, `seated` an
 
 ## C5. Erasure
 
-Erasure by guest id returns the counts of erased reservations, guests, and waitlist entries, and no personal value remains for that guest. It deletes the venue's waitlist entries with that contact and leaves other venues and other guests untouched. Each tombstone it emits carries a hash of the reservation id, visible in the event feed.
+Erasure by guest id returns the counts of erased reservations, guest records, and waitlist entries, and no personal value remains for that guest. The guest id is the record id read from `guest.guestId`. Erasure deletes the guest record and any guest merged into it, and `erasedGuests` reports how many. Each erased reservation keeps its date, party size, and status, with no guest linked. It deletes the venue's waitlist entries whose contact normalizes to the guest's keys and leaves other venues and other guests untouched. A guest id from another venue erases nothing. A guest id that is not a record is read as a contact, a deprecated fallback, and a contact that matches no record reports `erasedGuests` 0. Erasure by principal blanks the reservations that principal owns, then deletes every guest record of the venue that was linked to them and has no remaining reservation that is not erased, with the guests merged into it. A guest with a visit owned by another principal stays, and `erasedGuests` counts the records deleted. Each tombstone it emits carries a hash of the reservation id, visible in the event feed.
 
 ## C6. Notice address
 
@@ -69,3 +69,7 @@ Registering an https endpoint returns `201` with its id and a secret, and the se
 ## C16. Rating
 
 A reservation carries `rating`, an integer from 1 to 5 or null, and `ratingRecordedAt`, a timestamp or null. A create or walk-in without it returns both as null. A value outside 1 to 5, a non-integer, or a string fails with `invalid_request`. A modify that changes the rating bumps the version by one and emits one `modified` event. A modify that sets the same value changes nothing. Setting null clears the rating and `ratingRecordedAt`. A key without `write` cannot set it. Reads through get, list, search, and agenda return the stored value. Erasure resets both to null.
+
+## C17. Guest identity
+
+A create, walk-in, or seated waitlist entry with a contact returns `guest.guestId`. Two bookings in one venue whose contacts normalize to the same key return the same `guestId`. An email that differs only in case or surrounding whitespace is the same key. Dots and `+` tags are different keys. A phone without a country code is read with the venue's `phoneCountry`, or the country of its time zone when that is null, so `600 123 456` and `+34 600 123 456` match in Spain. The name never matches. The same contact in two venues returns two different ids. A booking without a contact, or with a contact that does not normalize, succeeds and returns no `guestId`. Concurrent bookings for one new contact produce exactly one guest. Consent and rating stay on each reservation. A `phoneCountry` that is not a supported upper-case ISO 3166 alpha-2 code fails with `invalid_request`.

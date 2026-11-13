@@ -15,7 +15,7 @@ Status legend:
 | C2 Idempotent create | **PASS** | `idempotency_keys` keyed on `(venue_id, key)`. Test: replay returns the same id and version. |
 | C3 Snapshot is not a hold | **PASS** | Availability is advisory; create re-checks via the exclusion constraint and a failed create rolls back. |
 | C4 Modify bumps the version | **PASS** | Version +1 on a change, no-op without a bump. A confirmation is sent once per (reservation, version) via Resend, idempotent by a unique constraint. |
-| C5 Erasure | **PASS** | Returns counts, nulls personal fields, emits tombstones with a hash in the event feed. Test: erasure is idempotent. |
+| C5 Erasure | **PASS** | Returns counts, nulls personal fields, emits tombstones with a hash in the event feed. By guest record id it deletes the guest and those merged into it and unlinks the anonymous visits. Erasure by principal also deletes the guest records left with no other visit. The contact fallback is deprecated. Tests in `apps/api/test/guests.test.ts` and `apps/api/test/erasure-waitlist.test.ts` cover record id, contact fallback, other venues, merged guests, waitlist, and idempotency. |
 | C6 Notice address | **PASS** | `notice_address_required` on enable-without-address and clear-while-enabled. Test covers both. |
 | C7 Party size | **PASS** | `party_size_too_large` (explicit and auto-assign) and `no_suitable_table`. Tests cover both. |
 | C8 Hours | **PASS** | `outside_hours` (hours, slot grid, last seating) and `lead_time_violation` are enforced and tested. Walk-ins bypass the slot grid and lead time. |
@@ -27,10 +27,11 @@ Status legend:
 | C14 Consent | **PASS** | `guest.consent` tri-state with `consentRecordedAt`. Tests in `apps/api/test/consent.test.ts` cover default, grant, invalid value, modify bump and event, same-value no-op, reads, walk-in, and erasure reset. |
 | C15 Webhooks | **PASS** | `webhook_endpoints` holds one cursor per endpoint over the event feed. A single-statement `FOR UPDATE SKIP LOCKED` claim leases an endpoint to one worker. Tests in `apps/api/test/webhooks.test.ts` cover signature, order, backoff, resume, independence, settle window, new-endpoint start, watermark jump, concurrent workers, SSRF ranges, DNS rebinding, cap, isolation, and secret exposure. `apps/api/test/webhooks-e2e.test.ts` delivers to a real local receiver and verifies with the snippet in `webhooks.md`. |
 | C16 Rating | **PASS** | `rating` 1 to 5 or null with `ratingRecordedAt`. Tests in `apps/api/test/rating.test.ts` cover create, walk-in, modify bump and event, same-value no-op, clear with null, invalid values, read-only key, reads, and erasure reset. |
+| C17 Guest identity | **PASS** | `guests` holds one record per venue and normalized key, with a per-venue unique index on email and on phone. The booking transaction links with insert-on-conflict. Tests in `apps/api/test/contact.test.ts` cover the normalization table. `apps/api/test/guests.test.ts` covers same contact, case and whitespace, dots and tags, local and international phone, configured country, venue isolation, no contact, unparseable contact, walk-in and waitlist seating, concurrent creates, and the idempotent backfill. |
 
 ## Open gaps
 
-None. All 16 conformance cases pass.
+None. All 17 conformance cases pass.
 
 ## Notes
 

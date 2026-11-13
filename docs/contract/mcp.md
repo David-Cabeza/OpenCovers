@@ -23,7 +23,11 @@ The MCP server implements this catalog. It wraps the HTTP API and is scoped per 
 | `venue.getConfig` | GET /venues/{venueId}/config | read | none |
 | `venue.setConfig` | PUT /venues/{venueId}/config | write | required |
 
-Reservation writes carry an idempotency key and return the reservation. Erasure returns the counts of erased reservations, guests, and waitlist entries. Reads never mutate.
+Reservation writes carry an idempotency key and return the reservation. Erasure returns the counts of erased reservations, guest records, and waitlist entries. Reads never mutate.
+
+Reads return `guest.guestId` when the reservation is linked to a guest record of the venue. `reservation.erasure` takes that id as `guestId`. A `guestId` that is not a guest record is read as a contact. That fallback is deprecated and kept for one version. `erasedGuests` counts guest records deleted, so a contact that matches no record reports 0. Erasure by `principal` also deletes the guest records whose every visit that principal owned, and keeps a guest who still has a visit owned by another principal.
+
+`venue.setConfig` accepts `phoneCountry`, an ISO 3166 alpha-2 code or null. It is the country used to read a guest phone without a country code. Null means the country of the venue's time zone.
 
 `reservation.create`, `reservation.walk_in`, and `reservation.modify` accept an optional `consent` of `unknown`, `granted`, or `denied`. Reads return it as `guest.consent`, with `guest.consentRecordedAt` once a guest has answered.
 

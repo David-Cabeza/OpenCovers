@@ -40,6 +40,7 @@ import {
 import { isConsent } from "./lib/consent";
 import { isRating } from "./lib/rating";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
+import { toCountryCode } from "./lib/contact";
 import { notifyReservation } from "./lib/notifications";
 import {
   addFloorItem,
@@ -643,6 +644,7 @@ function toApi(reservation: any, venueId: string) {
     guest: {
       name: reservation.guestName || undefined,
       contact: reservation.guestContact || undefined,
+      guestId: reservation.guestId ?? undefined,
       consent: reservation.consent,
       consentRecordedAt: reservation.consentRecordedAt ?? undefined,
     },
@@ -671,6 +673,9 @@ app.get("/v1/venues/:venueId/config", async (c) => {
 app.put("/v1/venues/:venueId/config", async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
+  if (body.phoneCountry != null && !toCountryCode(body.phoneCountry)) {
+    return error(c, "invalid_request", 400);
+  }
   const result = await setConfig(db, venueId, {
     enabled: body.enabled,
     noticeAddress: body.noticeAddress,
@@ -682,6 +687,7 @@ app.put("/v1/venues/:venueId/config", async (c) => {
     lastSeatingOffsetMinutes: isPosInt(body.lastSeatingOffsetMinutes)
       ? body.lastSeatingOffsetMinutes
       : undefined,
+    phoneCountry: body.phoneCountry === null ? null : toCountryCode(body.phoneCountry) ?? undefined,
   });
   if (!result.ok) return mapError(c, result.code);
   return c.json(result.config);
@@ -713,7 +719,7 @@ app.delete("/v1/venues/:venueId/webhooks/:webhookId", async (c) => {
 app.post("/v1/venues/:venueId/erasure", async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
-  const result = await erase(db, venueId, body.guestId, body.principal);
+  const result = await erase(db, venueId, body.guestId, body.principal, c.get("principal") as string);
   return c.json(result);
 });
 
