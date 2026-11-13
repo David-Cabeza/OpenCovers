@@ -8,6 +8,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -88,6 +89,13 @@ export const guests = pgTable(
   ],
 );
 
+export interface GuestSnapshot {
+  email: string | null;
+  phone: string | null;
+  name: string;
+  lastVisitAt: string;
+}
+
 export const guestAudit = pgTable(
   "guest_audit",
   {
@@ -96,13 +104,21 @@ export const guestAudit = pgTable(
       .notNull()
       .references(() => venues.id),
     guestId: text("guest_id").notNull(),
-    action: text("action").$type<"created" | "erased" | "expired">().notNull(),
+    action: text("action")
+      .$type<"created" | "erased" | "expired" | "merged" | "unmerged">()
+      .notNull(),
     principal: text("principal").notNull().default(""),
+    targetGuestId: text("target_guest_id"),
+    priorState: jsonb("prior_state").$type<GuestSnapshot>(),
+    reservationIds: jsonb("reservation_ids").$type<string[]>(),
     occurredAt: timestamp("occurred_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("idx_guest_audit_venue_guest").on(t.venueId, t.guestId)],
+  (t) => [
+    index("idx_guest_audit_venue_guest").on(t.venueId, t.guestId),
+    index("idx_guest_audit_venue_target").on(t.venueId, t.targetGuestId),
+  ],
 );
 
 export const reservations = pgTable(

@@ -421,7 +421,14 @@ paths:
         to any guest merged into it, unlinks them, and deletes those guest
         records. Each erased reservation keeps its date, party size, and
         status, so cover counts survive. It also deletes the venue's waitlist
-        entries whose contact normalizes to one of the guest's keys.
+        entries whose contact normalizes to one of the guest's keys. Erasing
+        a guest that was merged into another also erases the reservations
+        moved at that merge, which the target still holds.
+
+        Erasure and retention clear the stored prior state of every merge
+        audit entry about an erased or expired guest. The entry keeps its
+        ids, action, principal, and time, and the merge can no longer be
+        undone.
 
         Deprecated: a `guestId` that is not a guest record of the venue is
         read as a contact. The contact is normalized and erases the guest it
@@ -469,6 +476,145 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/guests:
+    get:
+      operationId: guest.list
+      summary: List the venue's guests
+      description: |
+        Any key or session that can read the venue. Guests are ordered by
+        `lastVisitAt` descending, then by id. A guest merged into another, or
+        whose personal fields were cleared by retention, is not listed.
+        `contact` matches the normalized email or phone with the same rule as
+        booking, and a contact that does not normalize matches nothing.
+        `name` matches a case-insensitive name prefix. Pass `nextCursor` back
+        as `cursor` for the next page. It is null on the last page. A cursor
+        from another venue or a malformed one fails with `invalid_request`.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: contact
+          in: query
+          required: false
+          schema: { type: string }
+        - name: name
+          in: query
+          required: false
+          schema: { type: string }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: One page of guests
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [guests, nextCursor]
+                properties:
+                  guests:
+                    type: array
+                    items: { $ref: "#/components/schemas/GuestRecord" }
+                  nextCursor:
+                    type: string
+                    nullable: true
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/guests/{guestId}:
+    get:
+      operationId: guest.get
+      summary: Read one guest with its visits
+      description: |
+        A guest of another venue, a guest merged into another, and a guest
+        cleared by retention fail with `guest_not_found`. The visits are the
+        reservations the guest holds, which include those of every guest
+        merged into it.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/guestId"
+      responses:
+        "200":
+          description: The guest
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestDetail" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/guests/{guestId}/merge:
+    post:
+      operationId: guest.merge
+      summary: Merge this guest into another
+      description: |
+        Admin only. Any other role fails with `forbidden`. Both guests must
+        belong to the venue and hold personal data, otherwise the call fails
+        with `guest_not_found`. Merging a guest into itself fails with
+        `invalid_request`. A source or target already merged into another
+        guest fails with `guest_merged`, so a merge can never form a cycle.
+
+        In one transaction every reservation of this guest moves to the
+        target, the target's `lastVisitAt` becomes the later of the two, and
+        this guest is kept, merged into the target. A later booking with this
+        guest's contact links to the target. The audit entry keeps this
+        guest's prior state and the ids of the moved reservations until an
+        unmerge, an erasure, or retention clears it. Repeating the
+        Idempotency-Key returns the target without merging again. Reusing it
+        for another merge fails with `invalid_request`.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/guestId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intoGuestId]
+              properties:
+                intoGuestId:
+                  type: string
+      responses:
+        "200":
+          description: The target guest after the merge
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestDetail" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/guests/{guestId}/unmerge:
+    post:
+      operationId: guest.unmerge
+      summary: Undo the latest merge of this guest
+      description: |
+        Admin only. Any other role fails with `forbidden`. The guest returns
+        to active with its prior name and contacts. The reservations moved at
+        merge time return to it. A reservation booked after the merge stays
+        with the target. The target's `lastVisitAt` is recomputed from the
+        reservations it still holds.
+
+        A guest that is not merged fails with `guest_not_merged`, so a second
+        unmerge fails. A merge whose audit entry is missing or was cleared by
+        erasure or retention fails with `unmerge_unavailable`. A target that
+        was itself merged since fails with `guest_merged`. Unmerge it first.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/guestId"
+      responses:
+        "200":
+          description: The restored guest
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestDetail" }
+        default:
+          $ref: "#/components/responses/Error"
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -489,6 +635,12 @@ components:
       in: path
       required: true
       schema: { type: string }
+    guestId:
+      name: guestId
+      in: path
+      required: true
+      schema: { type: string }
+      description: The guest record id.
     idempotencyKey:
       name: Idempotency-Key
       in: header
@@ -556,6 +708,68 @@ components:
           type: string
           format: date-time
           description: When consent last changed to `granted` or `denied`. Omitted while consent is `unknown`.
+
+    GuestRecord:
+      type: object
+      required: [id, name, email, phone, lastVisitAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          nullable: true
+          description: The normalized email.
+        phone:
+          type: string
+          nullable: true
+          description: The normalized phone in E.164.
+        lastVisitAt:
+          type: string
+          format: date-time
+          description: The start of the guest's latest reservation. Retention counts from it.
+
+    GuestDetail:
+      allOf:
+        - $ref: "#/components/schemas/GuestRecord"
+        - type: object
+          required: [visitCount, firstVisitAt, reservations, mergedGuests]
+          properties:
+            visitCount:
+              type: integer
+              description: The number of reservations the guest holds, in any status.
+            firstVisitAt:
+              type: string
+              format: date-time
+              nullable: true
+            reservations:
+              type: array
+              items:
+                type: object
+                required: [id, status]
+                properties:
+                  id:
+                    type: string
+                  status:
+                    $ref: "#/components/schemas/ReservationStatus"
+            mergedGuests:
+              type: array
+              description: The guests merged directly into this one. Each can be unmerged by its id.
+              items:
+                type: object
+                required: [id, name, email, phone]
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  email:
+                    type: string
+                    nullable: true
+                  phone:
+                    type: string
+                    nullable: true
 
     Consent:
       type: string
@@ -828,6 +1042,10 @@ components:
         - invalid_request
         - venue_not_found
         - reservation_not_found
+        - guest_not_found
+        - guest_merged
+        - guest_not_merged
+        - unmerge_unavailable
         - unauthorized
         - forbidden
         - slot_taken

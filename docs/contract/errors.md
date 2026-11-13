@@ -8,6 +8,7 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 - `venue_not_found`: the venue does not exist, or the caller cannot see it. Indistinguishable from not found.
 - `reservation_not_found`: the reservation does not exist, or the caller cannot see it.
 - `waitlist_entry_not_found`: the waitlist entry does not exist, or the caller cannot see it.
+- `guest_not_found`: the guest does not exist, belongs to another venue, was merged into another guest, or was cleared by retention. Indistinguishable from not found.
 
 ## Auth
 
@@ -32,6 +33,9 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 
 - `already_cancelled`: the reservation is already cancelled.
 - `invalid_transition`: the requested status change is not allowed from the current status.
+- `guest_merged`: a guest in a merge or unmerge is already merged into another guest.
+- `guest_not_merged`: the guest to unmerge is not merged.
+- `unmerge_unavailable`: the merge cannot be undone because its audit entry is missing or was cleared by erasure or retention.
 
 ## Idempotency and outcome
 

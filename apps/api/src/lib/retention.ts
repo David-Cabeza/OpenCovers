@@ -1,5 +1,6 @@
 import { and, eq, gte, inArray, isNotNull, isNull, lt, ne, notExists, or } from "drizzle-orm";
 import { guestAudit, guests, reservations, venues, waitlist } from "../db/schema";
+import { forgetMergeState } from "./guests";
 import { pruneEvents } from "./reservations";
 import { eraseReservations, withMerged, type Db } from "./venue";
 
@@ -83,6 +84,7 @@ async function expireGuests(db: Db, venueId: string, cutoff: Date, limit: number
     await tx
       .insert(guestAudit)
       .values(ids.map((id) => ({ venueId, guestId: id, action: "expired" as const, principal: "retention" })));
+    await forgetMergeState(tx, venueId, ids);
     return roots.length;
   });
 }

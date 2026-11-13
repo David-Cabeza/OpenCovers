@@ -141,6 +141,13 @@
       "when": 1794562562969,
       "tag": "0019_quick_madripoor",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794564180450,
+      "tag": "0020_true_falcon",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,7 @@ import * as schema from "../db/schema";
 import type { CountryCode } from "libphonenumber-js";
 import { consentColumns } from "./consent";
 import { normalizeContact, venueCountry } from "./contact";
+import { forgetMergeState, movedAtMerge } from "./guests";
 import { ratingColumns } from "./rating";
 import { normalizeTimeZone } from "./time";
 import { sha256Hex } from "./reservations";
@@ -188,10 +189,12 @@ export async function erase(
           .for("update")
       : [];
     const byGuest = await withMerged(tx, venueId, [...byId, ...byContact]);
+    const moved = await movedAtMerge(tx, venueId, byGuest);
 
     const owned = guestId
       ? or(
           byGuest.length > 0 ? inArray(reservations.guestId, byGuest.map((g) => g.id)) : undefined,
+          moved.length > 0 ? inArray(reservations.id, moved) : undefined,
           contact ? eq(reservations.guestContact, contact) : undefined,
         )
       : eq(reservations.ownerPrincipal, principal as string);
@@ -224,6 +227,7 @@ export async function erase(
         .insert(guestAudit)
         .values(targetIds.map((id) => ({ venueId, guestId: id, action: "erased" as const, principal: actor })));
     }
+    await forgetMergeState(tx, venueId, targetIds);
 
     const erasedWaitlistEntries = guestId
       ? await deleteWaitlist(tx, venue, contact, [

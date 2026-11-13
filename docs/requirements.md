@@ -100,6 +100,12 @@ Acceptance: the matching rule is documented and tested, and a booking that match
 
 Acceptance: a write that tries to set these fields is rejected or ignored, and the stored value comes only from the channel.
 
+### REQ-G4 Guest list and merge
+
+Staff and platforms with read access list and read the venue's guests. Only an admin merges two guests and undoes a merge. A merge moves the absorbed guest's reservations to the target and keeps the absorbed guest, so an unmerge restores it with exactly the reservations moved. The audit entry of a merge holds the absorbed guest's prior state, which is personal data, so erasure and retention clear it.
+
+Acceptance: conformance case C19.
+
 ## Notices and consent
 
 ### REQ-N1 Notice address

@@ -29,10 +29,11 @@ Status legend:
 | C16 Rating | **PASS** | `rating` 1 to 5 or null with `ratingRecordedAt`. Tests in `apps/api/test/rating.test.ts` cover create, walk-in, modify bump and event, same-value no-op, clear with null, invalid values, read-only key, reads, and erasure reset. |
 | C17 Guest identity | **PASS** | `guests` holds one record per venue and normalized key, with a per-venue unique index on email and on phone. The booking transaction links with insert-on-conflict. Tests in `apps/api/test/contact.test.ts` cover the normalization table. `apps/api/test/guests.test.ts` covers same contact, case and whitespace, dots and tags, local and international phone, configured country, venue isolation, no contact, unparseable contact, walk-in and waitlist seating, concurrent creates, and the idempotent backfill. |
 | C18 Guest retention | **PASS** | The hourly `runRetention` job in `apps/api/src/lib/retention.ts` claims eligible guests, then unlinked reservations, per venue in bounded batches with `FOR UPDATE SKIP LOCKED` and blanks their visits through `eraseReservations`, the same path erasure uses. Tests in `apps/api/test/guest-retention.test.ts` and `apps/api/test/reservation-retention.test.ts` cover expiry, future and seated visits, a stale last-visit time, the horizon, per-venue periods, a second run, batch bounds, overlapping runs, merged guests, tombstones and events, unlinked reservations with a name only, a contact only, and an unnormalizable contact, future and seated reservations, and scans for personal values. |
+| C19 Guest merge | **PASS** | `GET /guests` pages by `(last_visit_at desc, id)` with a venue-scoped cursor. Merge and unmerge lock the guest rows `FOR UPDATE`, merge in id order, and write a `guest_audit` entry with `prior_state` and the moved reservation ids. `forgetMergeState` in `apps/api/src/lib/guests.ts` clears `prior_state` on erasure and on guest expiry. Tests in `apps/api/test/guest-read.test.ts` cover order, filters, pagination with ties, bad cursors, isolation, and hidden guests. `apps/api/test/guest-merge.test.ts` covers roles, moved visits, idempotency, invalid and cyclic merges, opposite merges at once, exact unmerge, later bookings, rejected unmerges, and audit scans after erasure by guest id, by principal, and retention. |
 
 ## Open gaps
 
-None. All 18 conformance cases pass.
+None. All 19 conformance cases pass.
 
 ## Notes
 

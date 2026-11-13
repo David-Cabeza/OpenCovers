@@ -40,6 +40,16 @@ import {
 import { isConsent } from "./lib/consent";
 import { isRating } from "./lib/rating";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
+import {
+  decodeGuestCursor,
+  encodeGuestCursor,
+  getGuest,
+  listGuests,
+  mergeGuest,
+  unmergeGuest,
+  type GuestCursor,
+  type GuestWrite,
+} from "./lib/guests";
 import { toCountryCode } from "./lib/contact";
 import { notifyReservation } from "./lib/notifications";
 import {
@@ -70,6 +80,10 @@ const HTTP_STATUS: Record<string, number> = {
   reservation_not_found: 404,
   waitlist_entry_not_found: 404,
   venue_not_found: 404,
+  guest_not_found: 404,
+  guest_merged: 409,
+  guest_not_merged: 409,
+  unmerge_unavailable: 409,
   slot_taken: 409,
   no_suitable_table: 409,
   invalid_transition: 409,
@@ -619,6 +633,63 @@ app.delete("/v1/venues/:venueId/keys", async (c) => {
   const keys = await listVenueKeys(db, venueId);
   return c.json({ keys });
 });
+
+app.get("/v1/venues/:venueId/guests", async (c) => {
+  const venueId = c.req.param("venueId");
+  const limitRaw = c.req.query("limit") ?? "50";
+  const limit = Number(limitRaw);
+  if (!/^\d+$/.test(limitRaw) || limit < 1 || limit > 200) return error(c, "invalid_request", 400);
+  const cursor = c.req.query("cursor");
+  let after: GuestCursor | undefined;
+  if (cursor) {
+    const decoded = decodeGuestCursor(venueId, cursor);
+    if (!decoded) return error(c, "invalid_request", 400);
+    after = decoded;
+  }
+  const page = await listGuests(db, venueId, {
+    contact: c.req.query("contact"),
+    namePrefix: c.req.query("name"),
+    after,
+    limit,
+  });
+  return c.json({
+    guests: page.guests,
+    nextCursor: page.next ? encodeGuestCursor(venueId, page.next) : null,
+  });
+});
+
+app.get("/v1/venues/:venueId/guests/:guestId", async (c) => {
+  const guest = await getGuest(db, c.req.param("venueId"), c.req.param("guestId"));
+  if (!guest) return mapError(c, "guest_not_found");
+  return c.json(guest);
+});
+
+app.post("/v1/venues/:venueId/guests/:guestId/merge", async (c) => {
+  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+  const venueId = c.req.param("venueId");
+  const key = c.req.header("Idempotency-Key");
+  if (!key) return error(c, "invalid_request", 400);
+  const body = await c.req.json().catch(() => null);
+  if (typeof body?.intoGuestId !== "string" || body.intoGuestId === "") {
+    return error(c, "invalid_request", 400);
+  }
+  const result = await mergeGuest(db, venueId, c.req.param("guestId"), body.intoGuestId, key, c.get("principal"));
+  return guestResponse(c, result, venueId);
+});
+
+app.post("/v1/venues/:venueId/guests/:guestId/unmerge", async (c) => {
+  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+  const venueId = c.req.param("venueId");
+  const result = await unmergeGuest(db, venueId, c.req.param("guestId"), c.get("principal"));
+  return guestResponse(c, result, venueId);
+});
+
+async function guestResponse(c: any, result: GuestWrite, venueId: string) {
+  if (!result.ok) return mapError(c, result.code);
+  const guest = await getGuest(db, venueId, result.guestId);
+  if (!guest) return mapError(c, "guest_not_found");
+  return c.json(guest);
+}
 
 async function writeResponse(c: any, result: any, venueId: string) {
   if (!result.ok) return mapError(c, result.code);
