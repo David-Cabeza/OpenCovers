@@ -12,3 +12,8 @@ coverage/
 opencode.json
 .audit/
 .taste-skill/
+
+# OS and editor noise from macOS, Windows and Linux
+Thumbs.db
+desktop.ini
+*.log

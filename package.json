@@ -2,11 +2,18 @@
   "name": "opencovers",
   "private": true,
   "packageManager": "pnpm@11.0.9",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "pnpm --parallel -r dev",
+    "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
     "db:generate": "pnpm --filter @opencovers/api db:generate",
-    "db:migrate": "pnpm --filter @opencovers/api db:migrate"
+    "db:migrate": "pnpm --filter @opencovers/api db:migrate",
+    "check:publication": "bash scripts/check-publication.sh"
   }
 }
