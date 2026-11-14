@@ -6,7 +6,7 @@ The payload is thin. It names the event and the reservation, never the guest. To
 
 ## Registering an endpoint
 
-Webhooks are managed over HTTP only. They are not exposed through MCP. Every call needs a `write` or `admin` key for the venue, or a staff session with that role, the same as `PUT /v1/venues/{venueId}/config`. A `read` key gets `forbidden`.
+Webhooks are managed over HTTP only. They are not exposed through MCP. Every call needs a `write` or `admin` key for the venue, or a staff session with that role. A `read` key gets `forbidden`.
 
 - `POST /v1/venues/{venueId}/webhooks` with `{"url": "https://..."}` returns `201` and `{"id", "url", "enabled", "secret"}`.
 - `GET /v1/venues/{venueId}/webhooks` returns `{"webhooks": [...]}` with `id`, `url`, `enabled`, `failures`, `lastError`, and `nextAttemptAt`. It never returns the secret.

@@ -33,9 +33,11 @@ Status legend:
 | C20 Availability explanation | **PASS** | `GET /availability/explain` in `apps/api/src/app.ts`. `timeReasons` and `tableReasons` in `apps/api/src/lib/reservations.ts` hold the hours, slot grid, last seating, lead time, capacity, and table rules, and create, availability, and the explanation all call them. Tests in `apps/api/test/availability-explain.test.ts` cover each reason with its details, the priority order, an available slot, agreement with create and the availability list over a grid of times and party sizes, nearest times, a scan for personal data, venue isolation, a read key, and malformed queries. |
 | C21 Turn time and party limits | **PASS** | `turnMinutes` and `parseTurnTimes` in `apps/api/src/lib/turn-times.ts`. `bookingWindow` in `apps/api/src/lib/reservations.ts` resolves the turn time for create, walk-in, availability, and the explanation, and `serviceReasons` holds the service limits for all three. `turn_times` on `venues`, and `min_party_size` and `max_party_size` with a check constraint on `services`, in migration `0021`. Tests in `apps/api/test/turn-times-party-limits.test.ts` cover each turn time boundary, no rows, an explicit duration, walk-ins, a longer and a shorter turn seen through availability and create, each limit rejecting and clearing, a kept limit, a minimum above the maximum, walk-ins past the limits, the reason order, agreement over a grid, malformed values, venue isolation, and a read key. |
 
+| C22 Role boundaries | **PASS** | The venue middleware in `apps/api/src/app.ts` blocks `read` on every write. `adminOnly` guards config, services, tables, floor items, keys, and guest merge. Tests in `apps/api/test/authorization.test.ts` cover each admin route with a `write` and a `read` key, a config and catalog read back after each rejection, an admin success, a `write` and an `admin` staff session, and the reservation, waitlist, and erasure operations a `write` key keeps. |
+
 ## Open gaps
 
-None. All 20 conformance cases pass.
+None. All 22 conformance cases pass.
 
 ## Notes
 

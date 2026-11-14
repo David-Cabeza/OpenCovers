@@ -206,6 +206,12 @@ An MCP server exposes the same operations with the same tool ids as the HTTP con
 
 Acceptance: a call through MCP and a call through HTTP produce the same result for the same operation.
 
+### REQ-C3 Role boundaries
+
+Keys and staff sessions carry a per-venue role, `read`, `write`, or `admin`. A `write` role works the reservations: create, walk-in, modify, cancel, status, the waitlist, webhooks, and erasure. Only an `admin` changes how the venue is set up: its configuration, services, tables, floor items, API keys, and guest merges. A platform or agent that may book cannot redirect the venue's emails or reshape its floor.
+
+Acceptance: conformance case C22. A `read` or `write` key or session that tries an admin operation fails with `forbidden` and changes nothing.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:
