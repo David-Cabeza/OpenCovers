@@ -29,7 +29,11 @@ for file in "${required[@]}"; do
   fi
 done
 
-ruby -ryaml -e 'Dir[".github/**/*.yml"].each { |f| YAML.load_file(f) }'
+if command -v ruby >/dev/null 2>&1; then
+  ruby -ryaml -e 'Dir[".github/**/*.yml"].each { |f| YAML.load_file(f) }'
+else
+  printf 'note: ruby not found, skipping the YAML syntax check (install ruby to run it)\n' >&2
+fi
 
 if git grep -n -E "LicenseRef-Proprietary|BEGIN (RSA|OPENSSH|EC) PRIVATE" -- \
   README.md CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md GOVERNANCE.md ROADMAP.md docs .github; then

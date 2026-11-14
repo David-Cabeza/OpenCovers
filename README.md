@@ -108,6 +108,41 @@ Open <http://localhost:5173>, sign up, and create a venue. The public site is at
 
 To run the MCP server, see [apps/mcp](apps/mcp/README.md). Create an agent key from the staff app under **Setup → API keys**.
 
+## Setting up on a new machine
+
+Exact steps from a clean machine to a running stack. Intended layout: Ubuntu on WSL2, macOS, or any Linux. It has been exercised on macOS; the WSL2 path has not been run yet. Work inside the Linux file system (for WSL2, `~/projects`, not `/mnt/c`).
+
+1. **Prerequisites**: git, Docker (Docker Desktop with WSL integration, or Docker Engine), and Node.js 22.9 or newer through [nvm](https://github.com/nvm-sh/nvm).
+2. **Clone** (SSH):
+   ```sh
+   mkdir -p ~/projects && cd ~/projects
+   git clone git@github.com:David-Cabeza/OpenCovers.git
+   cd OpenCovers
+   ```
+3. **Node and pnpm**: `.nvmrc` pins the Node 22 line (22.9 or newer is required) and `packageManager` pins pnpm.
+   ```sh
+   nvm install        # reads .nvmrc
+   nvm use
+   corepack enable    # activates the pinned pnpm
+   # If corepack cannot fetch it: npm install -g pnpm@11.0.9
+   ```
+4. **Install and start the database**:
+   ```sh
+   pnpm install --frozen-lockfile
+   docker compose up -d     # PostgreSQL 16 on :5432 (opencovers + opencovers_test)
+   pnpm db:migrate
+   ```
+5. **Check it works**:
+   ```sh
+   pnpm typecheck
+   pnpm test
+   pnpm build
+   pnpm dev                 # API :3000 · staff app :5173 · site :5174
+   ```
+6. **Environment**: none is needed locally. To override a default, `cp .env.example .env` and uncomment only what you change. Never commit `.env`.
+
+Notes: use `git config core.autocrlf input` only if you also edit on Windows outside WSL (the repo already normalizes to LF). A fresh machine starts with an empty database, so create a new venue after signing up. The brand kit in `docs/brand` needs Chrome or Chromium only if you regenerate it.
+
 ## Demo
 
 A quick walkthrough of the agenda and the floor plan.

@@ -1,0 +1,17 @@
+# Normalise line endings so macOS, Linux and Windows (WSL) checkouts match.
+* text=auto eol=lf
+
+# Scripts must stay LF even if a Windows editor touches them.
+*.sh text eol=lf
+
+# Binary assets: never touch or diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.mp4 binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

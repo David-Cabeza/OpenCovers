@@ -15,7 +15,21 @@ const PNG = join(here, "png");
 mkdirSync(SVG, { recursive: true });
 mkdirSync(PNG, { recursive: true });
 
-const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+// Chrome/Chromium on macOS, Linux and WSL. Override with CHROME=/path/to/chrome.
+const CHROME =
+  process.env.CHROME ??
+  [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/snap/bin/chromium",
+  ].find((p) => existsSync(p)) ??
+  (() => {
+    console.error("Chrome not found. Install Google Chrome or Chromium, or set CHROME=/path/to/chrome.");
+    process.exit(1);
+  })();
 
 /* ---------------------------------------------------------------- tokens */
 const C = {
