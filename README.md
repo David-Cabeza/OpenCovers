@@ -110,7 +110,7 @@ To run the MCP server, see [apps/mcp](apps/mcp/README.md). Create an agent key f
 
 ## Setting up on a new machine
 
-Exact steps from a clean machine to a running stack. Tested layout: Ubuntu on WSL2, macOS, or any Linux. Work inside the Linux file system (for WSL2, `~/projects`, not `/mnt/c`).
+Exact steps from a clean machine to a running stack. Intended layout: Ubuntu on WSL2, macOS, or any Linux. It has been exercised on macOS; the WSL2 path has not been run yet. Work inside the Linux file system (for WSL2, `~/projects`, not `/mnt/c`).
 
 1. **Prerequisites**: git, Docker (Docker Desktop with WSL integration, or Docker Engine), and Node.js 22.9 or newer through [nvm](https://github.com/nvm-sh/nvm).
 2. **Clone** (SSH):
@@ -124,6 +124,7 @@ Exact steps from a clean machine to a running stack. Tested layout: Ubuntu on WS
    nvm install        # reads .nvmrc
    nvm use
    corepack enable    # activates the pinned pnpm
+   # If corepack cannot fetch it: npm install -g pnpm@11.0.9
    ```
 4. **Install and start the database**:
    ```sh
