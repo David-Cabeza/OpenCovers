@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { db } from "./db/client";
 import {
   addKey,
@@ -146,6 +146,11 @@ app.use("/v1/venues/:venueId/*", async (c, next) => {
   c.set("role", role);
   await next();
 });
+
+const adminOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+  await next();
+};
 
 app.get("/v1/venues", async (c) => {
   const user = await sessionUser(c);
@@ -492,7 +497,7 @@ app.get("/v1/venues/:venueId/floor-items", async (c) => {
   return c.json({ items });
 });
 
-app.post("/v1/venues/:venueId/floor-items", async (c) => {
+app.post("/v1/venues/:venueId/floor-items", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
   if (typeof body.type !== "string" || body.type === "") {
@@ -510,7 +515,7 @@ app.post("/v1/venues/:venueId/floor-items", async (c) => {
   return c.json({ items, item }, 201);
 });
 
-app.delete("/v1/venues/:venueId/floor-items/:itemId", async (c) => {
+app.delete("/v1/venues/:venueId/floor-items/:itemId", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const itemId = c.req.param("itemId");
   await deleteFloorItem(db, venueId, itemId);
@@ -518,7 +523,7 @@ app.delete("/v1/venues/:venueId/floor-items/:itemId", async (c) => {
   return c.json({ items });
 });
 
-app.patch("/v1/venues/:venueId/floor-items/:itemId", async (c) => {
+app.patch("/v1/venues/:venueId/floor-items/:itemId", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const itemId = c.req.param("itemId");
   const body = await c.req.json();
@@ -539,7 +544,7 @@ app.get("/v1/venues/:venueId/tables", async (c) => {
   return c.json({ tables });
 });
 
-app.post("/v1/venues/:venueId/tables", async (c) => {
+app.post("/v1/venues/:venueId/tables", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
   if (
@@ -563,7 +568,7 @@ app.post("/v1/venues/:venueId/tables", async (c) => {
   return c.json({ tables });
 });
 
-app.delete("/v1/venues/:venueId/tables/:tableId", async (c) => {
+app.delete("/v1/venues/:venueId/tables/:tableId", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const tableId = c.req.param("tableId");
   await deleteTable(db, venueId, tableId);
@@ -571,7 +576,7 @@ app.delete("/v1/venues/:venueId/tables/:tableId", async (c) => {
   return c.json({ tables });
 });
 
-app.patch("/v1/venues/:venueId/tables/:tableId", async (c) => {
+app.patch("/v1/venues/:venueId/tables/:tableId", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const tableId = c.req.param("tableId");
   const body = await c.req.json();
@@ -590,7 +595,7 @@ app.get("/v1/venues/:venueId/services", async (c) => {
   return c.json({ services });
 });
 
-app.post("/v1/venues/:venueId/services", async (c) => {
+app.post("/v1/venues/:venueId/services", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
   if (
@@ -615,7 +620,7 @@ app.post("/v1/venues/:venueId/services", async (c) => {
   return c.json({ services });
 });
 
-app.delete("/v1/venues/:venueId/services/:name", async (c) => {
+app.delete("/v1/venues/:venueId/services/:name", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const name = c.req.param("name");
   await deleteService(db, venueId, name);
@@ -623,15 +628,13 @@ app.delete("/v1/venues/:venueId/services/:name", async (c) => {
   return c.json({ services });
 });
 
-app.get("/v1/venues/:venueId/keys", async (c) => {
-  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+app.get("/v1/venues/:venueId/keys", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const keys = await listVenueKeys(db, venueId);
   return c.json({ keys });
 });
 
-app.post("/v1/venues/:venueId/keys", async (c) => {
-  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+app.post("/v1/venues/:venueId/keys", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
   if (
@@ -648,8 +651,7 @@ app.post("/v1/venues/:venueId/keys", async (c) => {
   return c.json({ keys }, 201);
 });
 
-app.delete("/v1/venues/:venueId/keys", async (c) => {
-  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+app.delete("/v1/venues/:venueId/keys", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
   if (typeof body.hash !== "string") return error(c, "invalid_request", 400);
@@ -688,8 +690,7 @@ app.get("/v1/venues/:venueId/guests/:guestId", async (c) => {
   return c.json(guest);
 });
 
-app.post("/v1/venues/:venueId/guests/:guestId/merge", async (c) => {
-  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+app.post("/v1/venues/:venueId/guests/:guestId/merge", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const key = c.req.header("Idempotency-Key");
   if (!key) return error(c, "invalid_request", 400);
@@ -701,8 +702,7 @@ app.post("/v1/venues/:venueId/guests/:guestId/merge", async (c) => {
   return guestResponse(c, result, venueId);
 });
 
-app.post("/v1/venues/:venueId/guests/:guestId/unmerge", async (c) => {
-  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+app.post("/v1/venues/:venueId/guests/:guestId/unmerge", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const result = await unmergeGuest(db, venueId, c.req.param("guestId"), c.get("principal"));
   return guestResponse(c, result, venueId);
@@ -765,7 +765,7 @@ app.get("/v1/venues/:venueId/config", async (c) => {
   return c.json(config);
 });
 
-app.put("/v1/venues/:venueId/config", async (c) => {
+app.put("/v1/venues/:venueId/config", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
   if (body.phoneCountry != null && !toCountryCode(body.phoneCountry)) {

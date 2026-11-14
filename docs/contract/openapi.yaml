@@ -321,7 +321,8 @@ paths:
         venue is enabled fails the same way. A `phoneCountry` that is not a
         supported ISO 3166 alpha-2 code in upper case fails with
         `invalid_request`. Null clears it. Malformed `turnTimes` fail with
-        `invalid_request`, and an empty array clears them.
+        `invalid_request`, and an empty array clears them. Admin only. Any
+        other role fails with `forbidden`.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -366,8 +367,8 @@ paths:
       description: |
         A limit left out keeps its stored value, and null clears it. A limit
         that is not an integer of at least 1, or a minimum above the maximum
-        after the update, fails with `invalid_request`. A `read` key fails
-        with `forbidden`. Not exposed through MCP.
+        after the update, fails with `invalid_request`. Admin only. Any other
+        role fails with `forbidden`. Not exposed through MCP.
       parameters:
         - $ref: "#/components/parameters/venueId"
       requestBody:
@@ -438,7 +439,7 @@ paths:
       operationId: webhook.list
       summary: List the venue's webhook endpoints
       description: |
-        Needs the same role as `venue.setConfig`. A `read` key fails with
+        Needs a `write` or `admin` key or session. A `read` key fails with
         `forbidden`. The secret is never returned. Not exposed through MCP.
         See docs/contract/webhooks.md.
       parameters:
@@ -731,7 +732,13 @@ components:
       type: apiKey
       in: header
       name: apikey
-      description: The key that identifies the caller and the channel.
+      description: |
+        The key that identifies the caller and the channel. A staff session
+        with a per-venue role is accepted the same way. A `read` key or role
+        reads. A `write` key or role also creates, modifies, cancels, and
+        moves reservations, runs the waitlist, manages webhooks, and erases.
+        Venue configuration, services, tables, floor items, API keys, and
+        guest merges need `admin`. Any other role fails with `forbidden`.
 
   parameters:
     venueId:
