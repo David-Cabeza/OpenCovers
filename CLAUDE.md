@@ -53,7 +53,6 @@ The staff app dev server proxies `/api` and `/v1` to the API on :3000. Productio
 ## External services
 - GitHub: source of truth, CI (`.github/workflows/ci.yml`: typecheck + tests against a Postgres service) and the site deploy.
 - GitHub Pages serves `apps/site` at opencovers.dev (`.github/workflows/deploy-site.yml`, runs on every push to `main`). `apps/site/public/CNAME` must stay `opencovers.dev`.
-- Cloudflare hosts the DNS for opencovers.dev (DNS only, grey cloud; the apex has the four GitHub Pages A records). Namecheap is the registrar.
 - Resend sends confirmation emails (optional; off until `RESEND_API_KEY` is set).
 
 ## Do not touch / be careful
