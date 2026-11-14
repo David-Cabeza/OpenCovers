@@ -6,7 +6,7 @@ Guidance for Claude Code (and any contributor) working in this repository.
 OpenCovers is an open-source reservation engine for restaurants: availability, bookings, tables and a signed event feed, exposed through an HTTP API and an MCP server. PostgreSQL enforces the no-double-booking rule. Status: pre-alpha. License: Apache-2.0. The project name is provisional (brand review pending, see `docs/cmo-brief.md` §12).
 
 ## Setup and commands
-Needs Node.js 22+ (`.nvmrc`), pnpm (pinned by `packageManager`, enable with `corepack enable`) and Docker.
+Needs Node.js 22.9+ (`.nvmrc` pins 22; the API's optional `.env` loading needs 22.9), pnpm (pinned by `packageManager`, enable with `corepack enable`) and Docker.
 
 ```sh
 docker compose up -d     # PostgreSQL 16 with `opencovers` (dev) and `opencovers_test` (tests)

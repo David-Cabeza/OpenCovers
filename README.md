@@ -112,14 +112,14 @@ To run the MCP server, see [apps/mcp](apps/mcp/README.md). Create an agent key f
 
 Exact steps from a clean machine to a running stack. Tested layout: Ubuntu on WSL2, macOS, or any Linux. Work inside the Linux file system (for WSL2, `~/projects`, not `/mnt/c`).
 
-1. **Prerequisites**: git, Docker (Docker Desktop with WSL integration, or Docker Engine), and Node.js 22 through [nvm](https://github.com/nvm-sh/nvm).
+1. **Prerequisites**: git, Docker (Docker Desktop with WSL integration, or Docker Engine), and Node.js 22.9 or newer through [nvm](https://github.com/nvm-sh/nvm).
 2. **Clone** (SSH):
    ```sh
    mkdir -p ~/projects && cd ~/projects
    git clone git@github.com:David-Cabeza/OpenCovers.git
    cd OpenCovers
    ```
-3. **Node and pnpm**: `.nvmrc` pins Node 22 and `packageManager` pins pnpm.
+3. **Node and pnpm**: `.nvmrc` pins the Node 22 line (22.9 or newer is required) and `packageManager` pins pnpm.
    ```sh
    nvm install        # reads .nvmrc
    nvm use
