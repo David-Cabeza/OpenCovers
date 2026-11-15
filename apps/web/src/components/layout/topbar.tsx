@@ -31,7 +31,7 @@ export function Topbar({ email }: { email?: string }) {
       <div className="flex items-center justify-between gap-4 px-6 py-3">
         <div className="flex items-center gap-3">
           {venues.length > 0 && (
-            <Select value={venueId ?? undefined} onValueChange={setVenue}>
+            <Select value={venueId ?? ""} onValueChange={setVenue}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Venue" />
               </SelectTrigger>
