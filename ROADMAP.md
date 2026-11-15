@@ -2,7 +2,7 @@
 
 OpenCovers is pre-alpha. The engine, the staff app, and the MCP server run locally and pass their tests. Nothing is deployed except the public site. This roadmap has two jobs. It records where the project stands, and it lays out the road to the product depth that mature restaurant reservation platforms offer, so contributors can choose a place to work.
 
-Phases are a sequence, not a promise of dates. Each phase has an exit criterion. Flags are the unit of work. Read [CONTRIBUTING.md](CONTRIBUTING.md) to claim one. Sizes (S, M, L) on the items below are first estimates. A maintainer refines them when the flag is opened, and splits any L.
+Phases are a sequence, not a promise of dates. There is no Phase 1 or Phase 9. Numbering started at the contract in Phase 2, and the first-venue phase was dropped, so its route is a decision below. Phase 0 is a track that runs alongside the others, listed last under Now because it gates making the repository public. Each phase has an exit criterion. Flags are the unit of work. Read [CONTRIBUTING.md](CONTRIBUTING.md) to claim one. Sizes (S, M, L) on the items below are first estimates. A maintainer refines them when the flag is opened, and splits any L.
 
 How we built this map. We studied what mature platforms publish about their products and wrote our own plan in our own words. The "Not planned" section says what we leave out and why.
 
@@ -10,19 +10,19 @@ How we built this map. We studied what mature platforms publish about their prod
 
 | Area | Today | Mature target | Phase |
 | --- | --- | --- | --- |
-| Booking and availability | Create, modify, cancel, seat. A database rule blocks double booking. Services, hours, pacing. | Layered availability rules, per-channel inventory, turn time by party size, an explanation for every closed slot. | 10 |
+| Booking and availability | Create, modify, cancel, seat. A database rule blocks double booking. Services, hours, pacing. Turn time by party size, party limits per service, and an endpoint that explains why a slot is closed. | Layered availability rules, per-channel inventory, an overbooking ceiling, a slot grid with per-day overrides. | 10 |
 | Tables and floor | Zones, combinations, automatic assignment, a visual floor editor. | Saved layouts per service, live table status, sections. | 10 |
-| Guests | A name and a contact on the reservation, plus a contact consent per reservation. | A guest profile with history, notes, allergies, tags, and segments. | 10 |
+| Guests | A guest record per venue, matched by normalized email or phone, with list, read, and admin merge and unmerge through the API. A contact consent and a rating per reservation. No staff app screen yet. | Notes, allergies, tags, and segments on the profile, and a staff app view. | 10 |
 | Waitlist and walk-ins | Both exist in the staff app. | A QR join page, a notice when the table is ready. | 11 |
 | Guest-facing surfaces | None. The API and the MCP server are the only entry points. | An embeddable booking widget, a self-service change link, themes. | 11 |
 | No-shows and payments | Status transitions only. | Deposits, card guarantees, no-show fees, refund windows, reconfirmation. | 12 |
 | Messaging | Email confirmations through Resend, off by default. | Pluggable email, SMS, and WhatsApp, automations on the event feed, STOP handling. | 13 |
 | Reviews | None. | A post-visit survey gated by consent, routing to a review link. | 13 |
-| Integrations | An API, signed webhooks, an event feed, an MCP server. | A documented POS contract with adapters, importers, calendar feeds, a conformance kit. | 14 |
+| Integrations | An API, signed webhooks, an event feed, an MCP server. Roles `read`, `write`, and `admin` apply to keys and to staff sessions. | A documented POS contract with adapters, importers, calendar feeds, a conformance kit. | 14 |
 | Reporting | A pacing view. | Covers, no-show rate, source mix, lead time, exports. | 15 |
-| Multiple venues | Venues are isolated. | Groups, shared guests by opt-in, group roles and dashboards. | 15 |
+| Multiple venues | Venues are isolated. Venue configuration and structure need an admin key. | Groups, shared guests by opt-in, group roles and dashboards. | 15 |
 | Events and ecosystem | None. | Inquiries, prepaid menus, ticketing, a plugin and theme registry. | 16 |
-| Privacy | Erasure with counts and tombstones, retention, per-reservation consent. | Data export, retention settings, a hardening guide. | 7, 10, 13 |
+| Privacy | Erasure with counts and tombstones, retention for guest records and reservations, per-reservation consent. | Data export, retention settings, a hardening guide. | 7, 10, 13 |
 
 ## Done
 
@@ -52,7 +52,11 @@ Availability, agenda, list, pacing, and an event feed with a cursor and a retent
 - Staff sign-in with Better Auth and per-venue roles. Scoped API keys for platforms and agents.
 - An MCP server with 18 tools over stdio.
 - A staff app with an agenda, availability, a visual floor plan and editor, a waitlist, and setup screens.
-- Contact consent per reservation (`unknown`, `granted`, `denied`).
+- Contact consent per reservation (`unknown`, `granted`, `denied`), and a rating per reservation from 1 to 5.
+- Guest records per venue, matched by normalized email or phone, with an hourly retention job, list and read endpoints, and admin merge and unmerge with an audit trail ([ADR-0003](docs/adr/0003-guest-identity.md), conformance C17 to C19).
+- An endpoint that explains why a slot is unavailable, from the same rules that decide booking (C20).
+- Turn time by party size, and a minimum and maximum party size per service (C21).
+- Role boundaries. A `read` key cannot write, and configuration, services, tables, floor items, keys, and guest merge need `admin` (C22).
 - Signed webhooks over the event feed, with ordered, at-least-once delivery and protection against server-side request forgery. See [docs/contract/webhooks.md](docs/contract/webhooks.md).
 - A one-command deployment with Docker Compose and no hosting vendor. See [docs/deploy.md](docs/deploy.md).
 - The public site at [opencovers.dev](https://opencovers.dev).
@@ -101,30 +105,32 @@ The phases below follow dependencies. Phase 10 comes first because later phases 
 
 The guest becomes a first-class record, and availability becomes a set of rules that can explain themselves.
 
-Design settled. [ADR-0003](docs/adr/0003-guest-identity.md) is accepted. A guest belongs to one venue, is matched by normalized email or phone, and merges are manual with an audit trail. A group can share guests by opt-in in Phase 15. Allergies as a structured field wait for the legal review.
+Design settled and the core is built. [ADR-0003](docs/adr/0003-guest-identity.md) is accepted, and the guest record, matching, retention, list, read, and merge are merged and covered by C17 to C19. A guest belongs to one venue, is matched by normalized email or phone, and merges are manual with an audit trail. A group can share guests by opt-in in Phase 15. Allergies as a structured field wait for the legal review.
 
 Guests
-- A guest entity separate from the reservation, with notes, allergies and diet, occasions, and visit history. [L, split it]
+- Done: a guest entity separate from the reservation, with matching, retention, list, read, and merge.
+- Pending: notes, allergies and diet, occasions, and a staff app view of the guest and visit history. [L, split it]
 - Tags, manual and rule-based, with a staff alert on the booking. [M]
 - Guest import from CSV and importers for common export formats. [M]
 - Segment queries and CSV export. [M]
 
 Availability
-- Turn time by party size instead of one fixed duration. [M]
+- Done: turn time by party size instead of one fixed duration (C21).
 - Shifts and pacing layered with access rules that can only restrict. [L, split it]
-- Party size minimum and maximum per service. [S]
+- Done: party size minimum and maximum per service (C21).
 - An explicit overbooking ceiling, default 0. [S]
 - Per-channel allocation, so a platform sees its own share of the slots. [M]
 - A slot grid with per-day overrides. [M]
-- An endpoint that explains why a slot is unavailable. [M]
+- Done: an endpoint that explains why a slot is unavailable (C20). A staff app view of the explanation is pending. [S]
 - Reconfirmation status on a reservation. [S]
 
 Staff and floor
 - A pre-shift view with VIPs, large parties, notes, and allergies. [M]
 - Saved floor layouts per service and live table status timers. [M]
-- Granular permissions beyond the three roles. [M]
+- Done: role boundaries for `read`, `write`, and `admin` (C22).
+- Pending: granular permissions beyond the three roles. [M]
 
-Exit criterion: a host sees who is coming and what they need, and a platform can ask why a slot is closed and get an answer.
+Exit criterion: a host sees who is coming and what they need, and a platform can ask why a slot is closed and get an answer. The second half is met through the API. The first half waits on the guest profile and the pre-shift view.
 
 ### Phase 11: Guest-facing surfaces
 
@@ -138,6 +144,7 @@ Today a guest can only book through a platform or an agent. This phase gives ven
 - A curated theme registry in the repository, reviewed through pull requests. [M]
 - Localization of the staff app and the widget. [L, split it]
 - A PWA mode for a tablet at the host stand. [M]
+- Local search visibility for venue pages. schema.org Restaurant (LocalBusiness) JSON-LD generated from venue data (name, public address, opening hours from the configured hours, services, a ReserveAction pointing at the booking page), rendered in the HTML of the page that hosts the widget or in a hosted page, because content inside an iframe is not read as the venue's page. Booking completes without leaving the venue's site. The venue schema has no public street address today. It has only `noticeAddress`, the restaurant's address for guest notices, so a public address field is a prerequisite. [M]
 
 Exit criterion: a venue puts a branded booking page on its own site without writing code.
 
