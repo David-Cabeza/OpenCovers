@@ -229,7 +229,7 @@ function ReservationRow({
                 </DropdownMenuItem>
               ))}
               {canEdit && (
-                <DropdownMenuItem onSelect={onEdit}>Edit consent and rating</DropdownMenuItem>
+                <DropdownMenuItem onSelect={onEdit}>Edit consent, rating and note</DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
