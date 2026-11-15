@@ -27,7 +27,7 @@ export function Topbar({ email }: { email?: string }) {
   const initials = (email ?? "U").slice(0, 2).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
+    <header className="print:hidden sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
       <div className="flex items-center justify-between gap-4 px-6 py-3">
         <div className="flex items-center gap-3">
           {venues.length > 0 && (
