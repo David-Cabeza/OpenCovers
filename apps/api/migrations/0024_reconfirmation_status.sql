@@ -1,0 +1,2 @@
+ALTER TABLE "reservations" ADD COLUMN "reconfirmation" text DEFAULT 'none' NOT NULL;--> statement-breakpoint
+ALTER TABLE "reservations" ADD COLUMN "reconfirmation_recorded_at" timestamp with time zone;

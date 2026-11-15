@@ -41,6 +41,7 @@ import {
 import { isConsent } from "./lib/consent";
 import { isCommentary } from "./lib/commentary";
 import { isRating } from "./lib/rating";
+import { isReconfirmation } from "./lib/reconfirmation";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
 import {
   decodeGuestCursor,
@@ -215,7 +216,12 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
   const key = c.req.header("Idempotency-Key");
   if (!key) return error(c, "invalid_request", 400);
   const body = await c.req.json();
-  if (hasInvalidConsent(body) || hasInvalidRating(body) || hasInvalidCommentary(body)) {
+  if (
+    hasInvalidConsent(body) ||
+    hasInvalidRating(body) ||
+    hasInvalidCommentary(body) ||
+    hasInvalidReconfirmation(body)
+  ) {
     return error(c, "invalid_request", 400);
   }
   if (
@@ -242,6 +248,7 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
       consent: body.guest?.consent,
       rating: body.rating,
       commentary: body.commentary,
+      reconfirmation: body.reconfirmation,
       bookedVia: c.get("principal") as string,
       basis: "service",
       ownerPrincipal: c.get("principal") as string,
@@ -261,7 +268,12 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
   if (!key) return error(c, "invalid_request", 400);
   const body = await c.req.json();
   if (typeof body.partySize !== "number") return error(c, "invalid_request", 400);
-  if (hasInvalidConsent(body) || hasInvalidRating(body) || hasInvalidCommentary(body)) {
+  if (
+    hasInvalidConsent(body) ||
+    hasInvalidRating(body) ||
+    hasInvalidCommentary(body) ||
+    body.reconfirmation !== undefined
+  ) {
     return error(c, "invalid_request", 400);
   }
   const result = await walkIn(
@@ -344,14 +356,19 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
   if (typeof body !== "object" || Object.keys(body).length === 0) {
     return error(c, "invalid_request", 400);
   }
-  if (hasInvalidConsent(body) || hasInvalidRating(body) || hasInvalidCommentary(body)) {
+  if (
+    hasInvalidConsent(body) ||
+    hasInvalidRating(body) ||
+    hasInvalidCommentary(body) ||
+    hasInvalidReconfirmation(body)
+  ) {
     return error(c, "invalid_request", 400);
   }
   const result = await modifyReservation(
     db,
     venueId,
     id,
-    { partySize: body.partySize, tableIds: body.tables, consent: body.guest?.consent, rating: body.rating, commentary: body.commentary },
+    { partySize: body.partySize, tableIds: body.tables, consent: body.guest?.consent, rating: body.rating, commentary: body.commentary, reconfirmation: body.reconfirmation },
     key,
   );
   if (result.ok && (body.partySize !== undefined || body.tables !== undefined)) {
@@ -749,6 +766,8 @@ function toApi(reservation: any, venueId: string) {
     rating: reservation.rating ?? null,
     ratingRecordedAt: reservation.ratingRecordedAt ?? null,
     commentary: reservation.commentary,
+    reconfirmation: reservation.reconfirmation,
+    reconfirmationRecordedAt: reservation.reconfirmationRecordedAt ?? null,
     tables: reservation.tableIds,
   };
 }
@@ -855,6 +874,11 @@ function hasInvalidConsent(body: any): boolean {
 function hasInvalidRating(body: any): boolean {
   const rating = body?.rating;
   return rating !== undefined && rating !== null && !isRating(rating);
+}
+
+function hasInvalidReconfirmation(body: any): boolean {
+  const reconfirmation = body?.reconfirmation;
+  return reconfirmation !== undefined && !isReconfirmation(reconfirmation);
 }
 
 function hasInvalidCommentary(body: any): boolean {

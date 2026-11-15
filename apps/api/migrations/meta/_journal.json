@@ -169,6 +169,13 @@
       "when": 1794770099029,
       "tag": "0023_overbooking_ceiling",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794771199570,
+      "tag": "0024_reconfirmation_status",
+      "breakpoints": true
     }
   ]
 }

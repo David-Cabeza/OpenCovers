@@ -16,6 +16,7 @@ import { consentColumns, type Consent } from "./consent";
 import { normalizeContact, venueCountry } from "./contact";
 import { linkGuest } from "./guests";
 import { ratingColumns, type Rating } from "./rating";
+import { reconfirmationColumns, type Reconfirmation } from "./reconfirmation";
 import {
   addDays,
   formatTime,
@@ -45,6 +46,7 @@ export interface CreateReservationInput {
   consent?: Consent;
   rating?: Rating | null;
   commentary?: string;
+  reconfirmation?: Reconfirmation;
   bookedVia?: string;
   basis?: string;
   ownerPrincipal?: string;
@@ -72,6 +74,7 @@ export interface ModifyReservationInput {
   consent?: Consent;
   rating?: Rating | null;
   commentary?: string;
+  reconfirmation?: Reconfirmation;
 }
 
 export interface Reservation {
@@ -94,6 +97,8 @@ export interface Reservation {
   rating: Rating | null;
   ratingRecordedAt: string | null;
   commentary: string;
+  reconfirmation: Reconfirmation;
+  reconfirmationRecordedAt: string | null;
   tableIds: string[];
 }
 
@@ -542,6 +547,8 @@ function toReservation(
     rating: row.rating,
     ratingRecordedAt: row.ratingRecordedAt ? row.ratingRecordedAt.toISOString() : null,
     commentary: row.commentary,
+    reconfirmation: row.reconfirmation,
+    reconfirmationRecordedAt: row.reconfirmationRecordedAt ? row.reconfirmationRecordedAt.toISOString() : null,
     tableIds,
   };
 }
@@ -659,6 +666,7 @@ export async function createReservation(
         ...consentColumns(input.consent ?? "unknown"),
         ...ratingColumns(input.rating ?? null),
         commentary: normalizeCommentary(input.commentary ?? ""),
+        ...reconfirmationColumns(input.reconfirmation ?? "none"),
       });
       for (const tableId of tableIds) {
         await tx.insert(tableAllocations).values({
@@ -801,11 +809,23 @@ export async function modifyReservation(
         input.rating !== undefined && input.rating !== current.rating;
       const commentary = input.commentary === undefined ? undefined : normalizeCommentary(input.commentary);
       const commentaryChanged = commentary !== undefined && commentary !== current.commentary;
-      if ((consentChanged || ratingChanged || commentaryChanged) && current.erased) {
+      const reconfirmationChanged =
+        input.reconfirmation !== undefined && input.reconfirmation !== current.reconfirmation;
+      if ((consentChanged || ratingChanged || commentaryChanged || reconfirmationChanged) && current.erased) {
         throw new ReservationError("invalid_request");
       }
+      if (reconfirmationChanged && current.status !== "booked") {
+        throw new ReservationError("invalid_transition");
+      }
 
-      if (!partyChanged && !tablesChanged && !consentChanged && !ratingChanged && !commentaryChanged) {
+      if (
+        !partyChanged &&
+        !tablesChanged &&
+        !consentChanged &&
+        !ratingChanged &&
+        !commentaryChanged &&
+        !reconfirmationChanged
+      ) {
         return current.version;
       }
 
@@ -818,6 +838,7 @@ export async function modifyReservation(
           ...(consentChanged ? consentColumns(input.consent!) : {}),
           ...(ratingChanged ? ratingColumns(input.rating!) : {}),
           ...(commentaryChanged ? { commentary } : {}),
+          ...(reconfirmationChanged ? reconfirmationColumns(input.reconfirmation!) : {}),
         })
         .where(eq(reservations.id, id));
       if (tablesChanged) {

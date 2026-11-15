@@ -17,6 +17,7 @@ import { consentColumns } from "./consent";
 import { normalizeContact, venueCountry } from "./contact";
 import { forgetMergeState, movedAtMerge } from "./guests";
 import { ratingColumns } from "./rating";
+import { reconfirmationColumns } from "./reconfirmation";
 import { normalizeTimeZone } from "./time";
 import { sha256Hex } from "./reservations";
 import type { TurnTime } from "./turn-times";
@@ -276,6 +277,7 @@ export async function eraseReservations(
         ...consentColumns("unknown"),
         ...ratingColumns(null),
         commentary: "",
+        ...reconfirmationColumns("none"),
         erased: true,
       })
       .where(and(eq(reservations.venueId, venueId), eq(reservations.id, m.id)));

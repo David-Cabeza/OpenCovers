@@ -164,6 +164,14 @@ Each reservation can carry a short free-text note for staff, up to 500 character
 
 Acceptance: a reservation created without a note reads back an empty string. A create with a note reads it back, trimmed. A modify that changes the note bumps the version once and emits one `modified` event, and the same value changes nothing. An empty string clears it. A value that is not a string or is longer than 500 characters fails with `invalid_request`. Erasure leaves an empty string.
 
+### REQ-N7 Per-reservation reconfirmation
+
+Each reservation records where the guest stands on reconfirming it: `none` (not asked, the default), `requested`, `confirmed`, `declined`, or `no_answer`, with the time it was recorded. Staff or a key with `write` can set it on create and change it on modify while the reservation is `booked`. The engine only stores the signal. It sends no reconfirmation request, and `declined` neither cancels the reservation nor frees its tables. Erasure and retention reset it to `none`. A host reads it to see who has confirmed.
+
+Acceptance: conformance case C25. A reservation created without it reads back `none` and no recorded time. A modify that changes it bumps the version once and emits one `modified` event, and the same value changes nothing. A value outside the set, and a walk-in that carries it, fail with `invalid_request`. A change on a reservation that is not `booked` fails with `invalid_transition`. Erasure leaves `none` and no recorded time.
+
+The text of any reconfirmation message and the legal basis for sending it are pending review. This requirement defines the stored signal only.
+
 ## Erasure
 
 ### REQ-E1 Erasure by id or principal
@@ -231,6 +239,6 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C1: two concurrent creates for the same table and time produce one booking and one conflict.
 - C2: replaying a create with the same idempotency key returns the original id, not a second booking.
 - C3: availability shows a free slot, then a create for that slot either fails with a defined conflict or assigns a different eligible table, and never double-books. A snapshot is not a hold.
-- C4: a modify bumps the version, and the confirmation is sent once for the new version when it carries party size or tables. A consent or rating only modify sends no email and is allowed on attended reservations.
+- C4: a modify bumps the version, and the confirmation is sent once for the new version when it carries party size or tables. A consent, rating, booking note, or reconfirmation only modify sends no email. The first three are allowed on attended reservations.
 - C5: erasure returns counts and leaves no personal value.
 - C6: turning the engine on without a notice address fails, and clearing the address while on fails.
