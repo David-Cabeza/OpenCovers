@@ -24,7 +24,7 @@ What application code enforces:
 - Serialization. With `lock: true` it first runs `pg_advisory_xact_lock(hashtextextended('overbooking:<venueId>', 0))`. The lock is per venue, held to the end of the transaction, and taken only on the overbooking path. Ordinary bookings do not take it.
 - The same check on three paths. `createReservation` (with the lock), `modifyReservation` (with the lock, when the party of a booking without tables grows or its tables change and it would hold none), and `evaluateSlot`, which backs availability and `GET /availability/explain` (without the lock, read only).
 
-Why a database constraint does not fit the sum. The exclusion constraint compares pairs of rows on one key. The ceiling is a sum over every row whose window overlaps another window, and the rows hold no key. A bookings window can overlap several others that do not overlap each other. PostgreSQL has no declarative constraint for "the sum over overlapping ranges stays under N".
+Why a database constraint does not fit the sum. The exclusion constraint compares pairs of rows on one key. The ceiling is a sum over every row whose window overlaps another window, and the rows hold no key. One booking window can overlap several others that do not overlap each other. PostgreSQL has no declarative constraint for "the sum over overlapping ranges stays under N".
 
 Facts checked on `origin/feat/overbooking-ceiling` (8c7b681). Read in the code, and `pnpm --filter @opencovers/api test` on an empty database passes: 28 files, 346 tests, including `apps/api/test/overbooking.test.ts`.
 
