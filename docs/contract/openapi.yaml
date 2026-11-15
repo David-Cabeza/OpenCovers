@@ -321,8 +321,9 @@ paths:
         venue is enabled fails the same way. A `phoneCountry` that is not a
         supported ISO 3166 alpha-2 code in upper case fails with
         `invalid_request`. Null clears it. Malformed `turnTimes` fail with
-        `invalid_request`, and an empty array clears them. Admin only. Any
-        other role fails with `forbidden`.
+        `invalid_request`, and an empty array clears them. An
+        `overbookingCeiling` that is not an integer from 0 to 1000 fails with
+        `invalid_request`. Admin only. Any other role fails with `forbidden`.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -828,7 +829,8 @@ components:
         as `party_size_too_small` or `party_size_too_large` with rule
         `service_limit`, then `party_size_too_large` for capacity or
         `no_suitable_table`. The codes are the error codes a create returns
-        for the same rule.
+        for the same rule. `no_suitable_table` is absent when the venue's
+        `overbookingCeiling` leaves room for the party.
       required: [code, message, details]
       properties:
         code:
@@ -1107,7 +1109,8 @@ components:
           description: |
             The ids of the tables the reservation holds, sorted ascending. It
             keeps the tables of an attended or no-show visit and is empty once
-            the reservation is cancelled.
+            the reservation is cancelled. It is also empty while a booking
+            accepted under the venue's `overbookingCeiling` waits for tables.
           items: { type: string }
         zone:
           type: string
@@ -1314,6 +1317,22 @@ components:
             - { upTo: 2, minutes: 90 }
             - { upTo: 4, minutes: 120 }
             - { upTo: 8, minutes: 150 }
+        overbookingCeiling:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          default: 0
+          description: |
+            The most covers, counted as party sizes, that the venue accepts
+            without tables at any one time. At 0 every booking holds tables.
+            Above 0, a booking that fits the venue but finds no free table
+            combination is accepted with no tables when the covers of every
+            active booking without tables that overlaps it, plus its own
+            party, stay within the ceiling. Such a booking has `tables: []`
+            until staff assign tables with a modify, and the database still
+            refuses any table that another booking holds. The ceiling never
+            applies to a walk-in, to a booking that names its tables, or to a
+            party larger than the venue. It is venue-wide, whatever the zone.
 
     Service:
       type: object

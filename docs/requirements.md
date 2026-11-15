@@ -70,7 +70,7 @@ Acceptance: a caller that deletes or bypasses the application check still cannot
 
 The engine assigns the table and zone for a booking. A caller may request a specific table or zone when the venue allows it.
 
-Acceptance: a booking that does not name a table still gets exactly one table assigned, and the response returns it.
+Acceptance: a booking that does not name a table still gets exactly one table assigned, and the response returns it. The one exception is a venue that sets an overbooking ceiling above 0, see REQ-B7.
 
 ### REQ-B4 Idempotent writes
 
@@ -89,6 +89,12 @@ Acceptance: no two writes can produce the same version, and versions never go ba
 A reservation's status is a closed vocabulary: booked, seated, attended, no_show, cancelled. Transitions are explicit and limited.
 
 Acceptance: the engine refuses a status it does not define, and a transition that is not allowed fails.
+
+### REQ-B7 Explicit overbooking ceiling
+
+A venue can set `overbookingCeiling`, the most covers it accepts without tables at any one time. The default is 0, and then every booking holds tables as REQ-B3 says. Above 0, a booking that fits the venue but finds no free table combination is accepted with no tables while the covers of the overlapping active bookings without tables stay within the ceiling. The ceiling never relaxes REQ-B2. A booking without tables holds no allocation, and tables are assigned later through a modify that the exclusion constraint checks. It does not apply to walk-ins, to named tables, or to a party larger than the venue.
+
+Acceptance: conformance case C24. At 0 every booking holds tables, and a modify cannot release them all. Concurrent creates never take more than the ceiling. A table assigned to a booking over the ceiling is refused when another booking holds it.
 
 ## Guest and client
 

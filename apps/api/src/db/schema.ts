@@ -36,7 +36,10 @@ export const venues = pgTable("venues", {
   retentionDays: integer("retention_days").notNull().default(DEFAULT_RETENTION_DAYS),
   phoneCountry: text("phone_country"),
   turnTimes: jsonb("turn_times").$type<TurnTime[]>().notNull().default([]),
-});
+  overbookingCeiling: integer("overbooking_ceiling").notNull().default(0),
+}, (t) => [
+  check("venues_overbooking_ceiling", sql`${t.overbookingCeiling} >= 0 AND ${t.overbookingCeiling} <= 1000`),
+]);
 
 export const services = pgTable(
   "services",

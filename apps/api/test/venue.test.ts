@@ -55,6 +55,7 @@ describe("venue config and erasure", () => {
         leadTimeMinutes: 0,
         lastSeatingOffsetMinutes: 0,
         phoneCountry: null,
+        overbookingCeiling: 0,
       },
     });
 
@@ -115,6 +116,7 @@ describe("venue config and erasure", () => {
       leadTimeMinutes: 0,
       lastSeatingOffsetMinutes: 0,
       phoneCountry: null,
+      overbookingCeiling: 0,
     });
 
     const again = await erase(db, "erase", "carlos@example.com");

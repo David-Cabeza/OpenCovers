@@ -35,10 +35,11 @@ Status legend:
 
 | C22 Role boundaries | **PASS** | The venue middleware in `apps/api/src/app.ts` blocks `read` on every write. `adminOnly` guards config, services, tables, floor items, keys, and guest merge. Tests in `apps/api/test/authorization.test.ts` cover each admin route with a `write` and a `read` key, a config and catalog read back after each rejection, an admin success, a `write` and an `admin` staff session, and the reservation, waitlist, and erasure operations a `write` key keeps. |
 | C23 Booking note | **PASS** | `commentary` text, at most 500 characters, with a database check, on create, walk-in, and modify, in migration `0022`. Tests in `apps/api/test/commentary.test.ts` cover default, create, walk-in, trimming, the length bound, invalid types, modify bump and event, same-value no-op, clear, attended and refused statuses, read-only key, reads, no email, the event feed carrying no note, erasure, and retention of a reservation with a note only. |
+| C24 Overbooking ceiling | **PASS** | `overbooking_ceiling` on `venues` with a check from 0 to 1000, in migration `0023`. `hasOverbookRoom` in `apps/api/src/lib/reservations.ts` is called by create, the modify that lowers or raises the tables or the party, availability, and the explanation. Create and modify take a per-venue advisory lock before they count, so concurrent writers serialize. The exclusion constraint on `table_allocations` is untouched, and a booking over the ceiling holds no allocation row. Tests in `apps/api/test/overbooking.test.ts` cover the setting and its bounds, the default of 0, filling to the ceiling and refusing past it, the read shape, agreement of availability and the explanation, overlap, cancellation and no-show, a party larger than the venue, named tables, walk-ins, venue isolation, 8 concurrent creates, idempotent replay, table assignment through modify and the exclusion constraint, party growth, and releasing tables. Removing the lock fails the concurrency test. |
 
 ## Open gaps
 
-None. All 23 conformance cases pass.
+None. All 24 conformance cases pass.
 
 ## Notes
 
