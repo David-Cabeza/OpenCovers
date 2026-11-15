@@ -88,11 +88,13 @@ Acceptance: no two writes can produce the same version, and versions never go ba
 
 A reservation's status is a closed vocabulary: booked, seated, attended, no_show, cancelled. Transitions are explicit and limited.
 
-Acceptance: the engine refuses a status it does not define, and a transition that is not allowed fails.
+A reservation cannot be seated without a table. A move to `seated` needs at least one active table allocation and otherwise fails with `table_required`. A booking accepted under the overbooking ceiling (REQ-B7) holds no table, so staff assign one with a modify before it can be seated. A walk-in is seated with its tables at creation and is not affected.
+
+Acceptance: the engine refuses a status it does not define, and a transition that is not allowed fails. Conformance case C26. A booking without tables cannot be seated, and a table that another booking holds is refused when staff assign it.
 
 ### REQ-B7 Explicit overbooking ceiling
 
-A venue can set `overbookingCeiling`, the most covers it accepts without tables at any one time. The default is 0, and then every booking holds tables as REQ-B3 says. Above 0, a booking that fits the venue but finds no free table combination is accepted with no tables while the covers of the overlapping active bookings without tables stay within the ceiling. The ceiling never relaxes REQ-B2. A booking without tables holds no allocation, and tables are assigned later through a modify that the exclusion constraint checks. It does not apply to walk-ins, to named tables, or to a party larger than the venue.
+A venue can set `overbookingCeiling`, the most covers it accepts without tables at any one time. The default is 0, and then every booking holds tables as REQ-B3 says. Above 0, a booking that fits the venue but finds no free table combination is accepted with no tables while the covers of the overlapping active bookings without tables stay within the ceiling. The ceiling never relaxes REQ-B2. A booking without tables holds no allocation, and tables are assigned later through a modify that the exclusion constraint checks, and the booking cannot be seated before then (REQ-B6). It does not apply to walk-ins, to named tables, or to a party larger than the venue.
 
 Acceptance: conformance case C24. At 0 every booking holds tables, and a modify cannot release them all. Concurrent creates never take more than the ceiling. A table assigned to a booking over the ceiling is refused when another booking holds it.
 
@@ -242,3 +244,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C4: a modify bumps the version, and the confirmation is sent once for the new version when it carries party size or tables. A consent, rating, booking note, or reconfirmation only modify sends no email. The first three are allowed on attended reservations.
 - C5: erasure returns counts and leaves no personal value.
 - C6: turning the engine on without a notice address fails, and clearing the address while on fails.
+- C26: a reservation without a table cannot be seated and fails with `table_required`. Staff assign a table with a modify first, and a taken table fails with `slot_taken`.

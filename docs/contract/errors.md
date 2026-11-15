@@ -21,6 +21,7 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 - `party_size_too_large`: the party exceeds the venue's capacity, or the maximum of the service that covers the time.
 - `party_size_too_small`: the party is below the minimum of the service that covers the time.
 - `no_suitable_table`: no table combination fits the party, and the venue's overbooking ceiling leaves no room for it. A modify that would leave a booking without tables beyond that ceiling fails with it too.
+- `table_required`: the reservation holds no table, so it cannot be seated. Staff assign a table with a modify first. A modify that would leave a seated reservation without tables fails with it too.
 - `outside_hours`: the time is outside the venue's hours, off the slot grid, or after the last seating.
 - `lead_time_violation`: the booking is too close to the requested time.
 
