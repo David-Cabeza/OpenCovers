@@ -14,9 +14,17 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useVenueConfig } from "@/hooks/use-venue-config";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type Role } from "@/lib/api";
 
-export function VenueSettings({ venueId }: { venueId: string }) {
+export const OVERBOOKING_MAX = 1000;
+
+function parseCeiling(value: string): number | null {
+  if (!/^\d+$/.test(value.trim())) return null;
+  const n = Number(value);
+  return n <= OVERBOOKING_MAX ? n : null;
+}
+
+export function VenueSettings({ venueId, role }: { venueId: string; role?: Role }) {
   const queryClient = useQueryClient();
   const { data, isPending } = useVenueConfig(venueId);
   const [enabled, setEnabled] = useState(false);
@@ -28,6 +36,8 @@ export function VenueSettings({ venueId }: { venueId: string }) {
   const [slotIntervalMinutes, setSlotIntervalMinutes] = useState("15");
   const [leadTimeMinutes, setLeadTimeMinutes] = useState("0");
   const [lastSeatingOffsetMinutes, setLastSeatingOffsetMinutes] = useState("0");
+  const [overbookingCeiling, setOverbookingCeiling] = useState("0");
+  const canEditCeiling = role === undefined || role === "admin";
 
   useEffect(() => {
     if (data) {
@@ -40,12 +50,15 @@ export function VenueSettings({ venueId }: { venueId: string }) {
       setSlotIntervalMinutes(String(data.slotIntervalMinutes));
       setLeadTimeMinutes(String(data.leadTimeMinutes));
       setLastSeatingOffsetMinutes(String(data.lastSeatingOffsetMinutes));
+      setOverbookingCeiling(String(data.overbookingCeiling ?? 0));
     }
   }, [data]);
 
   const save = useMutation({
-    mutationFn: () =>
-      api.setConfig(venueId, {
+    mutationFn: async () => {
+      const ceiling = parseCeiling(overbookingCeiling);
+      if (ceiling === null) throw new Error("overbooking_ceiling_invalid");
+      return api.setConfig(venueId, {
         enabled,
         noticeAddress,
         notificationsEnabled,
@@ -54,7 +67,9 @@ export function VenueSettings({ venueId }: { venueId: string }) {
         slotIntervalMinutes: Number(slotIntervalMinutes) || 0,
         leadTimeMinutes: Number(leadTimeMinutes) || 0,
         lastSeatingOffsetMinutes: Number(lastSeatingOffsetMinutes) || 0,
-      }),
+        overbookingCeiling: ceiling,
+      });
+    },
     onSuccess: (config) => {
       queryClient.setQueryData(["config", venueId], config);
       setResendConfigured(config.resendConfigured);
@@ -65,9 +80,13 @@ export function VenueSettings({ venueId }: { venueId: string }) {
       const message =
         err instanceof ApiError && err.code === "notice_address_required"
           ? "Add a notice address before enabling reservations."
-          : err instanceof Error
-            ? err.message
-            : "Could not save the settings.";
+          : err instanceof ApiError && err.code === "forbidden"
+            ? "Only an admin can change venue settings."
+            : err instanceof Error && err.message === "overbooking_ceiling_invalid"
+              ? `The overbooking ceiling must be a whole number from 0 to ${OVERBOOKING_MAX}.`
+              : err instanceof Error
+                ? err.message
+                : "Could not save the settings.";
       toast.error(message);
     },
   });
@@ -194,6 +213,34 @@ export function VenueSettings({ venueId }: { venueId: string }) {
                     onChange={(e) => setLastSeatingOffsetMinutes(e.target.value)}
                   />
                 </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 border-t pt-6">
+              <div>
+                <h4 className="font-medium">Overbooking</h4>
+                <p className="text-sm text-muted-foreground">
+                  Take a few covers beyond what your tables seat, with a hard limit.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="overbooking-ceiling">Overbooking ceiling</Label>
+                <Input
+                  id="overbooking-ceiling"
+                  type="number"
+                  min={0}
+                  max={OVERBOOKING_MAX}
+                  step={1}
+                  className="w-40"
+                  disabled={!canEditCeiling}
+                  value={overbookingCeiling}
+                  onChange={(e) => setOverbookingCeiling(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  The most guests the venue accepts without a table at the same time. 0
+                  turns overbooking off. Overbooked guests need a table assigned before
+                  they can be seated. Only an admin can change this.
+                </p>
               </div>
             </div>
 
