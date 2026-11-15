@@ -1,6 +1,7 @@
 import {
   CalendarClockIcon,
   CalendarDaysIcon,
+  ClipboardListIcon,
   GaugeIcon,
   LayoutGridIcon,
   SettingsIcon,
@@ -13,11 +14,13 @@ export type ViewId =
   | "floor"
   | "availability"
   | "waitlist"
+  | "preshift"
   | "pacing"
   | "setup";
 
 const NAV: { id: ViewId; label: string; icon: typeof CalendarDaysIcon }[] = [
   { id: "agenda", label: "Agenda", icon: CalendarDaysIcon },
+  { id: "preshift", label: "Pre-shift", icon: ClipboardListIcon },
   { id: "floor", label: "Floor plan", icon: LayoutGridIcon },
   { id: "availability", label: "Availability", icon: CalendarClockIcon },
   { id: "waitlist", label: "Waitlist", icon: UsersIcon },
@@ -33,7 +36,7 @@ export function Sidebar({
   onSelect: (view: ViewId) => void;
 }) {
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r bg-background">
+    <aside className="flex w-60 print:hidden shrink-0 flex-col border-r bg-background">
       <div className="flex items-center gap-2.5 border-b px-4 py-4">
         <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <CalendarDaysIcon className="size-4" />

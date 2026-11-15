@@ -110,6 +110,8 @@ export interface Reservation {
     consent?: Consent;
   };
   rating?: number | null;
+  zone?: string;
+  tables?: string[];
 }
 
 export interface AvailabilitySlot {

@@ -9,6 +9,7 @@ import { FloorView } from "./floor/floor-view";
 import { Sidebar, type ViewId } from "./layout/sidebar";
 import { Topbar } from "./layout/topbar";
 import { PacingView } from "./pacing/pacing-view";
+import { PreShiftView } from "./preshift/pre-shift-view";
 import { SetupView } from "./setup/setup-view";
 import { EmptyVenues } from "./venue/empty-venues";
 import { WaitlistView } from "./waitlist/waitlist-view";
@@ -37,7 +38,7 @@ export function Dashboard() {
       <Sidebar active={active} onSelect={setActive} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar email={session?.user.email} />
-        <main className="flex-1 p-6 lg:p-8">
+        <main className="flex-1 p-6 lg:p-8 print:p-0">
           {isPending ? (
             <div className="space-y-4">
               <Skeleton className="h-9 w-56" />
@@ -48,6 +49,7 @@ export function Dashboard() {
           ) : venueId ? (
             <>
               {active === "agenda" && <AgendaView venueId={venueId} />}
+              {active === "preshift" && <PreShiftView venueId={venueId} />}
               {active === "floor" && <FloorView venueId={venueId} />}
               {active === "availability" && <AvailabilityView venueId={venueId} />}
               {active === "waitlist" && <WaitlistView venueId={venueId} />}

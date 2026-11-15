@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/select";
 import type { Consent } from "@/lib/api";
 
-const OPTIONS: { value: Consent; label: string }[] = [
+export const CONSENT_OPTIONS: { value: Consent; label: string }[] = [
   { value: "unknown", label: "Not asked" },
   { value: "granted", label: "Granted" },
   { value: "denied", label: "Denied" },
@@ -26,7 +26,7 @@ export function ConsentSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {OPTIONS.map((o) => (
+        {CONSENT_OPTIONS.map((o) => (
           <SelectItem key={o.value} value={o.value}>
             {o.label}
           </SelectItem>
