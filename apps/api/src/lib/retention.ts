@@ -1,6 +1,7 @@
 import { and, eq, gte, inArray, isNotNull, isNull, lt, ne, notExists, or } from "drizzle-orm";
 import { guestAudit, guests, reservations, venues, waitlist } from "../db/schema";
 import { forgetMergeState } from "./guests";
+import { deleteLapsedInvitations } from "./invitations";
 import { pruneEvents } from "./reservations";
 import { eraseReservations, withMerged, type Db } from "./venue";
 
@@ -18,6 +19,7 @@ export async function runRetention(
   now = new Date(),
   batch: RetentionBatch = RETENTION_BATCH,
 ): Promise<void> {
+  await deleteLapsedInvitations(db, now);
   const all = await db.select({ id: venues.id, retentionDays: venues.retentionDays }).from(venues);
   for (const venue of all) {
     const cutoff = new Date(now.getTime() - venue.retentionDays * DAY_MS);

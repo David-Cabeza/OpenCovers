@@ -734,6 +734,156 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/invitations:
+    get:
+      operationId: invitation.list
+      summary: List the venue's staff invitations
+      description: |
+        Admin only, and only through a staff session. A key of any role, an
+        `admin` key included, fails with `forbidden`, and so does any other
+        session role. Newest first. The token and its hash are never
+        returned. Not exposed through MCP. See ADR-0006.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The venue's invitations in any status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [invitations]
+                properties:
+                  invitations:
+                    type: array
+                    items: { $ref: "#/components/schemas/Invitation" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: invitation.create
+      summary: Invite a person to the venue
+      description: |
+        Admin only, and only through a staff session. A key of any role, an
+        `admin` key included, fails with `forbidden`. The invitation grants
+        one membership in this venue with the given `role`, to whoever
+        redeems the token once before it expires.
+
+        With `email` the invitation is bound to that address, compared
+        without regard to case. Without it the invitation is an open link
+        that anyone holding the token can redeem. `expiresInHours` is an
+        integer from 1 to 336 and defaults to 72. A `role` outside `read`,
+        `write`, and `admin`, a malformed `email`, or a bad `expiresInHours`
+        fails with `invalid_request`.
+
+        The `token` appears only in this response. The engine stores a hash
+        and sends no email, so the admin passes the token to the invitee.
+        See ADR-0006.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { $ref: "#/components/schemas/Role" }
+                email: { type: string, format: email }
+                expiresInHours: { type: integer, minimum: 1, maximum: 336, default: 72 }
+      responses:
+        "201":
+          description: The invitation and its one-time token
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [invitation]
+                properties:
+                  invitation: { $ref: "#/components/schemas/InvitationCreated" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/invitations/{invitationId}:
+    delete:
+      operationId: invitation.revoke
+      summary: Revoke a pending invitation
+      description: |
+        Admin only, and only through a staff session. A pending invitation
+        becomes `revoked` and its token stops working. Revoking a revoked
+        or expired invitation returns it unchanged. Revoking a redeemed
+        invitation fails with `invitation_redeemed` and changes nothing. An
+        id that belongs to another venue fails with `invitation_not_found`,
+        the same as an unknown id.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: invitationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The invitation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [invitation]
+                properties:
+                  invitation: { $ref: "#/components/schemas/Invitation" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /invitations/redeem:
+    post:
+      operationId: invitation.redeem
+      summary: Redeem an invitation with a signed-in account
+      description: |
+        Needs a staff session and no venue role. A key fails with
+        `unauthorized`. Grants the invitation's role in its venue. An account
+        that is already a member keeps the higher of its role and the
+        invited one, and never loses a role. The invitation is used up
+        atomically, so of any number of concurrent redemptions one succeeds.
+
+        An unknown id, a wrong secret, and an expired, used, or revoked
+        invitation, and one bound to another email, all fail with
+        `invalid_invitation`, the same answer for every cause. The response
+        never names a venue except on success.
+
+        A person without an account redeems by signing up instead, with the
+        token in the `X-Invitation-Token` header on `POST
+        /api/auth/sign-up/email`. That works under every `SIGNUP` mode and
+        grants the same membership. A bad token fails there with `403` and
+        the code `INVALID_INVITATION`. Auth routes are outside this
+        contract.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: The membership the invitation granted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [membership]
+                properties:
+                  membership:
+                    type: object
+                    required: [venueId, role]
+                    properties:
+                      venueId: { type: string }
+                      role: { $ref: "#/components/schemas/Role" }
+        default:
+          $ref: "#/components/responses/Error"
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -1260,6 +1410,38 @@ components:
           type: string
           format: date-time
 
+    Role:
+      type: string
+      enum: [read, write, admin]
+
+    Invitation:
+      type: object
+      required: [id, role, email, status, createdAt, expiresAt, redeemedAt, revokedAt]
+      properties:
+        id: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        email:
+          type: string
+          nullable: true
+          description: The address the invitation is bound to, or null for an open link.
+        status:
+          type: string
+          enum: [pending, redeemed, revoked, expired]
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        redeemedAt: { type: string, format: date-time, nullable: true }
+        revokedAt: { type: string, format: date-time, nullable: true }
+
+    InvitationCreated:
+      allOf:
+        - $ref: "#/components/schemas/Invitation"
+        - type: object
+          required: [token]
+          properties:
+            token:
+              type: string
+              description: Shown once. The engine keeps only a hash of its secret.
+
     Webhook:
       type: object
       required: [id, url, enabled, failures, lastError, nextAttemptAt]
@@ -1438,3 +1620,6 @@ components:
         - webhook_not_found
         - webhook_url_rejected
         - webhook_limit_reached
+        - invalid_invitation
+        - invitation_not_found
+        - invitation_redeemed
