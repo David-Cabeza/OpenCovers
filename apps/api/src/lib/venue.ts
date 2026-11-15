@@ -17,6 +17,7 @@ import { consentColumns } from "./consent";
 import { normalizeContact, venueCountry } from "./contact";
 import { forgetMergeState, movedAtMerge } from "./guests";
 import { ratingColumns } from "./rating";
+import { reconfirmationColumns } from "./reconfirmation";
 import { normalizeTimeZone } from "./time";
 import { sha256Hex } from "./reservations";
 import type { TurnTime } from "./turn-times";
@@ -35,6 +36,7 @@ export interface VenueConfig {
   lastSeatingOffsetMinutes: number;
   phoneCountry: string | null;
   turnTimes?: TurnTime[];
+  overbookingCeiling: number;
 }
 
 export type ConfigResult =
@@ -85,6 +87,7 @@ export async function getConfig(db: Db, venueId: string): Promise<VenueConfig | 
     lastSeatingOffsetMinutes: venue.lastSeatingOffsetMinutes,
     phoneCountry: venue.phoneCountry,
     ...turnTimesField(venue.turnTimes),
+    overbookingCeiling: venue.overbookingCeiling,
   };
 }
 
@@ -106,6 +109,7 @@ export async function setConfig(
     lastSeatingOffsetMinutes?: number;
     phoneCountry?: CountryCode | null;
     turnTimes?: TurnTime[];
+    overbookingCeiling?: number;
   },
 ): Promise<ConfigResult> {
   const venue = (
@@ -126,6 +130,7 @@ export async function setConfig(
   const fromEmail = input.fromEmail !== undefined ? input.fromEmail : venue.fromEmail;
   const phoneCountry = input.phoneCountry !== undefined ? input.phoneCountry : venue.phoneCountry;
   const turnTimes = input.turnTimes ?? venue.turnTimes;
+  const overbookingCeiling = input.overbookingCeiling ?? venue.overbookingCeiling;
   const resendApiKey =
     input.resendApiKey !== undefined
       ? input.resendApiKey === ""
@@ -145,6 +150,7 @@ export async function setConfig(
       lastSeatingOffsetMinutes,
       phoneCountry,
       turnTimes,
+      overbookingCeiling,
     })
     .where(eq(venues.id, venueId));
   return {
@@ -160,6 +166,7 @@ export async function setConfig(
       lastSeatingOffsetMinutes,
       phoneCountry,
       ...turnTimesField(turnTimes),
+      overbookingCeiling,
     },
   };
 }
@@ -270,6 +277,7 @@ export async function eraseReservations(
         ...consentColumns("unknown"),
         ...ratingColumns(null),
         commentary: "",
+        ...reconfirmationColumns("none"),
         erased: true,
       })
       .where(and(eq(reservations.venueId, venueId), eq(reservations.id, m.id)));

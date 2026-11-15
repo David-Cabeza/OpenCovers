@@ -38,6 +38,13 @@ const ratingSchema = z
   .optional()
   .describe("The guest's rating of the visit, 1 to 5. Omit if not given. Null clears it.");
 
+const reconfirmationSchema = z
+  .enum(["none", "requested", "confirmed", "declined", "no_answer"])
+  .optional()
+  .describe(
+    "Whether the guest reconfirmed the booking. none means not asked, requested means asked and waiting. Omit to leave it unchanged. A booking is never cancelled by it.",
+  );
+
 const commentarySchema = z
   .string()
   .max(500)
@@ -184,10 +191,11 @@ export function createServer(): McpServer {
         consent: consentSchema,
         rating: ratingSchema,
         commentary: commentarySchema,
+        reconfirmation: reconfirmationSchema,
         idempotencyKey: z.string().optional(),
       }),
     },
-    async ({ venueId, date, time, partySize, tables, zone, guestName, guestContact, consent, rating, commentary, idempotencyKey: key }) => {
+    async ({ venueId, date, time, partySize, tables, zone, guestName, guestContact, consent, rating, commentary, reconfirmation, idempotencyKey: key }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/reservations`, {
@@ -202,6 +210,7 @@ export function createServer(): McpServer {
               guest: { name: guestName, contact: guestContact, consent },
               rating,
               commentary,
+              reconfirmation,
             },
           }),
         );
@@ -261,7 +270,7 @@ export function createServer(): McpServer {
     "reservation.modify",
     {
       title: "Modify reservation",
-      description: "Modify a reservation's party size, tables, contact consent, rating, and/or booking note.",
+      description: "Modify a reservation's party size, tables, contact consent, rating, booking note, and/or reconfirmation.",
       annotations: { idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
@@ -271,16 +280,17 @@ export function createServer(): McpServer {
         consent: consentSchema,
         rating: ratingSchema,
         commentary: commentarySchema,
+        reconfirmation: reconfirmationSchema,
         idempotencyKey: z.string().optional(),
       }),
     },
-    async ({ venueId, id, partySize, tables, consent, rating, commentary, idempotencyKey: key }) => {
+    async ({ venueId, id, partySize, tables, consent, rating, commentary, reconfirmation, idempotencyKey: key }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/reservations/${id}/modify`, {
             method: "POST",
             idempotencyKey: idempotencyKey(key),
-            body: { partySize, tables, guest: consent ? { consent } : undefined, rating, commentary },
+            body: { partySize, tables, guest: consent ? { consent } : undefined, rating, commentary, reconfirmation },
           }),
         );
       } catch (err) {
@@ -435,9 +445,18 @@ export function createServer(): McpServer {
           .nullable()
           .optional()
           .describe("ISO 3166 alpha-2 country for phone numbers without a country code. Null follows the venue time zone."),
+        overbookingCeiling: z
+          .number()
+          .int()
+          .min(0)
+          .max(1000)
+          .optional()
+          .describe(
+            "The most covers the venue accepts without tables at one time. 0 means every booking holds tables.",
+          ),
       }),
     },
-    async ({ venueId, enabled, noticeAddress, notificationsEnabled, resendApiKey, fromEmail, slotIntervalMinutes, leadTimeMinutes, lastSeatingOffsetMinutes, phoneCountry }) => {
+    async ({ venueId, enabled, noticeAddress, notificationsEnabled, resendApiKey, fromEmail, slotIntervalMinutes, leadTimeMinutes, lastSeatingOffsetMinutes, phoneCountry, overbookingCeiling }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/config`, {
@@ -452,6 +471,7 @@ export function createServer(): McpServer {
               leadTimeMinutes,
               lastSeatingOffsetMinutes,
               phoneCountry,
+              overbookingCeiling,
             },
           }),
         );

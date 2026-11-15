@@ -41,6 +41,7 @@ import {
 import { isConsent } from "./lib/consent";
 import { isCommentary } from "./lib/commentary";
 import { isRating } from "./lib/rating";
+import { isReconfirmation } from "./lib/reconfirmation";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
 import {
   decodeGuestCursor,
@@ -215,7 +216,12 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
   const key = c.req.header("Idempotency-Key");
   if (!key) return error(c, "invalid_request", 400);
   const body = await c.req.json();
-  if (hasInvalidConsent(body) || hasInvalidRating(body) || hasInvalidCommentary(body)) {
+  if (
+    hasInvalidConsent(body) ||
+    hasInvalidRating(body) ||
+    hasInvalidCommentary(body) ||
+    hasInvalidReconfirmation(body)
+  ) {
     return error(c, "invalid_request", 400);
   }
   if (
@@ -242,6 +248,7 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
       consent: body.guest?.consent,
       rating: body.rating,
       commentary: body.commentary,
+      reconfirmation: body.reconfirmation,
       bookedVia: c.get("principal") as string,
       basis: "service",
       ownerPrincipal: c.get("principal") as string,
@@ -261,7 +268,12 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
   if (!key) return error(c, "invalid_request", 400);
   const body = await c.req.json();
   if (typeof body.partySize !== "number") return error(c, "invalid_request", 400);
-  if (hasInvalidConsent(body) || hasInvalidRating(body) || hasInvalidCommentary(body)) {
+  if (
+    hasInvalidConsent(body) ||
+    hasInvalidRating(body) ||
+    hasInvalidCommentary(body) ||
+    body.reconfirmation !== undefined
+  ) {
     return error(c, "invalid_request", 400);
   }
   const result = await walkIn(
@@ -344,14 +356,19 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
   if (typeof body !== "object" || Object.keys(body).length === 0) {
     return error(c, "invalid_request", 400);
   }
-  if (hasInvalidConsent(body) || hasInvalidRating(body) || hasInvalidCommentary(body)) {
+  if (
+    hasInvalidConsent(body) ||
+    hasInvalidRating(body) ||
+    hasInvalidCommentary(body) ||
+    hasInvalidReconfirmation(body)
+  ) {
     return error(c, "invalid_request", 400);
   }
   const result = await modifyReservation(
     db,
     venueId,
     id,
-    { partySize: body.partySize, tableIds: body.tables, consent: body.guest?.consent, rating: body.rating, commentary: body.commentary },
+    { partySize: body.partySize, tableIds: body.tables, consent: body.guest?.consent, rating: body.rating, commentary: body.commentary, reconfirmation: body.reconfirmation },
     key,
   );
   if (result.ok && (body.partySize !== undefined || body.tables !== undefined)) {
@@ -749,6 +766,8 @@ function toApi(reservation: any, venueId: string) {
     rating: reservation.rating ?? null,
     ratingRecordedAt: reservation.ratingRecordedAt ?? null,
     commentary: reservation.commentary,
+    reconfirmation: reservation.reconfirmation,
+    reconfirmationRecordedAt: reservation.reconfirmationRecordedAt ?? null,
     tables: reservation.tableIds,
   };
 }
@@ -777,6 +796,9 @@ app.put("/v1/venues/:venueId/config", adminOnly, async (c) => {
   }
   const turnTimes = body.turnTimes === undefined ? undefined : parseTurnTimes(body.turnTimes);
   if (turnTimes === null) return error(c, "invalid_request", 400);
+  if (body.overbookingCeiling !== undefined && !isCeiling(body.overbookingCeiling)) {
+    return error(c, "invalid_request", 400);
+  }
   const result = await setConfig(db, venueId, {
     enabled: body.enabled,
     noticeAddress: body.noticeAddress,
@@ -790,6 +812,7 @@ app.put("/v1/venues/:venueId/config", adminOnly, async (c) => {
       : undefined,
     phoneCountry: body.phoneCountry === null ? null : toCountryCode(body.phoneCountry) ?? undefined,
     turnTimes,
+    overbookingCeiling: body.overbookingCeiling,
   });
   if (!result.ok) return mapError(c, result.code);
   return c.json(result.config);
@@ -853,6 +876,11 @@ function hasInvalidRating(body: any): boolean {
   return rating !== undefined && rating !== null && !isRating(rating);
 }
 
+function hasInvalidReconfirmation(body: any): boolean {
+  const reconfirmation = body?.reconfirmation;
+  return reconfirmation !== undefined && !isReconfirmation(reconfirmation);
+}
+
 function hasInvalidCommentary(body: any): boolean {
   const commentary = body?.commentary;
   return commentary !== undefined && !isCommentary(commentary);
@@ -869,6 +897,10 @@ function isDate(value: string): boolean {
 
 function isPartyLimit(value: unknown): boolean {
   return value === undefined || value === null || (Number.isInteger(value) && (value as number) >= 1);
+}
+
+function isCeiling(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 1000;
 }
 
 function isPosInt(value: unknown): value is number {

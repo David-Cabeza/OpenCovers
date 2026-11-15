@@ -1,0 +1,2 @@
+ALTER TABLE "venues" ADD COLUMN "overbooking_ceiling" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "venues" ADD CONSTRAINT "venues_overbooking_ceiling" CHECK ("venues"."overbooking_ceiling" >= 0 AND "venues"."overbooking_ceiling" <= 1000);

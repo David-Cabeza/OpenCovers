@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { Consent } from "../lib/consent";
 import type { Rating } from "../lib/rating";
+import type { Reconfirmation } from "../lib/reconfirmation";
 import type { TurnTime } from "../lib/turn-times";
 import {
   bigint,
@@ -36,7 +37,10 @@ export const venues = pgTable("venues", {
   retentionDays: integer("retention_days").notNull().default(DEFAULT_RETENTION_DAYS),
   phoneCountry: text("phone_country"),
   turnTimes: jsonb("turn_times").$type<TurnTime[]>().notNull().default([]),
-});
+  overbookingCeiling: integer("overbooking_ceiling").notNull().default(0),
+}, (t) => [
+  check("venues_overbooking_ceiling", sql`${t.overbookingCeiling} >= 0 AND ${t.overbookingCeiling} <= 1000`),
+]);
 
 export const services = pgTable(
   "services",
@@ -157,6 +161,8 @@ export const reservations = pgTable(
     consentRecordedAt: timestamp("consent_recorded_at", { withTimezone: true }),
     rating: integer("rating").$type<Rating>(),
     ratingRecordedAt: timestamp("rating_recorded_at", { withTimezone: true }),
+    reconfirmation: text("reconfirmation").$type<Reconfirmation>().notNull().default("none"),
+    reconfirmationRecordedAt: timestamp("reconfirmation_recorded_at", { withTimezone: true }),
     commentary: text("commentary").notNull().default(""),
     erased: boolean("erased").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })

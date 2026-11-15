@@ -321,8 +321,9 @@ paths:
         venue is enabled fails the same way. A `phoneCountry` that is not a
         supported ISO 3166 alpha-2 code in upper case fails with
         `invalid_request`. Null clears it. Malformed `turnTimes` fail with
-        `invalid_request`, and an empty array clears them. Admin only. Any
-        other role fails with `forbidden`.
+        `invalid_request`, and an empty array clears them. An
+        `overbookingCeiling` that is not an integer from 0 to 1000 fails with
+        `invalid_request`. Admin only. Any other role fails with `forbidden`.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -525,8 +526,8 @@ paths:
       description: |
         Erasure returns counts. For each erased reservation the event feed
         emits an `erased` event carrying a tombstone hash. Erasure also resets
-        the reservation's consent to `unknown`, its rating to null, and its
-        commentary to an empty string.
+        the reservation's consent to `unknown`, its rating to null, its
+        commentary to an empty string, and its reconfirmation to `none`.
 
         `guestId` is the guest record id, as returned in `guest.guestId`.
         Erasure by guest id blanks every reservation linked to that guest and
@@ -828,7 +829,8 @@ components:
         as `party_size_too_small` or `party_size_too_large` with rule
         `service_limit`, then `party_size_too_large` for capacity or
         `no_suitable_table`. The codes are the error codes a create returns
-        for the same rule.
+        for the same rule. `no_suitable_table` is absent when the venue's
+        `overbookingCeiling` leaves room for the party.
       required: [code, message, details]
       properties:
         code:
@@ -1056,6 +1058,23 @@ components:
         a key with `write` on create, walk-in and modify. Null on modify clears
         it. Erasure resets it to null.
 
+    Reconfirmation:
+      type: string
+      enum: [none, requested, confirmed, declined, no_answer]
+      default: none
+      description: |
+        Where the guest stands on reconfirming the booking. `none` means no
+        reconfirmation was asked, and it is the default. `requested` means
+        staff or a platform asked and wait for the answer. `confirmed` means
+        the guest confirmed. `declined` means the guest said they will not
+        come. `no_answer` means the guest was asked and did not answer.
+
+        The engine only stores the signal. It does not send a reconfirmation
+        request, and `declined` does not cancel the booking or free its
+        tables, so staff cancel it by hand. It is set on create and changed
+        on modify while the booking is `booked`. A walk-in does not take it
+        and fails with `invalid_request`. Erasure resets it to `none`.
+
     Commentary:
       type: string
       maxLength: 500
@@ -1107,7 +1126,8 @@ components:
           description: |
             The ids of the tables the reservation holds, sorted ascending. It
             keeps the tables of an attended or no-show visit and is empty once
-            the reservation is cancelled.
+            the reservation is cancelled. It is also empty while a booking
+            accepted under the venue's `overbookingCeiling` waits for tables.
           items: { type: string }
         zone:
           type: string
@@ -1122,6 +1142,13 @@ components:
           description: When the rating last changed. Null while `rating` is null.
         commentary:
           $ref: "#/components/schemas/Commentary"
+        reconfirmation:
+          $ref: "#/components/schemas/Reconfirmation"
+        reconfirmationRecordedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the reconfirmation last changed. Null while `reconfirmation` is `none`.
         status:
           $ref: "#/components/schemas/ReservationStatus"
         type:
@@ -1177,6 +1204,8 @@ components:
           type: string
         commentary:
           $ref: "#/components/schemas/Commentary"
+        reconfirmation:
+          $ref: "#/components/schemas/Reconfirmation"
 
     ReservationModify:
       type: object
@@ -1201,6 +1230,8 @@ components:
           $ref: "#/components/schemas/Rating"
         commentary:
           $ref: "#/components/schemas/Commentary"
+        reconfirmation:
+          $ref: "#/components/schemas/Reconfirmation"
 
     Event:
       type: object
@@ -1314,6 +1345,22 @@ components:
             - { upTo: 2, minutes: 90 }
             - { upTo: 4, minutes: 120 }
             - { upTo: 8, minutes: 150 }
+        overbookingCeiling:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          default: 0
+          description: |
+            The most covers, counted as party sizes, that the venue accepts
+            without tables at any one time. At 0 every booking holds tables.
+            Above 0, a booking that fits the venue but finds no free table
+            combination is accepted with no tables when the covers of every
+            active booking without tables that overlaps it, plus its own
+            party, stay within the ceiling. Such a booking has `tables: []`
+            until staff assign tables with a modify, and the database still
+            refuses any table that another booking holds. The ceiling never
+            applies to a walk-in, to a booking that names its tables, or to a
+            party larger than the venue. It is venue-wide, whatever the zone.
 
     Service:
       type: object
