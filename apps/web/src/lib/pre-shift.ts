@@ -11,10 +11,9 @@ export interface PreShiftRow {
   commentary: string | null;
 }
 
-// The API does not return a booking note yet. When `commentary` lands on
-// Reservation, read it here and the view shows it with no other change.
-function commentaryOf(_reservation: Reservation): string | null {
-  return null;
+function commentaryOf(reservation: Reservation): string | null {
+  const note = reservation.commentary?.trim();
+  return note ? note : null;
 }
 
 export function buildPreShift(

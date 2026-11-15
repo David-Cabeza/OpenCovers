@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -20,11 +21,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConsentSelect } from "@/components/reservation/consent-select";
-import { api, type Consent, type Reservation } from "@/lib/api";
+import { api, COMMENTARY_MAX, type Consent, type Reservation } from "@/lib/api";
 
 interface EditValues {
   consent: Consent;
   rating: string;
+  commentary: string;
 }
 
 const NO_RATING = "none";
@@ -33,6 +35,7 @@ function toValues(reservation: Reservation | null): EditValues {
   return {
     consent: reservation?.guest.consent ?? "unknown",
     rating: reservation?.rating ? String(reservation.rating) : NO_RATING,
+    commentary: reservation?.commentary ?? "",
   };
 }
 
@@ -50,6 +53,7 @@ export function EditReservationDialog({
     handleSubmit,
     reset,
     control,
+    register,
     formState: { isSubmitting },
   } = useForm<EditValues>({ defaultValues: toValues(reservation) });
 
@@ -63,6 +67,7 @@ export function EditReservationDialog({
       await api.modifyReservation(venueId, reservation.id, {
         guest: { consent: values.consent },
         rating: values.rating === NO_RATING ? null : Number(values.rating),
+        commentary: values.commentary.trim(),
       });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       toast.success("Reservation updated");
@@ -76,7 +81,7 @@ export function EditReservationDialog({
     <Dialog open={reservation !== null} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Consent and rating</DialogTitle>
+          <DialogTitle>Consent, rating and note</DialogTitle>
           <DialogDescription>
             {reservation?.guest.name
               ? `Update the details recorded for ${reservation.guest.name}.`
@@ -117,6 +122,19 @@ export function EditReservationDialog({
                 </Select>
               )}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-commentary">Note</Label>
+            <Textarea
+              id="edit-commentary"
+              maxLength={COMMENTARY_MAX}
+              placeholder="Anniversary, bring a cake"
+              {...register("commentary")}
+            />
+            <p className="text-sm text-muted-foreground">
+              Up to {COMMENTARY_MAX} characters. Do not enter health data such as allergies.
+            </p>
           </div>
 
           <DialogFooter>

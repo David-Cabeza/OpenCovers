@@ -25,7 +25,7 @@ import { useAgenda } from "@/hooks/use-agenda";
 import { useServices } from "@/hooks/use-services";
 import { useTables } from "@/hooks/use-tables";
 import { useWaitlist } from "@/hooks/use-waitlist";
-import type { Consent, WaitlistEntry } from "@/lib/api";
+import type { Consent, Reconfirmation, WaitlistEntry } from "@/lib/api";
 import { todayIso } from "@/lib/date";
 import { buildPreShift, LARGE_PARTY_MIN, totalCovers, type PreShiftRow } from "@/lib/pre-shift";
 
@@ -33,6 +33,16 @@ const ALL_SERVICES = "all";
 
 const consentLabel = (consent: Consent | undefined) =>
   CONSENT_OPTIONS.find((o) => o.value === (consent ?? "unknown"))?.label ?? "Not asked";
+
+const RECONFIRMATION_BADGES: Record<
+  Exclude<Reconfirmation, "none">,
+  { label: string; variant: "default" | "secondary" | "outline" | "destructive" }
+> = {
+  requested: { label: "Reconfirmation requested", variant: "outline" },
+  confirmed: { label: "Reconfirmed", variant: "secondary" },
+  declined: { label: "Declined", variant: "destructive" },
+  no_answer: { label: "No answer", variant: "outline" },
+};
 
 export function PreShiftView({ venueId }: { venueId: string }) {
   const [date, setDate] = useState(todayIso());
@@ -114,6 +124,7 @@ export function PreShiftView({ venueId }: { venueId: string }) {
                   <TableHead>Party</TableHead>
                   <TableHead>Table</TableHead>
                   <TableHead>Consent</TableHead>
+                  <TableHead>Reconfirmation</TableHead>
                   <TableHead>Rating</TableHead>
                   <TableHead>Notes</TableHead>
                 </TableRow>
@@ -157,6 +168,9 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
           {consentLabel(reservation.guest.consent)}
         </Badge>
       </TableCell>
+      <TableCell data-slot="reconfirmation">
+        <ReconfirmationBadge value={reservation.reconfirmation} />
+      </TableCell>
       <TableCell>
         {reservation.rating ? (
           <span className="inline-flex items-center gap-1 tabular-nums">
@@ -172,6 +186,12 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
       </TableCell>
     </TableRow>
   );
+}
+
+function ReconfirmationBadge({ value }: { value: Reconfirmation | undefined }) {
+  if (!value || value === "none") return <span className="text-muted-foreground">—</span>;
+  const badge = RECONFIRMATION_BADGES[value];
+  return <Badge variant={badge.variant}>{badge.label}</Badge>;
 }
 
 function WaitlistPending({ entries }: { entries: WaitlistEntry[] }) {

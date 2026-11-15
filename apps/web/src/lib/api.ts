@@ -94,6 +94,10 @@ export interface FloorItem {
 
 export type Consent = "unknown" | "granted" | "denied";
 
+export type Reconfirmation = "none" | "requested" | "confirmed" | "declined" | "no_answer";
+
+export const COMMENTARY_MAX = 500;
+
 export interface Reservation {
   id: string;
   venueId: string;
@@ -110,6 +114,9 @@ export interface Reservation {
     consent?: Consent;
   };
   rating?: number | null;
+  commentary?: string;
+  reconfirmation?: Reconfirmation;
+  reconfirmationRecordedAt?: string | null;
   zone?: string;
   tables?: string[];
 }
@@ -131,6 +138,7 @@ export interface CreateReservationBody {
     name?: string;
     contact?: string;
   };
+  commentary?: string;
 }
 
 export class ApiError extends Error {
@@ -314,6 +322,7 @@ export const api = {
       tables?: string[];
       guest?: { consent?: Consent };
       rating?: number | null;
+      commentary?: string;
     },
   ) =>
     request<Reservation>(`/v1/venues/${venueId}/reservations/${id}/modify`, {

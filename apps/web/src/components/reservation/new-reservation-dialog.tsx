@@ -13,13 +13,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useTables } from "@/hooks/use-tables";
-import { api } from "@/lib/api";
+import { api, COMMENTARY_MAX } from "@/lib/api";
 
 interface FormValues {
   partySize: number;
   name: string;
   contact: string;
+  commentary: string;
 }
 
 interface NewReservationDialogProps {
@@ -51,7 +53,7 @@ export function NewReservationDialog({
     watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: { partySize, name: "", contact: "" },
+    defaultValues: { partySize, name: "", contact: "", commentary: "" },
   });
 
   const watchedPartySize = Number(watch("partySize")) || 0;
@@ -66,7 +68,7 @@ export function NewReservationDialog({
 
   useEffect(() => {
     if (open) {
-      reset({ partySize, name: "", contact: "" });
+      reset({ partySize, name: "", contact: "", commentary: "" });
       setSelected([]);
     }
   }, [open, partySize, reset]);
@@ -96,6 +98,7 @@ export function NewReservationDialog({
           name: values.name || undefined,
           contact: values.contact || undefined,
         },
+        commentary: values.commentary.trim() || undefined,
       });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
@@ -124,6 +127,7 @@ export function NewReservationDialog({
               type="number"
               min={1}
               {...register("partySize", {
+                valueAsNumber: true,
                 required: "Party size is required.",
                 min: { value: 1, message: "At least one guest." },
               })}
@@ -178,6 +182,19 @@ export function NewReservationDialog({
                 {...register("contact")}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="reservation-commentary">Note</Label>
+            <Textarea
+              id="reservation-commentary"
+              maxLength={COMMENTARY_MAX}
+              placeholder="Anniversary, bring a cake"
+              {...register("commentary")}
+            />
+            <p className="text-sm text-muted-foreground">
+              Up to {COMMENTARY_MAX} characters. Do not enter health data such as allergies.
+            </p>
           </div>
 
           <DialogFooter>
