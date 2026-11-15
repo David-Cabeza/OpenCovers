@@ -340,15 +340,24 @@ export const grants = pgTable(
   (t) => [primaryKey({ columns: [t.keyHash, t.venueId] })],
 );
 
-export const user = pgTable("user", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").notNull(),
-  image: text("image"),
-  createdAt: timestamp("created_at").notNull(),
-  updatedAt: timestamp("updated_at").notNull(),
-});
+export const user = pgTable(
+  "user",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    emailVerified: boolean("email_verified").notNull(),
+    image: text("image"),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull(),
+    firstSignup: boolean("first_signup").notNull().default(false),
+  },
+  (t) => [
+    uniqueIndex("uq_user_first_signup")
+      .on(t.firstSignup)
+      .where(sql`${t.firstSignup}`),
+  ],
+);
 
 export const session = pgTable("session", {
   id: text("id").primaryKey(),

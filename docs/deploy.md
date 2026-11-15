@@ -31,7 +31,7 @@ openssl rand -base64 32   # paste into BETTER_AUTH_SECRET
 docker compose -f compose.prod.yaml --env-file .env.prod up -d --build
 ```
 
-Set `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` in `.env.prod`. The stack refuses to start without them. Use only letters and digits in the database password, because it goes inside the database URL. Open `http://localhost` and sign up.
+Set `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` in `.env.prod`. The stack refuses to start without them. Use only letters and digits in the database password, because it goes inside the database URL. Open `http://localhost` and sign up. The first account is the owner. See [Sign-up control](#sign-up-control).
 
 To serve a real domain, set `SITE_ADDRESS=app.example.com` and `PUBLIC_URL=https://app.example.com`. Caddy then gets a certificate on its own. Ports 80 and 443 must reach the machine. Use `HTTP_PORT` and `HTTPS_PORT` to publish other ports.
 
@@ -42,6 +42,26 @@ Before you serve real guests, read the [hardening guide](hardening.md). It cover
 To use an external PostgreSQL instead, remove the `db` service and its `depends_on` entry, and set `DATABASE_URL` on the `api` service to your connection string.
 
 Without Docker, build the staff app with `pnpm --filter @opencovers/web build`, serve `apps/web/dist` from any static host, and forward `/api/*` and `/v1/*` to the API. Add the staff app's origin to `TRUSTED_ORIGINS`.
+
+## Sign-up control
+
+`SIGNUP` decides who can create an account. The API enforces it, so it holds for every client of `/api/auth/*`.
+
+| Value | Behavior |
+| --- | --- |
+| `open` | Anyone can sign up. This is the default when `SIGNUP` is unset, which keeps `pnpm dev` friction free. |
+| `first-user` | Only the first account can sign up. After that every attempt is refused with `403` and the code `SIGNUP_CLOSED`. |
+| `closed` | No one can sign up. |
+
+`compose.prod.yaml` defaults to `first-user`, and `.env.prod.example` sets it. Create your own account before you publish the address, because the first visitor becomes the owner. Any other value stops the API at startup.
+
+Upgrading an existing stack:
+
+- An instance that already has accounts is closed under `first-user` with no extra step.
+- The default for `compose.prod.yaml` changed from open to `first-user`. If you relied on open sign-up, set `SIGNUP=open` in `.env.prod`.
+- The release adds a column and an index to the `user` table. The API applies the migration on boot.
+
+There is no way to add staff in the product yet. To add a person to an existing venue, set `SIGNUP=open`, run `docker compose -f compose.prod.yaml --env-file .env.prod up -d api`, let them sign up, set the value back and restart. Then add them to the venue by inserting a row into `venue_memberships` with their user id, the venue id and a role of `read`, `write` or `admin`. A staff invitation flow is planned. See [ADR-0005](adr/0005-signup-control.md).
 
 ## Public site
 
@@ -62,3 +82,4 @@ The API reads these variables regardless of host:
 | `BETTER_AUTH_SECRET` | yes | `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | yes | Public base URL of the API. |
 | `TRUSTED_ORIGINS` | yes | Comma-separated origins allowed to call auth (the staff app origin). |
+| `SIGNUP` | no | `open` (default), `first-user` or `closed`. See Sign-up control. |
