@@ -51,6 +51,11 @@ If you put another proxy or CDN in front of Caddy, nothing in OpenCovers depends
 ## Authentication and access
 
 - Staff sign in with email and password through Better Auth. Sessions are cookies signed with `BETTER_AUTH_SECRET`.
+- The `SIGNUP` variable decides who can create a staff account. The API enforces it for every client of `/api/auth/*`. A refused attempt returns `403` with the code `SIGNUP_CLOSED`.
+  - `open`: anyone can sign up. This is the default when `SIGNUP` is unset, so `pnpm dev` needs no environment.
+  - `first-user`: only the first account can sign up. After that every attempt is refused.
+  - `closed`: nobody can sign up.
+- `compose.prod.yaml` defaults to `first-user`. Any other value stops the API at startup. See [Sign-up control](deploy.md#sign-up-control) and [ADR-0005](adr/0005-signup-control.md).
 - Agents and integrations use API keys sent in the `apikey` header. The API stores only the SHA-256 hash of each key.
 - Roles are `read`, `write` and `admin`. A `read` key cannot call a write method. Configuration, tables, services, keys, guest merges and the floor plan require `admin`.
 - A key is granted to specific venues. A request for a venue the key does not hold returns not found.
@@ -167,7 +172,11 @@ If you maintain your own copy of the Caddyfile or add a third-party script, styl
 
 Close these before you serve real guests, or accept the risk knowingly.
 
-1. **Open sign-up.** Email and password sign-up is enabled and there is no switch to close it. Anyone who can reach the staff app can create an account and a venue of their own. Venue data stays isolated, but the instance is not private. Restrict access at the network layer, for example with Caddy `basic_auth` or an IP allowlist, until the project adds a sign-up control.
+1. **Sign-up and staff access.** The production stack defaults to `SIGNUP=first-user`, so a fork that changes nothing is private after the first account exists. Dev and any run outside compose default to `open`, where anyone who can reach the staff app can create an account and a venue. Venue data stays isolated, but that instance is not private. Four limits remain.
+   - The first visitor to a fresh `first-user` instance becomes the owner. Register your own account before you publish the address.
+   - Upgrading changes the compose default from open to `first-user`. An instance that already has accounts closes to new sign-ups on its next `up`. An instance with no accounts stays claimable. If you relied on open sign-up, set `SIGNUP=open` in `.env.prod`.
+   - There is no staff invitation flow yet. Adding a person means setting `SIGNUP=open`, restarting the API, letting them sign up, setting the value back, and inserting a `venue_memberships` row in SQL. The steps are in [Sign-up control](deploy.md#sign-up-control). The flow is planned. See [ADR-0005](adr/0005-signup-control.md).
+   - If two first sign-ups arrive at the same moment, the database lets one commit. The loser gets a generic failure from the database error, not the `SIGNUP_CLOSED` message. Sign-up is not rate limited. See gap 2.
 2. **No rate limiting in OpenCovers.** Sign-in and the API can be hit as fast as the machine allows. Add limits at your edge (a CDN, a firewall, or a Caddy rate-limit module). The API itself configures none. Better Auth may apply its own defaults to sign-in. This repository does not set or test them.
 3. **No built-in backups.** Backups, restores and off-site copies are your job. The commands above are manual.
 4. **Single instance.** Compose runs one API process. There is no high availability. Compose runs a health check on `api` (`GET /health` on port 3000) and on `web` (the Caddy admin endpoint at `127.0.0.1:2019`), and `docker compose ps` shows the result. Nothing restarts or alerts on `unhealthy`. Caddy routes `GET /health` to the API, so you can monitor `https://your-domain/health` from outside.
@@ -180,7 +189,7 @@ Close these before you serve real guests, or accept the risk knowingly.
 - [ ] `SITE_ADDRESS` and `PUBLIC_URL` use your real domain, and `https://` loads with a valid certificate.
 - [ ] `oc ps` shows only `web` with published ports, and all three services report `healthy`.
 - [ ] `curl -I https://your-domain/` shows the headers listed under Security headers, and `curl https://your-domain/health` returns `{"ok":true,"service":"opencovers"}`.
-- [ ] Sign-up is restricted at the network layer, or you accept that it is open.
+- [ ] `SIGNUP` is `first-user` or `closed` (check `oc exec api printenv SIGNUP`), you registered your own account before publishing the address, and you know how you will add staff.
 - [ ] A backup ran, the dump left the machine, and you restored it on a spare machine.
 - [ ] `WEBHOOK_ALLOW_INSECURE` is unset.
 - [ ] Each agent key has the lowest role it needs and a named `principal`.
