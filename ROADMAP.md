@@ -10,12 +10,12 @@ How we built this map. We studied what mature platforms publish about their prod
 
 | Area | Today | Mature target | Phase |
 | --- | --- | --- | --- |
-| Booking and availability | Create, modify, cancel, seat. A database rule blocks double booking. Services, hours, pacing. Turn time by party size, party limits per service, and an endpoint that explains why a slot is closed. | Layered availability rules, per-channel inventory, an overbooking ceiling, a slot grid with per-day overrides. | 10 |
+| Booking and availability | Create, modify, cancel, seat. A database rule blocks double booking. Services, hours, pacing. Turn time by party size, party limits per service, an overbooking ceiling per venue, and an endpoint that explains why a slot is closed. | Layered availability rules, per-channel inventory, a slot grid with per-day overrides. | 10 |
 | Tables and floor | Zones, combinations, automatic assignment, a visual floor editor. | Saved layouts per service, live table status, sections. | 10 |
-| Guests | A guest record per venue, matched by normalized email or phone, with list, read, and admin merge and unmerge through the API. A contact consent and a rating per reservation. No staff app screen yet. | Notes, allergies, tags, and segments on the profile, and a staff app view. | 10 |
+| Guests | A guest record per venue, matched by normalized email or phone, with list, read, and admin merge and unmerge through the API. A contact consent, a rating, and a booking note per reservation. No guest screen in the staff app yet. | Notes, allergies, tags, and segments on the profile, and a staff app view. | 10 |
 | Waitlist and walk-ins | Both exist in the staff app. | A QR join page, a notice when the table is ready. | 11 |
 | Guest-facing surfaces | None. The API and the MCP server are the only entry points. | An embeddable booking widget, a self-service change link, themes. | 11 |
-| No-shows and payments | Status transitions only. | Deposits, card guarantees, no-show fees, refund windows, reconfirmation. | 12 |
+| No-shows and payments | Status transitions and a reconfirmation status on each reservation. | Deposits, card guarantees, no-show fees, refund windows, automatic reconfirmation messages. | 12 |
 | Messaging | Email confirmations through Resend, off by default. | Pluggable email, SMS, and WhatsApp, automations on the event feed, STOP handling. | 13 |
 | Reviews | None. | A post-visit survey gated by consent, routing to a review link. | 13 |
 | Integrations | An API, signed webhooks, an event feed, an MCP server. Roles `read`, `write`, and `admin` apply to keys and to staff sessions. | A documented POS contract with adapters, importers, calendar feeds, a conformance kit. | 14 |
@@ -57,6 +57,11 @@ Availability, agenda, list, pacing, and an event feed with a cursor and a retent
 - An endpoint that explains why a slot is unavailable, from the same rules that decide booking (C20).
 - Turn time by party size, and a minimum and maximum party size per service (C21).
 - Role boundaries. A `read` key cannot write, and configuration, services, tables, floor items, keys, and guest merge need `admin` (C22).
+- A booking note, `commentary`, on create, walk-in, and modify, up to 500 characters (C23).
+- An explicit overbooking ceiling per venue, default 0, enforced under a per-venue lock (C24).
+- A reconfirmation status on a reservation (C25).
+- A pre-shift view in the staff app for a service and date.
+- Vitest and Testing Library in the staff app and the public site.
 - Signed webhooks over the event feed, with ordered, at-least-once delivery and protection against server-side request forgery. See [docs/contract/webhooks.md](docs/contract/webhooks.md).
 - A one-command deployment with Docker Compose and no hosting vendor. See [docs/deploy.md](docs/deploy.md).
 - The public site at [opencovers.dev](https://opencovers.dev).
@@ -81,9 +86,9 @@ Status: next.
 - Pending: automatic HTTPS on a real domain. [S]
 - Done: a click-through of the staff screens in a browser. All six screens load, and a walk-in seats a guest against the migrated database.
 - Done: consent at walk-in and an edit dialog for consent and rating in the staff app. Rating and consent can be set on an attended visit.
-- Pending: the React warning about an inline script, probably from the theme library. [S]
-- Pending: a hardening guide for self-hosters. [M]
-- Pending: automated tests for the staff app and the public site, which have none today. [M]
+- Done: the React warning about an inline script, fixed by dropping the theme library.
+- Done: a hardening guide for self-hosters, in [docs/hardening.md](docs/hardening.md).
+- Done: automated tests for the staff app and the public site, run with Vitest.
 
 Exit criterion: the staff app signs in and books a table against an API running from the Docker image.
 
@@ -105,11 +110,13 @@ The phases below follow dependencies. Phase 10 comes first because later phases 
 
 The guest becomes a first-class record, and availability becomes a set of rules that can explain themselves.
 
-Design settled and the core is built. [ADR-0003](docs/adr/0003-guest-identity.md) is accepted, and the guest record, matching, retention, list, read, and merge are merged and covered by C17 to C19. A guest belongs to one venue, is matched by normalized email or phone, and merges are manual with an audit trail. A group can share guests by opt-in in Phase 15. Allergies as a structured field wait for the legal review.
+Design settled and the core is built. [ADR-0003](docs/adr/0003-guest-identity.md) is accepted, and the guest record, matching, retention, list, read, and merge are merged and covered by C17 to C19. A guest belongs to one venue, is matched by normalized email or phone, and merges are manual with an audit trail. A group can share guests by opt-in in Phase 15. Allergies as a structured field wait for the legal review. The booking note is merged (C23), and it is free text, not an allergy field.
 
 Guests
 - Done: a guest entity separate from the reservation, with matching, retention, list, read, and merge.
-- Pending: notes, allergies and diet, occasions, and a staff app view of the guest and visit history. [L, split it]
+- Done: a booking note, `commentary`, on the reservation (C23, issue #16 part 1).
+- Pending: allergies and diet, blocked on legal review. [M]
+- Pending: occasions, and a staff app view of the guest and visit history. [L, split it]
 - Tags, manual and rule-based, with a staff alert on the booking. [M]
 - Guest import from CSV and importers for common export formats. [M]
 - Segment queries and CSV export. [M]
@@ -118,19 +125,19 @@ Availability
 - Done: turn time by party size instead of one fixed duration (C21).
 - Shifts and pacing layered with access rules that can only restrict. [L, split it]
 - Done: party size minimum and maximum per service (C21).
-- An explicit overbooking ceiling, default 0. [S]
+- Done: an explicit overbooking ceiling, default 0 (C24, migration 0023).
 - Per-channel allocation, so a platform sees its own share of the slots. [M]
 - A slot grid with per-day overrides. [M]
 - Done: an endpoint that explains why a slot is unavailable (C20). A staff app view of the explanation is pending. [S]
-- Reconfirmation status on a reservation. [S]
+- Done: reconfirmation status on a reservation (C25, migration 0024).
 
 Staff and floor
-- A pre-shift view with VIPs, large parties, notes, and allergies. [M]
+- Done: a pre-shift view in the staff app for a service and date. Its note column is not wired to `commentary` yet, and allergies wait for the legal review. [S]
 - Saved floor layouts per service and live table status timers. [M]
 - Done: role boundaries for `read`, `write`, and `admin` (C22).
 - Pending: granular permissions beyond the three roles. [M]
 
-Exit criterion: a host sees who is coming and what they need, and a platform can ask why a slot is closed and get an answer. The second half is met through the API. The first half waits on the guest profile and the pre-shift view.
+Exit criterion: a host sees who is coming and what they need, and a platform can ask why a slot is closed and get an answer. The second half is met through the API. The first half is partly met. The pre-shift view exists, and it waits on the note column and on the guest profile.
 
 ### Phase 11: Guest-facing surfaces
 
