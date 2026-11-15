@@ -21,12 +21,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AssignTablesDialog } from "@/components/reservation/assign-tables-dialog";
 import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useAgenda } from "@/hooks/use-agenda";
+import { useTables } from "@/hooks/use-tables";
 import { api, type Reservation } from "@/lib/api";
 import { todayIso } from "@/lib/date";
+import { errorMessage, isApiError } from "@/lib/error-message";
 import { guestInitials } from "@/lib/format";
 
 const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
@@ -71,9 +74,12 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const [date, setDate] = useState(todayIso());
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [editing, setEditing] = useState<Reservation | null>(null);
+  const [assigning, setAssigning] = useState<Reservation | null>(null);
   const queryClient = useQueryClient();
   const { data, isPending } = useAgenda(venueId, date);
   const reservations = data?.reservations ?? [];
+  const { data: tablesData } = useTables(venueId);
+  const tableNames = new Map((tablesData?.tables ?? []).map((t) => [t.id, t.name]));
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
@@ -86,14 +92,22 @@ export function AgendaView({ venueId }: { venueId: string }) {
       toast.success("Reservation cancelled");
       invalidate();
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not cancel."),
+    onError: (err) => toast.error(errorMessage(err, "Could not cancel.")),
   });
 
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       api.setStatus(venueId, id, status),
     onSuccess: () => invalidate(),
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not update."),
+    onError: (err, { id }) => {
+      if (isApiError(err, "table_required")) {
+        toast.error("Assign a table first.");
+        const reservation = reservations.find((r) => r.id === id);
+        if (reservation) setAssigning(reservation);
+        return;
+      }
+      toast.error(errorMessage(err, "Could not update."));
+    },
   });
 
   return (
@@ -134,6 +148,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
                 <TableHead>Time</TableHead>
                 <TableHead>Guest</TableHead>
                 <TableHead>Party</TableHead>
+                <TableHead>Tables</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
@@ -143,6 +158,8 @@ export function AgendaView({ venueId }: { venueId: string }) {
                 <ReservationRow
                   key={r.id}
                   reservation={r}
+                  tableNames={tableNames}
+                  onAssign={() => setAssigning(r)}
                   onCancel={() => cancel.mutate(r.id)}
                   onStatus={(status) => setStatus.mutate({ id: r.id, status })}
                   onEdit={() => setEditing(r)}
@@ -154,6 +171,13 @@ export function AgendaView({ venueId }: { venueId: string }) {
       )}
 
       <WalkInDialog venueId={venueId} open={walkInOpen} onOpenChange={setWalkInOpen} />
+      <AssignTablesDialog
+        venueId={venueId}
+        reservation={assigning}
+        onOpenChange={(open) => {
+          if (!open) setAssigning(null);
+        }}
+      />
       <EditReservationDialog
         venueId={venueId}
         reservation={editing}
@@ -167,17 +191,23 @@ export function AgendaView({ venueId }: { venueId: string }) {
 
 function ReservationRow({
   reservation,
+  tableNames,
+  onAssign,
   onCancel,
   onStatus,
   onEdit,
 }: {
   reservation: Reservation;
+  tableNames: Map<string, string>;
+  onAssign: () => void;
   onCancel: () => void;
   onStatus: (status: string) => void;
   onEdit: () => void;
 }) {
   const actions = rowActions(reservation.status);
   const canEdit = ["booked", "seated", "attended"].includes(reservation.status);
+  const canAssign = ["booked", "seated"].includes(reservation.status);
+  const tableIds = reservation.tables ?? [];
 
   return (
     <TableRow>
@@ -203,12 +233,21 @@ function ReservationRow({
       </TableCell>
       <TableCell>{reservation.partySize}</TableCell>
       <TableCell>
+        {tableIds.length > 0 ? (
+          tableIds.map((id) => tableNames.get(id) ?? id).join(", ")
+        ) : canAssign ? (
+          <Badge variant="destructive">Unassigned</Badge>
+        ) : (
+          "-"
+        )}
+      </TableCell>
+      <TableCell>
         <Badge variant={statusVariant[reservation.status] ?? "outline"}>
           {statusLabel[reservation.status] ?? reservation.status}
         </Badge>
       </TableCell>
       <TableCell>
-        {(actions.length > 0 || canEdit) && (
+        {(actions.length > 0 || canEdit || canAssign) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -228,6 +267,11 @@ function ReservationRow({
                   {action.label}
                 </DropdownMenuItem>
               ))}
+              {canAssign && (
+                <DropdownMenuItem onSelect={onAssign}>
+                  {tableIds.length > 0 ? "Change tables" : "Assign tables"}
+                </DropdownMenuItem>
+              )}
               {canEdit && (
                 <DropdownMenuItem onSelect={onEdit}>Edit consent, rating and note</DropdownMenuItem>
               )}
