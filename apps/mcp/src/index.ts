@@ -38,6 +38,13 @@ const ratingSchema = z
   .optional()
   .describe("The guest's rating of the visit, 1 to 5. Omit if not given. Null clears it.");
 
+const reconfirmationSchema = z
+  .enum(["none", "requested", "confirmed", "declined", "no_answer"])
+  .optional()
+  .describe(
+    "Whether the guest reconfirmed the booking. none means not asked, requested means asked and waiting. Omit to leave it unchanged. A booking is never cancelled by it.",
+  );
+
 const commentarySchema = z
   .string()
   .max(500)
@@ -184,10 +191,11 @@ export function createServer(): McpServer {
         consent: consentSchema,
         rating: ratingSchema,
         commentary: commentarySchema,
+        reconfirmation: reconfirmationSchema,
         idempotencyKey: z.string().optional(),
       }),
     },
-    async ({ venueId, date, time, partySize, tables, zone, guestName, guestContact, consent, rating, commentary, idempotencyKey: key }) => {
+    async ({ venueId, date, time, partySize, tables, zone, guestName, guestContact, consent, rating, commentary, reconfirmation, idempotencyKey: key }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/reservations`, {
@@ -202,6 +210,7 @@ export function createServer(): McpServer {
               guest: { name: guestName, contact: guestContact, consent },
               rating,
               commentary,
+              reconfirmation,
             },
           }),
         );
@@ -261,7 +270,7 @@ export function createServer(): McpServer {
     "reservation.modify",
     {
       title: "Modify reservation",
-      description: "Modify a reservation's party size, tables, contact consent, rating, and/or booking note.",
+      description: "Modify a reservation's party size, tables, contact consent, rating, booking note, and/or reconfirmation.",
       annotations: { idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
@@ -271,16 +280,17 @@ export function createServer(): McpServer {
         consent: consentSchema,
         rating: ratingSchema,
         commentary: commentarySchema,
+        reconfirmation: reconfirmationSchema,
         idempotencyKey: z.string().optional(),
       }),
     },
-    async ({ venueId, id, partySize, tables, consent, rating, commentary, idempotencyKey: key }) => {
+    async ({ venueId, id, partySize, tables, consent, rating, commentary, reconfirmation, idempotencyKey: key }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/reservations/${id}/modify`, {
             method: "POST",
             idempotencyKey: idempotencyKey(key),
-            body: { partySize, tables, guest: consent ? { consent } : undefined, rating, commentary },
+            body: { partySize, tables, guest: consent ? { consent } : undefined, rating, commentary, reconfirmation },
           }),
         );
       } catch (err) {

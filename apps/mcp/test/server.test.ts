@@ -82,6 +82,20 @@ describe("opencovers MCP server", () => {
     expect(schema.properties.overbookingCeiling).toMatchObject({ minimum: 0, maximum: 1000 });
   });
 
+  it("accepts the closed reconfirmation set on create and modify but not on walk-in", async () => {
+    const { tools } = await client.listTools();
+    for (const name of ["reservation.create", "reservation.modify"]) {
+      const schema = tools.find((t) => t.name === name)?.inputSchema as {
+        properties: Record<string, { enum?: string[] }>;
+      };
+      expect(schema.properties.reconfirmation.enum).toEqual(["none", "requested", "confirmed", "declined", "no_answer"]);
+    }
+    const walkIn = tools.find((t) => t.name === "reservation.walk_in")?.inputSchema as {
+      properties: Record<string, unknown>;
+    };
+    expect(walkIn.properties.reconfirmation).toBeUndefined();
+  });
+
   it("accepts a bounded booking note on create, walk-in and modify", async () => {
     const { tools } = await client.listTools();
     for (const name of ["reservation.create", "reservation.walk_in", "reservation.modify"]) {

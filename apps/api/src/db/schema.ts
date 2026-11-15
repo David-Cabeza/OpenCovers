@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { Consent } from "../lib/consent";
 import type { Rating } from "../lib/rating";
+import type { Reconfirmation } from "../lib/reconfirmation";
 import type { TurnTime } from "../lib/turn-times";
 import {
   bigint,
@@ -160,6 +161,8 @@ export const reservations = pgTable(
     consentRecordedAt: timestamp("consent_recorded_at", { withTimezone: true }),
     rating: integer("rating").$type<Rating>(),
     ratingRecordedAt: timestamp("rating_recorded_at", { withTimezone: true }),
+    reconfirmation: text("reconfirmation").$type<Reconfirmation>().notNull().default("none"),
+    reconfirmationRecordedAt: timestamp("reconfirmation_recorded_at", { withTimezone: true }),
     commentary: text("commentary").notNull().default(""),
     erased: boolean("erased").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
