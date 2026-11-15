@@ -269,6 +269,7 @@ export async function eraseReservations(
         guestId: null,
         ...consentColumns("unknown"),
         ...ratingColumns(null),
+        commentary: "",
         erased: true,
       })
       .where(and(eq(reservations.venueId, venueId), eq(reservations.id, m.id)));

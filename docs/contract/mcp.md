@@ -33,4 +33,6 @@ Reads return `guest.guestId` when the reservation is linked to a guest record of
 
 The same three tools accept an optional `rating`, an integer from 1 to 5, or null on modify to clear it. Reads return it as `rating` and `ratingRecordedAt`.
 
+The same three tools accept an optional `commentary`, a short note for staff of up to 500 characters. An empty string on modify clears it. Reads return it as `commentary`. It is not for health data, so do not put allergies, medical conditions, or diet needs in it.
+
 The MCP server is scoped per agent key. A key sees only the venues it is granted, and the grant limits which tool ids it may call.

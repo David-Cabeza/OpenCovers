@@ -152,6 +152,12 @@ Each reservation can record the guest's rating of the visit, an integer from 1 t
 
 Acceptance: a reservation created without a rating reads back null. A create with `5` reads back `5` with a recorded time. A modify that changes the rating bumps the version once and emits one `modified` event, and the same value changes nothing. Null clears the rating and its time. A value outside 1 to 5 fails with `invalid_request`. Erasure leaves null and no recorded time.
 
+### REQ-N6 Per-reservation booking note
+
+Each reservation can carry a short free-text note for staff, up to 500 characters, such as an occasion. Absent means an empty string. Staff or a key with `write` can set it on create and walk-in and change or clear it on modify. Erasure and retention clear it. The note is not for health data. The engine cannot tell whether a note holds any, so the contract states the rule and the engine adds no allergy or diet field until a legal review of health data is done. The note stays on the reservation and is never copied to a guest record, an email, or a webhook payload.
+
+Acceptance: a reservation created without a note reads back an empty string. A create with a note reads it back, trimmed. A modify that changes the note bumps the version once and emits one `modified` event, and the same value changes nothing. An empty string clears it. A value that is not a string or is longer than 500 characters fails with `invalid_request`. Erasure leaves an empty string.
+
 ## Erasure
 
 ### REQ-E1 Erasure by id or principal

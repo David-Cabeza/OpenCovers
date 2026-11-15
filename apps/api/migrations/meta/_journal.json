@@ -155,6 +155,13 @@
       "when": 1794585074726,
       "tag": "0021_turn_times_party_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794769688674,
+      "tag": "0022_booking_commentary",
+      "breakpoints": true
     }
   ]
 }

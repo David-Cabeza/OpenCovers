@@ -11,6 +11,7 @@ import {
   venues,
 } from "../db/schema";
 import * as schema from "../db/schema";
+import { normalizeCommentary } from "./commentary";
 import { consentColumns, type Consent } from "./consent";
 import { normalizeContact, venueCountry } from "./contact";
 import { linkGuest } from "./guests";
@@ -43,6 +44,7 @@ export interface CreateReservationInput {
   guestContact?: string;
   consent?: Consent;
   rating?: Rating | null;
+  commentary?: string;
   bookedVia?: string;
   basis?: string;
   ownerPrincipal?: string;
@@ -58,6 +60,7 @@ export interface WalkInInput {
   guestContact?: string;
   consent?: Consent;
   rating?: Rating | null;
+  commentary?: string;
   bookedVia?: string;
   basis?: string;
   ownerPrincipal?: string;
@@ -68,6 +71,7 @@ export interface ModifyReservationInput {
   tableIds?: string[];
   consent?: Consent;
   rating?: Rating | null;
+  commentary?: string;
 }
 
 export interface Reservation {
@@ -89,6 +93,7 @@ export interface Reservation {
   consentRecordedAt: string | null;
   rating: Rating | null;
   ratingRecordedAt: string | null;
+  commentary: string;
   tableIds: string[];
 }
 
@@ -494,6 +499,7 @@ function toReservation(
     consentRecordedAt: row.consentRecordedAt ? row.consentRecordedAt.toISOString() : null,
     rating: row.rating,
     ratingRecordedAt: row.ratingRecordedAt ? row.ratingRecordedAt.toISOString() : null,
+    commentary: row.commentary,
     tableIds,
   };
 }
@@ -601,6 +607,7 @@ export async function createReservation(
         guestId: guest?.id ?? null,
         ...consentColumns(input.consent ?? "unknown"),
         ...ratingColumns(input.rating ?? null),
+        commentary: normalizeCommentary(input.commentary ?? ""),
       });
       for (const tableId of tableIds) {
         await tx.insert(tableAllocations).values({
@@ -657,6 +664,7 @@ export async function walkIn(
       guestContact: input.guestContact,
       consent: input.consent,
       rating: input.rating,
+      commentary: input.commentary,
       bookedVia: input.bookedVia,
       basis: input.basis,
       ownerPrincipal: input.ownerPrincipal,
@@ -717,11 +725,13 @@ export async function modifyReservation(
         input.consent !== undefined && input.consent !== current.consent;
       const ratingChanged =
         input.rating !== undefined && input.rating !== current.rating;
-      if ((consentChanged || ratingChanged) && current.erased) {
+      const commentary = input.commentary === undefined ? undefined : normalizeCommentary(input.commentary);
+      const commentaryChanged = commentary !== undefined && commentary !== current.commentary;
+      if ((consentChanged || ratingChanged || commentaryChanged) && current.erased) {
         throw new ReservationError("invalid_request");
       }
 
-      if (!partyChanged && !tablesChanged && !consentChanged && !ratingChanged) {
+      if (!partyChanged && !tablesChanged && !consentChanged && !ratingChanged && !commentaryChanged) {
         return current.version;
       }
 
@@ -733,6 +743,7 @@ export async function modifyReservation(
           ...(partyChanged ? { partySize: input.partySize! } : {}),
           ...(consentChanged ? consentColumns(input.consent!) : {}),
           ...(ratingChanged ? ratingColumns(input.rating!) : {}),
+          ...(commentaryChanged ? { commentary } : {}),
         })
         .where(eq(reservations.id, id));
       if (tablesChanged) {

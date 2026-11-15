@@ -525,7 +525,8 @@ paths:
       description: |
         Erasure returns counts. For each erased reservation the event feed
         emits an `erased` event carrying a tombstone hash. Erasure also resets
-        the reservation's consent to `unknown` and its rating to null.
+        the reservation's consent to `unknown`, its rating to null, and its
+        commentary to an empty string.
 
         `guestId` is the guest record id, as returned in `guest.guestId`.
         Erasure by guest id blanks every reservation linked to that guest and
@@ -1055,6 +1056,19 @@ components:
         a key with `write` on create, walk-in and modify. Null on modify clears
         it. Erasure resets it to null.
 
+    Commentary:
+      type: string
+      maxLength: 500
+      description: |
+        A short note for staff about this booking, up to 500 characters after
+        trimming, such as "anniversary, bring a cake". Empty means no note. On
+        modify, an empty string clears it. Erasure clears it.
+
+        It is not for health data. Do not record allergies, medical
+        conditions, or diet needs in it. The engine does not process health
+        data yet, and it cannot tell that a note holds some. Those fields wait
+        for a legal review and a guest-level model.
+
     GuestModify:
       type: object
       properties:
@@ -1106,6 +1120,8 @@ components:
           format: date-time
           nullable: true
           description: When the rating last changed. Null while `rating` is null.
+        commentary:
+          $ref: "#/components/schemas/Commentary"
         status:
           $ref: "#/components/schemas/ReservationStatus"
         type:
@@ -1121,8 +1137,6 @@ components:
         bookedVia:
           type: string
         source:
-          type: string
-        commentary:
           type: string
         createdAt:
           type: string
@@ -1162,7 +1176,7 @@ components:
         source:
           type: string
         commentary:
-          type: string
+          $ref: "#/components/schemas/Commentary"
 
     ReservationModify:
       type: object
@@ -1186,7 +1200,7 @@ components:
         rating:
           $ref: "#/components/schemas/Rating"
         commentary:
-          type: string
+          $ref: "#/components/schemas/Commentary"
 
     Event:
       type: object
