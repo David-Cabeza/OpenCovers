@@ -1,4 +1,4 @@
-import { and, eq, gt, gte, inArray, lt } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, lt, ne, notExists, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   events,
@@ -426,7 +426,15 @@ async function evaluateSlot(
   const { service, reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
   reasons.push(...serviceReasons(service, request));
   const fit = await tableReasons(db, venue.id, startsAt, endsAt, request.partySize, request.zone);
-  return fit.ok ? reasons : [...reasons, fit.reason];
+  if (fit.ok) return reasons;
+  if (
+    fit.reason.code === "no_suitable_table" &&
+    !request.walkIn &&
+    (await hasOverbookRoom(db, venue, startsAt, endsAt, request.partySize))
+  ) {
+    return reasons;
+  }
+  return [...reasons, fit.reason];
 }
 
 async function totalSeats(db: Db, venueId: string, tableIds: string[]) {
@@ -436,6 +444,40 @@ async function totalSeats(db: Db, venueId: string, tableIds: string[]) {
     .from(tables)
     .where(and(eq(tables.venueId, venueId), inArray(tables.id, tableIds)));
   return rows.reduce((sum, r) => sum + r.seats, 0);
+}
+
+async function hasOverbookRoom(
+  exec: Db | DbTx,
+  venue: VenueRow,
+  startsAt: Date,
+  endsAt: Date,
+  covers: number,
+  opts: { lock?: boolean; exceptId?: string } = {},
+): Promise<boolean> {
+  if (covers > venue.overbookingCeiling) return false;
+  if (opts.lock) {
+    await exec.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`overbooking:${venue.id}`}, 0))`);
+  }
+  const unseated = await exec
+    .select({ partySize: reservations.partySize })
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.venueId, venue.id),
+        inArray(reservations.status, ACTIVE_STATUSES),
+        lt(reservations.startsAt, endsAt),
+        gt(reservations.endsAt, startsAt),
+        notExists(
+          exec
+            .select({ one: tableAllocations.reservationId })
+            .from(tableAllocations)
+            .where(eq(tableAllocations.reservationId, reservations.id)),
+        ),
+        opts.exceptId ? ne(reservations.id, opts.exceptId) : undefined,
+      ),
+    );
+  const used = unseated.reduce((sum, r) => sum + r.partySize, 0);
+  return used + covers <= venue.overbookingCeiling;
 }
 
 function pickCombination(
@@ -582,8 +624,17 @@ export async function createReservation(
       let tableIds = input.tableIds ?? [];
       if (autoAssign) {
         const fit = await tableReasons(tx, venueId, startsAt, endsAt, input.partySize, zone);
-        if (!fit.ok) throw new ReservationError(fit.reason.code);
-        tableIds = fit.tableIds;
+        if (fit.ok) {
+          tableIds = fit.tableIds;
+        } else if (
+          fit.reason.code === "no_suitable_table" &&
+          !request.walkIn &&
+          (await hasOverbookRoom(tx, venue, startsAt, endsAt, input.partySize, { lock: true }))
+        ) {
+          tableIds = [];
+        } else {
+          throw new ReservationError(fit.reason.code);
+        }
       }
       const guest = contactKey
         ? await linkGuest(tx, venueId, contactKey, input.guestName ?? "", startsAt, input.ownerPrincipal ?? "")
@@ -719,6 +770,29 @@ export async function modifyReservation(
         !ACTIVE_STATUSES.includes(current.status)
       ) {
         throw new ReservationError("invalid_transition");
+      }
+
+      const grows = partyChanged && input.partySize! > current.partySize;
+      if (tablesChanged || grows) {
+        const held =
+          input.tableIds !== undefined
+            ? input.tableIds.length
+            : (
+                await tx
+                  .select({ tableId: tableAllocations.tableId })
+                  .from(tableAllocations)
+                  .where(eq(tableAllocations.reservationId, id))
+              ).length;
+        const venue = (await tx.select().from(venues).where(eq(venues.id, venueId)).limit(1))[0];
+        if (
+          held === 0 &&
+          !(await hasOverbookRoom(tx, venue, current.startsAt, current.endsAt, input.partySize ?? current.partySize, {
+            lock: true,
+            exceptId: id,
+          }))
+        ) {
+          throw new ReservationError("no_suitable_table");
+        }
       }
 
       const consentChanged =

@@ -435,9 +435,18 @@ export function createServer(): McpServer {
           .nullable()
           .optional()
           .describe("ISO 3166 alpha-2 country for phone numbers without a country code. Null follows the venue time zone."),
+        overbookingCeiling: z
+          .number()
+          .int()
+          .min(0)
+          .max(1000)
+          .optional()
+          .describe(
+            "The most covers the venue accepts without tables at one time. 0 means every booking holds tables.",
+          ),
       }),
     },
-    async ({ venueId, enabled, noticeAddress, notificationsEnabled, resendApiKey, fromEmail, slotIntervalMinutes, leadTimeMinutes, lastSeatingOffsetMinutes, phoneCountry }) => {
+    async ({ venueId, enabled, noticeAddress, notificationsEnabled, resendApiKey, fromEmail, slotIntervalMinutes, leadTimeMinutes, lastSeatingOffsetMinutes, phoneCountry, overbookingCeiling }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/config`, {
@@ -452,6 +461,7 @@ export function createServer(): McpServer {
               leadTimeMinutes,
               lastSeatingOffsetMinutes,
               phoneCountry,
+              overbookingCeiling,
             },
           }),
         );

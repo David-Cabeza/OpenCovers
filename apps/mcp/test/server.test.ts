@@ -74,6 +74,14 @@ describe("opencovers MCP server", () => {
     }
   });
 
+  it("sets the overbooking ceiling from 0 to 1000 in venue.setConfig", async () => {
+    const { tools } = await client.listTools();
+    const schema = tools.find((t) => t.name === "venue.setConfig")?.inputSchema as {
+      properties: Record<string, { minimum?: number; maximum?: number }>;
+    };
+    expect(schema.properties.overbookingCeiling).toMatchObject({ minimum: 0, maximum: 1000 });
+  });
+
   it("accepts a bounded booking note on create, walk-in and modify", async () => {
     const { tools } = await client.listTools();
     for (const name of ["reservation.create", "reservation.walk_in", "reservation.modify"]) {
