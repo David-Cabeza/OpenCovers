@@ -135,15 +135,33 @@ The API code adds none of the following. See known gaps.
 
 - Rate limiting on `/v1/*` or on sign-in.
 - Request body size limits.
-- Security headers such as HSTS or a content security policy. The Caddyfile sets only `encode gzip`.
 - Account lockout or two-factor sign-in.
 
 What the code does provide:
+
+- Security headers, set by `apps/web/Caddyfile` on every response from the `web` service. See Security headers below.
 
 - Webhook targets are checked before delivery. Plain `http` and private addresses are rejected unless `WEBHOOK_ALLOW_INSECURE=true`. Never set that variable in production. The API logs a warning at startup when it is on.
 - Every write needs an idempotency key, so a retried request does not double-book.
 - The database rejects overlapping bookings with an exclusion constraint.
 - Retention runs hourly and blanks personal fields on records older than each venue's retention period.
+
+## Security headers
+
+`apps/web/Caddyfile` sets these headers on every response, including the proxied API routes:
+
+- `X-Content-Type-Options: nosniff`.
+- `Referrer-Policy: strict-origin-when-cross-origin`.
+- `X-Frame-Options: DENY`.
+- `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'`.
+- `Strict-Transport-Security: max-age=31536000`, only on HTTPS requests. It has no `includeSubDomains` and no `preload`.
+- The `Server` header is removed.
+
+The staff app cannot be embedded in a frame. Scripts must come from the same origin, with no inline script and no `eval`. The two Google Fonts hosts are allowed because `apps/web/index.html` loads the Inter font from them.
+
+`style-src` allows `'unsafe-inline'` on purpose. The toast library injects `<style>` tags at runtime and supports no nonce, so a run without it blocked two inline style tags at load. Scripts stay strict.
+
+If you maintain your own copy of the Caddyfile or add a third-party script, style or connection, update the policy or the browser will block it.
 
 ## Known gaps
 
@@ -151,17 +169,17 @@ Close these before you serve real guests, or accept the risk knowingly.
 
 1. **Open sign-up.** Email and password sign-up is enabled and there is no switch to close it. Anyone who can reach the staff app can create an account and a venue of their own. Venue data stays isolated, but the instance is not private. Restrict access at the network layer, for example with Caddy `basic_auth` or an IP allowlist, until the project adds a sign-up control.
 2. **No rate limiting in OpenCovers.** Sign-in and the API can be hit as fast as the machine allows. Add limits at your edge (a CDN, a firewall, or a Caddy rate-limit module). The API itself configures none. Better Auth may apply its own defaults to sign-in. This repository does not set or test them.
-3. **No security headers.** Add them in a Caddyfile `header` block if you maintain your own copy of `apps/web/Caddyfile`.
-4. **No built-in backups.** Backups, restores and off-site copies are your job. The commands above are manual.
-5. **Single instance.** Compose runs one API process. There is no high availability and no health check on the `api` or `web` containers. `GET /health` exists in the API, but Caddy does not route it. A request to `/health` through the stack returns the staff app page, not the API answer. Monitor `https://your-domain/` or add a `/health` route to your own Caddyfile.
-6. **No audit log of staff sign-ins.** Guest merges keep an audit trail. Sign-ins and key changes do not.
-7. **Operator-side items.** Private vulnerability reporting and a monitored code of conduct contact are not code. They are tracked in the roadmap, Phase 0.
+3. **No built-in backups.** Backups, restores and off-site copies are your job. The commands above are manual.
+4. **Single instance.** Compose runs one API process. There is no high availability. Compose runs a health check on `api` (`GET /health` on port 3000) and on `web` (the Caddy admin endpoint at `127.0.0.1:2019`), and `docker compose ps` shows the result. Nothing restarts or alerts on `unhealthy`. Caddy routes `GET /health` to the API, so you can monitor `https://your-domain/health` from outside.
+5. **No audit log of staff sign-ins.** Guest merges keep an audit trail. Sign-ins and key changes do not.
+6. **Operator-side items.** Private vulnerability reporting and a monitored code of conduct contact are not code. They are tracked in the roadmap, Phase 0.
 
 ## Checklist before the first real venue
 
 - [ ] `.env.prod` has a random `BETTER_AUTH_SECRET` and `POSTGRES_PASSWORD`, mode 600, not in git.
 - [ ] `SITE_ADDRESS` and `PUBLIC_URL` use your real domain, and `https://` loads with a valid certificate.
-- [ ] `oc ps` shows only `web` with published ports.
+- [ ] `oc ps` shows only `web` with published ports, and all three services report `healthy`.
+- [ ] `curl -I https://your-domain/` shows the headers listed under Security headers, and `curl https://your-domain/health` returns `{"ok":true,"service":"opencovers"}`.
 - [ ] Sign-up is restricted at the network layer, or you accept that it is open.
 - [ ] A backup ran, the dump left the machine, and you restored it on a spare machine.
 - [ ] `WEBHOOK_ALLOW_INSECURE` is unset.
