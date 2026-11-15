@@ -1,0 +1,2 @@
+ALTER TABLE "user" ADD COLUMN "first_signup" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_user_first_signup" ON "user" USING btree ("first_signup") WHERE "user"."first_signup";

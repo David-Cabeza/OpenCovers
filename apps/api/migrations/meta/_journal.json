@@ -176,6 +176,13 @@
       "when": 1794771199570,
       "tag": "0024_reconfirmation_status",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794780238363,
+      "tag": "0025_mean_gateway",
+      "breakpoints": true
     }
   ]
 }
