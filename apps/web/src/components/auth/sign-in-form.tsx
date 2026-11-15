@@ -35,6 +35,7 @@ export function SignInForm() {
         <Input
           id="signin-email"
           type="email"
+          autoComplete="email"
           placeholder="you@example.com"
           {...register("email", { required: "Email is required." })}
         />
@@ -48,6 +49,7 @@ export function SignInForm() {
         <Input
           id="signin-password"
           type="password"
+          autoComplete="current-password"
           placeholder="••••••••"
           {...register("password", { required: "Password is required." })}
         />

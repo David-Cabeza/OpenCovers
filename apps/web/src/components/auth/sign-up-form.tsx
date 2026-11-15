@@ -35,6 +35,7 @@ export function SignUpForm() {
         <Label htmlFor="signup-name">Name</Label>
         <Input
           id="signup-name"
+          autoComplete="name"
           placeholder="Jane Doe"
           {...register("name", { required: "Name is required." })}
         />
@@ -48,6 +49,7 @@ export function SignUpForm() {
         <Input
           id="signup-email"
           type="email"
+          autoComplete="email"
           placeholder="you@example.com"
           {...register("email", { required: "Email is required." })}
         />
@@ -61,6 +63,7 @@ export function SignUpForm() {
         <Input
           id="signup-password"
           type="password"
+          autoComplete="new-password"
           placeholder="Choose a strong password"
           {...register("password", {
             required: "Password is required.",
