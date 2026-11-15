@@ -332,12 +332,13 @@ describe("overbooked bookings and the tables", () => {
     expect(await held(second.id)).toEqual(second.tables);
   });
 
-  it("seats a booking that has no table", async () => {
+  it("refuses to seat a booking that has no table", async () => {
     const venueId = await seedVenue(2);
     await fill(venueId);
     const over = await (await book(venueId)).json();
     const res = await call(venueId, `/reservations/${over.id}/status`, { method: "POST", body: { status: "seated" } });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("table_required");
     expect((await book(venueId)).status).toBe(409);
   });
 });

@@ -201,6 +201,7 @@ export type WriteErrorCode =
   | "party_size_too_large"
   | "party_size_too_small"
   | "no_suitable_table"
+  | "table_required"
   | "outside_hours"
   | "lead_time_violation"
   | "venue_not_found";
@@ -781,6 +782,10 @@ export async function modifyReservation(
       }
 
       const grows = partyChanged && input.partySize! > current.partySize;
+      if (tablesChanged && current.status === "seated" && input.tableIds!.length === 0) {
+        throw new ReservationError("table_required");
+      }
+
       if (tablesChanged || grows) {
         const held =
           input.tableIds !== undefined
@@ -929,6 +934,14 @@ export async function setStatus(
       const allowed = ALLOWED_TRANSITIONS[status];
       if (!allowed || !allowed.includes(current.status)) {
         throw new ReservationError("invalid_transition");
+      }
+      if (status === "seated") {
+        const held = await tx
+          .select({ tableId: tableAllocations.tableId })
+          .from(tableAllocations)
+          .where(and(eq(tableAllocations.reservationId, id), eq(tableAllocations.active, true)))
+          .limit(1);
+        if (held.length === 0) throw new ReservationError("table_required");
       }
       const nextVersion = current.version + 1;
       await tx.update(reservations).set({ status, version: nextVersion }).where(eq(reservations.id, id));
