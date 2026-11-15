@@ -157,17 +157,19 @@ export const reservations = pgTable(
     consentRecordedAt: timestamp("consent_recorded_at", { withTimezone: true }),
     rating: integer("rating").$type<Rating>(),
     ratingRecordedAt: timestamp("rating_recorded_at", { withTimezone: true }),
+    commentary: text("commentary").notNull().default(""),
     erased: boolean("erased").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [
+    check("reservations_commentary_length", sql`char_length(${t.commentary}) <= 500`),
     index("idx_reservations_venue_date").on(t.venueId, t.date),
     index("idx_reservations_venue_guest").on(t.venueId, t.guestId),
     index("idx_reservations_unlinked_retention")
       .on(t.venueId, t.endsAt, t.id)
-      .where(sql`${t.guestId} is null and ${t.erased} = false and (${t.guestName} <> '' or ${t.guestContact} <> '')`),
+      .where(sql`${t.guestId} is null and ${t.erased} = false and (${t.guestName} <> '' or ${t.guestContact} <> '' or ${t.commentary} <> '')`),
   ],
 );
 

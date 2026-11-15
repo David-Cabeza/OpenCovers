@@ -105,7 +105,7 @@ async function expireUnlinkedReservations(
           isNull(reservations.guestId),
           eq(reservations.erased, false),
           lt(reservations.endsAt, cutoff),
-          or(ne(reservations.guestName, ""), ne(reservations.guestContact, "")),
+          or(ne(reservations.guestName, ""), ne(reservations.guestContact, ""), ne(reservations.commentary, "")),
         ),
       )
       .orderBy(reservations.endsAt, reservations.id)

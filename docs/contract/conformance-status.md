@@ -34,10 +34,11 @@ Status legend:
 | C21 Turn time and party limits | **PASS** | `turnMinutes` and `parseTurnTimes` in `apps/api/src/lib/turn-times.ts`. `bookingWindow` in `apps/api/src/lib/reservations.ts` resolves the turn time for create, walk-in, availability, and the explanation, and `serviceReasons` holds the service limits for all three. `turn_times` on `venues`, and `min_party_size` and `max_party_size` with a check constraint on `services`, in migration `0021`. Tests in `apps/api/test/turn-times-party-limits.test.ts` cover each turn time boundary, no rows, an explicit duration, walk-ins, a longer and a shorter turn seen through availability and create, each limit rejecting and clearing, a kept limit, a minimum above the maximum, walk-ins past the limits, the reason order, agreement over a grid, malformed values, venue isolation, and a read key. |
 
 | C22 Role boundaries | **PASS** | The venue middleware in `apps/api/src/app.ts` blocks `read` on every write. `adminOnly` guards config, services, tables, floor items, keys, and guest merge. Tests in `apps/api/test/authorization.test.ts` cover each admin route with a `write` and a `read` key, a config and catalog read back after each rejection, an admin success, a `write` and an `admin` staff session, and the reservation, waitlist, and erasure operations a `write` key keeps. |
+| C23 Booking note | **PASS** | `commentary` text, at most 500 characters, with a database check, on create, walk-in, and modify, in migration `0022`. Tests in `apps/api/test/commentary.test.ts` cover default, create, walk-in, trimming, the length bound, invalid types, modify bump and event, same-value no-op, clear, attended and refused statuses, read-only key, reads, no email, the event feed carrying no note, erasure, and retention of a reservation with a note only. |
 
 ## Open gaps
 
-None. All 22 conformance cases pass.
+None. All 23 conformance cases pass.
 
 ## Notes
 

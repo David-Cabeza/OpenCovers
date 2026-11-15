@@ -74,6 +74,19 @@ describe("opencovers MCP server", () => {
     }
   });
 
+  it("accepts a bounded booking note on create, walk-in and modify", async () => {
+    const { tools } = await client.listTools();
+    for (const name of ["reservation.create", "reservation.walk_in", "reservation.modify"]) {
+      const schema = tools.find((t) => t.name === name)?.inputSchema as {
+        properties: Record<string, { type?: string; maxLength?: number; description?: string }>;
+      };
+      const commentary = schema.properties.commentary;
+      expect(commentary.type).toBe("string");
+      expect(commentary.maxLength).toBe(500);
+      expect(commentary.description).toContain("Never put allergies");
+    }
+  });
+
   it("accepts a rating from 1 to 5 on create, walk-in and modify", async () => {
     const { tools } = await client.listTools();
     for (const name of ["reservation.create", "reservation.walk_in", "reservation.modify"]) {

@@ -1,0 +1,4 @@
+DROP INDEX "idx_reservations_unlinked_retention";--> statement-breakpoint
+ALTER TABLE "reservations" ADD COLUMN "commentary" text DEFAULT '' NOT NULL;--> statement-breakpoint
+CREATE INDEX "idx_reservations_unlinked_retention" ON "reservations" USING btree ("venue_id","ends_at","id") WHERE "reservations"."guest_id" is null and "reservations"."erased" = false and ("reservations"."guest_name" <> '' or "reservations"."guest_contact" <> '' or "reservations"."commentary" <> '');--> statement-breakpoint
+ALTER TABLE "reservations" ADD CONSTRAINT "reservations_commentary_length" CHECK (char_length("reservations"."commentary") <= 500);
