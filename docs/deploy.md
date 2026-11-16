@@ -83,6 +83,28 @@ Each invitation works once. The invitee gets the invited role in that one venue,
 
 An invited account can still create a venue of its own with `POST /v1/venues`, as any account can. See the hardening guide, known gaps. The API has no rate limiting, so keep invitation tokens private and short lived.
 
+## Rate limiting
+
+The API limits sign-in, sign-up and invitation redemption per client address. It keeps the counters in memory. A refused call returns `429` with the code `rate_limited` and a `Retry-After` header. [ADR-0007](adr/0007-rate-limiting.md) has the design and the measured behavior of Better Auth's own limiter.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `RATE_LIMIT` | `on` when `NODE_ENV=production`, otherwise `off` | `on` or `off`. An explicit value always wins. |
+| `TRUST_PROXY` | `false`, `true` in `compose.prod.yaml` | Read the client address from the last `X-Forwarded-For` entry. Turn it on only when a reverse proxy is the sole way to reach the API. |
+| `RATE_LIMIT_AUTH` | `30/15m` | Sign-in and every other write under `/api/auth` except sign-up. |
+| `RATE_LIMIT_SIGNUP` | `5/1h` | Sign-up. |
+| `RATE_LIMIT_INVITATION` | `10/15m` | `POST /v1/invitations/redeem` and a sign-up that carries `X-Invitation-Token`. |
+
+A budget is `max/window`, with a window in `s`, `m` or `h`. An unknown value stops the API at startup and names the variable. An empty value means the default.
+
+- The compose stack sets `TRUST_PROXY=true`. Caddy replaces any client `X-Forwarded-For` with the address it sees, so a client cannot pick its own address. Do not publish the `api` port.
+- With `TRUST_PROXY=false` behind a proxy, every client shares the proxy's address, so one abuser refuses everyone. The API logs a warning when it sees the header in that state.
+- A CDN or second proxy in front of Caddy is not supported. All clients behind one edge address share a budget. Limit at the CDN, or accept that.
+- Counters live in the API process. A restart clears them, and two API instances count separately.
+- Staff in one venue usually share one public address. The defaults allow a shift change. Raise `RATE_LIMIT_AUTH` if a venue is large.
+- Behind a venue's shared network, one abusive device can spend the budget for everyone there until the window ends.
+- The limiter is off unless `NODE_ENV=production` or `RATE_LIMIT=on`, so `pnpm dev` needs no setting. The image and `compose.prod.yaml` set both. Outside Docker, set `NODE_ENV=production` or `RATE_LIMIT=on`, or the API runs with no limits. It logs one line at startup that says which.
+
 ## Public site
 
 The project's site is built by `.github/workflows/deploy-site.yml` and published to GitHub Pages at **opencovers.dev**. The `CNAME` file in `apps/site/public/` pins the custom domain. A fork has no need for this workflow. Build with `pnpm --filter @opencovers/site build` and serve `apps/site/dist` wherever you like.
@@ -103,3 +125,6 @@ The API reads these variables regardless of host:
 | `BETTER_AUTH_URL` | yes | Public base URL of the API. |
 | `TRUSTED_ORIGINS` | yes | Comma-separated origins allowed to call auth (the staff app origin). |
 | `SIGNUP` | no | `open` (default), `first-user` or `closed`. See Sign-up control. |
+| `RATE_LIMIT` | no | `on` or `off`. Default `on` in `compose.prod.yaml`. See Rate limiting. |
+| `TRUST_PROXY` | no | `false` (default) or `true`. See Rate limiting. |
+| `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |

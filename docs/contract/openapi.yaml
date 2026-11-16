@@ -9,6 +9,11 @@ info:
     Every write carries an `Idempotency-Key` header and produces a monotonic
     version. See docs/contract/errors.md for the error vocabulary.
 
+    Some calls are rate limited per client address. A refused call returns
+    429 with the code `rate_limited` and a `Retry-After` header. The limited
+    calls are the sign-in and sign-up routes under /api/auth and invitation
+    redemption. They are listed in docs/adr/0007-rate-limiting.md.
+
 security:
   - ApiKeyAuth: []
 
@@ -929,6 +934,15 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: Too many requests. The code is `rate_limited`.
+      headers:
+        Retry-After:
+          description: Seconds to wait before the next attempt.
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
 
   schemas:
     ReservationStatus:
@@ -1599,6 +1613,7 @@ components:
         - unmerge_unavailable
         - unauthorized
         - forbidden
+        - rate_limited
         - slot_taken
         - party_size_too_large
         - party_size_too_small

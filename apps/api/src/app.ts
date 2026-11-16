@@ -19,6 +19,7 @@ import {
   redeemInvitation,
   revokeInvitation,
 } from "./lib/invitations";
+import { createRateLimiter, rateLimitConfigFromEnv } from "./lib/rate-limit";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import {
   deleteService,
@@ -122,6 +123,8 @@ type AppEnv = {
 };
 
 const app = new Hono<AppEnv>();
+
+app.use("*", createRateLimiter(rateLimitConfigFromEnv()).middleware);
 
 app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
 

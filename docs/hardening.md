@@ -44,9 +44,11 @@ The project has not yet verified automatic HTTPS on a real domain. Check it your
 
 ## Reverse proxy and client IP
 
-Caddy is the only proxy in front of the API. Its `reverse_proxy` directive passes the client address in `X-Forwarded-For`. The API does not read `X-Forwarded-For` or any other forwarded header. It makes no decision from the client address, so there is no trusted proxy setting to configure.
+Caddy is the only proxy in front of the API. Its `reverse_proxy` directive replaces any client `X-Forwarded-For` with the address it sees (measured with Caddy 2.11 and `apps/web/Caddyfile`). The API reads that header for one decision, the rate limits, and only when `TRUST_PROXY=true`. `compose.prod.yaml` sets it. See [Rate limiting](deploy.md#rate-limiting) and [ADR-0007](adr/0007-rate-limiting.md).
 
-If you put another proxy or CDN in front of Caddy, nothing in OpenCovers depends on the client IP. Be aware that Caddy then sees the proxy's address, not the guest's.
+- Keep `TRUST_PROXY=true` with the stack as shipped. With it off, every client shares Caddy's address, so one abuser can refuse everyone's sign-in until the window ends. The API logs a warning when it sees the header in that state.
+- If the API is ever reachable without Caddy, `TRUST_PROXY=true` lets a client pick its own address. It can dodge its limit, or spend another address's budget. Do not publish the `api` port.
+- A proxy or CDN in front of Caddy is not supported. Caddy then sees the proxy's address, so all clients behind one edge share a budget. Limit at the edge instead.
 
 ## Authentication and access
 
@@ -139,12 +141,13 @@ Read the commit log or release notes before you update. A pre-alpha release can 
 
 The API code adds none of the following. See known gaps.
 
-- Rate limiting on `/v1/*` or on sign-in.
+- Rate limiting on `/v1/*`.
 - Request body size limits.
 - Account lockout or two-factor sign-in.
 
 What the code does provide:
 
+- Rate limits per client address on sign-in and other writes under `/api/auth`, on sign-up, and on invitation redemption, kept in memory. They are on when `NODE_ENV=production` or `RATE_LIMIT=on`, and the compose stack sets both. Outside Docker the operator must set one of them. See known gap 2.
 - Security headers, set by `apps/web/Caddyfile` on every response from the `web` service. See Security headers below.
 
 - Webhook targets are checked before delivery. Plain `http` and private addresses are rejected unless `WEBHOOK_ALLOW_INSECURE=true`. Never set that variable in production. The API logs a warning at startup when it is on.
@@ -178,8 +181,21 @@ Close these before you serve real guests, or accept the risk knowingly.
    - Upgrading changes the compose default from open to `first-user`. An instance that already has accounts closes to new sign-ups on its next `up`. An instance with no accounts stays claimable. If you relied on open sign-up, set `SIGNUP=open` in `.env.prod`.
    - Staff are added with an invitation through the API, with no SQL. The staff app has no screen for invitations yet, so an admin calls the API by hand, see [Adding staff](deploy.md#adding-staff). The API can list and revoke invitations but cannot list or remove members. See [ADR-0006](adr/0006-staff-invitations.md).
    - Accounts can still create venues. Any account, an invited one included, can create a venue of its own with `POST /v1/venues`. Venue data stays isolated, but a closed instance is not closed to venue creation by people you invite. Restrict who you invite until the project limits venue creation.
-   - If two first sign-ups arrive at the same moment, the database lets one commit. The loser gets a generic failure from the database error, not the `SIGNUP_CLOSED` message. Sign-up is not rate limited. See gap 2.
-2. **No rate limiting in OpenCovers.** Sign-in and the API can be hit as fast as the machine allows. Add limits at your edge (a CDN, a firewall, or a Caddy rate-limit module). The API itself configures none. Better Auth may apply its own defaults to sign-in. This repository does not set or test them.
+   - If two first sign-ups arrive at the same moment, the database lets one commit. The loser gets a generic failure from the database error, not the `SIGNUP_CLOSED` message. Sign-up is rate limited per address. See gap 2.
+2. **Rate limiting covers credentials only.** The API limits three kinds of call per client address, in memory. Defaults are in brackets. See [ADR-0007](adr/0007-rate-limiting.md) and [Rate limiting](deploy.md#rate-limiting).
+   - Sign-in and every other write under `/api/auth` except sign-up (30 per 15 minutes).
+   - Sign-up (5 per hour).
+   - `POST /v1/invitations/redeem` and a sign-up that carries `X-Invitation-Token` (10 per 15 minutes).
+
+   A refused call returns `429` with `rate_limited` and `Retry-After`, the same whatever the request names. Reads, `/health` and CORS preflights are never limited. What is **not** covered:
+   - Every other `/v1` route, including reservation writes, key creation, webhooks and `POST /v1/venues`.
+   - An attacker with many addresses. The key is the address. There is no account lockout, no CAPTCHA and no second factor.
+   - Several API instances and restarts. Counters live in the process, so a restart clears them and two instances count separately. Compose runs one.
+   - A shared address. People behind one venue network share a budget.
+   - A CDN or second proxy in front of Caddy. See Reverse proxy and client IP.
+   - Visibility. Refusals are not logged or counted.
+
+   Better Auth's own limiter is replaced. Measured on 1.7.18, it was on only with `NODE_ENV=production` (so in the compose stack, not in `pnpm dev`), allowed 3 sign-ins or sign-ups per 10 seconds per address, kept its state in memory, covered only `/api/auth`, and answered `429` with `X-Retry-After` and no error code. Add a CDN, a firewall or a Caddy rate-limit module for the rest.
 3. **No built-in backups.** Backups, restores and off-site copies are your job. The commands above are manual.
 4. **Single instance.** Compose runs one API process. There is no high availability. Compose runs a health check on `api` (`GET /health` on port 3000) and on `web` (the Caddy admin endpoint at `127.0.0.1:2019`), and `docker compose ps` shows the result. Nothing restarts or alerts on `unhealthy`. Caddy routes `GET /health` to the API, so you can monitor `https://your-domain/health` from outside.
 5. **No audit log of staff sign-ins.** Guest merges keep an audit trail. Sign-ins and key changes do not.
@@ -191,6 +207,7 @@ Close these before you serve real guests, or accept the risk knowingly.
 - [ ] `SITE_ADDRESS` and `PUBLIC_URL` use your real domain, and `https://` loads with a valid certificate.
 - [ ] `oc ps` shows only `web` with published ports, and all three services report `healthy`.
 - [ ] `curl -I https://your-domain/` shows the headers listed under Security headers, and `curl https://your-domain/health` returns `{"ok":true,"service":"opencovers"}`.
+- [ ] `oc exec api printenv TRUST_PROXY` prints `true`, and 31 wrong sign-ins from one machine to `/api/auth/sign-in/email` end in `429` with a `Retry-After` header. Wait 15 minutes before you sign in yourself.
 - [ ] `SIGNUP` is `first-user` or `closed` (check `oc exec api printenv SIGNUP`), you registered your own account before publishing the address, and you know how you will add staff.
 - [ ] A backup ran, the dump left the machine, and you restored it on a spare machine.
 - [ ] `WEBHOOK_ALLOW_INSECURE` is unset.

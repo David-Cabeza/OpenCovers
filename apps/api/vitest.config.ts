@@ -7,6 +7,7 @@ export default defineConfig({
     hookTimeout: 20000,
     fileParallelism: false,
     env: {
+      RATE_LIMIT: "off",
       DATABASE_URL:
         process.env.TEST_DATABASE_URL ??
         "postgres://postgres:postgres@localhost:5432/opencovers_test",

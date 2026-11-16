@@ -15,6 +15,10 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 - `unauthorized`: the caller is not authenticated.
 - `forbidden`: the caller is authenticated but lacks the role for the operation.
 
+## Rate limiting
+
+- `rate_limited`: the caller sent too many requests of a limited kind. The response is `429` with a `Retry-After` header in whole seconds. The body is the same whatever the request named. The limited calls are sign-in and other writes under `/api/auth`, sign-up, and invitation redemption. See [ADR-0007](../adr/0007-rate-limiting.md).
+
 ## Availability and allocation
 
 - `slot_taken`: the requested time is no longer available and no other eligible table remains.

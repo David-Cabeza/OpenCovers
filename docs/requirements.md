@@ -240,6 +240,12 @@ A venue `admin` can add staff without touching the database. An invitation grant
 
 Acceptance: conformance case C27. Concurrent redemptions of one token produce one membership and at most one account. Every failed redemption gets the same answer and names no venue. Under `SIGNUP=closed` a sign-up without a valid invitation still fails with `SIGNUP_CLOSED`.
 
+### REQ-C4 Rate limits on credential paths
+
+Sign-in and every other write under `/api/auth`, sign-up, and invitation redemption are limited per client address, with a separate budget for each. A refused call returns `429`, the code `rate_limited` and a `Retry-After` header, the same whatever the request names. Reads and `/health` are not limited. The limits and the trusted proxy are settings, and a fork that changes nothing is limited. The limits are per process and per address. They do not stop an attacker who holds many addresses, and they do not cover other `/v1` routes. See [ADR-0007](adr/0007-rate-limiting.md).
+
+Acceptance: conformance case C28.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:
@@ -251,3 +257,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C5: erasure returns counts and leaves no personal value.
 - C6: turning the engine on without a notice address fails, and clearing the address while on fails.
 - C26: a reservation without a table cannot be seated and fails with `table_required`. Staff assign a table with a modify first, and a taken table fails with `slot_taken`.
+- C28: an address that spends its budget of sign-in, sign-up or invitation calls gets `429` with `rate_limited` and `Retry-After`, the same answer whatever the request names. Reads and `/health` pass. C27 is reserved for staff invitations.
