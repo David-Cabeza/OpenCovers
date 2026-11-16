@@ -299,8 +299,8 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
               <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                 <li>The venue name becomes public when the profile is published.</li>
                 <li>
-                  Opening hours are currently published for all 7 days of the week, whatever the
-                  days your services run. Per-day hours are coming.
+                  Opening hours come from your services and the days they run, so keep the days
+                  of each service up to date.
                 </li>
               </ul>
             </div>

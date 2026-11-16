@@ -136,7 +136,7 @@ describe("PublicProfileCard", () => {
     const url = `${window.location.origin}/v1/venues/v1/public.jsonld`;
     expect(screen.getByLabelText("Public JSON-LD address")).toHaveValue(url);
     expect(screen.getByText("The venue name becomes public when the profile is published.")).toBeInTheDocument();
-    expect(screen.getByText(/published for all 7 days/)).toBeInTheDocument();
+    expect(screen.getByText(/come from your services and the days they run/)).toBeInTheDocument();
 
     const writeText = vi.spyOn(navigator.clipboard, "writeText");
     await user.click(screen.getByRole("button", { name: "Copy address" }));
