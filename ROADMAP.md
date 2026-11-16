@@ -60,6 +60,7 @@ Availability, agenda, list, pacing, and an event feed with a cursor and a retent
 - A booking note, `commentary`, on create, walk-in, and modify, up to 500 characters (C23).
 - An explicit overbooking ceiling per venue, default 0, enforced under a per-venue lock (C24).
 - A reconfirmation status on a reservation (C25).
+- Optional booking policy per venue: how far ahead a booking may name, a cap on one guest's active bookings per day, and blocked dates (C35, [ADR-0013](docs/adr/0013-booking-policy.md)).
 - A pre-shift view in the staff app for a service and date.
 - Vitest and Testing Library in the staff app and the public site.
 - Signed webhooks over the event feed, with ordered, at-least-once delivery and protection against server-side request forgery. See [docs/contract/webhooks.md](docs/contract/webhooks.md).

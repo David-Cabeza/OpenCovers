@@ -234,7 +234,13 @@ paths:
         the limits of the service that covers the time fails with
         `party_size_too_small` or `party_size_too_large`. A walk-in is not
         held to the service limits, as it is not held to the slot grid or
-        the lead time.
+        the lead time, or to the booking horizon and blocked dates of the
+        venue. A date further ahead than `maxAdvanceDays` fails with
+        `beyond_booking_horizon`, and a blocked date with `date_blocked`.
+        A guest who already holds `maxActivePerGuestPerDay` active bookings
+        on the date, found by the guest's contact, fails with
+        `guest_booking_limit` (409). A booking without a usable contact is
+        not counted against the cap.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -410,7 +416,12 @@ paths:
         `invalid_request`. Null clears it. Malformed `turnTimes` fail with
         `invalid_request`, and an empty array clears them. An
         `overbookingCeiling` that is not an integer from 0 to 1000 fails with
-        `invalid_request`. Admin only. Any other role fails with `forbidden`.
+        `invalid_request`. A `maxAdvanceDays` that is not null or an integer
+        from 0 to 1000, a `maxActivePerGuestPerDay` that is not null or an
+        integer from 1 to 100, and a `blockedDates` that is not a list of at
+        most 366 valid dates or ranges also fail with `invalid_request`.
+        Admin only. Any other role fails with `forbidden`. A policy change
+        never cancels or alters a booking that already exists.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -1291,7 +1302,8 @@ components:
       description: |
         One rule that blocks the time. Reasons come in this fixed order:
         `outside_hours` with rule `hours`, then rule `slot_grid`, then rule
-        `last_seating`, then `lead_time_violation`, then the service limit
+        `last_seating`, then `lead_time_violation`, then
+        `beyond_booking_horizon`, then `date_blocked`, then the service limit
         as `party_size_too_small` or `party_size_too_large` with rule
         `service_limit`, then `party_size_too_large` for capacity or
         `no_suitable_table`. The codes are the error codes a create returns
@@ -1301,7 +1313,7 @@ components:
       properties:
         code:
           type: string
-          enum: [outside_hours, lead_time_violation, party_size_too_small, party_size_too_large, no_suitable_table]
+          enum: [outside_hours, lead_time_violation, beyond_booking_horizon, date_blocked, party_size_too_small, party_size_too_large, no_suitable_table]
         message:
           type: string
           description: Human-readable. May change.
@@ -1311,6 +1323,8 @@ components:
             - $ref: "#/components/schemas/ExplainSlotGrid"
             - $ref: "#/components/schemas/ExplainLastSeating"
             - $ref: "#/components/schemas/ExplainLeadTime"
+            - $ref: "#/components/schemas/ExplainHorizon"
+            - $ref: "#/components/schemas/ExplainBlockedDate"
             - $ref: "#/components/schemas/ExplainServiceMinimum"
             - $ref: "#/components/schemas/ExplainServiceMaximum"
             - $ref: "#/components/schemas/ExplainPartySize"
@@ -1358,6 +1372,22 @@ components:
         openEnd: { type: string }
         lastSeatingOffsetMinutes: { type: integer }
         lastSeating: { type: string }
+
+    ExplainHorizon:
+      type: object
+      description: Details of `beyond_booking_horizon`.
+      required: [maxAdvanceDays, latest]
+      properties:
+        maxAdvanceDays: { type: integer }
+        latest: { type: string, format: date, description: The last bookable date, in the venue's time zone. }
+
+    ExplainBlockedDate:
+      type: object
+      description: Details of `date_blocked`. The blocked range that holds the date.
+      required: [from, to]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
 
     ExplainLeadTime:
       type: object
@@ -1939,6 +1969,52 @@ components:
             refuses any table that another booking holds. The ceiling never
             applies to a walk-in, to a booking that names its tables, or to a
             party larger than the venue. It is venue-wide, whatever the zone.
+        maxAdvanceDays:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 1000
+          default: null
+          description: |
+            The furthest date, in days after today in the venue's time zone,
+            that a booking may name. A booking on that day passes and one a
+            day later fails with `beyond_booking_horizon`. Null, the default,
+            sets no limit. A walk-in is not held to it.
+        maxActivePerGuestPerDay:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 100
+          default: null
+          description: |
+            The most active (booked or seated) bookings that one guest may
+            hold on one local date, counted by the guest record that the
+            contact resolves to. A create over the cap fails with
+            `guest_booking_limit`. Null, the default, sets no limit.
+            Availability and the explanation are anonymous, so they do not
+            apply it. A booking without a usable contact is not counted, and
+            a walk-in is not held to it.
+        blockedDates:
+          type: array
+          maxItems: 366
+          default: []
+          description: |
+            Dates on which the venue takes no bookings, in its time zone. A
+            write takes each entry as a `YYYY-MM-DD` date or a `{ from, to }`
+            range, both inclusive, and replaces the list. An empty array
+            clears it. Overlapping and adjacent entries are merged, and a read
+            returns sorted `{ from, to }` ranges. A blocked date fails a
+            create with `date_blocked`, and availability shows its times as
+            unavailable. A walk-in is not held to it.
+          items:
+            type: object
+            required: [from, to]
+            additionalProperties: false
+            properties:
+              from: { type: string, format: date }
+              to: { type: string, format: date }
+          example:
+            - { from: "2026-12-24", to: "2026-12-26" }
 
     Service:
       type: object
@@ -2002,6 +2078,9 @@ components:
         - table_required
         - outside_hours
         - lead_time_violation
+        - beyond_booking_horizon
+        - date_blocked
+        - guest_booking_limit
         - email_required
         - confirmation_required
         - approval_required

@@ -282,6 +282,12 @@ An agent can tell from an error alone whether repeating the same call can succee
 
 Acceptance: conformance case C34. There is no version-conflict error, because writes carry no expected version.
 
+### REQ-C12 Per-venue booking policy
+
+A venue can set simple rules for the bookings it takes, so it can refuse bookings too far ahead, stop one guest from holding many bookings on the same day, and close specific dates. `maxAdvanceDays` caps how many days ahead a booking may name, `maxActivePerGuestPerDay` caps the active bookings one guest holds on a date, and `blockedDates` lists dates and ranges with no bookings. All three are optional and off by default, and only an admin sets them. The horizon and the blocked dates are enforced by the same check in create, availability and the explanation. The cap needs the guest's contact, so only create applies it, and a booking with no usable contact is not counted. A walk-in is held to none of them. A change of policy never cancels or alters a booking that already exists. No new personal data is stored. See ADR-0013.
+
+Acceptance: conformance case C35. Each rule has its own error code, and concurrent creates by one guest never exceed the cap.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:
@@ -299,3 +305,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C32: removing a member revokes the keys they made in that venue and their sessions when no membership is left, flags their webhooks without deleting them, all or nothing, and an admin reads the venue's membership audit log.
 - C33: a venue with the public profile on serves a credential-free `public.jsonld` Restaurant with hours and no private field, an unknown venue or one with the profile off gives the same `venue_not_found`, and only an admin writes validated fields.
 - C34: every error body carries `retryable`, the MCP tool error text says it, and every MCP tool declares its three hints.
+- C35: a venue's optional horizon, per-guest daily cap and blocked dates refuse a create with `beyond_booking_horizon`, `guest_booking_limit` or `date_blocked`, availability and the explanation agree on the first and last, a walk-in is held to none, and the defaults change nothing.

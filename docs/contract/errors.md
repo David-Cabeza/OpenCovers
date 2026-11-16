@@ -35,8 +35,11 @@ Every error response is `{"code": "...", "message": "...", "retryable": true|fal
 - `table_required`: the reservation holds no table, so it cannot be seated. Staff assign a table with a modify first. A modify that would leave a seated reservation without tables fails with it too. Not retryable.
 - `outside_hours`: the time is outside the venue's hours, off the slot grid, or after the last seating. Not retryable.
 - `lead_time_violation`: the booking is too close to the requested time. Not retryable.
+- `beyond_booking_horizon`: the date is further ahead than the venue's `maxAdvanceDays`. Not retryable.
+- `date_blocked`: the venue takes no bookings on that date. Not retryable.
+- `guest_booking_limit`: the guest already holds the venue's `maxActivePerGuestPerDay` active bookings on that date. Create only, because availability does not know the guest. Not retryable.
 
-`GET /availability/explain` returns `outside_hours`, `lead_time_violation`, `party_size_too_small`, `party_size_too_large`, and `no_suitable_table` as reason codes in a `200` answer, with the same meaning.
+`GET /availability/explain` returns `outside_hours`, `lead_time_violation`, `beyond_booking_horizon`, `date_blocked`, `party_size_too_small`, `party_size_too_large`, and `no_suitable_table` as reason codes in a `200` answer, with the same meaning.
 
 ## Guest
 

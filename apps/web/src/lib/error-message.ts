@@ -23,6 +23,9 @@ export const MESSAGES: Record<string, string> = {
   table_required: "Assign a table first.",
   outside_hours: "That time is outside the venue's opening hours.",
   lead_time_violation: "That time is too soon. Pick a later time.",
+  beyond_booking_horizon: "That date is further ahead than this venue takes bookings.",
+  date_blocked: "This venue takes no bookings on that date.",
+  guest_booking_limit: "This guest already has the most bookings allowed on that date.",
   // Guest
   email_required: "Add the guest's email or phone to continue.",
   confirmation_required: "The guest has to confirm before this can be saved.",

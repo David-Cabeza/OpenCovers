@@ -442,9 +442,35 @@ export function createServer(): McpServer {
           .describe(
             "The most covers the venue accepts without tables at one time. 0 means every booking holds tables.",
           ),
+        maxAdvanceDays: z
+          .number()
+          .int()
+          .min(0)
+          .max(1000)
+          .nullable()
+          .optional()
+          .describe("Refuse bookings more than this many days ahead, counted from today in the venue time zone. Null turns it off."),
+        maxActivePerGuestPerDay: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .nullable()
+          .optional()
+          .describe("The most active bookings one guest, identified by contact, may hold on one date. Null turns it off."),
+        blockedDates: z
+          .array(
+            z.union([
+              z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+              z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict(),
+            ]),
+          )
+          .max(366)
+          .optional()
+          .describe("Dates (YYYY-MM-DD) or { from, to } ranges, inclusive, in the venue time zone, on which no bookings are taken. Replaces the list. An empty list clears it."),
       }),
     },
-    async ({ venueId, enabled, noticeAddress, notificationsEnabled, resendApiKey, fromEmail, slotIntervalMinutes, leadTimeMinutes, lastSeatingOffsetMinutes, phoneCountry, overbookingCeiling }) => {
+    async ({ venueId, enabled, noticeAddress, notificationsEnabled, resendApiKey, fromEmail, slotIntervalMinutes, leadTimeMinutes, lastSeatingOffsetMinutes, phoneCountry, overbookingCeiling, maxAdvanceDays, maxActivePerGuestPerDay, blockedDates }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/config`, {
@@ -460,6 +486,9 @@ export function createServer(): McpServer {
               lastSeatingOffsetMinutes,
               phoneCountry,
               overbookingCeiling,
+              maxAdvanceDays,
+              maxActivePerGuestPerDay,
+              blockedDates,
             },
           }),
         );

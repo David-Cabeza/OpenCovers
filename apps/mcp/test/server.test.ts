@@ -112,6 +112,17 @@ describe("opencovers MCP server", () => {
     expect(schema.properties.overbookingCeiling).toMatchObject({ minimum: 0, maximum: 1000 });
   });
 
+  it("sets the booking policy in venue.setConfig", async () => {
+    const { tools } = await client.listTools();
+    const schema = tools.find((t) => t.name === "venue.setConfig")?.inputSchema as {
+      properties: Record<string, unknown>;
+    };
+    const shape = (name: string) => JSON.stringify(schema.properties[name]);
+    expect(shape("maxAdvanceDays")).toContain('"maximum":1000');
+    expect(shape("maxActivePerGuestPerDay")).toContain('"maximum":100');
+    expect(shape("blockedDates")).toContain('"maxItems":366');
+  });
+
   it("accepts the closed reconfirmation set on create and modify but not on walk-in", async () => {
     const { tools } = await client.listTools();
     for (const name of ["reservation.create", "reservation.modify"]) {

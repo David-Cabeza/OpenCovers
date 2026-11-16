@@ -13,6 +13,7 @@ import {
 } from "../db/schema";
 import * as schema from "../db/schema";
 import type { CountryCode } from "libphonenumber-js";
+import type { DateRange } from "./booking-policy";
 import { consentColumns } from "./consent";
 import { normalizeContact, venueCountry } from "./contact";
 import { forgetMergeState, movedAtMerge } from "./guests";
@@ -37,6 +38,9 @@ export interface VenueConfig {
   phoneCountry: string | null;
   turnTimes?: TurnTime[];
   overbookingCeiling: number;
+  maxAdvanceDays: number | null;
+  maxActivePerGuestPerDay: number | null;
+  blockedDates: DateRange[];
 }
 
 export type ConfigResult =
@@ -88,6 +92,9 @@ export async function getConfig(db: Db, venueId: string): Promise<VenueConfig | 
     phoneCountry: venue.phoneCountry,
     ...turnTimesField(venue.turnTimes),
     overbookingCeiling: venue.overbookingCeiling,
+    maxAdvanceDays: venue.maxAdvanceDays,
+    maxActivePerGuestPerDay: venue.maxActivePerGuestPerDay,
+    blockedDates: venue.blockedDates,
   };
 }
 
@@ -110,6 +117,9 @@ export async function setConfig(
     phoneCountry?: CountryCode | null;
     turnTimes?: TurnTime[];
     overbookingCeiling?: number;
+    maxAdvanceDays?: number | null;
+    maxActivePerGuestPerDay?: number | null;
+    blockedDates?: DateRange[];
   },
 ): Promise<ConfigResult> {
   const venue = (
@@ -131,6 +141,10 @@ export async function setConfig(
   const phoneCountry = input.phoneCountry !== undefined ? input.phoneCountry : venue.phoneCountry;
   const turnTimes = input.turnTimes ?? venue.turnTimes;
   const overbookingCeiling = input.overbookingCeiling ?? venue.overbookingCeiling;
+  const maxAdvanceDays = input.maxAdvanceDays !== undefined ? input.maxAdvanceDays : venue.maxAdvanceDays;
+  const maxActivePerGuestPerDay =
+    input.maxActivePerGuestPerDay !== undefined ? input.maxActivePerGuestPerDay : venue.maxActivePerGuestPerDay;
+  const blockedDates = input.blockedDates ?? venue.blockedDates;
   const resendApiKey =
     input.resendApiKey !== undefined
       ? input.resendApiKey === ""
@@ -151,6 +165,9 @@ export async function setConfig(
       phoneCountry,
       turnTimes,
       overbookingCeiling,
+      maxAdvanceDays,
+      maxActivePerGuestPerDay,
+      blockedDates,
     })
     .where(eq(venues.id, venueId));
   return {
@@ -167,6 +184,9 @@ export async function setConfig(
       phoneCountry,
       ...turnTimesField(turnTimes),
       overbookingCeiling,
+      maxAdvanceDays,
+      maxActivePerGuestPerDay,
+      blockedDates,
     },
   };
 }
