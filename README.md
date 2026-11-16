@@ -43,6 +43,14 @@ A GiST exclusion constraint in PostgreSQL rejects overlapping table allocations.
 
 Staff sign in with Better Auth and get a per-venue role. Platforms and AI agents use scoped API keys (`read`/`write`) that a venue admin mints and revokes from the staff app.
 
+### 🎛️ Control of the room and the book
+
+An explicit overbooking ceiling per venue (default 0, enforced under a per-venue lock), a booking note of up to 500 characters, a reconfirmation status on each reservation, and a rule that a reservation cannot be seated without a table. The staff app has a pre-shift view for a service and date, and an endpoint explains why a slot is closed.
+
+### 👥 Staff access you control
+
+A venue admin invites staff and removes members from the staff app, with the roles `read`, `write`, and `admin` applied to keys and sessions. Sign-up is controlled with the `SIGNUP` setting, only the owner creates venues on closed instances, and sign-in, sign-up and invitation redemption are rate limited.
+
 ### 🤖 An MCP server
 
 The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly.
@@ -192,7 +200,7 @@ OpenCovers has no hosting vendor dependency. It needs PostgreSQL and a Node.js p
 
 ## Status
 
-Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — all 30 conformance cases pass, signed webhooks included. A deployment is prepared (Dockerfile and runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
+Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — all 30 conformance cases pass, signed webhooks included. A deployment is prepared (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
 
 ## Contributing
 
