@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
@@ -36,7 +37,7 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
       void queryClient.invalidateQueries({ queryKey: ["keys", venueId] });
       toast.success("Key revoked");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not revoke."),
+    onError: (err) => toast.error(errorMessage(err, "Could not revoke.")),
   });
 
   return (

@@ -77,7 +77,7 @@ describe("WalkInDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Seat guest" }));
 
-    expect(await screen.findByText("no_table_available")).toBeInTheDocument();
+    expect(await screen.findByText("Could not seat the guest.")).toBeInTheDocument();
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 });

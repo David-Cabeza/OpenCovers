@@ -139,6 +139,29 @@ describe("VenueSettings overbooking ceiling", () => {
     expect(await screen.findByText("Only an admin can change venue settings.")).toBeInTheDocument();
   });
 
+  it("asks to retry later when the API answers 429", async () => {
+    const user = userEvent.setup();
+    mockApi(() => json({ code: "rate_limited", message: "slow down" }, 429));
+    renderSettings("admin");
+
+    await ceilingInput();
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(await screen.findByText(/Too many attempts/)).toBeInTheDocument();
+  });
+
+  it("does not show a raw unknown code", async () => {
+    const user = userEvent.setup();
+    mockApi(() => json({ code: "db_exploded", message: "x" }, 500));
+    renderSettings("admin");
+
+    await ceilingInput();
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(await screen.findByText("Could not save the settings.")).toBeInTheDocument();
+    expect(screen.queryByText("db_exploded")).not.toBeInTheDocument();
+  });
+
   it("locks the field for a user who is not an admin", async () => {
     mockApi(() => json(CONFIG));
     renderSettings("write");

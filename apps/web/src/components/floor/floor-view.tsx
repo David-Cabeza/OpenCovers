@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArmchairIcon } from "lucide-react";
@@ -33,7 +34,7 @@ export function FloorView({ venueId }: { venueId: string }) {
       void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       void queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not move."),
+    onError: (err) => toast.error(errorMessage(err, "Could not move.")),
   });
 
   return (

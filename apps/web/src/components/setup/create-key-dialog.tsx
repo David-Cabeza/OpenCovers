@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckIcon, CopyIcon } from "lucide-react";
@@ -60,7 +61,7 @@ export function CreateKeyDialog({
       await queryClient.invalidateQueries({ queryKey: ["keys", venueId] });
       setGenerated(key);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create the key.");
+      toast.error(errorMessage(err, "Could not create the key."));
     }
   }
 

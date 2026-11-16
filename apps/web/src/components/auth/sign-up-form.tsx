@@ -1,3 +1,4 @@
+import { authErrorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -24,8 +25,8 @@ export function SignUpForm() {
     setServerError(null);
     const { error } = await authClient.signUp.email(values);
     if (error) {
-      setServerError(error.message ?? "Could not create the account.");
-      toast.error(error.message ?? "Could not create the account.");
+      setServerError(authErrorMessage(error, "Could not create the account."));
+      toast.error(authErrorMessage(error, "Could not create the account."));
     }
   }
 

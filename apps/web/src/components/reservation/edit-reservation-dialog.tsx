@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
@@ -73,7 +74,7 @@ export function EditReservationDialog({
       toast.success("Reservation updated");
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not update the reservation.");
+      toast.error(errorMessage(err, "Could not update the reservation."));
     }
   }
 
