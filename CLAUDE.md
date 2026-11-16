@@ -48,7 +48,7 @@ The staff app dev server proxies `/api` and `/v1` to the API on :3000. Productio
 - A change to the contract needs `docs/contract/openapi.yaml`, `docs/contract/conformance.md` and `conformance-status.md` updated together.
 - Decisions that change architecture, contract or security go in `docs/adr/` (start from `TEMPLATE.md`).
 - TypeScript strict, ESM (`"type": "module"`). LF line endings (`.gitattributes`), 2-space indent (`.editorconfig`).
-- Public docs (README, CONTRIBUTING, contract) are in English. The website copy (`apps/site`) is in Spanish.
+- Public docs (README, CONTRIBUTING, contract) are in English. The website copy (`apps/site`) is in Spanish, except the English page `/en/` and `llms.txt`.
 
 ## External services
 - GitHub: source of truth, CI (`.github/workflows/ci.yml`: typecheck + tests against a Postgres service) and the site deploy.

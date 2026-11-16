@@ -1,0 +1,27 @@
+# OpenCovers
+
+> OpenCovers is an open source reservation engine for restaurants: availability, bookings, tables and a signed event feed, exposed through an HTTP API and an MCP server with 18 tools over stdio. Pre-alpha. License: Apache-2.0. Built with Node.js, Hono, Drizzle and PostgreSQL. PostgreSQL enforces the no-double-booking rule with a GiST exclusion constraint. The MCP server is the npm package `@opencovers/mcp` (`npx -y @opencovers/mcp`).
+
+## Start here
+
+- [Overview for developers (English)](https://opencovers.dev/en/): what it is, guarantees, API, MCP server and local setup.
+- [README](https://github.com/David-Cabeza/OpenCovers/blob/main/README.md): features, architecture and quick start.
+
+## Contract
+
+- [OpenAPI contract](https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/openapi.yaml): the HTTP API under /v1.
+- [MCP tools](https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/mcp.md): the 18-tool catalog.
+- [Errors](https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/errors.md): the error vocabulary.
+- [Conformance cases](https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/conformance.md): the behavior any implementation must pass.
+- [Webhooks](https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/webhooks.md): signed push of the event feed.
+
+## Decisions
+
+- [Architecture decision records](https://github.com/David-Cabeza/OpenCovers/tree/main/docs/adr): why the engine is built this way.
+
+## Optional
+
+- [Source code](https://github.com/David-Cabeza/OpenCovers)
+- [npm package @opencovers/mcp](https://www.npmjs.com/package/@opencovers/mcp)
+- [Roadmap](https://github.com/David-Cabeza/OpenCovers/blob/main/ROADMAP.md)
+- [Sitio en español](https://opencovers.dev/)
