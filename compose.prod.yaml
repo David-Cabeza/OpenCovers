@@ -28,6 +28,11 @@ services:
       BETTER_AUTH_URL: ${PUBLIC_URL:-http://localhost}
       TRUSTED_ORIGINS: ${PUBLIC_URL:-http://localhost}
       SIGNUP: ${SIGNUP:-first-user}
+      RATE_LIMIT: ${RATE_LIMIT:-on}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      RATE_LIMIT_AUTH: ${RATE_LIMIT_AUTH:-}
+      RATE_LIMIT_SIGNUP: ${RATE_LIMIT_SIGNUP:-}
+      RATE_LIMIT_INVITATION: ${RATE_LIMIT_INVITATION:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
     healthcheck:

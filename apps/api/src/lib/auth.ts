@@ -22,6 +22,8 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
   database: drizzleAdapter(db, { provider: "pg", schema: betterAuthSchema }),
   emailAndPassword: { enabled: true },
+  // lib/rate-limit.ts limits /api/auth. Better Auth's own limiter would answer a second 429 in another shape.
+  rateLimit: { enabled: false },
   user: {
     additionalFields: {
       firstSignup: {

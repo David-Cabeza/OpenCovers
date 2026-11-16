@@ -14,7 +14,7 @@ What exists today:
 - **Memberships.** `venue_memberships` links a user to a venue with a role of `read`, `write` or `admin`. Only `createVenue` inserts one for a normal request.
 - **Roles.** `admin` is the top role. There is no owner role. The first account on a `first-user` instance is marked by `user.first_signup`, and that mark has no effect on access.
 - **Keys.** An API key can hold the `admin` role for a venue. A key belongs to an integration, not to a person.
-- **Rate limiting.** OpenCovers has none for `/v1/*`. See the hardening guide, known gap 2.
+- **Rate limiting.** OpenCovers has none for `/v1/*` except the credential paths in [ADR-0007](0007-rate-limiting.md). See the hardening guide, known gap 2.
 
 Two properties bind the design. An invitation must not open a way to create accounts that `SIGNUP` forbids, beyond the one account per invitation. And it must not create a venue or a new owner.
 
@@ -86,7 +86,7 @@ The claim happens before the account is written, so a sign-up that fails after t
 
 ### Rate limiting
 
-Not available. OpenCovers has no rate limiting on `/v1/*` and does not add it here. Redemption is protected by the size of the secret, not by throttling. An `admin` can create many invitations. Operators who need limits add them at the edge, as the hardening guide says. Better Auth's own sign-up limits are neither set nor tested by this repository.
+This decision adds none. [ADR-0007](0007-rate-limiting.md) later limits `POST /v1/invitations/redeem` and a sign-up with `X-Invitation-Token` per client address. The size of the secret is still the main protection. An `admin` can create many invitations, and invitation creation is not limited.
 
 ### Retention and erasure
 
@@ -106,7 +106,7 @@ No email sending, no staff screen in `apps/web`, no way to list or remove member
 
 **Harder.** The sign-up hook now has two branches and reads a request header. A failed sign-up after the claim burns the invitation. The admin shares the token by hand, because the API sends no email. An open link works for whoever holds it first, so it must be sent over a private channel.
 
-**Accepted.** An invited account can still call `POST /v1/venues` and create a venue of its own on a closed instance. That is hardening known gap 2, unchanged by this decision, and it is the next thing to restrict. The invitation grants no more than any open sign-up did before ADR-0005. Email-bound invitations check the address the invitee typed and do not verify it, because email verification is off. The token is the secret. There is no rate limit on redemption attempts. An admin session that is stolen can mint invitations until it is revoked. Staff cannot yet see who holds a membership, so they cannot yet remove one.
+**Accepted.** An invited account can still call `POST /v1/venues` and create a venue of its own on a closed instance. That is hardening known gap 2, unchanged by this decision, and it is the next thing to restrict. The invitation grants no more than any open sign-up did before ADR-0005. Email-bound invitations check the address the invitee typed and do not verify it, because email verification is off. The token is the secret. Redemption attempts are limited per client address by ADR-0007, and the secret's size is the main protection. An admin session that is stolen can mint invitations until it is revoked. Staff cannot yet see who holds a membership, so they cannot yet remove one.
 
 ## Alternatives considered
 
