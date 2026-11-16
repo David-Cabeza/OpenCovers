@@ -69,7 +69,9 @@ describe("TeamView", () => {
     await user.click(
       within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }),
     );
-    expect(await screen.findByText("last_admin")).toBeInTheDocument();
+    expect(await screen.findByText(
+      "A venue needs at least one admin. Make someone else an admin first.",
+    )).toBeInTheDocument();
   });
 
   it("creates an invitation and shows the token once", async () => {
@@ -89,6 +91,11 @@ describe("TeamView", () => {
     expect(api.calls("POST", "/v1/venues/v1/invitations")[0].body).toEqual({ role: "write" });
     await user.click(within(dialog).getByRole("button", { name: "Copy token" }));
     expect(writeText).toHaveBeenCalledWith("i2.secret");
+
+    const link = `${window.location.origin}/#/invite?token=i2.secret`;
+    expect(within(dialog).getByTestId("invite-link")).toHaveTextContent(link);
+    await user.click(within(dialog).getByRole("button", { name: "Copy link" }));
+    expect(writeText).toHaveBeenCalledWith(link);
 
     await user.click(within(dialog).getByRole("button", { name: "Done" }));
     await waitFor(() => expect(screen.queryByText("i2.secret")).not.toBeInTheDocument());

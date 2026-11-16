@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type Role } from "@/lib/api";
 import { errorMessage } from "@/lib/error-message";
+import { inviteLink } from "@/lib/invite-link";
 
 interface InviteValues {
   role: Role;
@@ -34,6 +35,7 @@ export function InviteDialog({
   const queryClient = useQueryClient();
   const [token, setToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const {
     register,
@@ -47,6 +49,7 @@ export function InviteDialog({
       reset({ role: "read", email: "" });
       setToken(null);
       setCopied(false);
+      setLinkCopied(false);
     }
   }, [open, reset]);
 
@@ -64,10 +67,10 @@ export function InviteDialog({
     }
   }
 
-  async function copy() {
-    await navigator.clipboard.writeText(token as string);
-    setCopied(true);
-    toast.success("Token copied");
+  async function copy(text: string, what: string, done: (v: boolean) => void) {
+    await navigator.clipboard.writeText(text);
+    done(true);
+    toast.success(`${what} copied`);
   }
 
   return (
@@ -83,15 +86,43 @@ export function InviteDialog({
         {token ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Copy this token now. It will not be shown again. Send it over a private channel.
+              Copy the link or the token now. Neither will be shown again. Send it over a private
+              channel.
             </p>
-            <div className="flex items-start gap-2">
-              <code className="flex-1 break-all rounded-md bg-muted px-3 py-2 text-sm">
-                {token}
-              </code>
-              <Button variant="outline" size="icon" aria-label="Copy token" onClick={copy}>
-                {copied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
-              </Button>
+            <div className="space-y-1">
+              <Label>Invite link</Label>
+              <div className="flex items-start gap-2">
+                <code
+                  data-testid="invite-link"
+                  className="flex-1 break-all rounded-md bg-muted px-3 py-2 text-sm"
+                >
+                  {inviteLink(token)}
+                </code>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Copy link"
+                  onClick={() => copy(inviteLink(token), "Link", setLinkCopied)}
+                >
+                  {linkCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Token</Label>
+              <div className="flex items-start gap-2">
+                <code className="flex-1 break-all rounded-md bg-muted px-3 py-2 text-sm">
+                  {token}
+                </code>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Copy token"
+                  onClick={() => copy(token, "Token", setCopied)}
+                >
+                  {copied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
+                </Button>
+              </div>
             </div>
             <DialogFooter>
               <Button onClick={() => onOpenChange(false)}>Done</Button>

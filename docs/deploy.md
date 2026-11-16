@@ -65,7 +65,7 @@ Upgrading an existing stack:
 
 A venue `admin` adds staff with an invitation, with no change to `SIGNUP` and no SQL. It works under `open`, `first-user` and `closed`. See [ADR-0006](adr/0006-staff-invitations.md).
 
-An admin creates and revokes invitations on the Team screen of the staff app, or through the API with a signed-in session. Redeeming still goes through the API. Invitations are created through a staff session. An API key, an `admin` key included, is refused.
+An admin creates and revokes invitations on the Team screen of the staff app, or through the API with a signed-in session. The invitee redeems in the staff app too, from the invite link the dialog shows. Invitations are created through a staff session. An API key, an `admin` key included, is refused.
 
 1. The admin signs in and creates the invitation. Give an `email` to hold it for one address, or leave it out for an open link. It expires after 72 hours unless `expiresInHours` says otherwise, up to 336.
 
@@ -75,9 +75,9 @@ An admin creates and revokes invitations on the Team screen of the staff app, or
      -d '{"role":"write","email":"maria@example.com"}'
    ```
 
-2. The response holds a `token`. It is shown once, because the API stores only a hash. Send it to the person over a private channel. The API sends no email.
-3. A person who already has an account signs in and sends `POST /v1/invitations/redeem` with `{"token": "..."}`.
-4. A person with no account signs up with the token in the `X-Invitation-Token` header on `POST /api/auth/sign-up/email`. A sign-up with a valid token works even when `SIGNUP=closed`. A sign-up without one is still refused with `SIGNUP_CLOSED`.
+2. The response holds a `token`. It is shown once, because the API stores only a hash. The Team dialog shows it with a ready-to-copy link, `https://your-domain/#/invite?token=TOKEN`. Send the link or the token to the person over a private channel. The API sends no email. The token sits in the URL fragment, so it never reaches Caddy or its logs, and the staff app removes it from the address bar as soon as it reads it.
+3. A person who already has an account opens the link, signs in if needed, and presses Join. Through the API, they send `POST /v1/invitations/redeem` with `{"token": "..."}`.
+4. A person with no account opens the link and signs up on that page, which sends the token in the `X-Invitation-Token` header on `POST /api/auth/sign-up/email`. Without the app, send that header yourself. A sign-up with a valid token works even when `SIGNUP=closed`. A sign-up without one is still refused with `SIGNUP_CLOSED`.
 
 Each invitation works once. The invitee gets the invited role in that one venue, and redeeming never creates a venue. `GET /v1/venues/VENUE_ID/invitations` lists them, and `DELETE /v1/venues/VENUE_ID/invitations/INVITATION_ID` revokes a pending one. Revoking does not remove a member who already redeemed. Use the members routes for that, below.
 

@@ -13,7 +13,13 @@ interface SignUpValues {
   password: string;
 }
 
-export function SignUpForm() {
+export function SignUpForm({
+  invitationToken,
+  onSuccess,
+}: {
+  invitationToken?: string;
+  onSuccess?: () => void;
+}) {
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -23,11 +29,18 @@ export function SignUpForm() {
 
   async function onSubmit(values: SignUpValues) {
     setServerError(null);
-    const { error } = await authClient.signUp.email(values);
+    const { error } = await authClient.signUp.email({
+      ...values,
+      ...(invitationToken
+        ? { fetchOptions: { headers: { "X-Invitation-Token": invitationToken } } }
+        : {}),
+    });
     if (error) {
       setServerError(authErrorMessage(error, "Could not create the account."));
       toast.error(authErrorMessage(error, "Could not create the account."));
+      return;
     }
+    onSuccess?.();
   }
 
   return (
