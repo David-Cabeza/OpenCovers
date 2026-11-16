@@ -49,7 +49,7 @@ An explicit overbooking ceiling per venue (default 0, enforced under a per-venue
 
 ### 👥 Staff access you control
 
-A venue admin invites staff and removes members from the staff app, with the roles `read`, `write`, and `admin` applied to keys and sessions. Sign-up is controlled with the `SIGNUP` setting, only the owner creates venues on closed instances, and sign-in, sign-up and invitation redemption are rate limited.
+A venue admin invites staff and removes members through the API, with no SQL (the staff app has no screen for this yet), with the roles `read`, `write`, and `admin` applied to keys and sessions. Sign-up is controlled with the `SIGNUP` setting, only the owner creates venues on closed instances, and sign-in, sign-up and invitation redemption are rate limited.
 
 ### 🤖 An MCP server
 
