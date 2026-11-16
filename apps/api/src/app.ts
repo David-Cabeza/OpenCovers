@@ -22,6 +22,7 @@ import {
 import { createRateLimiter, rateLimitConfigFromEnv } from "./lib/rate-limit";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import { mayCreateVenue, signupMode } from "./lib/signup";
+import { listMembers, removeMember } from "./lib/members";
 import {
   deleteService,
   deleteTable,
@@ -90,6 +91,8 @@ const HTTP_STATUS: Record<string, number> = {
   invalid_invitation: 400,
   invitation_not_found: 404,
   invitation_redeemed: 409,
+  member_not_found: 404,
+  last_admin: 409,
   unauthorized: 401,
   forbidden: 403,
   venue_creation_closed: 403,
@@ -229,6 +232,19 @@ app.delete("/v1/venues/:venueId/invitations/:invitationId", adminOnly, staffSess
   const result = await revokeInvitation(db, c.req.param("venueId"), c.req.param("invitationId"));
   if (!result.ok) return mapError(c, result.code);
   return c.json({ invitation: result.invitation });
+});
+
+app.get("/v1/venues/:venueId/members", adminOnly, staffSessionOnly, async (c) => {
+  const members = await listMembers(db, c.req.param("venueId"));
+  return c.json({ members });
+});
+
+app.delete("/v1/venues/:venueId/members/:userId", adminOnly, staffSessionOnly, async (c) => {
+  const user = await sessionUser(c);
+  if (!user) return error(c, "unauthorized", 401);
+  const result = await removeMember(db, c.req.param("venueId"), user.id, c.req.param("userId"));
+  if (!result.ok) return mapError(c, result.code);
+  return c.json({ member: result.member });
 });
 
 app.post("/v1/invitations/redeem", async (c) => {

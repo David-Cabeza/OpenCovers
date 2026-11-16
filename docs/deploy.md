@@ -79,7 +79,7 @@ The API is ready. The staff app screen is not built yet, so for now an admin cal
 3. A person who already has an account signs in and sends `POST /v1/invitations/redeem` with `{"token": "..."}`.
 4. A person with no account signs up with the token in the `X-Invitation-Token` header on `POST /api/auth/sign-up/email`. A sign-up with a valid token works even when `SIGNUP=closed`. A sign-up without one is still refused with `SIGNUP_CLOSED`.
 
-Each invitation works once. The invitee gets the invited role in that one venue, and redeeming never creates a venue. `GET /v1/venues/VENUE_ID/invitations` lists them, and `DELETE /v1/venues/VENUE_ID/invitations/INVITATION_ID` revokes a pending one. Revoking does not remove a member who already redeemed, and there is no endpoint for that yet. To remove one, delete their `venue_memberships` row.
+Each invitation works once. The invitee gets the invited role in that one venue, and redeeming never creates a venue. `GET /v1/venues/VENUE_ID/invitations` lists them, and `DELETE /v1/venues/VENUE_ID/invitations/INVITATION_ID` revokes a pending one. Revoking does not remove a member who already redeemed. Use the members routes for that, below.
 
 An invited account cannot create a venue of its own under `first-user` or `closed`. See [Who can create a venue](#who-can-create-a-venue). Redemption is rate limited per address, see [Rate limiting](#rate-limiting), but keep invitation tokens private and short lived.
 
@@ -126,6 +126,22 @@ A budget is `max/window`, with a window in `s`, `m` or `h`. An unknown value sto
 - Staff in one venue usually share one public address. The defaults allow a shift change. Raise `RATE_LIMIT_AUTH` if a venue is large.
 - Behind a venue's shared network, one abusive device can spend the budget for everyone there until the window ends.
 - The limiter is off unless `NODE_ENV=production` or `RATE_LIMIT=on`, so `pnpm dev` needs no setting. The image and `compose.prod.yaml` set both. Outside Docker, set `NODE_ENV=production` or `RATE_LIMIT=on`, or the API runs with no limits. It logs one line at startup that says which.
+
+### Seeing and removing staff
+
+A venue `admin` with a staff session lists who has access and removes someone. An API key is refused, an `admin` key included. The staff app has no screen for this yet. See [ADR-0009](adr/0009-venue-members.md).
+
+```sh
+curl https://your-domain/v1/venues/VENUE_ID/members -H 'Cookie: SESSION_COOKIE'
+curl -X DELETE https://your-domain/v1/venues/VENUE_ID/members/USER_ID -H 'Cookie: SESSION_COOKIE'
+```
+
+- The list shows each member's `userId`, `name`, `email` and `role`. `userId` is the handle for removal.
+- The person loses access to that venue on their next request. Their account stays, and so do their other venues.
+- A venue keeps at least one `admin`. Removing the last one, yourself included, fails with `last_admin`. Invite another admin first.
+- There is no role change. Remove the person and invite them again at the new role.
+- Removal does not revoke API keys or webhook endpoints the person created, because they belong to the venue and not to a user. After a leaver who handled keys, review `GET /v1/venues/VENUE_ID/keys` and revoke what they held.
+- Nothing records who removed whom. Keep your own note if you need one.
 
 ## Public site
 

@@ -252,6 +252,12 @@ On an instance that is not `SIGNUP=open`, an invited account never creates a ven
 
 Acceptance: conformance case C29. Under `first-user` and `closed`, an account invited as `read`, `write`, or `admin` cannot create a venue, and the first owner can. Under `open` nothing changes.
 
+### REQ-C7 Venue members
+
+A venue `admin` can see who has access to the venue and remove someone, with no SQL. The list shows each member's name, email and role, and only for that venue. A removed person loses access to that venue on their next request and keeps their account. A venue always keeps at least one `admin`, even when two admins remove each other at the same moment. Only a staff session with the `admin` role lists or removes members. A key does not, whatever its role. Removal does not revoke API keys, which belong to integrations, and is not recorded in the event feed. There is no role change. See ADR-0009.
+
+Acceptance: conformance case C30. Concurrent removals leave at least one admin. A member of another venue is not found. A removed person's next request fails with `venue_not_found`, and they can be invited again.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:
@@ -264,3 +270,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C6: turning the engine on without a notice address fails, and clearing the address while on fails.
 - C26: a reservation without a table cannot be seated and fails with `table_required`. Staff assign a table with a modify first, and a taken table fails with `slot_taken`.
 - C28: an address that spends its budget of sign-in, sign-up or invitation calls gets `429` with `rate_limited` and `Retry-After`, the same answer whatever the request names. Reads and `/health` pass. C27 is reserved for staff invitations.
+- C30: a venue admin lists and removes members, a venue always keeps one admin even under concurrent removals, and a removed person gets `venue_not_found`.
