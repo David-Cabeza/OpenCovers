@@ -229,7 +229,14 @@ app.post("/v1/venues/:venueId/invitations", adminOnly, staffSessionOnly, async (
 });
 
 app.delete("/v1/venues/:venueId/invitations/:invitationId", adminOnly, staffSessionOnly, async (c) => {
-  const result = await revokeInvitation(db, c.req.param("venueId"), c.req.param("invitationId"));
+  const user = await sessionUser(c);
+  if (!user) return error(c, "unauthorized", 401);
+  const result = await revokeInvitation(
+    db,
+    c.req.param("venueId"),
+    c.req.param("invitationId"),
+    user.id,
+  );
   if (!result.ok) return mapError(c, result.code);
   return c.json({ invitation: result.invitation });
 });

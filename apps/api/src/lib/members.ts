@@ -1,5 +1,6 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { user, venueMemberships } from "../db/schema";
+import { recordMembershipAudit } from "./membership-audit";
 import type { Db, Role } from "./memberships";
 
 export interface MemberView {
@@ -56,6 +57,12 @@ export async function removeMember(
     await tx
       .delete(venueMemberships)
       .where(and(eq(venueMemberships.venueId, venueId), eq(venueMemberships.userId, targetId)));
+    await recordMembershipAudit(tx, venueId, {
+      action: "member_removed",
+      actorUserId: actorId,
+      targetUserId: targetId,
+      role: target.role as Role,
+    });
     return { ok: true, member: { userId: targetId, role: target.role as Role } };
   });
 }

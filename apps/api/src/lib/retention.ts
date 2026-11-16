@@ -1,5 +1,5 @@
 import { and, eq, gte, inArray, isNotNull, isNull, lt, ne, notExists, or } from "drizzle-orm";
-import { guestAudit, guests, reservations, venues, waitlist } from "../db/schema";
+import { guestAudit, guests, membershipAudit, reservations, venues, waitlist } from "../db/schema";
 import { forgetMergeState } from "./guests";
 import { deleteLapsedInvitations } from "./invitations";
 import { pruneEvents } from "./reservations";
@@ -27,6 +27,7 @@ export async function runRetention(
     await inBatches(batch, (limit) => expireGuests(db, venue.id, cutoff, limit));
     await inBatches(batch, (limit) => expireUnlinkedReservations(db, venue.id, cutoff, limit));
     await inBatches(batch, (limit) => expireWaitlist(db, venue.id, cutoff, limit));
+    await inBatches(batch, (limit) => expireMembershipAudit(db, venue.id, cutoff, limit));
   }
 }
 
@@ -137,4 +138,26 @@ async function expireWaitlist(db: Db, venueId: string, cutoff: Date, limit: numb
     .where(and(eq(waitlist.venueId, venueId), inArray(waitlist.id, due)))
     .returning({ id: waitlist.id });
   return deleted.length;
+}
+
+async function expireMembershipAudit(
+  db: Db,
+  venueId: string,
+  cutoff: Date,
+  limit: number,
+): Promise<number> {
+  const due = await db
+    .select({ id: membershipAudit.id })
+    .from(membershipAudit)
+    .where(and(eq(membershipAudit.venueId, venueId), lt(membershipAudit.occurredAt, cutoff)))
+    .orderBy(membershipAudit.occurredAt, membershipAudit.id)
+    .limit(limit);
+  if (due.length === 0) return 0;
+  await db.delete(membershipAudit).where(
+    inArray(
+      membershipAudit.id,
+      due.map((r) => r.id),
+    ),
+  );
+  return due.length;
 }
