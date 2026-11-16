@@ -352,7 +352,7 @@ function Features() {
           onClick={() => toggle(i)}
         >
           <div className="txt">
-            <h3 className="s">{b.s}</h3>
+            <h2 className="s">{b.s}</h2>
             <p className="c">{b.c}</p>
           </div>
           <button
