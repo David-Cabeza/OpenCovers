@@ -1,3 +1,4 @@
+import { oauthProviderAuthServerMetadata } from "@better-auth/oauth-provider";
 import { Hono, type MiddlewareHandler } from "hono";
 import { and, eq } from "drizzle-orm";
 import { account as authAccounts } from "./db/schema";
@@ -20,7 +21,7 @@ import {
   encodeAuditCursor,
   listMembershipAudit,
 } from "./lib/membership-audit";
-import { auth, trustedOrigins } from "./lib/auth";
+import { auth, mcpRemote, trustedOrigins } from "./lib/auth";
 import { getReservationTrace } from "./lib/reservation-trace";
 import { staffOriginGuard } from "./lib/staff-origin";
 import { CHANNEL_HEADER, keyOrigin, sessionOrigin, WIDGET, type Origin } from "./lib/origin";
@@ -195,6 +196,12 @@ app.use("/v1/*", staffOriginGuard(trustedOrigins));
 app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
 
 app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+
+if (mcpRemote) {
+  // RFC 8414 places the metadata of the issuer <origin>/api/auth at this path.
+  const authServerMetadata = oauthProviderAuthServerMetadata(auth);
+  app.get("/.well-known/oauth-authorization-server/api/auth", (c) => authServerMetadata(c.req.raw));
+}
 
 // The staff app asks this before it shows a sign-in form (ADR-0022). Demo off: `enabled: false` and nothing else.
 // Signed in with a sandbox: that session's own sandbox, and no one else's.
