@@ -428,6 +428,96 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/public-profile:
+    get:
+      operationId: venue.getPublicProfile
+      summary: Read the venue's public profile fields
+      description: |
+        The fields behind `public.jsonld`, for staff. Any role of the venue
+        reads them. Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The public profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicProfile" }
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: venue.setPublicProfile
+      summary: Update the venue's public profile
+      description: |
+        Partial update. A field that is absent stays, and `null` clears it.
+        An invalid field fails with `invalid_request`: a URL that is not
+        `https` or carries credentials, a `country` that is not a supported
+        upper-case ISO 3166-1 alpha-2 code, a string over its length limit,
+        a malformed phone or `priceRange`, or a coordinate out of range.
+        Setting `publicProfileEnabled` to true needs a venue name, `street`,
+        `locality` and `country`. Setting only one of `latitude` and
+        `longitude` is refused. Either failure is `public_profile_incomplete`.
+        The private `noticeAddress` is never published. Admin only. Any other
+        role fails with `forbidden`. Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PublicProfile" }
+      responses:
+        "200":
+          description: The updated public profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicProfile" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/public.jsonld:
+    get:
+      operationId: venue.publicJsonLd
+      summary: The venue as schema.org Restaurant JSON-LD
+      description: |
+        Public. Needs no credentials and is not rate limited (ADR-0007 never
+        limits GET). It returns the document only when the venue turned
+        `publicProfileEnabled` on. An unknown venue and a venue with the
+        profile off give the same `404` with `venue_not_found`, the same body
+        and the same headers. The document holds the venue name, the public
+        address, the optional `url`, `telephone`, `servesCuisine`,
+        `priceRange` and `geo`, one `openingHoursSpecification` entry per
+        service (all seven days), and a `ReserveAction` only when
+        `bookingUrl` is set. It never holds `noticeAddress`, an email, a key
+        or guest data. It carries `ETag` and `Cache-Control: public,
+        max-age=300`, and `If-None-Match` gets `304`.
+        `Access-Control-Allow-Origin` is `*`. Not exposed through MCP.
+        See docs/adr/0012-public-profile-jsonld.md.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: The Restaurant document
+          headers:
+            ETag: { schema: { type: string } }
+            Cache-Control: { schema: { type: string } }
+          content:
+            application/ld+json:
+              schema: { $ref: "#/components/schemas/RestaurantJsonLd" }
+        "304":
+          description: Not modified
+        "404":
+          description: Unknown venue, or the profile is off. Cacheable for 60 seconds.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /venues/{venueId}/services:
     get:
       operationId: venue.listServices
@@ -1751,6 +1841,51 @@ components:
           properties:
             venueId:
               type: string
+
+    PublicProfile:
+      type: object
+      description: |
+        The venue's public data. Separate from the private configuration.
+        Every field is nullable except the flag. See docs/adr/0012-public-profile-jsonld.md.
+      properties:
+        publicProfileEnabled: { type: boolean, default: false }
+        street: { type: string, nullable: true, maxLength: 200 }
+        locality: { type: string, nullable: true, maxLength: 100 }
+        postalCode: { type: string, nullable: true, maxLength: 20 }
+        region: { type: string, nullable: true, maxLength: 100 }
+        country:
+          type: string
+          nullable: true
+          example: ES
+          description: ISO 3166-1 alpha-2, upper case.
+        phone: { type: string, nullable: true, maxLength: 30, example: "+34 910 000 000" }
+        websiteUrl: { type: string, nullable: true, format: uri, maxLength: 2048, description: https only. }
+        bookingUrl:
+          type: string
+          nullable: true
+          format: uri
+          maxLength: 2048
+          description: https only. Adds a ReserveAction to the JSON-LD.
+        cuisine: { type: string, nullable: true, maxLength: 100 }
+        priceRange: { type: string, nullable: true, enum: ["$", "$$", "$$$", "$$$$", null] }
+        latitude: { type: number, nullable: true, minimum: -90, maximum: 90 }
+        longitude: { type: number, nullable: true, minimum: -180, maximum: 180 }
+
+    RestaurantJsonLd:
+      type: object
+      required: ["@context", "@type", name, address]
+      properties:
+        "@context": { type: string, enum: ["https://schema.org"] }
+        "@type": { type: string, enum: [Restaurant] }
+        name: { type: string }
+        address: { type: object }
+        url: { type: string }
+        telephone: { type: string }
+        servesCuisine: { type: string }
+        priceRange: { type: string }
+        geo: { type: object }
+        openingHoursSpecification: { type: array, items: { type: object } }
+        potentialAction: { type: object }
 
     VenueConfig:
       type: object

@@ -46,6 +46,8 @@ export const MESSAGES: Record<string, string> = {
   transient: "Something went wrong on our side. Try again in a moment.",
   // Notices and erasure
   notice_address_required: "Add a notice address before enabling reservations.",
+  public_profile_incomplete:
+    "Add the venue name, street, town and country before publishing the public profile, and give both coordinates or none.",
   stale_second_factor: "Your verification has expired. Verify again and retry.",
   // Feed
   expired_cursor: "That position in the event feed is too old. Start again from the latest events.",

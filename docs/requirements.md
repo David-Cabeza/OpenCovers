@@ -270,6 +270,12 @@ Removing a member also ends what they left behind, in the same transaction, so a
 
 Acceptance: conformance case C32. Keys, endpoints and logins created before the change have no known creator and are not reached.
 
+### REQ-C10 Public venue profile and JSON-LD
+
+A venue can publish structured local data that search engines read from its own pages, without exposing anything private. The venue holds a separate, opt-in public profile (address, phone, website, booking URL, cuisine, price range, optional coordinates) that is never derived from `noticeAddress`. An unauthenticated, cacheable `GET /v1/venues/{venueId}/public.jsonld` returns a schema.org `Restaurant` with the opening hours from the venue's services, and a `ReserveAction` only when a booking URL is set. It answers `venue_not_found` for an unknown venue and for a venue with the profile off, with no difference. URLs are `https` only, the country is ISO 3166-1 alpha-2, and strings are length bounded. Only an admin writes the profile. No guest data is stored or published. See ADR-0012.
+
+Acceptance: conformance case C33. The venue embeds the document in the HTML of its own page, not in an iframe, and Google's Rich Results Test reads it.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:
@@ -285,3 +291,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C30: a venue admin lists and removes members, a venue always keeps one admin even under concurrent removals, and a removed person gets `venue_not_found`.
 - C31: each invitation created or revoked, each redemption and each member removal writes one id-only audit row in the same transaction, and a no-op writes none.
 - C32: removing a member revokes the keys they made in that venue and their sessions when no membership is left, flags their webhooks without deleting them, all or nothing, and an admin reads the venue's membership audit log.
+- C33: a venue with the public profile on serves a credential-free `public.jsonld` Restaurant with hours and no private field, an unknown venue or one with the profile off gives the same `venue_not_found`, and only an admin writes validated fields.
