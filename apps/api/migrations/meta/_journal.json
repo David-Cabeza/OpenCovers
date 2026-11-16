@@ -183,6 +183,13 @@
       "when": 1794780238363,
       "tag": "0025_mean_gateway",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794782096578,
+      "tag": "0026_black_loners",
+      "breakpoints": true
     }
   ]
 }

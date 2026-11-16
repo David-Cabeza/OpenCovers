@@ -413,4 +413,29 @@ export const venueMemberships = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.venueId] })],
 );
 
+export const invitations = pgTable(
+  "invitations",
+  {
+    id: text("id").primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    email: text("email"),
+    tokenHash: text("token_hash").notNull(),
+    invitedBy: text("invited_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
+    redeemedBy: text("redeemed_by").references(() => user.id, { onDelete: "set null" }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("idx_invitations_venue").on(t.venueId, t.createdAt),
+    index("idx_invitations_expires").on(t.expiresAt),
+    check("invitations_role", sql`${t.role} IN ('read', 'write', 'admin')`),
+    check("invitations_not_both", sql`${t.redeemedAt} IS NULL OR ${t.revokedAt} IS NULL`),
+  ],
+);
+
 export const betterAuthSchema = { user, session, account, verification };

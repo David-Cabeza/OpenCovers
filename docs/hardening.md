@@ -58,6 +58,7 @@ If you put another proxy or CDN in front of Caddy, nothing in OpenCovers depends
 - `compose.prod.yaml` defaults to `first-user`. Any other value stops the API at startup. See [Sign-up control](deploy.md#sign-up-control) and [ADR-0005](adr/0005-signup-control.md).
 - Agents and integrations use API keys sent in the `apikey` header. The API stores only the SHA-256 hash of each key.
 - Roles are `read`, `write` and `admin`. A `read` key cannot call a write method. Configuration, tables, services, keys, guest merges and the floor plan require `admin`.
+- Staff are added with invitations. An invitation is single use, expires, and its token is shown once and stored only as a hash. Only a venue `admin` with a staff session creates one. The API does not rate limit redemption attempts, and the staff app has no invitation screen yet.
 - A key is granted to specific venues. A request for a venue the key does not hold returns not found.
 - Give each agent the lowest role that works. The venue keys endpoint accepts only `read` and `write`.
 
@@ -172,10 +173,11 @@ If you maintain your own copy of the Caddyfile or add a third-party script, styl
 
 Close these before you serve real guests, or accept the risk knowingly.
 
-1. **Sign-up and staff access.** The production stack defaults to `SIGNUP=first-user`, so a fork that changes nothing is private after the first account exists. Dev and any run outside compose default to `open`, where anyone who can reach the staff app can create an account and a venue. Venue data stays isolated, but that instance is not private. Four limits remain.
+1. **Sign-up and staff access.** The production stack defaults to `SIGNUP=first-user`, so a fork that changes nothing is private after the first account exists. Dev and any run outside compose default to `open`, where anyone who can reach the staff app can create an account and a venue. Venue data stays isolated, but that instance is not private. Five limits remain.
    - The first visitor to a fresh `first-user` instance becomes the owner. Register your own account before you publish the address.
    - Upgrading changes the compose default from open to `first-user`. An instance that already has accounts closes to new sign-ups on its next `up`. An instance with no accounts stays claimable. If you relied on open sign-up, set `SIGNUP=open` in `.env.prod`.
-   - There is no staff invitation flow yet. Adding a person means setting `SIGNUP=open`, restarting the API, letting them sign up, setting the value back, and inserting a `venue_memberships` row in SQL. The steps are in [Sign-up control](deploy.md#sign-up-control). The flow is planned. See [ADR-0005](adr/0005-signup-control.md).
+   - Staff are added with an invitation through the API, with no SQL. The staff app has no screen for invitations yet, so an admin calls the API by hand, see [Adding staff](deploy.md#adding-staff). The API can list and revoke invitations but cannot list or remove members. See [ADR-0006](adr/0006-staff-invitations.md).
+   - Accounts can still create venues. Any account, an invited one included, can create a venue of its own with `POST /v1/venues`. Venue data stays isolated, but a closed instance is not closed to venue creation by people you invite. Restrict who you invite until the project limits venue creation.
    - If two first sign-ups arrive at the same moment, the database lets one commit. The loser gets a generic failure from the database error, not the `SIGNUP_CLOSED` message. Sign-up is not rate limited. See gap 2.
 2. **No rate limiting in OpenCovers.** Sign-in and the API can be hit as fast as the machine allows. Add limits at your edge (a CDN, a firewall, or a Caddy rate-limit module). The API itself configures none. Better Auth may apply its own defaults to sign-in. This repository does not set or test them.
 3. **No built-in backups.** Backups, restores and off-site copies are your job. The commands above are manual.

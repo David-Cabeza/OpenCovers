@@ -234,6 +234,12 @@ Keys and staff sessions carry a per-venue role, `read`, `write`, or `admin`. A `
 
 Acceptance: conformance case C22. A `read` or `write` key or session that tries an admin operation fails with `forbidden` and changes nothing.
 
+### REQ-C4 Staff invitations
+
+A venue `admin` can add staff without touching the database. An invitation grants one membership, `read`, `write`, or `admin`, in one venue, to whoever redeems its token once before it expires. It may be bound to an email address. An invited sign-up works under every `SIGNUP` mode, creates no venue, and never makes the account the first user. The token is shown once and only a hash is stored. Only a staff session with the `admin` role creates, lists, or revokes invitations. A key does not, whatever its role. See ADR-0006.
+
+Acceptance: conformance case C27. Concurrent redemptions of one token produce one membership and at most one account. Every failed redemption gets the same answer and names no venue. Under `SIGNUP=closed` a sign-up without a valid invitation still fails with `SIGNUP_CLOSED`.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:

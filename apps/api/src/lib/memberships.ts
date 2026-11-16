@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { venueMemberships, venues } from "../db/schema";
 import * as schema from "../db/schema";
@@ -16,6 +16,27 @@ export async function addMembership(
     .insert(venueMemberships)
     .values({ userId, venueId, role })
     .onConflictDoUpdate({ target: [venueMemberships.userId, venueMemberships.venueId], set: { role } });
+}
+
+function roleRank(column: SQL) {
+  return sql`(CASE ${column} WHEN 'admin' THEN 3 WHEN 'write' THEN 2 ELSE 1 END)`;
+}
+
+export async function grantMembership(
+  db: Pick<Db, "execute">,
+  userId: string,
+  venueId: string,
+  role: Role,
+): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO venue_memberships (user_id, venue_id, role)
+    VALUES (${userId}, ${venueId}, ${role})
+    ON CONFLICT (user_id, venue_id) DO UPDATE SET role = CASE
+      WHEN ${roleRank(sql`excluded.role`)} > ${roleRank(sql`venue_memberships.role`)}
+      THEN excluded.role
+      ELSE venue_memberships.role
+    END
+  `);
 }
 
 export async function getMembership(

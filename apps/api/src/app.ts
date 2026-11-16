@@ -11,6 +11,14 @@ import {
   revokeVenueKey,
 } from "./lib/api-keys";
 import { auth } from "./lib/auth";
+import {
+  createInvitation,
+  isExpiryHours,
+  isInvitationEmail,
+  listInvitations,
+  redeemInvitation,
+  revokeInvitation,
+} from "./lib/invitations";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import {
   deleteService,
@@ -77,6 +85,9 @@ import {
 
 const HTTP_STATUS: Record<string, number> = {
   invalid_request: 400,
+  invalid_invitation: 400,
+  invitation_not_found: 404,
+  invitation_redeemed: 409,
   unauthorized: 401,
   forbidden: 403,
   reservation_not_found: 404,
@@ -175,6 +186,53 @@ app.post("/v1/venues", async (c) => {
     timezone: typeof body.timezone === "string" ? body.timezone : undefined,
   });
   return c.json({ venue: { id, name: body.name } }, 201);
+});
+
+const staffSessionOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (c.req.header("apikey")) return error(c, "forbidden", 403);
+  await next();
+};
+
+app.get("/v1/venues/:venueId/invitations", adminOnly, staffSessionOnly, async (c) => {
+  const invitations = await listInvitations(db, c.req.param("venueId"));
+  return c.json({ invitations });
+});
+
+app.post("/v1/venues/:venueId/invitations", adminOnly, staffSessionOnly, async (c) => {
+  const user = await sessionUser(c);
+  if (!user) return error(c, "unauthorized", 401);
+  const body = await c.req.json().catch(() => null);
+  if (
+    !isRole(body?.role) ||
+    (body.email !== undefined && !isInvitationEmail(body.email)) ||
+    (body.expiresInHours !== undefined && !isExpiryHours(body.expiresInHours))
+  ) {
+    return error(c, "invalid_request", 400);
+  }
+  const { invitation, token } = await createInvitation(db, c.req.param("venueId"), user.id, {
+    role: body.role,
+    email: body.email,
+    expiresInHours: body.expiresInHours,
+  });
+  return c.json({ invitation: { ...invitation, token } }, 201);
+});
+
+app.delete("/v1/venues/:venueId/invitations/:invitationId", adminOnly, staffSessionOnly, async (c) => {
+  const result = await revokeInvitation(db, c.req.param("venueId"), c.req.param("invitationId"));
+  if (!result.ok) return mapError(c, result.code);
+  return c.json({ invitation: result.invitation });
+});
+
+app.post("/v1/invitations/redeem", async (c) => {
+  const user = await sessionUser(c);
+  if (!user) return error(c, "unauthorized", 401);
+  const body = await c.req.json().catch(() => null);
+  if (typeof body?.token !== "string" || body.token === "") {
+    return error(c, "invalid_request", 400);
+  }
+  const membership = await redeemInvitation(db, body.token, user);
+  if (!membership) return error(c, "invalid_invitation", 400);
+  return c.json({ membership });
 });
 
 app.get("/v1/auth/keys", async (c) => {

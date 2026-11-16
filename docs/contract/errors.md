@@ -41,6 +41,14 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 - `guest_not_merged`: the guest to unmerge is not merged.
 - `unmerge_unavailable`: the merge cannot be undone because its audit entry is missing or was cleared by erasure or retention.
 
+## Invitations
+
+- `invalid_invitation`: the token does not redeem. The id is unknown, the secret is wrong, or the invitation is expired, used, revoked, or bound to another email. One answer for every cause.
+- `invitation_not_found`: the invitation does not exist, or belongs to another venue. Indistinguishable from not found.
+- `invitation_redeemed`: the invitation is already redeemed, so it cannot be revoked.
+
+A sign-up with a bad `X-Invitation-Token` fails on the auth route with `403` and the code `INVALID_INVITATION`. Auth routes are outside this contract.
+
 ## Idempotency and outcome
 
 - `idempotency_in_flight`: a write with this key is already running.

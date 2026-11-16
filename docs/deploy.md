@@ -61,7 +61,27 @@ Upgrading an existing stack:
 - The default for `compose.prod.yaml` changed from open to `first-user`. If you relied on open sign-up, set `SIGNUP=open` in `.env.prod`.
 - The release adds a column and an index to the `user` table. The API applies the migration on boot.
 
-There is no way to add staff in the product yet. To add a person to an existing venue, set `SIGNUP=open`, run `docker compose -f compose.prod.yaml --env-file .env.prod up -d api`, let them sign up, set the value back and restart. Then add them to the venue by inserting a row into `venue_memberships` with their user id, the venue id and a role of `read`, `write` or `admin`. A staff invitation flow is planned. See [ADR-0005](adr/0005-signup-control.md).
+### Adding staff
+
+A venue `admin` adds staff with an invitation, with no change to `SIGNUP` and no SQL. It works under `open`, `first-user` and `closed`. See [ADR-0006](adr/0006-staff-invitations.md).
+
+The API is ready. The staff app screen is not built yet, so for now an admin calls the API with a signed-in session. Invitations are created through a staff session. An API key, an `admin` key included, is refused.
+
+1. The admin signs in and creates the invitation. Give an `email` to hold it for one address, or leave it out for an open link. It expires after 72 hours unless `expiresInHours` says otherwise, up to 336.
+
+   ```sh
+   curl -X POST https://your-domain/v1/venues/VENUE_ID/invitations \
+     -H 'Cookie: SESSION_COOKIE' -H 'Content-Type: application/json' \
+     -d '{"role":"write","email":"maria@example.com"}'
+   ```
+
+2. The response holds a `token`. It is shown once, because the API stores only a hash. Send it to the person over a private channel. The API sends no email.
+3. A person who already has an account signs in and sends `POST /v1/invitations/redeem` with `{"token": "..."}`.
+4. A person with no account signs up with the token in the `X-Invitation-Token` header on `POST /api/auth/sign-up/email`. A sign-up with a valid token works even when `SIGNUP=closed`. A sign-up without one is still refused with `SIGNUP_CLOSED`.
+
+Each invitation works once. The invitee gets the invited role in that one venue, and redeeming never creates a venue. `GET /v1/venues/VENUE_ID/invitations` lists them, and `DELETE /v1/venues/VENUE_ID/invitations/INVITATION_ID` revokes a pending one. Revoking does not remove a member who already redeemed, and there is no endpoint for that yet. To remove one, delete their `venue_memberships` row.
+
+An invited account can still create a venue of its own with `POST /v1/venues`, as any account can. See the hardening guide, known gaps. The API has no rate limiting, so keep invitation tokens private and short lived.
 
 ## Public site
 
