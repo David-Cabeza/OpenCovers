@@ -1,12 +1,47 @@
 {
   "name": "@opencovers/mcp",
-  "private": true,
+  "version": "0.1.0",
+  "description": "MCP server for the OpenCovers restaurant reservation engine: availability, bookings, tables and waitlist over stdio.",
+  "mcpName": "io.github.David-Cabeza/opencovers",
+  "license": "Apache-2.0",
+  "homepage": "https://opencovers.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/David-Cabeza/OpenCovers.git",
+    "directory": "apps/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/David-Cabeza/OpenCovers/issues"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "restaurant",
+    "reservations",
+    "booking",
+    "opencovers"
+  ],
   "type": "module",
+  "bin": {
+    "opencovers-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.9.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "inspector": "npx @modelcontextprotocol/inspector tsx src/index.ts"
+    "inspector": "npx @modelcontextprotocol/inspector tsx src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
