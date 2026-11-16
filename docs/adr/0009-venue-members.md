@@ -79,7 +79,7 @@ This lock is the guarantee, and it holds for every caller of this code. It does 
 ### What removal does and does not reach
 
 - **Sessions.** Removed. Access is checked against the membership on every request, so the person's next request to this venue fails with `venue_not_found`. Their session is not revoked, because it also serves their other venues.
-- **The account.** Kept. Better Auth owns it, and the person may belong to other venues. With no membership left, the account signs in and `GET /v1/venues` returns an empty list. It can still call `POST /v1/venues` and create a venue of its own, which is hardening known gap 1, unchanged.
+- **The account.** Kept. Better Auth owns it, and the person may belong to other venues. With no membership left, the account signs in and `GET /v1/venues` returns an empty list. Under `SIGNUP=open` it can still call `POST /v1/venues` and create a venue of its own. Under `first-user` and `closed` it cannot, see [ADR-0008](0008-venue-creation-limit.md).
 - **API keys.** Not affected. A key belongs to an integration, not to a user, and no column links a key to the person who created it. A key the removed person made keeps working until an admin revokes it. The admin should review `GET /v1/venues/{venueId}/keys` after removing someone who handled keys. The same holds for webhook endpoints.
 - **Past records.** Not rewritten. Events and reservations keep the `principal` text, which is the email of whoever acted. Removal does not edit history.
 - **Invitations.** A removed person's earlier invitation stays redeemed. It cannot be used again. To bring the person back, an admin creates a new one, and redeeming it grants a fresh membership.
