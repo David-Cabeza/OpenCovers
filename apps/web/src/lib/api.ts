@@ -1,4 +1,6 @@
-export type Role = "read" | "write" | "admin";
+import type { PublicProfile } from "@/lib/public-profile";
+
+export type Role ="read" | "write" | "admin";
 
 export interface Venue {
   id: string;
@@ -313,6 +315,16 @@ export const api = {
   ) =>
     request<VenueConfig>(`/v1/venues/${venueId}/config`, {
       method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  getPublicProfile: (venueId: string) =>
+    request<PublicProfile>(`/v1/venues/${venueId}/public-profile`),
+
+  setPublicProfile: (venueId: string, body: Partial<PublicProfile>) =>
+    request<PublicProfile>(`/v1/venues/${venueId}/public-profile`, {
+      method: "PUT",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
       body: JSON.stringify(body),
     }),
 
