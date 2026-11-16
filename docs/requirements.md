@@ -264,6 +264,12 @@ An admin can tell who invited, who joined and who was removed, because every cha
 
 Acceptance: conformance case C31. Each event writes one row with the right action, actor, target, invitation and role. A repeated revoke, a refused removal and a refused redemption write none. A venue sees only its own rows. Concurrent redemptions write one `redeemed` row.
 
+### REQ-C9 Member removal revokes what the person left behind
+
+Removing a member also ends what they left behind, in the same transaction, so a leaver cannot keep working credentials unnoticed. It revokes the API keys the person made in that venue. It revokes all their sessions when the removal was their last membership, and keeps them when the person still belongs to another venue. It marks the webhook endpoints the person made as created by a departed member, without deleting or disabling them, and the webhook list shows it. A failure anywhere rolls the whole removal back, and a refused removal revokes nothing. A venue `admin` reads the membership audit log of REQ-C8, newest first, with cursor pagination, and another venue's log is not found. See ADR-0011.
+
+Acceptance: conformance case C32. Keys, endpoints and logins created before the change have no known creator and are not reached.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:
@@ -278,3 +284,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C28: an address that spends its budget of sign-in, sign-up or invitation calls gets `429` with `rate_limited` and `Retry-After`, the same answer whatever the request names. Reads and `/health` pass. C27 is reserved for staff invitations.
 - C30: a venue admin lists and removes members, a venue always keeps one admin even under concurrent removals, and a removed person gets `venue_not_found`.
 - C31: each invitation created or revoked, each redemption and each member removal writes one id-only audit row in the same transaction, and a no-op writes none.
+- C32: removing a member revokes the keys they made in that venue and their sessions when no membership is left, flags their webhooks without deleting them, all or nothing, and an admin reads the venue's membership audit log.

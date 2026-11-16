@@ -244,6 +244,11 @@ export const webhookEndpoints = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // Set only for endpoints created by a staff session after ADR-0011.
+    // Older rows and endpoints created with a key stay null (unknown).
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    // Set when the creator is removed from the venue. The endpoint keeps working.
+    creatorDepartedAt: timestamp("creator_departed_at", { withTimezone: true }),
   },
   (t) => [
     index("idx_webhook_endpoints_venue").on(t.venueId),
@@ -327,6 +332,9 @@ export const apiKeys = pgTable("api_keys", {
   hash: text("hash").primaryKey(),
   principal: text("principal").notNull(),
   role: text("role").notNull().default("read"),
+  // The staff member who minted the key. Null for keys made before ADR-0011
+  // and for keys made through the global admin-key route.
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
 });
 
 export const grants = pgTable(

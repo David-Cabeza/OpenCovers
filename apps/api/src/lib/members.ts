@@ -1,5 +1,5 @@
-import { and, asc, eq, sql } from "drizzle-orm";
-import { user, venueMemberships } from "../db/schema";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { apiKeys, grants, session, user, venueMemberships, webhookEndpoints } from "../db/schema";
 import { recordMembershipAudit } from "./membership-audit";
 import type { Db, Role } from "./memberships";
 
@@ -26,7 +26,11 @@ export async function listMembers(db: Db, venueId: string): Promise<MemberView[]
 }
 
 export type RemoveResult =
-  | { ok: true; member: { userId: string; role: Role } }
+  | {
+      ok: true;
+      member: { userId: string; role: Role };
+      revoked: { keys: number; sessions: number; webhooksFlagged: number };
+    }
   | { ok: false; code: "venue_not_found" | "member_not_found" | "last_admin" };
 
 export async function removeMember(
@@ -63,6 +67,49 @@ export async function removeMember(
       targetUserId: targetId,
       role: target.role as Role,
     });
-    return { ok: true, member: { userId: targetId, role: target.role as Role } };
+
+    // Keys this person minted for this venue lose this venue's grant, the same
+    // as an admin revoking them. A key with no grant left is deleted.
+    const mine = await tx
+      .select({ hash: apiKeys.hash })
+      .from(apiKeys)
+      .innerJoin(grants, eq(grants.keyHash, apiKeys.hash))
+      .where(and(eq(apiKeys.createdBy, targetId), eq(grants.venueId, venueId)));
+    for (const { hash } of mine) {
+      await tx.delete(grants).where(and(eq(grants.keyHash, hash), eq(grants.venueId, venueId)));
+      const left = await tx.select().from(grants).where(eq(grants.keyHash, hash)).limit(1);
+      if (left.length === 0) await tx.delete(apiKeys).where(eq(apiKeys.hash, hash));
+    }
+
+    // Sessions belong to the account, not to a venue. Revoke them only when
+    // this was the account's last membership, so other venues keep working.
+    const [stillMember] = await tx
+      .select({ venueId: venueMemberships.venueId })
+      .from(venueMemberships)
+      .where(eq(venueMemberships.userId, targetId))
+      .limit(1);
+    const sessionsRevoked = stillMember
+      ? 0
+      : (await tx.delete(session).where(eq(session.userId, targetId)).returning({ id: session.id }))
+          .length;
+
+    // Webhooks keep delivering. Mark them so an admin can review.
+    const flagged = await tx
+      .update(webhookEndpoints)
+      .set({ creatorDepartedAt: sql`now()` })
+      .where(
+        and(
+          eq(webhookEndpoints.venueId, venueId),
+          eq(webhookEndpoints.createdBy, targetId),
+          isNull(webhookEndpoints.creatorDepartedAt),
+        ),
+      )
+      .returning({ id: webhookEndpoints.id });
+
+    return {
+      ok: true,
+      member: { userId: targetId, role: target.role as Role },
+      revoked: { keys: mine.length, sessions: sessionsRevoked, webhooksFlagged: flagged.length },
+    };
   });
 }

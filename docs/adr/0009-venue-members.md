@@ -1,6 +1,6 @@
 # ADR-0009: Venue members
 
-- Status: Proposed
+- Status: Proposed. The limits on sessions, keys and webhooks are replaced by [ADR-0011](0011-member-removal-revocation.md), and the missing audit by [ADR-0010](0010-membership-audit.md).
 - Date: 2026-11-16
 - Deciders: David Cabeza
 

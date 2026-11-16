@@ -129,7 +129,7 @@ A budget is `max/window`, with a window in `s`, `m` or `h`. An unknown value sto
 
 ### Seeing and removing staff
 
-A venue `admin` with a staff session lists who has access and removes someone. An API key is refused, an `admin` key included. The Team screen of the staff app does both. See [ADR-0009](adr/0009-venue-members.md).
+A venue `admin` with a staff session lists who has access and removes someone. An API key is refused, an `admin` key included. The Team screen of the staff app does both. See [ADR-0009](adr/0009-venue-members.md) and [ADR-0011](adr/0011-member-removal-revocation.md).
 
 ```sh
 curl https://your-domain/v1/venues/VENUE_ID/members -H 'Cookie: SESSION_COOKIE'
@@ -137,11 +137,12 @@ curl -X DELETE https://your-domain/v1/venues/VENUE_ID/members/USER_ID -H 'Cookie
 ```
 
 - The list shows each member's `userId`, `name`, `email` and `role`. `userId` is the handle for removal.
-- The person loses access to that venue on their next request. Their account stays, and so do their other venues.
+- The person loses access to that venue on their next request. Their account stays, and so do their other venues. When this was their last membership, their sessions are revoked too, so they must sign in again and then see no venue. When they still belong to another venue, their sessions are kept, because a session belongs to the account and not to a venue.
 - A venue keeps at least one `admin`. Removing the last one, yourself included, fails with `last_admin`. Invite another admin first.
 - There is no role change. Remove the person and invite them again at the new role.
-- Removal does not revoke API keys or webhook endpoints the person created, because they belong to the venue and not to a user. After a leaver who handled keys, review `GET /v1/venues/VENUE_ID/keys` and revoke what they held.
-- Nothing records who removed whom. Keep your own note if you need one.
+- Removal revokes the API keys the person made in this venue, and the response counts them under `revoked`. Keys made before ADR-0011, and keys made with an `admin` key, have no known creator and are not touched. After a leaver who handled keys, review `GET /v1/venues/VENUE_ID/keys` and revoke what they held.
+- Webhook endpoints the person made keep delivering. They are not deleted or disabled. `GET /v1/venues/VENUE_ID/webhooks` shows `creatorDepartedAt` on them, so review each and delete any you do not trust. Endpoints made before ADR-0011 have no known creator.
+- Invitations created, revoked and redeemed, and removals, are recorded ([ADR-0010](adr/0010-membership-audit.md)). `GET /v1/venues/VENUE_ID/audit` (an `admin` session or key) lists them, newest first, with `limit` and `cursor`. It holds ids and a role only, no emails or tokens.
 
 ## Public site
 
