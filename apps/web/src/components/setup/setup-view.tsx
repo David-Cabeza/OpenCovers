@@ -23,6 +23,7 @@ import {
 import { useServices } from "@/hooks/use-services";
 import { useTables } from "@/hooks/use-tables";
 import { api, type Service, type Table as TableInfo } from "@/lib/api";
+import { formatDays } from "@/lib/weekdays";
 import { ServiceFormDialog } from "./service-form-dialog";
 import { TableFormDialog } from "./table-form-dialog";
 import { VenueSettings } from "./venue-settings";
@@ -182,6 +183,7 @@ function ServicesSection({ venueId }: { venueId: string }) {
                 <TableHead>Name</TableHead>
                 <TableHead>Opens</TableHead>
                 <TableHead>Closes</TableHead>
+                <TableHead>Days</TableHead>
                 <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
@@ -191,6 +193,7 @@ function ServicesSection({ venueId }: { venueId: string }) {
                   <TableCell className="font-medium capitalize">{s.name}</TableCell>
                   <TableCell>{s.openStart}</TableCell>
                   <TableCell>{s.openEnd}</TableCell>
+                  <TableCell>{formatDays(s.days)}</TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
                       <Button

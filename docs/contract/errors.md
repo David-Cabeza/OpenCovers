@@ -33,7 +33,7 @@ Every error response is `{"code": "...", "message": "...", "retryable": true|fal
 - `party_size_too_small`: the party is below the minimum of the service that covers the time. Not retryable.
 - `no_suitable_table`: no table combination fits the party, and the venue's overbooking ceiling leaves no room for it. A modify that would leave a booking without tables beyond that ceiling fails with it too. Not retryable.
 - `table_required`: the reservation holds no table, so it cannot be seated. Staff assign a table with a modify first. A modify that would leave a seated reservation without tables fails with it too. Not retryable.
-- `outside_hours`: the time is outside the venue's hours, off the slot grid, or after the last seating. Not retryable.
+- `outside_hours`: the time is outside the venue's hours or on a weekday the service does not open, off the slot grid, or after the last seating. Not retryable.
 - `lead_time_violation`: the booking is too close to the requested time. Not retryable.
 - `beyond_booking_horizon`: the date is further ahead than the venue's `maxAdvanceDays`. Not retryable.
 - `date_blocked`: the venue takes no bookings on that date. Not retryable.

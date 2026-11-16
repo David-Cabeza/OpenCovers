@@ -22,6 +22,8 @@ export interface ServiceInfo {
   openEnd: string;
   minPartySize?: number;
   maxPartySize?: number;
+  /** ISO weekdays (1 Monday to 7 Sunday) the service opens on, ascending. */
+  days: number[];
 }
 
 export interface ServiceInput {
@@ -30,6 +32,17 @@ export interface ServiceInput {
   openEnd: string;
   minPartySize?: number | null;
   maxPartySize?: number | null;
+  days?: number[];
+}
+
+export const ALL_DAYS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
+
+/** A non-empty list of distinct ISO weekdays, 1 to 7. Returns it sorted, or null when invalid. */
+export function parseDays(value: unknown): number[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 7) return null;
+  if (!value.every((d) => Number.isInteger(d) && d >= 1 && d <= 7)) return null;
+  if (new Set(value).size !== value.length) return null;
+  return [...(value as number[])].sort((a, b) => a - b);
 }
 
 export async function listTables(db: Db, venueId: string): Promise<TableInfo[]> {
@@ -111,6 +124,7 @@ export async function listServices(db: Db, venueId: string): Promise<ServiceInfo
     openEnd: s.openEnd,
     ...(s.minPartySize !== null ? { minPartySize: s.minPartySize } : {}),
     ...(s.maxPartySize !== null ? { maxPartySize: s.maxPartySize } : {}),
+    days: [...s.days].sort((a, b) => a - b),
   }));
 }
 
@@ -131,7 +145,8 @@ export async function upsertService(
   if (minPartySize !== null && maxPartySize !== null && minPartySize > maxPartySize) {
     return { ok: false, code: "invalid_request" };
   }
-  const row = { openStart: input.openStart, openEnd: input.openEnd, minPartySize, maxPartySize };
+  const days = input.days ?? current?.days ?? [...ALL_DAYS];
+  const row = { openStart: input.openStart, openEnd: input.openEnd, minPartySize, maxPartySize, days };
   await db
     .insert(services)
     .values({ venueId, name: input.name, ...row })

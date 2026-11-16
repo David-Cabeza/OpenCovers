@@ -47,6 +47,8 @@ export interface Service {
   name: string;
   openStart: string;
   openEnd: string;
+  /** ISO weekdays the service opens on, 1 Monday to 7 Sunday. */
+  days: number[];
 }
 
 export interface VenueConfig {
@@ -274,7 +276,10 @@ export const api = {
   listServices: (venueId: string) =>
     request<{ services: Service[] }>(`/v1/venues/${venueId}/services`),
 
-  upsertService: (venueId: string, body: { name: string; openStart: string; openEnd: string }) =>
+  upsertService: (
+    venueId: string,
+    body: { name: string; openStart: string; openEnd: string; days?: number[] },
+  ) =>
     request<{ services: Service[] }>(`/v1/venues/${venueId}/services`, {
       method: "POST",
       body: JSON.stringify(body),

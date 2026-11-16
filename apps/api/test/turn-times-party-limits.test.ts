@@ -253,8 +253,8 @@ describe("party size limits per service", () => {
     await seedVenue(venueId, [2, 4, 6]);
     expect((await setService(venueId, { minPartySize: 2 })).status).toBe(200);
     expect(await listServices(venueId)).toEqual([
-      { name: "lunch", openStart: "12:00", openEnd: "16:00" },
-      { name: "dinner", openStart: "19:00", openEnd: "23:00", minPartySize: 2 },
+      { name: "lunch", openStart: "12:00", openEnd: "16:00", days: [1, 2, 3, 4, 5, 6, 7] },
+      { name: "dinner", openStart: "19:00", openEnd: "23:00", minPartySize: 2, days: [1, 2, 3, 4, 5, 6, 7] },
     ]);
 
     const rejected = await book(venueId, "20:00", 1);
@@ -272,7 +272,7 @@ describe("party size limits per service", () => {
     expect((await book(venueId, "20:00", 2)).status).toBe(200);
 
     expect((await setService(venueId, { minPartySize: null })).status).toBe(200);
-    expect((await listServices(venueId))[1]).toEqual({ name: "dinner", openStart: "19:00", openEnd: "23:00" });
+    expect((await listServices(venueId))[1]).toEqual({ name: "dinner", openStart: "19:00", openEnd: "23:00", days: [1, 2, 3, 4, 5, 6, 7] });
     expect((await book(venueId, "20:15", 1)).status).toBe(200);
   });
 
@@ -311,6 +311,7 @@ describe("party size limits per service", () => {
       openEnd: "23:30",
       minPartySize: 2,
       maxPartySize: 6,
+      days: [1, 2, 3, 4, 5, 6, 7],
     });
     expect((await setService(venueId, { maxPartySize: 2 })).status).toBe(200);
     expect((await listServices(venueId))[1]).toMatchObject({ minPartySize: 2, maxPartySize: 2 });
@@ -363,8 +364,8 @@ describe("party size limits per service", () => {
     const venueId = "pl-none";
     await seedVenue(venueId, [2, 4, 6]);
     expect(await listServices(venueId)).toEqual([
-      { name: "lunch", openStart: "12:00", openEnd: "16:00" },
-      { name: "dinner", openStart: "19:00", openEnd: "23:00" },
+      { name: "lunch", openStart: "12:00", openEnd: "16:00", days: [1, 2, 3, 4, 5, 6, 7] },
+      { name: "dinner", openStart: "19:00", openEnd: "23:00", days: [1, 2, 3, 4, 5, 6, 7] },
     ]);
     expect((await book(venueId, "20:00", 1)).status).toBe(200);
     expect((await book(venueId, "20:00", 13)).body.code).toBe("party_size_too_large");
@@ -488,7 +489,7 @@ describe("turn time and limit settings", () => {
     expect((await book("ts-iso-a", "13:00", 2)).body.code).toBe("party_size_too_small");
 
     expect(await getConfig("ts-iso-b")).not.toHaveProperty("turnTimes");
-    expect((await listServices("ts-iso-b"))[0]).toEqual({ name: "lunch", openStart: "12:00", openEnd: "16:00" });
+    expect((await listServices("ts-iso-b"))[0]).toEqual({ name: "lunch", openStart: "12:00", openEnd: "16:00", days: [1, 2, 3, 4, 5, 6, 7] });
     expect((await book("ts-iso-b", "13:00", 2)).status).toBe(200);
     expect((await book("ts-iso-b", "20:00", 2)).status).toBe(200);
     expect(await firstFreeAfter("ts-iso-b", "20:00")).toBe("22:00");

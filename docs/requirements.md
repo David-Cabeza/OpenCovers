@@ -288,6 +288,12 @@ A venue can set simple rules for the bookings it takes, so it can refuse booking
 
 Acceptance: conformance case C35. Each rule has its own error code, and concurrent creates by one guest never exceed the cap.
 
+### REQ-C13 Services have weekdays
+
+A venue that closes on some days, or runs a service only on some days, can say so. Each service has an optional set of ISO weekdays (`days`), all seven by default, so existing services and behavior do not change. Create, availability, the availability explanation and the public JSON-LD opening hours all read the same set, using the venue's time zone for the weekday of a date. An overnight service belongs to the day it opens. A walk-in is held to the weekday as it is to the hours. Only an admin sets it. See ADR-0014.
+
+Acceptance: conformance case C36.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:
@@ -306,3 +312,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C33: a venue with the public profile on serves a credential-free `public.jsonld` Restaurant with hours and no private field, an unknown venue or one with the profile off gives the same `venue_not_found`, and only an admin writes validated fields.
 - C34: every error body carries `retryable`, the MCP tool error text says it, and every MCP tool declares its three hints.
 - C35: a venue's optional horizon, per-guest daily cap and blocked dates refuse a create with `beyond_booking_horizon`, `guest_booking_limit` or `date_blocked`, availability and the explanation agree on the first and last, a walk-in is held to none, and the defaults change nothing.
+- C36: a service's optional `days` (all seven by default) limit create, availability, the explanation and the public opening hours to those weekdays in the venue time zone, an overnight service follows the day it opens, a walk-in is held to them, and the three paths agree.

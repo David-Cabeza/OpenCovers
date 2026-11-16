@@ -74,6 +74,13 @@ export function addDays(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 }
 
+// ISO weekday (1 Monday to 7 Sunday) of a calendar date. The date is already the
+// venue's local date, so no time zone is involved.
+export function isoWeekday(date: string): number {
+  const d = new Date(Date.parse(`${date}T00:00:00Z`)).getUTCDay();
+  return d === 0 ? 7 : d;
+}
+
 export function generateSlots(
   openStart: string,
   openEnd: string,

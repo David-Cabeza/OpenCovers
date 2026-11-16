@@ -34,6 +34,7 @@ import {
   deleteService,
   deleteTable,
   listServices,
+  parseDays,
   listTables,
   updateTableLayout,
   upsertService,
@@ -751,7 +752,8 @@ app.post("/v1/venues/:venueId/services", adminOnly, async (c) => {
     typeof body.openStart !== "string" ||
     typeof body.openEnd !== "string" ||
     !isPartyLimit(body.minPartySize) ||
-    !isPartyLimit(body.maxPartySize)
+    !isPartyLimit(body.maxPartySize) ||
+    (body.days !== undefined && parseDays(body.days) === null)
   ) {
     return error(c, "invalid_request");
   }
@@ -761,6 +763,7 @@ app.post("/v1/venues/:venueId/services", adminOnly, async (c) => {
     openEnd: body.openEnd,
     minPartySize: body.minPartySize,
     maxPartySize: body.maxPartySize,
+    days: body.days === undefined ? undefined : (parseDays(body.days) as number[]),
   });
   if (!upserted.ok) return error(c, upserted.code);
   const services = await listServices(db, venueId);

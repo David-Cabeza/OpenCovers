@@ -8,7 +8,7 @@
 
 A venue wants Google to read structured local data (name, address, hours, phone, cuisine, a way to book) from the venue's own pages. The standard way is schema.org `Restaurant` markup as JSON-LD. Phase 11 of the roadmap lists it, and a person asked for it directly.
 
-Everything the API stores about a venue is private by default. The only address is `noticeAddress`, the address that receives guest notices. It may be a personal mailbox, so it must not be published. Venue hours live in `services` (`openStart`, `openEnd`, no weekday, so every service applies every day).
+Everything the API stores about a venue is private by default. The only address is `noticeAddress`, the address that receives guest notices. It may be a personal mailbox, so it must not be published. Venue hours live in `services` (`openStart`, `openEnd`). They had no weekday when this ADR was written, so every service applied every day. [ADR-0014](0014-service-weekdays.md) adds `days`.
 
 Google reads JSON-LD from the HTML of the page it crawls. Markup inside an iframe belongs to the framed page, not to the venue's page. The booking widget does not exist yet, so the data has to be served as a document that the venue's own site embeds in its HTML.
 
@@ -45,7 +45,7 @@ Nullable columns on `venues`, all prefixed `public_`, plus an opt-in flag:
 `GET /v1/venues/{venueId}/public.jsonld` needs no credentials and returns `application/ld+json`:
 
 - `@context` `https://schema.org`, `@type` `Restaurant`, `name`, `address` (`PostalAddress`), and when set: `url`, `telephone`, `servesCuisine`, `priceRange`, `geo` (`GeoCoordinates`).
-- `openingHoursSpecification`: one entry per service, with `dayOfWeek` listing all seven days, `opens` = `openStart`, `closes` = `openEnd`. Omitted when the venue has no services. An overnight service (`closes` before `opens`) is passed through as stored.
+- `openingHoursSpecification`: one entry per service, with `dayOfWeek` listing all seven days (since ADR-0014, the days of that service), `opens` = `openStart`, `closes` = `openEnd`. Omitted when the venue has no services. An overnight service (`closes` before `opens`) is passed through as stored.
 - `potentialAction`: a `ReserveAction` whose target is `bookingUrl`, only when `bookingUrl` is set.
 
 It returns `404 venue_not_found` with the same body and headers when the venue is unknown and when the profile is off. Nothing else about the venue is reachable without credentials.
@@ -72,7 +72,7 @@ A server-side include or a few lines in the venue's site code is enough, with a 
 
 - The staff form for these fields. The API ships first.
 - An MCP tool. MCP wraps authenticated operations for agents. The public document is for web crawlers, so the tool surface is unchanged.
-- Opening hours per weekday, holidays, and `sameAs` social links. Services have no weekday today.
+- Opening hours per weekday (done in ADR-0014), holidays, and `sameAs` social links. Services have no weekday today.
 - Reviews and ratings markup. Ratings are per reservation and private, so none are published.
 
 ## Consequences
@@ -81,7 +81,7 @@ A server-side include or a few lines in the venue's site code is enough, with a 
 
 **Harder.** The route sits above the venue auth middleware, so a later reorder could break it or, worse, widen the exposure. A test pins it. The venue name and hours become public when the flag is on.
 
-**Accepted.** Hours are the same every day. Any caller can read the document, and one with a CDN in front is expected. A `ReserveAction` is valid schema.org, but Google's reservation features need a separate partner program, so the markup alone does not guarantee a Reserve button.
+**Accepted.** Hours were the same every day (changed by ADR-0014). Any caller can read the document, and one with a CDN in front is expected. A `ReserveAction` is valid schema.org, but Google's reservation features need a separate partner program, so the markup alone does not guarantee a Reserve button.
 
 ## Alternatives considered
 

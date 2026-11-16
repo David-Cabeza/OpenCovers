@@ -21,6 +21,7 @@ import { reconfirmationColumns, type Reconfirmation } from "./reconfirmation";
 import {
   addDays,
   formatTime,
+  isoWeekday,
   localDateTime,
   normalizeMinute,
   nowInTimezone,
@@ -123,6 +124,16 @@ export type Reason =
       code: "outside_hours";
       message: string;
       details: { rule: "hours"; services: { name: string; openStart: string; openEnd: string }[] };
+    }
+  | {
+      code: "outside_hours";
+      message: string;
+      details: {
+        rule: "weekday";
+        date: string;
+        weekday: number;
+        services: { name: string; openStart: string; openEnd: string; days: number[] }[];
+      };
     }
   | {
       code: "outside_hours";
@@ -275,14 +286,29 @@ function bookingWindow(venue: VenueRow, request: SlotRequest) {
   return { startsAt, endsAt: new Date(startsAt.getTime() + minutes * 60000) };
 }
 
-function serviceAt(serviceRows: ServiceRow[], time: string): ServiceRow | null {
+// The service that covers a local date and time. A service belongs to the weekday it
+// opens on, so the part of an overnight service after midnight counts against the
+// previous date's weekday. `ignoreDays` finds a service by time alone.
+function serviceAt(
+  serviceRows: ServiceRow[],
+  date: string,
+  time: string,
+  ignoreDays = false,
+): ServiceRow | null {
   const minute = toMinutes(time);
   for (const service of serviceRows) {
     const { start, end } = serviceWindow(service.openStart, service.openEnd);
     const m = normalizeMinute(minute, start);
-    if (m >= start && m < end) return service;
+    if (m < start || m >= end) continue;
+    if (ignoreDays) return service;
+    const openedOn = m === minute ? date : addDays(date, -1);
+    if (service.days.includes(isoWeekday(openedOn))) return service;
   }
   return null;
+}
+
+function servesDate(service: ServiceRow, date: string): boolean {
+  return service.days.includes(isoWeekday(date));
 }
 
 function timeReasons(
@@ -293,8 +319,28 @@ function timeReasons(
   now: number,
 ): { service: ServiceRow | null; reasons: Reason[] } {
   const reasons: Reason[] = [];
-  const service = serviceAt(serviceRows, request.time);
-  if (!service) {
+  const service = serviceAt(serviceRows, request.date, request.time);
+  const closedDay = service ? null : serviceAt(serviceRows, request.date, request.time, true);
+  if (!service && closedDay) {
+    reasons.push({
+      code: "outside_hours",
+      message: "The venue does not serve that weekday.",
+      details: {
+        rule: "weekday",
+        date: request.date,
+        weekday: isoWeekday(request.date),
+        services: [...serviceRows]
+          .filter((s) => serviceAt([s], request.date, request.time, true))
+          .sort((a, b) => a.openStart.localeCompare(b.openStart))
+          .map((s) => ({
+            name: s.name,
+            openStart: s.openStart,
+            openEnd: s.openEnd,
+            days: [...s.days].sort((a, b) => a - b),
+          })),
+      },
+    });
+  } else if (!service) {
     reasons.push({
       code: "outside_hours",
       message: "The time is outside every service.",
@@ -1218,6 +1264,7 @@ export async function getPacing(
     );
   const result: PacingService[] = [];
   for (const service of servicesRows) {
+    if (!servesDate(service, date)) continue;
     const { start, end } = serviceWindow(service.openStart, service.openEnd);
     const slots: PacingSlot[] = [];
     for (let m = start; m < end; m += venue.slotIntervalMinutes) {
@@ -1248,6 +1295,7 @@ async function gridAvailability(
 ): Promise<Record<string, GridSlot[]>> {
   const result: Record<string, GridSlot[]> = {};
   for (const service of serviceRows) {
+    if (!servesDate(service, date)) continue;
     const { start, end } = serviceWindow(service.openStart, service.openEnd);
     const slots: GridSlot[] = [];
     for (let m = start; m < end; m += venue.slotIntervalMinutes) {
