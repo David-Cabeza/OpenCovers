@@ -59,6 +59,9 @@ export interface VenueConfig {
   leadTimeMinutes: number;
   lastSeatingOffsetMinutes: number;
   overbookingCeiling: number;
+  maxAdvanceDays: number | null;
+  maxActivePerGuestPerDay: number | null;
+  blockedDates: { from: string; to: string }[];
 }
 
 export interface ApiKey {
@@ -298,6 +301,9 @@ export const api = {
       leadTimeMinutes?: number;
       lastSeatingOffsetMinutes?: number;
       overbookingCeiling?: number;
+      maxAdvanceDays?: number | null;
+      maxActivePerGuestPerDay?: number | null;
+      blockedDates?: { from: string; to: string }[];
     },
   ) =>
     request<VenueConfig>(`/v1/venues/${venueId}/config`, {
