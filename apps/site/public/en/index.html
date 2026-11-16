@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenCovers — open source reservation engine for restaurants</title>
+    <meta name="description" content="OpenCovers is an open source reservation engine for restaurants. HTTP API and MCP server. PostgreSQL prevents double booking. Apache-2.0, pre-alpha." />
+    <link rel="canonical" href="https://opencovers.dev/en/" />
+    <link rel="alternate" hreflang="es" href="https://opencovers.dev/" />
+    <link rel="alternate" hreflang="en" href="https://opencovers.dev/en/" />
+    <link rel="alternate" hreflang="x-default" href="https://opencovers.dev/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0e7c5a" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="OpenCovers" />
+    <meta property="og:locale" content="en" />
+    <meta property="og:title" content="OpenCovers — open source reservation engine for restaurants" />
+    <meta property="og:description" content="HTTP API and MCP server. PostgreSQL prevents double booking. Apache-2.0, pre-alpha." />
+    <meta property="og:url" content="https://opencovers.dev/en/" />
+    <meta property="og:image" content="https://opencovers.dev/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://opencovers.dev/og-image.png" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "OpenCovers",
+        "url": "https://opencovers.dev/en/",
+        "description": "Open source reservation engine for restaurants, with an HTTP API and an MCP server.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Windows",
+        "license": "https://www.apache.org/licenses/LICENSE-2.0",
+        "codeRepository": "https://github.com/David-Cabeza/OpenCovers",
+        "inLanguage": "en",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+      }
+    </script>
+    <style>
+      :root { --bg: #f7f7f5; --ink: #000; --muted: #55554f; --accent: #0e7c5a; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #111210; --ink: #f2f2ee; --muted: #a8a8a0; --accent: #4fd1a5; }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 1.0625rem;
+        line-height: 1.6;
+      }
+      main { max-width: 42rem; margin: 0 auto; padding: 48px 16px 96px; }
+      h1, h2 { font-family: "League Spartan", "Helvetica Neue", Arial, sans-serif; letter-spacing: -0.03em; line-height: 1.05; }
+      h1 { font-size: clamp(2.25rem, 8vw, 3.5rem); margin: 0 0 8px; }
+      h2 { font-size: 1.5rem; margin: 40px 0 8px; }
+      p, ul { margin: 0 0 16px; }
+      ul { padding-left: 1.25rem; }
+      a { color: var(--accent); }
+      pre { background: rgba(127,127,127,.14); padding: 16px; overflow-x: auto; border-radius: 8px; font-size: .9rem; line-height: 1.5; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+      nav.lang { font-size: .95rem; margin-bottom: 24px; }
+      .muted { color: var(--muted); }
+      :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <nav class="lang" aria-label="Language"><a href="/" hreflang="es" lang="es">Español</a> · English</nav>
+      <h1>OpenCovers</h1>
+      <p>OpenCovers is an open source reservation engine for restaurants. It handles availability, bookings, tables and a signed event feed. You use it through an HTTP API or an MCP server.</p>
+      <p class="muted">Status: pre-alpha. License: Apache-2.0. Stack: Node.js, Hono, Drizzle and PostgreSQL.</p>
+      <p><a href="https://github.com/David-Cabeza/OpenCovers">Source code on GitHub</a></p>
+
+      <h2>Guarantees</h2>
+      <ul>
+        <li>One transaction decides availability and booking.</li>
+        <li>PostgreSQL enforces no double booking with a GiST exclusion constraint. Application code does not.</li>
+        <li>Every write carries an idempotency key and produces a monotonic version.</li>
+        <li>Venue data is isolated. A request for another venue returns not found.</li>
+        <li>The engine stores the minimum guest data a booking needs. Erasure returns counts and keeps hashes, not personal values.</li>
+        <li>Webhooks are signed. They push events from the venue's event feed to your HTTPS endpoint.</li>
+      </ul>
+
+      <h2>HTTP API</h2>
+      <p>The API lives under <code>/v1</code>. It is described in <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/openapi.yaml">an OpenAPI contract</a>. Errors use a fixed vocabulary, listed in <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/errors.md">errors.md</a>. The contract and its <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/conformance.md">conformance cases</a> come before the implementation. <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/webhooks.md">Webhooks</a> are documented separately.</p>
+
+      <h2>MCP server</h2>
+      <p>The MCP server exposes 18 tools over stdio: <code>reservation.*</code>, <code>waitlist.*</code> and <code>venue.*</code>. It wraps the HTTP API. It is published on npm as <a href="https://www.npmjs.com/package/@opencovers/mcp">@opencovers/mcp</a>.</p>
+      <pre><code>npx -y @opencovers/mcp</code></pre>
+      <p>Create an agent key in the staff app under Setup, API keys. See the <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/mcp.md">MCP contract</a> and the <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/apps/mcp/README.md">package README</a>.</p>
+
+      <h2>Run it locally</h2>
+      <p>You need Node.js 22 or newer, pnpm and Docker.</p>
+      <pre><code>git clone https://github.com/David-Cabeza/OpenCovers.git
+cd OpenCovers
+docker compose up -d   # PostgreSQL
+pnpm install
+pnpm db:migrate
+pnpm dev               # API :3000 · staff app :5173 · site :5174</code></pre>
+      <p>Open <code>http://localhost:5173</code>, sign up and create a venue.</p>
+
+      <h2>More</h2>
+      <ul>
+        <li><a href="https://github.com/David-Cabeza/OpenCovers">README</a></li>
+        <li><a href="https://github.com/David-Cabeza/OpenCovers/tree/main/docs/adr">Architecture decision records</a></li>
+        <li><a href="https://github.com/David-Cabeza/OpenCovers/blob/main/ROADMAP.md">Roadmap</a></li>
+        <li><a href="https://github.com/David-Cabeza/OpenCovers/blob/main/LICENSE">Apache-2.0 license</a></li>
+        <li><a href="/llms.txt">llms.txt</a></li>
+      </ul>
+    </main>
+  </body>
+</html>
