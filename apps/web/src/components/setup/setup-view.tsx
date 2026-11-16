@@ -32,7 +32,7 @@ import type { Role } from "@/lib/api";
 export function SetupView({ venueId, role }: { venueId: string; role?: Role }) {
   return (
     <div className="space-y-8">
-      <VenueSettings venueId={venueId} />
+      <VenueSettings venueId={venueId} role={role} />
       <TablesSection venueId={venueId} />
       <FloorEditor venueId={venueId} />
       <ServicesSection venueId={venueId} />

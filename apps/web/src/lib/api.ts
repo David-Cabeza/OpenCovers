@@ -34,6 +34,7 @@ export interface VenueConfig {
   slotIntervalMinutes: number;
   leadTimeMinutes: number;
   lastSeatingOffsetMinutes: number;
+  overbookingCeiling: number;
 }
 
 export interface ApiKey {
@@ -272,6 +273,7 @@ export const api = {
       slotIntervalMinutes?: number;
       leadTimeMinutes?: number;
       lastSeatingOffsetMinutes?: number;
+      overbookingCeiling?: number;
     },
   ) =>
     request<VenueConfig>(`/v1/venues/${venueId}/config`, {
