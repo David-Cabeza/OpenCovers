@@ -258,6 +258,12 @@ A venue `admin` can see who has access to the venue and remove someone, with no 
 
 Acceptance: conformance case C30. Concurrent removals leave at least one admin. A member of another venue is not found. A removed person's next request fails with `venue_not_found`, and they can be invited again.
 
+### REQ-C8 Membership audit
+
+An admin can tell who invited, who joined and who was removed, because every change of access leaves one row in an append-only log scoped to the venue: an invitation created, an invitation revoked, an invitation redeemed, and a member removed. The row names the acting and the target account by id, the invitation, the role, and the time, and never holds an email, a name or a token. It is written in the same transaction as the change, so a change that fails or does nothing writes no row. Retention deletes a venue's rows after its `retentionDays`. There is no read route yet. See ADR-0010.
+
+Acceptance: conformance case C31. Each event writes one row with the right action, actor, target, invitation and role. A repeated revoke, a refused removal and a refused redemption write none. A venue sees only its own rows. Concurrent redemptions write one `redeemed` row.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:
@@ -271,3 +277,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C26: a reservation without a table cannot be seated and fails with `table_required`. Staff assign a table with a modify first, and a taken table fails with `slot_taken`.
 - C28: an address that spends its budget of sign-in, sign-up or invitation calls gets `429` with `rate_limited` and `Retry-After`, the same answer whatever the request names. Reads and `/health` pass. C27 is reserved for staff invitations.
 - C30: a venue admin lists and removes members, a venue always keeps one admin even under concurrent removals, and a removed person gets `venue_not_found`.
+- C31: each invitation created or revoked, each redemption and each member removal writes one id-only audit row in the same transaction, and a no-op writes none.

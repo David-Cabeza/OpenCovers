@@ -2,6 +2,7 @@ import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, gt, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { invitations } from "../db/schema";
 import { grantMembership, type Db, type Role } from "./memberships";
+import { recordMembershipAudit } from "./membership-audit";
 import { sha256Hex } from "./reservations";
 
 export const INVITATION_TOKEN_HEADER = "x-invitation-token";
@@ -66,18 +67,28 @@ export async function createInvitation(
   const id = randomUUID();
   const secret = randomBytes(32).toString("base64url");
   const hours = input.expiresInHours ?? DEFAULT_EXPIRY_HOURS;
-  const [row] = await db
-    .insert(invitations)
-    .values({
-      id,
-      venueId,
+  const tokenHash = await sha256Hex(secret);
+  const row = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(invitations)
+      .values({
+        id,
+        venueId,
+        role: input.role,
+        email: input.email?.trim().toLowerCase() ?? null,
+        tokenHash,
+        invitedBy,
+        expiresAt: sql`now() + ${hours} * interval '1 hour'`,
+      })
+      .returning();
+    await recordMembershipAudit(tx, venueId, {
+      action: "invited",
+      actorUserId: invitedBy,
+      invitationId: id,
       role: input.role,
-      email: input.email?.trim().toLowerCase() ?? null,
-      tokenHash: await sha256Hex(secret),
-      invitedBy,
-      expiresAt: sql`now() + ${hours} * interval '1 hour'`,
-    })
-    .returning();
+    });
+    return created;
+  });
   return { invitation: toView(row), token: `${id}.${secret}` };
 }
 
@@ -99,20 +110,32 @@ export async function revokeInvitation(
   db: Db,
   venueId: string,
   id: string,
+  actorId: string,
 ): Promise<RevokeResult> {
   const where = and(eq(invitations.id, id), eq(invitations.venueId, venueId));
-  const [revoked] = await db
-    .update(invitations)
-    .set({ revokedAt: sql`now()` })
-    .where(
-      and(
-        where,
-        isNull(invitations.redeemedAt),
-        isNull(invitations.revokedAt),
-        gt(invitations.expiresAt, sql`now()`),
-      ),
-    )
-    .returning();
+  const revoked = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(invitations)
+      .set({ revokedAt: sql`now()` })
+      .where(
+        and(
+          where,
+          isNull(invitations.redeemedAt),
+          isNull(invitations.revokedAt),
+          gt(invitations.expiresAt, sql`now()`),
+        ),
+      )
+      .returning();
+    if (row) {
+      await recordMembershipAudit(tx, venueId, {
+        action: "invite_revoked",
+        actorUserId: actorId,
+        invitationId: id,
+        role: row.role as Role,
+      });
+    }
+    return row;
+  });
   if (revoked) return { ok: true, invitation: toView(revoked) };
   const [row] = await db.select().from(invitations).where(where).limit(1);
   if (!row) return { ok: false, code: "invitation_not_found" };
@@ -176,6 +199,12 @@ export async function redeemInvitation(
     const claimed = await claim(tx, id, account.email, account.id);
     if (!claimed) return null;
     await grantMembership(tx, account.id, claimed.venueId, claimed.role);
+    await recordMembershipAudit(tx, claimed.venueId, {
+      action: "redeemed",
+      targetUserId: account.id,
+      invitationId: id,
+      role: claimed.role,
+    });
     return claimed;
   });
 }
@@ -205,7 +234,15 @@ export async function grantClaimedInvitation(
         ),
       )
       .returning({ venueId: invitations.venueId, role: invitations.role });
-    if (row) await grantMembership(tx, userId, row.venueId, row.role as Role);
+    if (row) {
+      await grantMembership(tx, userId, row.venueId, row.role as Role);
+      await recordMembershipAudit(tx, row.venueId, {
+        action: "redeemed",
+        targetUserId: userId,
+        invitationId: id,
+        role: row.role as Role,
+      });
+    }
   });
 }
 
