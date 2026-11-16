@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { Consent } from "../lib/consent";
 import type { Rating } from "../lib/rating";
 import type { Reconfirmation } from "../lib/reconfirmation";
+import type { DateRange } from "../lib/booking-policy";
 import type { TurnTime } from "../lib/turn-times";
 import {
   bigint,
@@ -39,6 +40,9 @@ export const venues = pgTable("venues", {
   phoneCountry: text("phone_country"),
   turnTimes: jsonb("turn_times").$type<TurnTime[]>().notNull().default([]),
   overbookingCeiling: integer("overbooking_ceiling").notNull().default(0),
+  maxAdvanceDays: integer("max_advance_days"),
+  maxActivePerGuestPerDay: integer("max_active_per_guest_per_day"),
+  blockedDates: jsonb("blocked_dates").$type<DateRange[]>().notNull().default([]),
   publicProfileEnabled: boolean("public_profile_enabled").notNull().default(false),
   publicStreet: text("public_street"),
   publicLocality: text("public_locality"),
@@ -54,6 +58,11 @@ export const venues = pgTable("venues", {
   publicLongitude: doublePrecision("public_longitude"),
 }, (t) => [
   check("venues_overbooking_ceiling", sql`${t.overbookingCeiling} >= 0 AND ${t.overbookingCeiling} <= 1000`),
+  check("venues_max_advance_days", sql`${t.maxAdvanceDays} IS NULL OR (${t.maxAdvanceDays} >= 0 AND ${t.maxAdvanceDays} <= 1000)`),
+  check(
+    "venues_max_active_per_guest_per_day",
+    sql`${t.maxActivePerGuestPerDay} IS NULL OR (${t.maxActivePerGuestPerDay} >= 1 AND ${t.maxActivePerGuestPerDay} <= 100)`,
+  ),
   check(
     "venues_public_geo",
     sql`(${t.publicLatitude} IS NULL) = (${t.publicLongitude} IS NULL) AND (${t.publicLatitude} IS NULL OR (${t.publicLatitude} BETWEEN -90 AND 90 AND ${t.publicLongitude} BETWEEN -180 AND 180))`,

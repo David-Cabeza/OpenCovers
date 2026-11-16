@@ -80,6 +80,7 @@ import {
   type GuestWrite,
 } from "./lib/guests";
 import { toCountryCode } from "./lib/contact";
+import { isMaxActivePerGuest, isMaxAdvanceDays, parseBlockedDates } from "./lib/booking-policy";
 import { parseTurnTimes } from "./lib/turn-times";
 import { notifyReservation } from "./lib/notifications";
 import {
@@ -920,6 +921,12 @@ app.put("/v1/venues/:venueId/config", adminOnly, async (c) => {
   if (body.overbookingCeiling !== undefined && !isCeiling(body.overbookingCeiling)) {
     return error(c, "invalid_request");
   }
+  const blockedDates = body.blockedDates === undefined ? undefined : parseBlockedDates(body.blockedDates);
+  if (blockedDates === null) return error(c, "invalid_request");
+  if (body.maxAdvanceDays != null && !isMaxAdvanceDays(body.maxAdvanceDays)) return error(c, "invalid_request");
+  if (body.maxActivePerGuestPerDay != null && !isMaxActivePerGuest(body.maxActivePerGuestPerDay)) {
+    return error(c, "invalid_request");
+  }
   const result = await setConfig(db, venueId, {
     enabled: body.enabled,
     noticeAddress: body.noticeAddress,
@@ -934,6 +941,9 @@ app.put("/v1/venues/:venueId/config", adminOnly, async (c) => {
     phoneCountry: body.phoneCountry === null ? null : toCountryCode(body.phoneCountry) ?? undefined,
     turnTimes,
     overbookingCeiling: body.overbookingCeiling,
+    maxAdvanceDays: body.maxAdvanceDays,
+    maxActivePerGuestPerDay: body.maxActivePerGuestPerDay,
+    blockedDates,
   });
   if (!result.ok) return error(c, result.code);
   return c.json(result.config);

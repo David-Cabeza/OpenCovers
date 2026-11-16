@@ -1,4 +1,4 @@
-import { and, eq, gt, gte, inArray, lt, ne, notExists, sql } from "drizzle-orm";
+import { and, count, eq, gt, gte, inArray, lt, ne, notExists, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   events,
@@ -11,6 +11,7 @@ import {
   venues,
 } from "../db/schema";
 import * as schema from "../db/schema";
+import { blockedRange } from "./booking-policy";
 import { normalizeCommentary } from "./commentary";
 import { consentColumns, type Consent } from "./consent";
 import { normalizeContact, venueCountry } from "./contact";
@@ -153,6 +154,16 @@ export type Reason =
       details: { leadTimeMinutes: number; earliest: { date: string; time: string } };
     }
   | {
+      code: "beyond_booking_horizon";
+      message: string;
+      details: { maxAdvanceDays: number; latest: string };
+    }
+  | {
+      code: "date_blocked";
+      message: string;
+      details: { from: string; to: string };
+    }
+  | {
       code: "party_size_too_small";
       message: string;
       details: { rule: "service_limit"; service: string; partySize: number; minPartySize: number };
@@ -204,6 +215,9 @@ export type WriteErrorCode =
   | "table_required"
   | "outside_hours"
   | "lead_time_violation"
+  | "beyond_booking_horizon"
+  | "date_blocked"
+  | "guest_booking_limit"
   | "venue_not_found";
 
 export type WriteResult =
@@ -337,6 +351,24 @@ function timeReasons(
         leadTimeMinutes: venue.leadTimeMinutes,
         earliest: localDateTime(earliest, venue.timezone),
       },
+    });
+  }
+  if (!request.walkIn && venue.maxAdvanceDays !== null) {
+    const latest = addDays(localDateTime(new Date(now), venue.timezone).date, venue.maxAdvanceDays);
+    if (request.date > latest) {
+      reasons.push({
+        code: "beyond_booking_horizon",
+        message: "The date is further ahead than the venue takes bookings.",
+        details: { maxAdvanceDays: venue.maxAdvanceDays, latest },
+      });
+    }
+  }
+  const blocked = request.walkIn ? undefined : blockedRange(venue.blockedDates, request.date);
+  if (blocked) {
+    reasons.push({
+      code: "date_blocked",
+      message: "The venue takes no bookings on that date.",
+      details: { from: blocked.from, to: blocked.to },
     });
   }
   return { service, reasons };
@@ -629,6 +661,30 @@ export async function createReservation(
         if (existing.kind !== "create") throw new ReservationError("invalid_request");
         return { id: existing.reservationId, version: existing.version };
       }
+      const cap = request.walkIn ? null : venue.maxActivePerGuestPerDay;
+      // linkGuest also row-locks the guest, but only as a side effect. This lock keeps count-then-insert serial on its own.
+      if (cap !== null && contactKey) {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`guest-day:${venueId}:${contactKey.kind}:${contactKey.value}:${input.date}`}, 0))`,
+        );
+      }
+      const guest = contactKey
+        ? await linkGuest(tx, venueId, contactKey, input.guestName ?? "", startsAt, input.ownerPrincipal ?? "")
+        : null;
+      if (cap !== null && guest) {
+        const [{ held }] = await tx
+          .select({ held: count() })
+          .from(reservations)
+          .where(
+            and(
+              eq(reservations.venueId, venueId),
+              eq(reservations.guestId, guest.id),
+              eq(reservations.date, input.date),
+              inArray(reservations.status, ACTIVE_STATUSES),
+            ),
+          );
+        if (held >= cap) throw new ReservationError("guest_booking_limit");
+      }
       let tableIds = input.tableIds ?? [];
       if (autoAssign) {
         const fit = await tableReasons(tx, venueId, startsAt, endsAt, input.partySize, zone);
@@ -644,9 +700,6 @@ export async function createReservation(
           throw new ReservationError(fit.reason.code);
         }
       }
-      const guest = contactKey
-        ? await linkGuest(tx, venueId, contactKey, input.guestName ?? "", startsAt, input.ownerPrincipal ?? "")
-        : null;
       await tx.insert(reservations).values({
         id,
         venueId,
