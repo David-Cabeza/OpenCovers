@@ -8,6 +8,30 @@ export interface Venue {
   role: Role;
 }
 
+export interface Member {
+  userId: string;
+  name: string;
+  email: string;
+  role: Role;
+}
+
+export type InvitationStatus = "pending" | "redeemed" | "revoked" | "expired";
+
+export interface Invitation {
+  id: string;
+  role: Role;
+  email: string | null;
+  status: InvitationStatus;
+  createdAt: string;
+  expiresAt: string;
+  redeemedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface InvitationCreated extends Invitation {
+  token: string;
+}
+
 export interface Table {
   id: string;
   name: string;
@@ -298,6 +322,33 @@ export const api = {
       method: "DELETE",
       body: JSON.stringify({ hash }),
     }),
+
+  listMembers: (venueId: string) =>
+    request<{ members: Member[] }>(`/v1/venues/${venueId}/members`),
+
+  removeMember: (venueId: string, userId: string) =>
+    request<{ member: { userId: string; role: Role } }>(
+      `/v1/venues/${venueId}/members/${encodeURIComponent(userId)}`,
+      { method: "DELETE" },
+    ),
+
+  listInvitations: (venueId: string) =>
+    request<{ invitations: Invitation[] }>(`/v1/venues/${venueId}/invitations`),
+
+  createInvitation: (
+    venueId: string,
+    body: { role: Role; email?: string; expiresInHours?: number },
+  ) =>
+    request<{ invitation: InvitationCreated }>(`/v1/venues/${venueId}/invitations`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  revokeInvitation: (venueId: string, invitationId: string) =>
+    request<{ invitation: Invitation }>(
+      `/v1/venues/${venueId}/invitations/${encodeURIComponent(invitationId)}`,
+      { method: "DELETE" },
+    ),
 
   agenda: (venueId: string, date: string) =>
     request<{ reservations: Reservation[] }>(
