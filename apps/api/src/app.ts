@@ -94,47 +94,13 @@ import {
   listWebhooks,
   webhookPolicyFromEnv,
 } from "./lib/webhooks";
+import { ERRORS, errorBody, type ErrorCode } from "./lib/errors";
 import {
   addWaitlist,
   cancelWaitlist,
   listWaitlist,
   seatWaitlist,
 } from "./lib/waitlist";
-
-const HTTP_STATUS: Record<string, number> = {
-  invalid_request: 400,
-  invalid_invitation: 400,
-  invitation_not_found: 404,
-  invitation_redeemed: 409,
-  member_not_found: 404,
-  last_admin: 409,
-  unauthorized: 401,
-  forbidden: 403,
-  venue_creation_closed: 403,
-  reservation_not_found: 404,
-  waitlist_entry_not_found: 404,
-  venue_not_found: 404,
-  guest_not_found: 404,
-  guest_merged: 409,
-  guest_not_merged: 409,
-  unmerge_unavailable: 409,
-  slot_taken: 409,
-  no_suitable_table: 409,
-  table_required: 409,
-  invalid_transition: 409,
-  already_cancelled: 409,
-  notice_address_required: 409,
-  public_profile_incomplete: 409,
-  party_size_too_large: 400,
-  party_size_too_small: 400,
-  outside_hours: 400,
-  lead_time_violation: 400,
-  expired_cursor: 400,
-  webhook_not_found: 404,
-  webhook_url_rejected: 400,
-  webhook_limit_reached: 409,
-  transient: 500,
-};
 
 type AppEnv = {
   Variables: {
@@ -153,7 +119,7 @@ app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
 
 // Public and unauthenticated by design (ADR-0012). It must stay above the
 // venue auth middleware below. GET is not rate limited (ADR-0007).
-const NOT_FOUND_BODY = JSON.stringify({ code: "venue_not_found", message: "venue_not_found" });
+const NOT_FOUND_BODY = JSON.stringify(errorBody("venue_not_found"));
 
 app.options("/v1/venues/:venueId/public.jsonld", (c) =>
   c.body(null, 204, {
@@ -195,23 +161,23 @@ app.use("/v1/venues/:venueId/*", async (c, next) => {
     const result = await authenticate(db, key, venueId);
     if (!result.ok) {
       return result.reason === "unauthorized"
-        ? error(c, "unauthorized", 401)
-        : error(c, "venue_not_found", 404);
+        ? error(c, "unauthorized")
+        : error(c, "venue_not_found");
     }
     principal = result.principal;
     role = result.role;
   } else {
     const user = await sessionUser(c);
-    if (!user) return error(c, "unauthorized", 401);
+    if (!user) return error(c, "unauthorized");
     const membership = await getMembership(db, user.id, venueId);
-    if (!membership) return error(c, "venue_not_found", 404);
+    if (!membership) return error(c, "venue_not_found");
     principal = user.email;
     role = membership.role;
   }
 
   const isWrite = ["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method);
   if (isWrite && role === "read") {
-    return error(c, "forbidden", 403);
+    return error(c, "forbidden");
   }
   c.set("principal", principal);
   c.set("role", role);
@@ -219,26 +185,26 @@ app.use("/v1/venues/:venueId/*", async (c, next) => {
 });
 
 const adminOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
-  if (c.get("role") !== "admin") return error(c, "forbidden", 403);
+  if (c.get("role") !== "admin") return error(c, "forbidden");
   await next();
 };
 
 app.get("/v1/venues", async (c) => {
   const user = await sessionUser(c);
-  if (!user) return error(c, "unauthorized", 401);
+  if (!user) return error(c, "unauthorized");
   const venues = await listVenuesForUser(db, user.id);
   return c.json({ venues });
 });
 
 app.post("/v1/venues", async (c) => {
   const user = await sessionUser(c);
-  if (!user) return error(c, "unauthorized", 401);
+  if (!user) return error(c, "unauthorized");
   if (!(await mayCreateVenue(db, signupMode(), user.id))) {
-    return error(c, "venue_creation_closed", 403);
+    return error(c, "venue_creation_closed");
   }
   const body = await c.req.json();
   if (typeof body.name !== "string" || body.name.trim() === "") {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const { id } = await createVenue(db, user.id, {
     id: typeof body.id === "string" ? body.id : undefined,
@@ -249,7 +215,7 @@ app.post("/v1/venues", async (c) => {
 });
 
 const staffSessionOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
-  if (c.req.header("apikey")) return error(c, "forbidden", 403);
+  if (c.req.header("apikey")) return error(c, "forbidden");
   await next();
 };
 
@@ -260,14 +226,14 @@ app.get("/v1/venues/:venueId/invitations", adminOnly, staffSessionOnly, async (c
 
 app.post("/v1/venues/:venueId/invitations", adminOnly, staffSessionOnly, async (c) => {
   const user = await sessionUser(c);
-  if (!user) return error(c, "unauthorized", 401);
+  if (!user) return error(c, "unauthorized");
   const body = await c.req.json().catch(() => null);
   if (
     !isRole(body?.role) ||
     (body.email !== undefined && !isInvitationEmail(body.email)) ||
     (body.expiresInHours !== undefined && !isExpiryHours(body.expiresInHours))
   ) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const { invitation, token } = await createInvitation(db, c.req.param("venueId"), user.id, {
     role: body.role,
@@ -279,14 +245,14 @@ app.post("/v1/venues/:venueId/invitations", adminOnly, staffSessionOnly, async (
 
 app.delete("/v1/venues/:venueId/invitations/:invitationId", adminOnly, staffSessionOnly, async (c) => {
   const user = await sessionUser(c);
-  if (!user) return error(c, "unauthorized", 401);
+  if (!user) return error(c, "unauthorized");
   const result = await revokeInvitation(
     db,
     c.req.param("venueId"),
     c.req.param("invitationId"),
     user.id,
   );
-  if (!result.ok) return mapError(c, result.code);
+  if (!result.ok) return error(c, result.code);
   return c.json({ invitation: result.invitation });
 });
 
@@ -297,9 +263,9 @@ app.get("/v1/venues/:venueId/members", adminOnly, staffSessionOnly, async (c) =>
 
 app.delete("/v1/venues/:venueId/members/:userId", adminOnly, staffSessionOnly, async (c) => {
   const user = await sessionUser(c);
-  if (!user) return error(c, "unauthorized", 401);
+  if (!user) return error(c, "unauthorized");
   const result = await removeMember(db, c.req.param("venueId"), user.id, c.req.param("userId"));
-  if (!result.ok) return mapError(c, result.code);
+  if (!result.ok) return error(c, result.code);
   return c.json({ member: result.member, revoked: result.revoked });
 });
 
@@ -308,13 +274,13 @@ app.get("/v1/venues/:venueId/audit", adminOnly, async (c) => {
   const limitRaw = c.req.query("limit") ?? String(AUDIT_DEFAULT_LIMIT);
   const limit = Number(limitRaw);
   if (!/^\d+$/.test(limitRaw) || limit < 1 || limit > AUDIT_MAX_LIMIT) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const cursor = c.req.query("cursor");
   let after: number | undefined;
   if (cursor) {
     const decoded = decodeAuditCursor(venueId, cursor);
-    if (decoded === null) return error(c, "invalid_request", 400);
+    if (decoded === null) return error(c, "invalid_request");
     after = decoded;
   }
   const page = await listMembershipAudit(db, venueId, { after, limit });
@@ -326,13 +292,13 @@ app.get("/v1/venues/:venueId/audit", adminOnly, async (c) => {
 
 app.post("/v1/invitations/redeem", async (c) => {
   const user = await sessionUser(c);
-  if (!user) return error(c, "unauthorized", 401);
+  if (!user) return error(c, "unauthorized");
   const body = await c.req.json().catch(() => null);
   if (typeof body?.token !== "string" || body.token === "") {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const membership = await redeemInvitation(db, body.token, user);
-  if (!membership) return error(c, "invalid_invitation", 400);
+  if (!membership) return error(c, "invalid_invitation");
   return c.json({ membership });
 });
 
@@ -352,11 +318,11 @@ app.post("/v1/auth/keys", async (c) => {
     typeof body.principal !== "string" ||
     !isRole(body.role)
   ) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const venues = body.venues === undefined ? ["*"] : body.venues;
   if (!Array.isArray(venues) || venues.some((v: unknown) => typeof v !== "string")) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   await addKey(db, body.key, body.principal, venues, body.role);
   return c.json({ ok: true });
@@ -366,7 +332,7 @@ app.delete("/v1/auth/keys", async (c) => {
   const admin = await authorizeAdmin(c);
   if (admin instanceof Response) return admin;
   const body = await c.req.json();
-  if (typeof body.key !== "string") return error(c, "invalid_request", 400);
+  if (typeof body.key !== "string") return error(c, "invalid_request");
   await revokeKey(db, body.key);
   return c.json({ ok: true });
 });
@@ -374,7 +340,7 @@ app.delete("/v1/auth/keys", async (c) => {
 app.post("/v1/venues/:venueId/reservations", async (c) => {
   const venueId = c.req.param("venueId");
   const key = c.req.header("Idempotency-Key");
-  if (!key) return error(c, "invalid_request", 400);
+  if (!key) return error(c, "invalid_request");
   const body = await c.req.json();
   if (
     hasInvalidConsent(body) ||
@@ -382,7 +348,7 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
     hasInvalidCommentary(body) ||
     hasInvalidReconfirmation(body)
   ) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   if (
     typeof body.date !== "string" ||
@@ -392,7 +358,7 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
       (!Array.isArray(body.tables) ||
         body.tables.some((t: unknown) => typeof t !== "string")))
   ) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const result = await createReservation(
     db,
@@ -425,16 +391,16 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
 app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
   const venueId = c.req.param("venueId");
   const key = c.req.header("Idempotency-Key");
-  if (!key) return error(c, "invalid_request", 400);
+  if (!key) return error(c, "invalid_request");
   const body = await c.req.json();
-  if (typeof body.partySize !== "number") return error(c, "invalid_request", 400);
+  if (typeof body.partySize !== "number") return error(c, "invalid_request");
   if (
     hasInvalidConsent(body) ||
     hasInvalidRating(body) ||
     hasInvalidCommentary(body) ||
     body.reconfirmation !== undefined
   ) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const result = await walkIn(
     db,
@@ -472,14 +438,14 @@ app.get("/v1/venues/:venueId/waitlist", async (c) => {
 app.post("/v1/venues/:venueId/waitlist", async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
-  if (typeof body.partySize !== "number") return error(c, "invalid_request", 400);
+  if (typeof body.partySize !== "number") return error(c, "invalid_request");
   const result = await addWaitlist(db, venueId, {
     partySize: body.partySize,
     zone: typeof body.zone === "string" ? body.zone : undefined,
     guestName: body.guest?.name,
     guestContact: body.guest?.contact,
   });
-  if (!result.ok) return mapError(c, result.code);
+  if (!result.ok) return error(c, result.code);
   const entries = await listWaitlist(db, venueId);
   return c.json({ entries }, 201);
 });
@@ -488,11 +454,11 @@ app.post("/v1/venues/:venueId/waitlist/:id/seat", async (c) => {
   const venueId = c.req.param("venueId");
   const id = c.req.param("id");
   const key = c.req.header("Idempotency-Key");
-  if (!key) return error(c, "invalid_request", 400);
+  if (!key) return error(c, "invalid_request");
   const result = await seatWaitlist(db, venueId, id, key);
-  if (!result.ok) return mapError(c, result.code);
+  if (!result.ok) return error(c, result.code);
   const reservation = await getReservation(db, venueId, result.reservationId);
-  if (!reservation) return mapError(c, "reservation_not_found");
+  if (!reservation) return error(c, "reservation_not_found");
   void notifyReservation(db, venueId, result.reservationId, reservation.version, "confirmation");
   void notifyReservation(db, venueId, result.reservationId, reservation.version, "notice");
   return c.json(toApi(reservation, venueId), 200);
@@ -502,7 +468,7 @@ app.post("/v1/venues/:venueId/waitlist/:id/cancel", async (c) => {
   const venueId = c.req.param("venueId");
   const id = c.req.param("id");
   const result = await cancelWaitlist(db, venueId, id);
-  if (!result.ok) return mapError(c, result.code);
+  if (!result.ok) return error(c, result.code);
   const entries = await listWaitlist(db, venueId);
   return c.json({ entries });
 });
@@ -511,10 +477,10 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
   const venueId = c.req.param("venueId");
   const id = c.req.param("id");
   const key = c.req.header("Idempotency-Key");
-  if (!key) return error(c, "invalid_request", 400);
+  if (!key) return error(c, "invalid_request");
   const body = await c.req.json();
   if (typeof body !== "object" || Object.keys(body).length === 0) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   if (
     hasInvalidConsent(body) ||
@@ -522,7 +488,7 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
     hasInvalidCommentary(body) ||
     hasInvalidReconfirmation(body)
   ) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const result = await modifyReservation(
     db,
@@ -541,11 +507,11 @@ app.post("/v1/venues/:venueId/reservations/:id/cancel", async (c) => {
   const venueId = c.req.param("venueId");
   const id = c.req.param("id");
   const key = c.req.header("Idempotency-Key");
-  if (!key) return error(c, "invalid_request", 400);
+  if (!key) return error(c, "invalid_request");
   const result = await cancelReservation(db, venueId, id, key);
-  if (!result.ok) return mapError(c, result.code);
+  if (!result.ok) return error(c, result.code);
   const reservation = await getReservation(db, venueId, id);
-  if (!reservation) return mapError(c, "reservation_not_found");
+  if (!reservation) return error(c, "reservation_not_found");
   void notifyReservation(db, venueId, id, reservation.version, "cancellation");
   return c.json(toApi(reservation, venueId), 200);
 });
@@ -554,10 +520,10 @@ app.post("/v1/venues/:venueId/reservations/:id/status", async (c) => {
   const venueId = c.req.param("venueId");
   const id = c.req.param("id");
   const key = c.req.header("Idempotency-Key");
-  if (!key) return error(c, "invalid_request", 400);
+  if (!key) return error(c, "invalid_request");
   const body = await c.req.json();
   if (body.status !== "seated" && body.status !== "attended" && body.status !== "no_show") {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const result = await setStatus(db, venueId, id, body.status, key);
   return writeResponse(c, result, venueId);
@@ -567,7 +533,7 @@ app.get("/v1/venues/:venueId/reservations/search", async (c) => {
   const venueId = c.req.param("venueId");
   const dateStart = c.req.query("dateStart");
   const dateEnd = c.req.query("dateEnd");
-  if (!dateStart || !dateEnd) return error(c, "invalid_request", 400);
+  if (!dateStart || !dateEnd) return error(c, "invalid_request");
   const statuses = c.req.queries("status");
   const reservations = await searchReservations(
     db,
@@ -583,7 +549,7 @@ app.get("/v1/venues/:venueId/reservations/:id", async (c) => {
   const venueId = c.req.param("venueId");
   const id = c.req.param("id");
   const reservation = await getReservation(db, venueId, id);
-  if (!reservation) return mapError(c, "reservation_not_found");
+  if (!reservation) return error(c, "reservation_not_found");
   return c.json(toApi(reservation, venueId));
 });
 
@@ -597,7 +563,7 @@ app.get("/v1/venues/:venueId/reservations", async (c) => {
 app.get("/v1/venues/:venueId/agenda", async (c) => {
   const venueId = c.req.param("venueId");
   const date = c.req.query("date");
-  if (!date) return error(c, "invalid_request", 400);
+  if (!date) return error(c, "invalid_request");
   const reservations = await listByDate(db, venueId, date);
   return c.json({ reservations: reservations.map((r) => toApi(r, venueId)) });
 });
@@ -608,14 +574,14 @@ app.get("/v1/venues/:venueId/events", async (c) => {
   let afterId = 0;
   if (cursor) {
     const prefix = `${venueId}:`;
-    if (!cursor.startsWith(prefix)) return mapError(c, "invalid_request");
+    if (!cursor.startsWith(prefix)) return error(c, "invalid_request");
     afterId = parseInt(cursor.slice(prefix.length), 10);
-    if (Number.isNaN(afterId)) return mapError(c, "invalid_request");
+    if (Number.isNaN(afterId)) return error(c, "invalid_request");
   }
   const limit = parseInt(c.req.query("limit") ?? "100", 10);
   const watermark = await getEventsWatermark(db, venueId);
   if (afterId > 0 && watermark > 0 && afterId < watermark) {
-    return mapError(c, "expired_cursor");
+    return error(c, "expired_cursor");
   }
   const events = await getEvents(db, venueId, afterId, limit);
   const lastId = events.length > 0 ? events[events.length - 1].id : afterId;
@@ -629,9 +595,9 @@ app.get("/v1/venues/:venueId/availability", async (c) => {
   const venueId = c.req.param("venueId");
   const date = c.req.query("date");
   const partySizeRaw = c.req.query("partySize");
-  if (!date || !partySizeRaw) return error(c, "invalid_request", 400);
+  if (!date || !partySizeRaw) return error(c, "invalid_request");
   const partySize = parseInt(partySizeRaw, 10);
-  if (Number.isNaN(partySize)) return error(c, "invalid_request", 400);
+  if (Number.isNaN(partySize)) return error(c, "invalid_request");
   const availability = await getAvailability(db, venueId, date, partySize);
   return c.json({ availability });
 });
@@ -643,7 +609,7 @@ app.get("/v1/venues/:venueId/availability/explain", async (c) => {
   const partySizeRaw = c.req.query("partySize") ?? "";
   const zone = c.req.query("zone");
   if (!isDate(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time) || !/^[1-9]\d*$/.test(partySizeRaw)) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const explanation = await explainSlot(db, venueId, {
     date,
@@ -651,7 +617,7 @@ app.get("/v1/venues/:venueId/availability/explain", async (c) => {
     partySize: Number(partySizeRaw),
     zone: zone || undefined,
   });
-  if (!explanation) return mapError(c, "venue_not_found");
+  if (!explanation) return error(c, "venue_not_found");
   return c.json(explanation);
 });
 
@@ -666,7 +632,7 @@ app.get("/v1/venues/:venueId/floor", async (c) => {
 app.get("/v1/venues/:venueId/pacing", async (c) => {
   const venueId = c.req.param("venueId");
   const date = c.req.query("date");
-  if (!date) return error(c, "invalid_request", 400);
+  if (!date) return error(c, "invalid_request");
   const pacing = await getPacing(db, venueId, date);
   return c.json({ pacing });
 });
@@ -681,7 +647,7 @@ app.post("/v1/venues/:venueId/floor-items", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
   if (typeof body.type !== "string" || body.type === "") {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const item = await addFloorItem(db, venueId, {
     type: body.type,
@@ -735,7 +701,7 @@ app.post("/v1/venues/:venueId/tables", adminOnly, async (c) => {
     !Number.isInteger(body.seats) ||
     body.seats < 1
   ) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   await upsertTable(db, venueId, {
     id: body.id,
@@ -786,7 +752,7 @@ app.post("/v1/venues/:venueId/services", adminOnly, async (c) => {
     !isPartyLimit(body.minPartySize) ||
     !isPartyLimit(body.maxPartySize)
   ) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const upserted = await upsertService(db, venueId, {
     name: body.name,
@@ -795,7 +761,7 @@ app.post("/v1/venues/:venueId/services", adminOnly, async (c) => {
     minPartySize: body.minPartySize,
     maxPartySize: body.maxPartySize,
   });
-  if (!upserted.ok) return mapError(c, upserted.code);
+  if (!upserted.ok) return error(c, upserted.code);
   const services = await listServices(db, venueId);
   return c.json({ services });
 });
@@ -824,7 +790,7 @@ app.post("/v1/venues/:venueId/keys", adminOnly, async (c) => {
     body.principal === "" ||
     (body.role !== "read" && body.role !== "write")
   ) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   await addVenueKey(db, venueId, body.key, body.principal, body.role, await creatorId(c));
   const keys = await listVenueKeys(db, venueId);
@@ -834,7 +800,7 @@ app.post("/v1/venues/:venueId/keys", adminOnly, async (c) => {
 app.delete("/v1/venues/:venueId/keys", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
-  if (typeof body.hash !== "string") return error(c, "invalid_request", 400);
+  if (typeof body.hash !== "string") return error(c, "invalid_request");
   await revokeVenueKey(db, venueId, body.hash);
   const keys = await listVenueKeys(db, venueId);
   return c.json({ keys });
@@ -844,12 +810,12 @@ app.get("/v1/venues/:venueId/guests", async (c) => {
   const venueId = c.req.param("venueId");
   const limitRaw = c.req.query("limit") ?? "50";
   const limit = Number(limitRaw);
-  if (!/^\d+$/.test(limitRaw) || limit < 1 || limit > 200) return error(c, "invalid_request", 400);
+  if (!/^\d+$/.test(limitRaw) || limit < 1 || limit > 200) return error(c, "invalid_request");
   const cursor = c.req.query("cursor");
   let after: GuestCursor | undefined;
   if (cursor) {
     const decoded = decodeGuestCursor(venueId, cursor);
-    if (!decoded) return error(c, "invalid_request", 400);
+    if (!decoded) return error(c, "invalid_request");
     after = decoded;
   }
   const page = await listGuests(db, venueId, {
@@ -866,17 +832,17 @@ app.get("/v1/venues/:venueId/guests", async (c) => {
 
 app.get("/v1/venues/:venueId/guests/:guestId", async (c) => {
   const guest = await getGuest(db, c.req.param("venueId"), c.req.param("guestId"));
-  if (!guest) return mapError(c, "guest_not_found");
+  if (!guest) return error(c, "guest_not_found");
   return c.json(guest);
 });
 
 app.post("/v1/venues/:venueId/guests/:guestId/merge", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const key = c.req.header("Idempotency-Key");
-  if (!key) return error(c, "invalid_request", 400);
+  if (!key) return error(c, "invalid_request");
   const body = await c.req.json().catch(() => null);
   if (typeof body?.intoGuestId !== "string" || body.intoGuestId === "") {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const result = await mergeGuest(db, venueId, c.req.param("guestId"), body.intoGuestId, key, c.get("principal"));
   return guestResponse(c, result, venueId);
@@ -889,16 +855,16 @@ app.post("/v1/venues/:venueId/guests/:guestId/unmerge", adminOnly, async (c) => 
 });
 
 async function guestResponse(c: any, result: GuestWrite, venueId: string) {
-  if (!result.ok) return mapError(c, result.code);
+  if (!result.ok) return error(c, result.code);
   const guest = await getGuest(db, venueId, result.guestId);
-  if (!guest) return mapError(c, "guest_not_found");
+  if (!guest) return error(c, "guest_not_found");
   return c.json(guest);
 }
 
 async function writeResponse(c: any, result: any, venueId: string) {
-  if (!result.ok) return mapError(c, result.code);
+  if (!result.ok) return error(c, result.code);
   const reservation = await getReservation(db, venueId, result.id);
-  if (!reservation) return mapError(c, "reservation_not_found");
+  if (!reservation) return error(c, "reservation_not_found");
   return c.json(toApi(reservation, venueId), 200);
 }
 
@@ -932,19 +898,14 @@ function toApi(reservation: any, venueId: string) {
   };
 }
 
-function mapError(c: any, code: string) {
-  const status = HTTP_STATUS[code] ?? 400;
-  return error(c, code, status);
-}
-
-function error(c: any, code: string, status: number) {
-  return c.json({ code, message: code }, status);
+function error(c: any, code: ErrorCode) {
+  return c.json(errorBody(code), ERRORS[code].status);
 }
 
 app.get("/v1/venues/:venueId/config", async (c) => {
   const venueId = c.req.param("venueId");
   const config = await getConfig(db, venueId);
-  if (!config) return mapError(c, "venue_not_found");
+  if (!config) return error(c, "venue_not_found");
   return c.json(config);
 });
 
@@ -952,12 +913,12 @@ app.put("/v1/venues/:venueId/config", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
   if (body.phoneCountry != null && !toCountryCode(body.phoneCountry)) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const turnTimes = body.turnTimes === undefined ? undefined : parseTurnTimes(body.turnTimes);
-  if (turnTimes === null) return error(c, "invalid_request", 400);
+  if (turnTimes === null) return error(c, "invalid_request");
   if (body.overbookingCeiling !== undefined && !isCeiling(body.overbookingCeiling)) {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const result = await setConfig(db, venueId, {
     enabled: body.enabled,
@@ -974,13 +935,13 @@ app.put("/v1/venues/:venueId/config", adminOnly, async (c) => {
     turnTimes,
     overbookingCeiling: body.overbookingCeiling,
   });
-  if (!result.ok) return mapError(c, result.code);
+  if (!result.ok) return error(c, result.code);
   return c.json(result.config);
 });
 
 app.get("/v1/venues/:venueId/public-profile", async (c) => {
   const profile = await getProfile(db, c.req.param("venueId"));
-  if (!profile) return mapError(c, "venue_not_found");
+  if (!profile) return error(c, "venue_not_found");
   return c.json(profile);
 });
 
@@ -989,17 +950,17 @@ app.put("/v1/venues/:venueId/public-profile", adminOnly, async (c) => {
   try {
     body = await c.req.json();
   } catch {
-    return error(c, "invalid_request", 400);
+    return error(c, "invalid_request");
   }
   const input = parseProfileInput(body);
-  if (!input) return error(c, "invalid_request", 400);
+  if (!input) return error(c, "invalid_request");
   const result = await setProfile(db, c.req.param("venueId"), input);
-  if (!result.ok) return mapError(c, result.code);
+  if (!result.ok) return error(c, result.code);
   return c.json(result.profile);
 });
 
 app.get("/v1/venues/:venueId/webhooks", async (c) => {
-  if (c.get("role") === "read") return error(c, "forbidden", 403);
+  if (c.get("role") === "read") return error(c, "forbidden");
   const webhooks = await listWebhooks(db, c.req.param("venueId"));
   return c.json({ webhooks });
 });
@@ -1007,7 +968,7 @@ app.get("/v1/venues/:venueId/webhooks", async (c) => {
 app.post("/v1/venues/:venueId/webhooks", async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json().catch(() => null);
-  if (typeof body?.url !== "string") return error(c, "invalid_request", 400);
+  if (typeof body?.url !== "string") return error(c, "invalid_request");
   const result = await createWebhook(
     db,
     venueId,
@@ -1015,14 +976,14 @@ app.post("/v1/venues/:venueId/webhooks", async (c) => {
     webhookPolicyFromEnv(),
     await creatorId(c),
   );
-  if (!result.ok) return mapError(c, result.code);
+  if (!result.ok) return error(c, result.code);
   return c.json(result.webhook, 201);
 });
 
 app.delete("/v1/venues/:venueId/webhooks/:webhookId", async (c) => {
   const venueId = c.req.param("venueId");
   const deleted = await deleteWebhook(db, venueId, c.req.param("webhookId"));
-  if (!deleted) return mapError(c, "webhook_not_found");
+  if (!deleted) return error(c, "webhook_not_found");
   const webhooks = await listWebhooks(db, venueId);
   return c.json({ webhooks });
 });
@@ -1049,12 +1010,12 @@ async function creatorId(c: any): Promise<string | null> {
 
 async function authorizeAdmin(c: any): Promise<{ principal: string } | Response> {
   const key = c.req.header("apikey");
-  if (!key) return error(c, "unauthorized", 401);
+  if (!key) return error(c, "unauthorized");
   const admin = await authenticateAdmin(db, key);
   if (!admin.ok) {
     return admin.reason === "unauthorized"
-      ? error(c, "unauthorized", 401)
-      : error(c, "forbidden", 403);
+      ? error(c, "unauthorized")
+      : error(c, "forbidden");
   }
   return { principal: admin.principal };
 }

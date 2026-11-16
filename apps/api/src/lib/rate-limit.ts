@@ -1,6 +1,7 @@
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { Context, MiddlewareHandler } from "hono";
 import { isIP } from "node:net";
+import { ERRORS, errorBody } from "./errors";
 
 export const RULE_NAMES = ["auth", "signup", "invitation"] as const;
 export type RuleName = (typeof RULE_NAMES)[number];
@@ -220,8 +221,8 @@ export function createRateLimiter(config: RateLimitConfig, options: RateLimitOpt
     const retryAfter = consume(names, clientOf(c), now());
     if (retryAfter === 0) return next();
     return c.json(
-      { code: "rate_limited", message: "Too many requests. Try again later." },
-      429,
+      { ...errorBody("rate_limited"), message: "Too many requests. Try again later." },
+      ERRORS.rate_limited.status,
       { "Retry-After": String(retryAfter) },
     );
   };

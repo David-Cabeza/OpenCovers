@@ -534,7 +534,7 @@ describe("webhook admin API", () => {
     for (const url of [`http://${PUBLIC_V4}/hook`, "https://localhost/hook"]) {
       const res = await call(venueId, key, "POST", "", { url });
       expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ code: "webhook_url_rejected", message: "webhook_url_rejected" });
+      expect(await res.json()).toEqual({ code: "webhook_url_rejected", message: "webhook_url_rejected", retryable: false });
     }
     expect((await call(venueId, key, "POST", "", {})).status).toBe(400);
   });

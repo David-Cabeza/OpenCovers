@@ -276,6 +276,12 @@ A venue can publish structured local data that search engines read from its own 
 
 Acceptance: conformance case C33. The venue embeds the document in the HTML of its own page, not in an iframe, and Google's Rich Results Test reads it.
 
+### REQ-C11 Errors say whether to retry, and MCP tools declare what they do
+
+An agent can tell from an error alone whether repeating the same call can succeed. Every error body carries `retryable`, true when the same request, unchanged, may succeed later and false when the caller must change something first. The MCP tool error text says which. Every MCP tool declares `readOnlyHint`, `destructiveHint` and `idempotentHint` explicitly, so a client does not have to guess from the MCP defaults.
+
+Acceptance: conformance case C34. There is no version-conflict error, because writes carry no expected version.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:
@@ -292,3 +298,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C31: each invitation created or revoked, each redemption and each member removal writes one id-only audit row in the same transaction, and a no-op writes none.
 - C32: removing a member revokes the keys they made in that venue and their sessions when no membership is left, flags their webhooks without deleting them, all or nothing, and an admin reads the venue's membership audit log.
 - C33: a venue with the public profile on serves a credential-free `public.jsonld` Restaurant with hours and no private field, an unknown venue or one with the profile off gives the same `venue_not_found`, and only an admin writes validated fields.
+- C34: every error body carries `retryable`, the MCP tool error text says it, and every MCP tool declares its three hints.

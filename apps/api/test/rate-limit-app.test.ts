@@ -91,7 +91,7 @@ describe("rate limiting on the real app", () => {
     const res = await signIn(ip, "nobody@example.com");
     expect(res.status).toBe(429);
     expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
-    expect(await res.json()).toEqual({ code: "rate_limited", message: expect.any(String) });
+    expect(await res.json()).toEqual({ code: "rate_limited", message: expect.any(String), retryable: true });
   });
 
   it("is the only limiter, so better-auth never answers its own 429", async () => {

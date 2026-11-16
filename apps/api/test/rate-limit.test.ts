@@ -140,7 +140,7 @@ describe("limits trigger and reset", () => {
     expect(res.headers.get("retry-after")).toBe("40");
     expect(res.headers.get("content-type")).toMatch(/application\/json/);
     const body = await res.json();
-    expect(body).toEqual({ code: "rate_limited", message: expect.any(String) });
+    expect(body).toEqual({ code: "rate_limited", message: expect.any(String), retryable: true });
   });
 
   it("lets requests through again when the window has passed", async () => {

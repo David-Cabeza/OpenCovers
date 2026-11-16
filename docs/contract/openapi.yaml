@@ -1970,12 +1970,17 @@ components:
 
     Error:
       type: object
-      required: [code, message]
+      required: [code, message, retryable]
       properties:
         code:
           $ref: "#/components/schemas/ErrorCode"
         message:
           type: string
+        retryable:
+          type: boolean
+          description: |
+            True when repeating the same request, unchanged, may succeed
+            later. False when the caller must change something first.
 
     ErrorCode:
       type: string
@@ -2006,8 +2011,10 @@ components:
         - unknown_outcome
         - transient
         - notice_address_required
+        - public_profile_incomplete
         - stale_second_factor
         - expired_cursor
+        - waitlist_entry_not_found
         - webhook_not_found
         - webhook_url_rejected
         - webhook_limit_reached
