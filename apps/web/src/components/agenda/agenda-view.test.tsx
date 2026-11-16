@@ -22,6 +22,14 @@ function reservation(overrides: Partial<Reservation> = {}): Reservation {
 }
 
 const AGENDA = "GET /v1/venues/v1/agenda";
+const TABLES_ROUTE = "GET /v1/venues/v1/tables";
+const MODIFY = "POST /v1/venues/v1/reservations/r1/modify";
+const STATUS = "POST /v1/venues/v1/reservations/r1/status";
+
+const TABLES = [
+  { id: "t1", name: "Table 1", seats: 2, zone: "", shape: "rect", posX: 0, posY: 0, rotation: 0 },
+  { id: "t2", name: "Table 2", seats: 4, zone: "", shape: "rect", posX: 0, posY: 0, rotation: 0 },
+];
 
 function setup(initial: Reservation, extra: Parameters<typeof mockApi>[0] = {}) {
   const state = { current: initial };
@@ -192,5 +200,103 @@ describe("AgendaView actions", () => {
       rating: 3,
       commentary: "Quiet table",
     });
+  });
+});
+
+describe("AgendaView table assignment", () => {
+  afterEach(resetApiMocks);
+
+  function setupTables(reservations: Reservation[], extra: Parameters<typeof mockApi>[0] = {}) {
+    const api = mockApi({
+      [AGENDA]: () => ({ body: { reservations } }),
+      [TABLES_ROUTE]: () => ({ body: { tables: TABLES } }),
+      ...extra,
+    });
+    renderWithApp(<AgendaView venueId="v1" />);
+    return { api, user: userEvent.setup() };
+  }
+
+  const party4 = () => reservation({ partySize: 4, guest: { name: "Ana", consent: "unknown" } });
+
+  it("marks a booking without tables as Unassigned and names the tables of one that has them", async () => {
+    setupTables([
+      party4(),
+      reservation({
+        id: "r2",
+        time: "21:00",
+        guest: { name: "Luis", consent: "unknown" },
+        tables: ["t2"],
+      }),
+    ]);
+
+    expect(await screen.findByText("Unassigned")).toBeInTheDocument();
+    expect(await screen.findByText("Table 2")).toBeInTheDocument();
+  });
+
+  it("assigns the chosen tables through modify", async () => {
+    const { api, user } = setupTables([party4()], {
+      [MODIFY]: { body: reservation({ tables: ["t2"] }) },
+    });
+
+    await openRowMenu(user, "Ana");
+    await user.click(await screen.findByRole("menuitem", { name: "Assign tables" }));
+    await user.click(await screen.findByRole("button", { name: /Table 2/ }));
+    expect(screen.getByText("4 seats selected for 4 guests.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save tables" }));
+
+    await waitFor(() => expect(api.writes()).toHaveLength(1));
+    expect(api.writes()[0].path).toBe("/v1/venues/v1/reservations/r1/modify");
+    expect(api.writes()[0].body).toEqual({ tables: ["t2"] });
+  });
+
+  it("does not call the API when the selected tables seat fewer guests than the party", async () => {
+    const { api, user } = setupTables([party4()]);
+
+    await openRowMenu(user, "Ana");
+    await user.click(await screen.findByRole("menuitem", { name: "Assign tables" }));
+    await user.click(await screen.findByRole("button", { name: /Table 1/ }));
+    await user.click(screen.getByRole("button", { name: "Save tables" }));
+
+    expect(screen.getByText("2 seats selected for 4 guests.")).toBeInTheDocument();
+    expect(api.writes()).toHaveLength(0);
+  });
+
+  it.each([
+    ["slot_taken", "One of those tables is already taken at that time. Pick another table."],
+    ["no_suitable_table", "Those tables do not fit this party at that time."],
+  ])("shows a clear message for %s", async (code, message) => {
+    const { user } = setupTables([party4()], {
+      [MODIFY]: { status: 409, body: { code, message: code } },
+    });
+
+    await openRowMenu(user, "Ana");
+    await user.click(await screen.findByRole("menuitem", { name: "Assign tables" }));
+    await user.click(await screen.findByRole("button", { name: /Table 2/ }));
+    await user.click(screen.getByRole("button", { name: "Save tables" }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  it("opens the assign dialog when seating fails with table_required", async () => {
+    const { user } = setupTables([party4()], {
+      [STATUS]: { status: 409, body: { code: "table_required", message: "table_required" } },
+    });
+
+    await openRowMenu(user, "Ana");
+    await user.click(await screen.findByRole("menuitem", { name: "Seat" }));
+
+    expect(await screen.findByText("Assign a table first.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Assign tables" })).toBeInTheDocument();
+  });
+
+  it("shows the API code message for an unknown error when seating", async () => {
+    const { user } = setupTables([party4()], {
+      [STATUS]: { status: 409, body: { code: "invalid_transition", message: "x" } },
+    });
+
+    await openRowMenu(user, "Ana");
+    await user.click(await screen.findByRole("menuitem", { name: "Seat" }));
+
+    expect(await screen.findByText("invalid_transition")).toBeInTheDocument();
   });
 });
