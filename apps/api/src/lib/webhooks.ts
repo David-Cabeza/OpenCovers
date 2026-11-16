@@ -43,6 +43,7 @@ export type WebhookSummary = {
   failures: number;
   lastError: string | null;
   nextAttemptAt: string;
+  creatorDepartedAt: string | null;
 };
 
 export type WebhookCreated = { id: string; url: string; enabled: boolean; secret: string };
@@ -84,6 +85,7 @@ export async function createWebhook(
   venueId: string,
   rawUrl: string,
   policy: TargetPolicy,
+  createdBy: string | null = null,
 ): Promise<CreateWebhookResult> {
   const checked = await checkTarget(rawUrl, policy);
   if (!checked.ok) return { ok: false, code: "webhook_url_rejected" };
@@ -118,6 +120,7 @@ export async function createWebhook(
       url,
       secret,
       lastEventId: Math.max(maxId, venue.watermark),
+      createdBy,
     });
     return { ok: true, webhook: { id, url, enabled: true, secret } } as const;
   });
@@ -136,6 +139,7 @@ export async function listWebhooks(db: Db, venueId: string): Promise<WebhookSumm
     failures: r.failures,
     lastError: r.lastError,
     nextAttemptAt: r.nextAttemptAt.toISOString(),
+    creatorDepartedAt: r.creatorDepartedAt?.toISOString() ?? null,
   }));
 }
 

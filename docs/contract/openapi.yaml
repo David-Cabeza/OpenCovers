@@ -951,8 +951,16 @@ paths:
         Admin only, and only through a staff session. Deletes the person's
         membership in this venue. Their next request to the venue fails with
         `venue_not_found`. Their account, their sessions, and their other
-        venues are untouched. API keys and webhooks they created are not
-        affected, because a key belongs to an integration and not to a user.
+        venues are untouched.
+
+        In the same transaction the removal revokes the API keys the person
+        made in this venue, revokes all their sessions when this was their
+        last membership (and keeps them when they still belong to another
+        venue, because a session belongs to the account), and sets
+        `creatorDepartedAt` on the webhook endpoints they made, which keep
+        delivering. A failure anywhere rolls all of it back. Keys, endpoints,
+        and sessions made before ADR-0011 have no recorded creator and are not
+        reached.
 
         A venue always keeps at least one `admin`. A removal that would leave
         none, including an admin removing themselves, fails with
@@ -963,7 +971,7 @@ paths:
         A `userId` that is unknown, or is a member of another venue only,
         fails with `member_not_found`, the same answer for both. There is no
         role change. Remove the member and invite them again. A removal is
-        not recorded in the event feed. See ADR-0009.
+        not recorded in the event feed. See ADR-0009 and ADR-0011.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - name: userId
@@ -972,12 +980,12 @@ paths:
           schema: { type: string }
       responses:
         "200":
-          description: The membership that was removed
+          description: The membership that was removed, and what it revoked
           content:
             application/json:
               schema:
                 type: object
-                required: [member]
+                required: [member, revoked]
                 properties:
                   member:
                     type: object
@@ -985,6 +993,55 @@ paths:
                     properties:
                       userId: { type: string }
                       role: { $ref: "#/components/schemas/Role" }
+                  revoked:
+                    type: object
+                    required: [keys, sessions, webhooksFlagged]
+                    properties:
+                      keys: { type: integer, minimum: 0 }
+                      sessions: { type: integer, minimum: 0 }
+                      webhooksFlagged: { type: integer, minimum: 0 }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/audit:
+    get:
+      operationId: audit.list
+      summary: Read the venue's membership audit log
+      description: |
+        Admin only, through a staff session or an `admin` key. A `read` or
+        `write` session or key fails with `forbidden`, and a caller outside
+        the venue fails with `venue_not_found`. Entries are newest first. The
+        log records invitations created, revoked, and redeemed, and member
+        removals (ADR-0010). It holds ids and a role only, never an email, a
+        name, an invitation token, or a key. Pass `nextCursor` back as
+        `cursor` for the next page. It is null on the last page. A cursor from
+        another venue or a malformed one, and a bad `limit`, fail with
+        `invalid_request`. Not exposed through MCP. See ADR-0011.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: One page of audit entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries, nextCursor]
+                properties:
+                  entries:
+                    type: array
+                    items: { $ref: "#/components/schemas/MembershipAuditEntry" }
+                  nextCursor:
+                    type: string
+                    nullable: true
         default:
           $ref: "#/components/responses/Error"
 
@@ -1586,6 +1643,23 @@ components:
         email: { type: string }
         role: { $ref: "#/components/schemas/Role" }
 
+    MembershipAuditEntry:
+      type: object
+      required: [id, action, actorUserId, targetUserId, invitationId, role, occurredAt]
+      properties:
+        id: { type: string }
+        action:
+          type: string
+          enum: [invited, invite_revoked, redeemed, member_removed]
+        actorUserId: { type: string, nullable: true }
+        targetUserId:
+          type: string
+          nullable: true
+          description: The account that redeemed, or the member removed.
+        invitationId: { type: string, nullable: true }
+        role: { type: string, nullable: true }
+        occurredAt: { type: string, format: date-time }
+
     Invitation:
       type: object
       required: [id, role, email, status, createdAt, expiresAt, redeemedAt, revokedAt]
@@ -1616,13 +1690,22 @@ components:
 
     Webhook:
       type: object
-      required: [id, url, enabled, failures, lastError, nextAttemptAt]
+      required: [id, url, enabled, failures, lastError, nextAttemptAt, creatorDepartedAt]
       properties:
         id:
           type: string
         url:
           type: string
           format: uri
+        creatorDepartedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Set when the staff member who registered the endpoint was removed
+            from the venue. The endpoint keeps delivering, so review it. Null
+            for endpoints made by someone still a member, made with a key, or
+            made before ADR-0011.
         enabled:
           type: boolean
         failures:

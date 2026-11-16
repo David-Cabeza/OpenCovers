@@ -21,12 +21,13 @@ export async function addKey(
   principal: string,
   venues: string[],
   role: Role = "read",
+  createdBy: string | null = null,
 ): Promise<void> {
   const hash = await sha256Hex(key);
   await db.transaction(async (tx) => {
     await tx
       .insert(apiKeys)
-      .values({ hash, principal, role })
+      .values({ hash, principal, role, createdBy })
       .onConflictDoNothing();
     for (const venue of venues) {
       await tx
@@ -111,8 +112,9 @@ export async function addVenueKey(
   key: string,
   principal: string,
   role: Role = "read",
+  createdBy: string | null = null,
 ): Promise<void> {
-  await addKey(db, key, principal, [venueId], role);
+  await addKey(db, key, principal, [venueId], role, createdBy);
 }
 
 export async function revokeVenueKey(

@@ -46,6 +46,18 @@ async function signUp(name = "Staff"): Promise<Account> {
   return { id: body.user.id, email, name, cookie };
 }
 
+// Removal that leaves no membership revokes the account's sessions (ADR-0010),
+// so the person signs in again to get a working cookie.
+async function signInAgain(account: Account): Promise<Account> {
+  const res = await auth.api.signInEmail({
+    body: { email: account.email, password: "password123" },
+    asResponse: true,
+  });
+  const cookie = res.headers.get("set-cookie");
+  if (!res.ok || !cookie) throw new Error("sign-in refused");
+  return { ...account, cookie };
+}
+
 async function adminOf(venueId: string, name?: string): Promise<Account> {
   const account = await signUp(name);
   await createVenue(db, account.id, { id: venueId, name: venueId });
@@ -189,14 +201,19 @@ describe("remove", () => {
     const victim = await memberOf("v1", "write");
     const res = await remove(admin, "v1", victim.id);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ member: { userId: victim.id, role: "write" } });
+    expect(await res.json()).toEqual({
+      member: { userId: victim.id, role: "write" },
+      revoked: { keys: 0, sessions: 1, webhooksFlagged: 0 },
+    });
     const { members } = await (await list(admin, "v1")).json();
     expect(members.map((m: { userId: string }) => m.userId)).toEqual([admin.id]);
   });
 
   it("ends the person's access to that venue on their next request", async () => {
     const admin = await adminOf("v1");
+    await adminOf("v2");
     const victim = await memberOf("v1", "write");
+    await addMembership(db, victim.id, "v2", "read");
     const date = "2026-11-12";
     expect((await call(victim, "GET", `/v1/venues/v1/agenda?date=${date}`)).status).toBe(200);
     expect((await remove(admin, "v1", victim.id)).status).toBe(200);
@@ -225,13 +242,13 @@ describe("remove", () => {
     expect((await rolesOf("v2"))[other.id]).toBe("admin");
   });
 
-  it("keeps an account with no membership left, and it sees no venues", async () => {
+  it("keeps an account with no membership left, but its sessions end (ADR-0010)", async () => {
     const admin = await adminOf("v1");
     const victim = await memberOf("v1", "read");
     await remove(admin, "v1", victim.id);
+    expect(await db.select().from(user).where(eq(user.id, victim.id))).toHaveLength(1);
     const res = await call(victim, "GET", "/v1/venues");
-    expect(res.status).toBe(200);
-    expect((await res.json()).venues).toEqual([]);
+    expect(res.status).toBe(401);
   });
 
   it("does not revoke API keys, which belong to integrations", async () => {
@@ -285,7 +302,7 @@ describe("remove", () => {
     const rows = await db.select().from(invitations).where(eq(invitations.venueId, "v1"));
     expect(rows).toHaveLength(1);
     expect(rows[0].redeemedBy).toBe(guest.id);
-    const again = await call(guest, "POST", "/v1/invitations/redeem", { token });
+    const again = await call(await signInAgain(guest), "POST", "/v1/invitations/redeem", { token });
     expect(again.status).toBe(400);
     expect((await again.json()).code).toBe("invalid_invitation");
     expect((await rolesOf("v1"))[guest.id]).toBeUndefined();
@@ -297,10 +314,11 @@ describe("remove", () => {
     expect((await remove(admin, "v1", person.id)).status).toBe(200);
     const created = await call(admin, "POST", "/v1/venues/v1/invitations", { role: "write" });
     const token = (await created.json()).invitation.token as string;
-    const redeemed = await call(person, "POST", "/v1/invitations/redeem", { token });
+    const back = await signInAgain(person);
+    const redeemed = await call(back, "POST", "/v1/invitations/redeem", { token });
     expect(redeemed.status).toBe(200);
     expect((await rolesOf("v1"))[person.id]).toBe("write");
-    expect((await call(person, "GET", "/v1/venues/v1/agenda?date=2026-11-12")).status).toBe(200);
+    expect((await call(back, "GET", "/v1/venues/v1/agenda?date=2026-11-12")).status).toBe(200);
   });
 });
 
@@ -346,6 +364,9 @@ describe("last admin", () => {
     const rounds = 12;
     const one = await signUp();
     const two = await signUp();
+    // An anchor venue keeps both sessions alive across rounds.
+    await createVenue(db, one.id, { id: "anchor", name: "anchor" });
+    await addMembership(db, two.id, "anchor", "read");
     for (let i = 0; i < rounds; i++) {
       const venueId = `race-${i}`;
       await createVenue(db, one.id, { id: venueId, name: venueId });
@@ -365,6 +386,9 @@ describe("last admin", () => {
 
   it("keeps an admin when three admins remove each other in a ring", async () => {
     const people = [await signUp(), await signUp(), await signUp()];
+    await createVenue(db, people[0].id, { id: "anchor", name: "anchor" });
+    await addMembership(db, people[1].id, "anchor", "read");
+    await addMembership(db, people[2].id, "anchor", "read");
     for (let i = 0; i < 8; i++) {
       const venueId = `ring-${i}`;
       await createVenue(db, people[0].id, { id: venueId, name: venueId });
@@ -394,9 +418,15 @@ describe("last admin", () => {
     const first = await adminOf("v1");
     const second = await memberOf("v1", "admin");
     const third = await memberOf("v1", "admin");
+    await adminOf("v2");
+    await addMembership(db, second.id, "v2", "read");
     await remove(first, "v1", second.id);
     const res = await remove(second, "v1", third.id);
     expect(res.status).toBe(404);
     expect((await rolesOf("v1"))[third.id]).toBe("admin");
+    // With no membership left the session is gone, so the same call is unauthorized.
+    const lone = await memberOf("v1", "admin");
+    await remove(first, "v1", lone.id);
+    expect((await remove(lone, "v1", third.id)).status).toBe(401);
   });
 });

@@ -523,6 +523,7 @@ describe("webhook admin API", () => {
           failures: 0,
           lastError: null,
           nextAttemptAt: expect.any(String),
+          creatorDepartedAt: null,
         },
       ],
     });

@@ -10,6 +10,13 @@ import {
   revokeKey,
   revokeVenueKey,
 } from "./lib/api-keys";
+import {
+  AUDIT_DEFAULT_LIMIT,
+  AUDIT_MAX_LIMIT,
+  decodeAuditCursor,
+  encodeAuditCursor,
+  listMembershipAudit,
+} from "./lib/membership-audit";
 import { auth } from "./lib/auth";
 import {
   createInvitation,
@@ -251,7 +258,28 @@ app.delete("/v1/venues/:venueId/members/:userId", adminOnly, staffSessionOnly, a
   if (!user) return error(c, "unauthorized", 401);
   const result = await removeMember(db, c.req.param("venueId"), user.id, c.req.param("userId"));
   if (!result.ok) return mapError(c, result.code);
-  return c.json({ member: result.member });
+  return c.json({ member: result.member, revoked: result.revoked });
+});
+
+app.get("/v1/venues/:venueId/audit", adminOnly, async (c) => {
+  const venueId = c.req.param("venueId");
+  const limitRaw = c.req.query("limit") ?? String(AUDIT_DEFAULT_LIMIT);
+  const limit = Number(limitRaw);
+  if (!/^\d+$/.test(limitRaw) || limit < 1 || limit > AUDIT_MAX_LIMIT) {
+    return error(c, "invalid_request", 400);
+  }
+  const cursor = c.req.query("cursor");
+  let after: number | undefined;
+  if (cursor) {
+    const decoded = decodeAuditCursor(venueId, cursor);
+    if (decoded === null) return error(c, "invalid_request", 400);
+    after = decoded;
+  }
+  const page = await listMembershipAudit(db, venueId, { after, limit });
+  return c.json({
+    entries: page.entries,
+    nextCursor: page.next === null ? null : encodeAuditCursor(venueId, page.next),
+  });
 });
 
 app.post("/v1/invitations/redeem", async (c) => {
@@ -756,7 +784,7 @@ app.post("/v1/venues/:venueId/keys", adminOnly, async (c) => {
   ) {
     return error(c, "invalid_request", 400);
   }
-  await addVenueKey(db, venueId, body.key, body.principal, body.role);
+  await addVenueKey(db, venueId, body.key, body.principal, body.role, await creatorId(c));
   const keys = await listVenueKeys(db, venueId);
   return c.json({ keys }, 201);
 });
@@ -918,7 +946,13 @@ app.post("/v1/venues/:venueId/webhooks", async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json().catch(() => null);
   if (typeof body?.url !== "string") return error(c, "invalid_request", 400);
-  const result = await createWebhook(db, venueId, body.url, webhookPolicyFromEnv());
+  const result = await createWebhook(
+    db,
+    venueId,
+    body.url,
+    webhookPolicyFromEnv(),
+    await creatorId(c),
+  );
   if (!result.ok) return mapError(c, result.code);
   return c.json(result.webhook, 201);
 });
@@ -942,6 +976,13 @@ async function sessionUser(c: any) {
   const result = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!result) return null;
   return result.user ?? null;
+}
+
+// The staff member behind a request, or null when a key made it. Only a
+// session names a person, so a key's creations stay unattributed.
+async function creatorId(c: any): Promise<string | null> {
+  if (c.req.header("apikey")) return null;
+  return (await sessionUser(c))?.id ?? null;
 }
 
 async function authorizeAdmin(c: any): Promise<{ principal: string } | Response> {
