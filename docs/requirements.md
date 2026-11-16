@@ -290,7 +290,7 @@ Acceptance: conformance case C35. Each rule has its own error code, and concurre
 
 ### REQ-C13 Services have weekdays
 
-A venue that closes on some days, or runs a service only on some days, can say so. Each service has an optional set of ISO weekdays (`days`), all seven by default, so existing services and behavior do not change. Create, availability, the availability explanation and the public JSON-LD opening hours all read the same set, using the venue's time zone for the weekday of a date. An overnight service belongs to the day it opens. A walk-in is held to the weekday as it is to the hours. Only an admin sets it. See ADR-0014.
+A venue that closes on some days, or runs a service only on some days, can say so. Each service has an optional set of ISO weekdays (`days`), all seven by default, so existing services and behavior do not change. Create, availability, the availability explanation and the public JSON-LD opening hours all read the same set, using the venue's time zone for the weekday of a date. An overnight service belongs to the day it opens. A walk-in is held to the weekday as it is to the hours. Only an admin sets it. See ADR-0015.
 
 Acceptance: conformance case C36.
 
