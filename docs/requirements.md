@@ -294,6 +294,18 @@ A venue that closes on some days, or runs a service only on some days, can say s
 
 Acceptance: conformance case C36.
 
+### REQ-C14 Member roles
+
+A venue `admin` changes another member's role, or their own, between `admin`, `write` and `read`, with no SQL and without removing and re-inviting. The change applies on the person's next request. A venue always keeps at least one `admin`, under concurrent requests too, and a change that would leave none fails with `last_admin`. Setting the role a member already holds changes nothing. Each change is written to the membership audit log. A member of another venue is not found, and only a staff session of an `admin` can do it, no key. See ADR-0016.
+
+Acceptance: conformance case C37.
+
+### REQ-C15 Venue creator transfer
+
+The account that may create venues on a `first-user` or `closed` instance can hand that right to another account that belongs to a venue it administers, with no SQL. Exactly one account holds it at any moment, only the current holder can hand it over, and the handover is written to the audit log of the venues the two share. See ADR-0016.
+
+Acceptance: conformance case C38. An instance that never had a creator, because its accounts were made under `open`, still marks its first creator with the one-time step in the deploy guide.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:
@@ -313,3 +325,5 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C34: every error body carries `retryable`, the MCP tool error text says it, and every MCP tool declares its three hints.
 - C35: a venue's optional horizon, per-guest daily cap and blocked dates refuse a create with `beyond_booking_horizon`, `guest_booking_limit` or `date_blocked`, availability and the explanation agree on the first and last, a walk-in is held to none, and the defaults change nothing.
 - C36: a service's optional `days` (all seven by default) limit create, availability, the explanation and the public opening hours to those weekdays in the venue time zone, an overnight service follows the day it opens, a walk-in is held to them, and the three paths agree.
+- C37: a venue admin changes a member's role through a session, the last admin cannot be demoted even under concurrent changes, the same role is a no-op, and each change writes one audit row.
+- C38: the venue creator hands the creator mark to a member of a venue they administer in one transaction, nobody else can, and an ineligible target is refused.

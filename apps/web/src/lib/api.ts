@@ -355,6 +355,20 @@ export const api = {
       { method: "DELETE" },
     ),
 
+  changeMemberRole: (venueId: string, userId: string, role: Role) =>
+    request<{ member: { userId: string; role: Role } }>(
+      `/v1/venues/${venueId}/members/${encodeURIComponent(userId)}`,
+      { method: "PATCH", body: JSON.stringify({ role }) },
+    ),
+
+  getAccount: () => request<{ account: { userId: string; isCreator: boolean } }>("/v1/account"),
+
+  transferCreator: (userId: string) =>
+    request<{ creator: { userId: string } }>("/v1/account/transfer-creator", {
+      method: "POST",
+      body: JSON.stringify({ userId }),
+    }),
+
   listInvitations: (venueId: string) =>
     request<{ invitations: Invitation[] }>(`/v1/venues/${venueId}/invitations`),
 

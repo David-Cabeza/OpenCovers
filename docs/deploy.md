@@ -104,6 +104,7 @@ Any other account gets `403` with the code `venue_creation_closed`, an invited `
 
   Only one account can hold the mark. If it fails, an account already holds it. Or set `SIGNUP=open` for as long as you need, which also lets anyone sign up, then set it back.
 - **Upgrading an instance that ran under `first-user`.** Its first account is already the owner. Nothing to do.
+- **Handing the owner to someone else.** The owner makes another account the creator with no SQL: `POST /v1/account/transfer-creator` with `{"userId": "..."}`, or the crown button next to a member on the Team screen. The target must be a member of a venue the owner administers. The owner loses the right to create venues and keeps every venue and role. Only the new owner can hand it back. The swap is one transaction, so there is always exactly one owner, and it is written to the audit log of the venues the two share. The SQL step above remains only for an instance that has no owner at all. See [ADR-0016](adr/0016-member-roles-and-creator-transfer.md).
 
 ## Rate limiting
 
@@ -139,10 +140,10 @@ curl -X DELETE https://your-domain/v1/venues/VENUE_ID/members/USER_ID -H 'Cookie
 - The list shows each member's `userId`, `name`, `email` and `role`. `userId` is the handle for removal.
 - The person loses access to that venue on their next request. Their account stays, and so do their other venues. When this was their last membership, their sessions are revoked too, so they must sign in again and then see no venue. When they still belong to another venue, their sessions are kept, because a session belongs to the account and not to a venue.
 - A venue keeps at least one `admin`. Removing the last one, yourself included, fails with `last_admin`. Invite another admin first.
-- There is no role change. Remove the person and invite them again at the new role.
+- To change a role, an `admin` sets it with `PATCH /v1/venues/VENUE_ID/members/USER_ID` and `{"role": "read"}` (or `write`, `admin`), or with the role selector on the Team screen. It applies on the person's next request. A change that would leave no `admin` fails with `last_admin`. A demotion does not revoke the keys the person made, so review `GET /v1/venues/VENUE_ID/keys` after demoting an admin. See [ADR-0016](adr/0016-member-roles-and-creator-transfer.md).
 - Removal revokes the API keys the person made in this venue, and the response counts them under `revoked`. Keys made before ADR-0011, and keys made with an `admin` key, have no known creator and are not touched. After a leaver who handled keys, review `GET /v1/venues/VENUE_ID/keys` and revoke what they held.
 - Webhook endpoints the person made keep delivering. They are not deleted or disabled. `GET /v1/venues/VENUE_ID/webhooks` shows `creatorDepartedAt` on them, so review each and delete any you do not trust. Endpoints made before ADR-0011 have no known creator.
-- Invitations created, revoked and redeemed, and removals, are recorded ([ADR-0010](adr/0010-membership-audit.md)). `GET /v1/venues/VENUE_ID/audit` (an `admin` session or key) lists them, newest first, with `limit` and `cursor`. It holds ids and a role only, no emails or tokens.
+- Invitations created, revoked and redeemed, removals, role changes and creator transfers, are recorded ([ADR-0010](adr/0010-membership-audit.md)). `GET /v1/venues/VENUE_ID/audit` (an `admin` session or key) lists them, newest first, with `limit` and `cursor`. It holds ids and a role only, no emails or tokens.
 
 ## Public site
 

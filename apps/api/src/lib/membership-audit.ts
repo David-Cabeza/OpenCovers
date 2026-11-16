@@ -6,7 +6,9 @@ export type MembershipAuditEntry =
   | { action: "invited"; actorUserId: string; invitationId: string; role: Role }
   | { action: "invite_revoked"; actorUserId: string; invitationId: string; role: Role }
   | { action: "redeemed"; targetUserId: string; invitationId: string; role: Role }
-  | { action: "member_removed"; actorUserId: string; targetUserId: string; role: Role };
+  | { action: "member_removed"; actorUserId: string; targetUserId: string; role: Role }
+  | { action: "role_changed"; actorUserId: string; targetUserId: string; role: Role }
+  | { action: "creator_transferred"; actorUserId: string; targetUserId: string };
 
 export async function recordMembershipAudit(
   tx: Pick<Db, "insert">,
@@ -19,16 +21,18 @@ export async function recordMembershipAudit(
     actorUserId: "actorUserId" in entry ? entry.actorUserId : null,
     targetUserId: "targetUserId" in entry ? entry.targetUserId : null,
     invitationId: "invitationId" in entry ? entry.invitationId : null,
-    role: entry.role,
+    role: "role" in entry ? entry.role : null,
   });
 }
 
 export const AUDIT_DEFAULT_LIMIT = 50;
 export const AUDIT_MAX_LIMIT = 200;
 
+export type MembershipAuditAction = MembershipAuditEntry["action"];
+
 export interface MembershipAuditView {
   id: string;
-  action: "invited" | "invite_revoked" | "redeemed" | "member_removed";
+  action: MembershipAuditAction;
   actorUserId: string | null;
   targetUserId: string | null;
   invitationId: string | null;

@@ -31,6 +31,7 @@ import {
 import { api, type Member } from "@/lib/api";
 import { errorMessage } from "@/lib/error-message";
 import { InviteDialog } from "./invite-dialog";
+import { MakeCreatorButton, RoleSelect } from "./member-actions";
 
 export function TeamView({ venueId }: { venueId: string }) {
   return (
@@ -89,12 +90,11 @@ function MembersCard({ venueId }: { venueId: string }) {
                   <TableCell className="font-medium">{m.name}</TableCell>
                   <TableCell>{m.email}</TableCell>
                   <TableCell>
-                    <Badge variant={m.role === "admin" ? "default" : "secondary"}>
-                      {m.role}
-                    </Badge>
+                    <RoleSelect venueId={venueId} member={m} />
                   </TableCell>
                   <TableCell>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-1">
+                      <MakeCreatorButton member={m} />
                       <Button
                         variant="ghost"
                         size="icon"

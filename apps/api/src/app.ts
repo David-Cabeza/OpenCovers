@@ -28,8 +28,8 @@ import {
 } from "./lib/invitations";
 import { createRateLimiter, rateLimitConfigFromEnv } from "./lib/rate-limit";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
-import { mayCreateVenue, signupMode } from "./lib/signup";
-import { listMembers, removeMember } from "./lib/members";
+import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/signup";
+import { changeMemberRole, listMembers, removeMember } from "./lib/members";
 import {
   deleteService,
   deleteTable,
@@ -198,6 +198,24 @@ app.get("/v1/venues", async (c) => {
   return c.json({ venues });
 });
 
+app.get("/v1/account", async (c) => {
+  if (c.req.header("apikey")) return error(c, "forbidden");
+  const user = await sessionUser(c);
+  if (!user) return error(c, "unauthorized");
+  return c.json({ account: { userId: user.id, isCreator: await isCreator(db, user.id) } });
+});
+
+app.post("/v1/account/transfer-creator", async (c) => {
+  if (c.req.header("apikey")) return error(c, "forbidden");
+  const user = await sessionUser(c);
+  if (!user) return error(c, "unauthorized");
+  const body = await c.req.json().catch(() => null);
+  if (typeof body?.userId !== "string" || body.userId === "") return error(c, "invalid_request");
+  const result = await transferCreator(db, user.id, body.userId);
+  if (!result.ok) return error(c, result.code);
+  return c.json({ creator: result.creator });
+});
+
 app.post("/v1/venues", async (c) => {
   const user = await sessionUser(c);
   if (!user) return error(c, "unauthorized");
@@ -261,6 +279,22 @@ app.delete("/v1/venues/:venueId/invitations/:invitationId", adminOnly, staffSess
 app.get("/v1/venues/:venueId/members", adminOnly, staffSessionOnly, async (c) => {
   const members = await listMembers(db, c.req.param("venueId"));
   return c.json({ members });
+});
+
+app.patch("/v1/venues/:venueId/members/:userId", adminOnly, staffSessionOnly, async (c) => {
+  const user = await sessionUser(c);
+  if (!user) return error(c, "unauthorized");
+  const body = await c.req.json().catch(() => null);
+  if (!isRole(body?.role)) return error(c, "invalid_request");
+  const result = await changeMemberRole(
+    db,
+    c.req.param("venueId"),
+    user.id,
+    c.req.param("userId"),
+    body.role,
+  );
+  if (!result.ok) return error(c, result.code);
+  return c.json({ member: result.member });
 });
 
 app.delete("/v1/venues/:venueId/members/:userId", adminOnly, staffSessionOnly, async (c) => {
