@@ -1,6 +1,6 @@
 # ADR-0014: Remote MCP transport with OAuth 2.1
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-16
 - Deciders: David Cabeza
 
@@ -253,11 +253,13 @@ These are properties of libraries this ADR has not run. Issue #67 tests each one
 - **Hide tools from `tools/list` by scope.** Rejected. The client would not learn that more scope exists. Listing all 16 and answering `insufficient_scope` lets it ask for more.
 - **Use the email as the principal, as a session does.** Keeps records readable. Rejected for now. It puts staff emails into more rows and hides which agent acted. Kept as an open question.
 
-## Open questions for the owner
+## Decisions on the open questions
 
-1. **Principal format.** `mcp:<clientId>:<userId>` keeps emails out and names the agent, but staff see an opaque string in the agenda and feed. The alternative is the person's email with a client suffix.
-2. **Dynamic Client Registration.** Off. If an agent the project needs supports nothing else, decide whether to allow it behind `MCP_DYNAMIC_REGISTRATION=on` with a registration rate limit.
-3. **Lifetimes and limits.** 15 minutes, 30 days, 90 days, 60 token calls per 15 minutes and 300 calls per 5 minutes are proposals, not measurements.
-4. **Venue sets.** A grant may name several venues. One venue per grant is simpler to reason about and costs multi-venue owners more connections.
-5. **Off by default.** `MCP_REMOTE=on` is required. The alternative is on whenever the public URL is HTTPS.
-6. **Idempotency on remote writes.** The write tools generate a key when the caller omits one, so a repeated call is not deduplicated. Requiring the key on the remote endpoint would change tool behavior, which issue #67 excludes.
+The owner accepted this ADR with these answers.
+
+1. **Principal format.** `mcp:<clientId>:<userId>`. It keeps staff emails out of more rows and names the agent.
+2. **Dynamic Client Registration.** Stays off. Revisit only if a needed client supports nothing else.
+3. **Lifetimes and limits.** The proposed values stand: 15 minutes, 30 days, 90 days, 60 token calls per 15 minutes and 300 calls per 5 minutes. They are not measurements. Adjust them with real use.
+4. **Venue sets.** A grant may name several venues.
+5. **Off by default.** `MCP_REMOTE=on` is required.
+6. **Idempotency on remote writes.** Not part of issue #67, because it changes tool behavior. A separate flag covers it.
