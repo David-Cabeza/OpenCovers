@@ -1,0 +1,32 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.David-Cabeza/opencovers",
+  "description": "Restaurant reservations over MCP: availability, bookings, tables and waitlist, backed by the OpenCovers engine.",
+  "repository": {
+    "url": "https://github.com/David-Cabeza/OpenCovers",
+    "source": "github",
+    "subfolder": "apps/mcp"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@opencovers/mcp",
+      "version": "0.1.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "OPENCOVERS_API_KEY",
+          "description": "Agent key created in the staff app under Setup > API keys.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "OPENCOVERS_BASE_URL",
+          "description": "Base URL of your OpenCovers API.",
+          "default": "http://localhost:3000"
+        }
+      ]
+    }
+  ]
+}

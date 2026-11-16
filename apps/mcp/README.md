@@ -4,6 +4,14 @@ An MCP server that exposes the OpenCovers reservation API to MCP hosts such as C
 
 ## Run
 
+From npm (once published):
+
+```bash
+OPENCOVERS_API_KEY=... npx -y @opencovers/mcp
+```
+
+From a clone of the repository:
+
 ```bash
 OPENCOVERS_API_KEY=... pnpm --filter @opencovers/mcp dev
 ```
@@ -21,7 +29,24 @@ Create and revoke keys from the staff app under **Setup → API keys** (venue ad
 
 ## Configure a host
 
-Claude Desktop (`claude_desktop_config.json`):
+Claude Desktop (`claude_desktop_config.json`), using the npm package:
+
+```json
+{
+  "mcpServers": {
+    "opencovers": {
+      "command": "npx",
+      "args": ["-y", "@opencovers/mcp"],
+      "env": {
+        "OPENCOVERS_API_KEY": "your-key",
+        "OPENCOVERS_BASE_URL": "http://localhost:3000"
+      }
+    }
+  }
+}
+```
+
+Or from a clone of the repository:
 
 ```json
 {
@@ -42,3 +67,7 @@ Claude Desktop (`claude_desktop_config.json`):
 ## Tools
 
 See [docs/contract/mcp.md](../../docs/contract/mcp.md) for the full catalog: availability, agenda, list, search, get, create, modify, cancel, status, events, erasure, and venue config.
+
+## Publishing
+
+`pnpm --filter @opencovers/mcp build` compiles to `dist/`, and `prepack` does it automatically. The package is published to npm as `@opencovers/mcp` and listed in the official MCP registry through `server.json` (its `name` must match `mcpName` in `package.json`).
