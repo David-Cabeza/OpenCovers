@@ -1,6 +1,6 @@
 # ADR-0012: Public venue profile and schema.org JSON-LD
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-16
 - Deciders: David Cabeza
 
