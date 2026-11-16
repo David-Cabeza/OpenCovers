@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -55,7 +56,7 @@ export function AddWaitlistDialog({
       toast.success("Added to the waitlist");
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not add to the waitlist.");
+      toast.error(errorMessage(err, "Could not add to the waitlist."));
     }
   }
 

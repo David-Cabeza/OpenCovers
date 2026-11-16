@@ -137,7 +137,7 @@ describe("AgendaView actions", () => {
 
     await user.click(await screen.findByRole("menuitem", { name: "Seat" }));
 
-    expect(await screen.findByText("invalid_transition")).toBeInTheDocument();
+    expect(await screen.findByText("This reservation cannot change to that status right now.")).toBeInTheDocument();
     expect(screen.getByText("Booked")).toBeInTheDocument();
   });
 
@@ -152,7 +152,7 @@ describe("AgendaView actions", () => {
 
     await user.click(await screen.findByRole("menuitem", { name: "Cancel" }));
 
-    expect(await screen.findByText("already_cancelled")).toBeInTheDocument();
+    expect(await screen.findByText("This reservation is already cancelled.")).toBeInTheDocument();
   });
 
   it("offers no status actions for a finished reservation", async () => {
@@ -289,7 +289,7 @@ describe("AgendaView table assignment", () => {
     expect(await screen.findByRole("heading", { name: "Assign tables" })).toBeInTheDocument();
   });
 
-  it("shows the API code message for an unknown error when seating", async () => {
+  it("shows the friendly message for a refused status change when seating", async () => {
     const { user } = setupTables([party4()], {
       [STATUS]: { status: 409, body: { code: "invalid_transition", message: "x" } },
     });
@@ -297,6 +297,6 @@ describe("AgendaView table assignment", () => {
     await openRowMenu(user, "Ana");
     await user.click(await screen.findByRole("menuitem", { name: "Seat" }));
 
-    expect(await screen.findByText("invalid_transition")).toBeInTheDocument();
+    expect(await screen.findByText("This reservation cannot change to that status right now.")).toBeInTheDocument();
   });
 });

@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
@@ -66,7 +67,7 @@ export function WalkInDialog({
       toast.success("Guest seated");
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not seat the guest.");
+      toast.error(errorMessage(err, "Could not seat the guest."));
     }
   }
 

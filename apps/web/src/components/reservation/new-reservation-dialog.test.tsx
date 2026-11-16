@@ -164,14 +164,17 @@ describe("NewReservationDialog", () => {
     expect(api.writes()).toHaveLength(0);
   });
 
-  it.each(["slot_taken", "outside_hours"])(
+  it.each([
+    ["slot_taken", "One of those tables is already taken at that time. Pick another table."],
+    ["outside_hours", "That time is outside the venue's opening hours."],
+  ])(
     "shows the %s error and keeps the dialog open",
-    async (code) => {
+    async (code, text) => {
       const { onOpenChange, user } = setup({ [CREATE]: { status: 409, body: { code } } });
       await user.click(await screen.findByRole("button", { name: "Table 1 · 2" }));
       await submit(user);
 
-      expect(await screen.findByText(code)).toBeInTheDocument();
+      expect(await screen.findByText(text)).toBeInTheDocument();
       expect(onOpenChange).not.toHaveBeenCalledWith(false);
       expect(screen.getByRole("button", { name: "Create reservation" })).toBeEnabled();
     },

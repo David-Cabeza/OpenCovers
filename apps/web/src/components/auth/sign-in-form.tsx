@@ -1,3 +1,4 @@
+import { authErrorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -23,8 +24,8 @@ export function SignInForm() {
     setServerError(null);
     const { error } = await authClient.signIn.email(values);
     if (error) {
-      setServerError(error.message ?? "Could not sign in.");
-      toast.error(error.message ?? "Could not sign in.");
+      setServerError(authErrorMessage(error, "Could not sign in."));
+      toast.error(authErrorMessage(error, "Could not sign in."));
     }
   }
 

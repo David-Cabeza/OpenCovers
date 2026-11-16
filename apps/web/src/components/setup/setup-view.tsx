@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
@@ -55,7 +56,7 @@ function TablesSection({ venueId }: { venueId: string }) {
       void queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
       toast.success("Table removed");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not remove."),
+    onError: (err) => toast.error(errorMessage(err, "Could not remove.")),
   });
 
   return (
@@ -147,7 +148,7 @@ function ServicesSection({ venueId }: { venueId: string }) {
       void queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
       toast.success("Service removed");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not remove."),
+    onError: (err) => toast.error(errorMessage(err, "Could not remove.")),
   });
 
   return (

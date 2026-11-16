@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
@@ -58,7 +59,7 @@ export function CreateVenueDialog({ triggerLabel = "New venue" }: { triggerLabel
       setOpen(false);
       toast.success("Venue created");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create the venue.");
+      toast.error(errorMessage(err, "Could not create the venue."));
     }
   }
 

@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -72,7 +73,7 @@ export function TableFormDialog({
       toast.success(editing ? "Table updated" : "Table added");
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save the table.");
+      toast.error(errorMessage(err, "Could not save the table."));
     }
   }
 

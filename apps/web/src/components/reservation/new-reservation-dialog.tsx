@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -105,7 +106,7 @@ export function NewReservationDialog({
       toast.success("Reservation created");
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create the reservation.");
+      toast.error(errorMessage(err, "Could not create the reservation."));
     }
   }
 

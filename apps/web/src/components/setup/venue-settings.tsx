@@ -1,3 +1,4 @@
+import { errorMessage, isApiError } from "@/lib/error-message";
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -14,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useVenueConfig } from "@/hooks/use-venue-config";
-import { api, ApiError, type Role } from "@/lib/api";
+import { api, type Role } from "@/lib/api";
 
 export const OVERBOOKING_MAX = 1000;
 
@@ -78,15 +79,11 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
     },
     onError: (err) => {
       const message =
-        err instanceof ApiError && err.code === "notice_address_required"
-          ? "Add a notice address before enabling reservations."
-          : err instanceof ApiError && err.code === "forbidden"
+        err instanceof Error && err.message === "overbooking_ceiling_invalid"
+          ? `The overbooking ceiling must be a whole number from 0 to ${OVERBOOKING_MAX}.`
+          : isApiError(err, "forbidden")
             ? "Only an admin can change venue settings."
-            : err instanceof Error && err.message === "overbooking_ceiling_invalid"
-              ? `The overbooking ceiling must be a whole number from 0 to ${OVERBOOKING_MAX}.`
-              : err instanceof Error
-                ? err.message
-                : "Could not save the settings.";
+            : errorMessage(err, "Could not save the settings.");
       toast.error(message);
     },
   });

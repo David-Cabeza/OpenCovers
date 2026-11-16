@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -66,7 +67,7 @@ export function ServiceFormDialog({
       toast.success(editing ? "Service updated" : "Service added");
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save the service.");
+      toast.error(errorMessage(err, "Could not save the service."));
     }
   }
 

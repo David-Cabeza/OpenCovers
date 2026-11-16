@@ -101,7 +101,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
     onSuccess: () => invalidate(),
     onError: (err, { id }) => {
       if (isApiError(err, "table_required")) {
-        toast.error("Assign a table first.");
+        toast.error(errorMessage(err, "Assign a table first."));
         const reservation = reservations.find((r) => r.id === id);
         if (reservation) setAssigning(reservation);
         return;

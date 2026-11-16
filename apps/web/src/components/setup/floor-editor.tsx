@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -56,7 +57,7 @@ export function FloorEditor({ venueId }: { venueId: string }) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["floor-items", venueId] });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not add element."),
+    onError: (err) => toast.error(errorMessage(err, "Could not add element.")),
   });
 
   const deleteItem = useMutation({

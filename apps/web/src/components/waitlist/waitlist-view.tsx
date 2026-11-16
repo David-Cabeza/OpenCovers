@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArmchairIcon, PlusIcon, Trash2Icon } from "lucide-react";
@@ -39,7 +40,7 @@ export function WaitlistView({ venueId }: { venueId: string }) {
       toast.success("Guest seated");
       invalidate();
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not seat."),
+    onError: (err) => toast.error(errorMessage(err, "Could not seat.")),
   });
 
   const cancel = useMutation({
@@ -48,7 +49,7 @@ export function WaitlistView({ venueId }: { venueId: string }) {
       toast.success("Removed from the waitlist");
       invalidate();
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not remove."),
+    onError: (err) => toast.error(errorMessage(err, "Could not remove.")),
   });
 
   return (
