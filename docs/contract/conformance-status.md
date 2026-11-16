@@ -45,10 +45,11 @@ Status legend:
 
 | C32 Member removal revocation and audit read | **PASS** | Migration `0028` adds `api_keys.created_by` and `webhook_endpoints.created_by` and `creator_departed_at`. `removeMember` in `apps/api/src/lib/members.ts` revokes the person's keys for the venue, deletes their sessions when no membership remains, and flags their webhooks, after the unchanged last-admin lock and in the same transaction as the C31 audit row. `listMembershipAudit` in `apps/api/src/lib/membership-audit.ts` and `GET /v1/venues/:venueId/audit` behind `adminOnly` read the C31 log. Tests in `apps/api/test/venue-revocation.test.ts` cover sessions revoked and kept, keys revoked only for the person and venue, a shared key keeping its other grant, webhooks flagged and not deleted, creator attribution, rollback through a failing audit trigger, the last admin revoking nothing, a scan for tokens, emails, keys, and secrets, roles and keys on the audit route, venue isolation, pagination, and bad cursors and limits. Rows made before the migration have no creator. |
 | C33 Public profile and JSON-LD | **PASS** | Migration `0029` adds the `public_*` columns on `venues`. `public.jsonld` is registered above the venue auth middleware in `apps/api/src/app.ts` and built in `apps/api/src/lib/public-profile.ts`. Tests in `apps/api/test/public-profile.test.ts` cover the round trip, validation, flag off, document shape and hours, no ReserveAction without a booking URL, no private field, venue isolation, admin-only write, unauthenticated read, `ETag` and `304`. |
+| C34 Error retry hint | **PASS** | `apps/api/src/lib/errors.ts` is a typed registry of `{ status, retryable }` per code, and `error()` and the rate limiter build every body from it. `apps/api/test/error-retry-hint.test.ts` covers a 4xx, the `transient` 5xx entry, and the `429` (in `rate-limit-app.test.ts`), and guards drift between the registry, `errors.md` and the `openapi.yaml` enum. `apps/mcp/src/fail.ts` appends the suffix, and `apps/mcp/test/server.test.ts` covers it, the three explicit hints on every tool, and read tools as read-only. No route emits `transient`, `idempotency_in_flight` or `unknown_outcome` yet, so those are covered through the registry. |
 
 ## Open gaps
 
-None. All 33 conformance cases pass.
+None. All 34 conformance cases pass.
 
 ## Notes
 

@@ -23,6 +23,25 @@ The MCP server implements this catalog. It wraps the HTTP API and is scoped per 
 | `venue.getConfig` | GET /venues/{venueId}/config | read | none |
 | `venue.setConfig` | PUT /venues/{venueId}/config | write | required |
 
+## Tool hints
+
+Every tool sets `readOnlyHint`, `destructiveHint` and `idempotentHint` explicitly. A client that sees a write tool without `destructiveHint: false` must treat it as destructive, so none is left to the default. `idempotentHint` is true when the same call, key included, has no further effect. A write tool generates a fresh key when the caller omits it, so a retry is only idempotent when the caller passes the key back.
+
+| Tool id | readOnly | destructive | idempotent | Reason |
+| --- | --- | --- | --- | --- |
+| `reservation.availability`, `reservation.agenda`, `reservation.list`, `reservation.search`, `reservation.get`, `reservation.events`, `waitlist.list`, `venue.getConfig` | true | false | true | Reads. |
+| `reservation.create`, `reservation.walk_in` | false | false | true | Adds a booking and removes nothing. A repeat with the same key returns the same booking. |
+| `reservation.modify` | false | true | true | Overwrites fields and may release tables. |
+| `reservation.cancel` | false | true | true | Ends the booking and frees its tables. |
+| `reservation.status` | false | false | true | Moves the status forward, and the feed keeps the history. |
+| `reservation.erasure` | false | true | true | Removes personal data for good. |
+| `waitlist.add` | false | false | false | Adds an entry and takes no key, so a repeat adds another. |
+| `waitlist.seat` | false | false | true | Turns an entry into a booking. A repeat with the same key returns the same booking. |
+| `waitlist.cancel` | false | true | true | Removes an entry. A repeat changes nothing more. |
+| `venue.setConfig` | false | true | true | Overwrites the venue configuration. |
+
+A tool error reads `API error <status>: <code>` followed by ` (retryable)` or ` (not retryable)`, taken from the `retryable` field of the HTTP error. See [errors.md](errors.md).
+
 Reservation writes carry an idempotency key and return the reservation. Erasure returns the counts of erased reservations, guest records, and waitlist entries. Reads never mutate.
 
 Reads return `guest.guestId` when the reservation is linked to a guest record of the venue. `reservation.erasure` takes that id as `guestId`. A `guestId` that is not a guest record is read as a contact. That fallback is deprecated and kept for one version. `erasedGuests` counts guest records deleted, so a contact that matches no record reports 0. Erasure by `principal` also deletes the guest records whose every visit that principal owned, and keeps a guest who still has a visit owned by another principal.

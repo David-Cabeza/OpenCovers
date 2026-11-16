@@ -83,6 +83,6 @@ describe("api keys", () => {
       }),
     });
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ code: "forbidden", message: "forbidden" });
+    expect(await res.json()).toEqual({ code: "forbidden", message: "forbidden", retryable: false });
   });
 });

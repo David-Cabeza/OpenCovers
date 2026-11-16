@@ -2,27 +2,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { ApiError, request } from "./client.js";
+import { request } from "./client.js";
+import { type ToolResult, fail } from "./fail.js";
 
 const VERSION = "0.1.0";
 
-type ToolResult = {
-  content: Array<{ type: "text"; text: string }>;
-  isError?: boolean;
-};
-
 function ok(data: unknown): ToolResult {
   return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
-}
-
-function fail(err: unknown): ToolResult {
-  const message =
-    err instanceof ApiError
-      ? `API error ${err.status}: ${err.code}`
-      : err instanceof Error
-        ? err.message
-        : String(err);
-  return { isError: true, content: [{ type: "text", text: message }] };
 }
 
 const consentSchema = z
@@ -65,7 +51,7 @@ export function createServer(): McpServer {
       title: "Availability",
       description:
         "List available time slots for a venue on a date for a party size, grouped by service (meal period).",
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string().describe("The venue id."),
         date: z.string().describe("Date as YYYY-MM-DD."),
@@ -90,7 +76,7 @@ export function createServer(): McpServer {
     {
       title: "Agenda",
       description: "List reservations for a venue on a specific date.",
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         date: z.string().describe("Date as YYYY-MM-DD."),
@@ -110,7 +96,7 @@ export function createServer(): McpServer {
     {
       title: "List reservations",
       description: "List all reservations for a venue.",
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({ venueId: z.string() }),
     },
     async ({ venueId }) => {
@@ -127,7 +113,7 @@ export function createServer(): McpServer {
     {
       title: "Search reservations",
       description: "Search reservations for a venue within a date range, optionally filtered by status.",
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         dateStart: z.string().describe("Inclusive start date as YYYY-MM-DD."),
@@ -155,7 +141,7 @@ export function createServer(): McpServer {
     {
       title: "Get reservation",
       description: "Get a single reservation by id.",
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({ venueId: z.string(), id: z.string() }),
     },
     async ({ venueId, id }) => {
@@ -173,7 +159,7 @@ export function createServer(): McpServer {
       title: "Create reservation",
       description:
         "Create a reservation and return it. Pass table ids to assign them explicitly, or omit tables to let the engine assign tables automatically for the party size.",
-      annotations: { idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         date: z.string().describe("Date as YYYY-MM-DD."),
@@ -227,7 +213,7 @@ export function createServer(): McpServer {
       title: "Walk-in",
       description:
         "Seat a guest who arrives without a reservation. Defaults the time to now in the venue timezone.",
-      annotations: { idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         partySize: z.number().int().positive(),
@@ -272,7 +258,7 @@ export function createServer(): McpServer {
     {
       title: "Modify reservation",
       description: "Modify a reservation's party size, tables, contact consent, rating, booking note, and/or reconfirmation.",
-      annotations: { idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         id: z.string(),
@@ -305,7 +291,7 @@ export function createServer(): McpServer {
     {
       title: "Cancel reservation",
       description: "Cancel a reservation. Idempotent for the same key.",
-      annotations: { idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         id: z.string(),
@@ -332,7 +318,7 @@ export function createServer(): McpServer {
       title: "Set reservation status",
       description:
         "Advance a reservation status: seat, mark attended, or mark no-show. Seating needs a table: a booking without tables fails with table_required, so assign one with reservation.modify first.",
-      annotations: { idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         id: z.string(),
@@ -360,7 +346,7 @@ export function createServer(): McpServer {
     {
       title: "Reservation events",
       description: "Read the reservation event feed for a venue, from a cursor.",
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         cursor: z.string().optional(),
@@ -384,7 +370,7 @@ export function createServer(): McpServer {
       title: "Erase personal data",
       description:
         "Erase guest data for a venue, by guest id or owner principal. A guest id erases the guest record, every reservation linked to it, and the venue's waitlist entries with the same contact. An owner principal erases the reservations it owns and the guest records left with no other visit. A guest id that is not a record is read as a contact, which is deprecated. Returns counts of erased reservations, guest records, and waitlist entries.",
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         guestId: z
@@ -413,7 +399,7 @@ export function createServer(): McpServer {
     {
       title: "Get venue config",
       description: "Read whether a venue accepts reservations and its notice address.",
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({ venueId: z.string() }),
     },
     async ({ venueId }) => {
@@ -431,7 +417,7 @@ export function createServer(): McpServer {
       title: "Set venue config",
       description:
         "Enable or disable reservations and set the notice address. Enabling requires a notice address.",
-      annotations: { idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         enabled: z.boolean().optional(),
@@ -488,7 +474,7 @@ export function createServer(): McpServer {
     {
       title: "List waitlist",
       description: "List the guests currently waiting for a table.",
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({ venueId: z.string() }),
     },
     async ({ venueId }) => {
@@ -505,7 +491,7 @@ export function createServer(): McpServer {
     {
       title: "Add to waitlist",
       description: "Add a guest to the waitlist when no table is available.",
-      annotations: { idempotentHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         venueId: z.string(),
         partySize: z.number().int().positive(),
@@ -533,7 +519,7 @@ export function createServer(): McpServer {
     {
       title: "Seat a waitlist entry",
       description: "Seat a waiting guest, turning the entry into a reservation.",
-      annotations: { idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         id: z.string(),
@@ -559,7 +545,7 @@ export function createServer(): McpServer {
     {
       title: "Cancel a waitlist entry",
       description: "Remove a guest from the waitlist.",
-      annotations: { idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         id: z.string(),

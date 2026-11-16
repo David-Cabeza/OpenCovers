@@ -61,7 +61,7 @@ describe("cursor expiry", () => {
       { headers: { apikey: "ret-key" } },
     );
     expect(stale.status).toBe(400);
-    expect(await stale.json()).toEqual({ code: "expired_cursor", message: "expired_cursor" });
+    expect(await stale.json()).toEqual({ code: "expired_cursor", message: "expired_cursor", retryable: false });
 
     const ok = await app.request(
       `/v1/venues/retention-route/events?cursor=retention-route:${watermark}`,

@@ -2,6 +2,7 @@ export class ApiError extends Error {
   constructor(
     public code: string,
     public status: number,
+    public retryable?: boolean,
   ) {
     super(code);
   }
@@ -48,7 +49,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const text = await res.text();
   const data = text ? JSON.parse(text) : undefined;
   if (!res.ok) {
-    throw new ApiError((data as { code?: string } | undefined)?.code ?? "error", res.status);
+    const body = data as { code?: string; retryable?: unknown } | undefined;
+    throw new ApiError(
+      body?.code ?? "error",
+      res.status,
+      typeof body?.retryable === "boolean" ? body.retryable : undefined,
+    );
   }
   return data as T;
 }

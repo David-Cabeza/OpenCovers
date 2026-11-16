@@ -90,6 +90,7 @@ async function expectRefused(res: Response) {
   expect(await res.json()).toEqual({
     code: "venue_creation_closed",
     message: "venue_creation_closed",
+    retryable: false,
   });
 }
 

@@ -1,0 +1,50 @@
+// retryable: repeating the same request, unchanged, may succeed later.
+// False when the caller must change something first (inputs, credentials, state).
+export const ERRORS = {
+  invalid_request: { status: 400, retryable: false },
+  invalid_invitation: { status: 400, retryable: false },
+  invitation_not_found: { status: 404, retryable: false },
+  invitation_redeemed: { status: 409, retryable: false },
+  member_not_found: { status: 404, retryable: false },
+  last_admin: { status: 409, retryable: false },
+  unauthorized: { status: 401, retryable: false },
+  forbidden: { status: 403, retryable: false },
+  venue_creation_closed: { status: 403, retryable: false },
+  reservation_not_found: { status: 404, retryable: false },
+  waitlist_entry_not_found: { status: 404, retryable: false },
+  venue_not_found: { status: 404, retryable: false },
+  guest_not_found: { status: 404, retryable: false },
+  guest_merged: { status: 409, retryable: false },
+  guest_not_merged: { status: 409, retryable: false },
+  unmerge_unavailable: { status: 409, retryable: false },
+  slot_taken: { status: 409, retryable: false },
+  no_suitable_table: { status: 409, retryable: false },
+  table_required: { status: 409, retryable: false },
+  invalid_transition: { status: 409, retryable: false },
+  already_cancelled: { status: 409, retryable: false },
+  notice_address_required: { status: 409, retryable: false },
+  public_profile_incomplete: { status: 409, retryable: false },
+  party_size_too_large: { status: 400, retryable: false },
+  party_size_too_small: { status: 400, retryable: false },
+  outside_hours: { status: 400, retryable: false },
+  lead_time_violation: { status: 400, retryable: false },
+  expired_cursor: { status: 400, retryable: false },
+  webhook_not_found: { status: 404, retryable: false },
+  webhook_url_rejected: { status: 400, retryable: false },
+  webhook_limit_reached: { status: 409, retryable: false },
+  rate_limited: { status: 429, retryable: true },
+  transient: { status: 500, retryable: true },
+  // The next six are in the vocabulary but no route emits them yet.
+  idempotency_in_flight: { status: 409, retryable: true },
+  unknown_outcome: { status: 503, retryable: true },
+  email_required: { status: 400, retryable: false },
+  confirmation_required: { status: 409, retryable: false },
+  approval_required: { status: 409, retryable: false },
+  stale_second_factor: { status: 403, retryable: false },
+} as const satisfies Record<string, { status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503; retryable: boolean }>;
+
+export type ErrorCode = keyof typeof ERRORS;
+
+export function errorBody(code: ErrorCode) {
+  return { code, message: code, retryable: ERRORS[code].retryable };
+}
