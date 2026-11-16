@@ -24,7 +24,7 @@ curl -X PUT "$API/v1/venues/$VENUE/public-profile" \
 
 URLs must be `https`. `country` is an upper-case ISO 3166-1 alpha-2 code. Turning it on needs the venue name, `street`, `locality` and `country`. Opening hours come from the venue's services and the weekdays each service opens on (`days` on the service, all seven by default, see [ADR-0015](adr/0015-service-weekdays.md)). Set `days` so a venue that closes one day does not publish false hours. Without a `bookingUrl` the document has no `ReserveAction`.
 
-There is no screen in the staff app for this yet.
+An admin can also edit these fields in the staff app, under Setup, Public profile.
 
 ## 2. Put the document in your page's HTML
 
