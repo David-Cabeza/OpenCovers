@@ -21,6 +21,7 @@ import {
 } from "./lib/invitations";
 import { createRateLimiter, rateLimitConfigFromEnv } from "./lib/rate-limit";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
+import { mayCreateVenue, signupMode } from "./lib/signup";
 import {
   deleteService,
   deleteTable,
@@ -91,6 +92,7 @@ const HTTP_STATUS: Record<string, number> = {
   invitation_redeemed: 409,
   unauthorized: 401,
   forbidden: 403,
+  venue_creation_closed: 403,
   reservation_not_found: 404,
   waitlist_entry_not_found: 404,
   venue_not_found: 404,
@@ -179,6 +181,9 @@ app.get("/v1/venues", async (c) => {
 app.post("/v1/venues", async (c) => {
   const user = await sessionUser(c);
   if (!user) return error(c, "unauthorized", 401);
+  if (!(await mayCreateVenue(db, signupMode(), user.id))) {
+    return error(c, "venue_creation_closed", 403);
+  }
   const body = await c.req.json();
   if (typeof body.name !== "string" || body.name.trim() === "") {
     return error(c, "invalid_request", 400);

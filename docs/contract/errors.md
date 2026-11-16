@@ -14,6 +14,7 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 
 - `unauthorized`: the caller is not authenticated.
 - `forbidden`: the caller is authenticated but lacks the role for the operation.
+- `venue_creation_closed`: the instance does not let this account create a venue. Under `SIGNUP=first-user` and `SIGNUP=closed` only the owner may, so any other account, an invited one included, gets it with `403`. It is not `forbidden`, which is about a role in an existing venue. Nothing is created.
 
 ## Rate limiting
 

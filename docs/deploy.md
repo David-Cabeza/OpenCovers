@@ -81,7 +81,29 @@ The API is ready. The staff app screen is not built yet, so for now an admin cal
 
 Each invitation works once. The invitee gets the invited role in that one venue, and redeeming never creates a venue. `GET /v1/venues/VENUE_ID/invitations` lists them, and `DELETE /v1/venues/VENUE_ID/invitations/INVITATION_ID` revokes a pending one. Revoking does not remove a member who already redeemed, and there is no endpoint for that yet. To remove one, delete their `venue_memberships` row.
 
-An invited account can still create a venue of its own with `POST /v1/venues`, as any account can. See the hardening guide, known gaps. The API has no rate limiting, so keep invitation tokens private and short lived.
+An invited account cannot create a venue of its own under `first-user` or `closed`. See [Who can create a venue](#who-can-create-a-venue). Redemption is rate limited per address, see [Rate limiting](#rate-limiting), but keep invitation tokens private and short lived.
+
+### Who can create a venue
+
+`POST /v1/venues` follows `SIGNUP`. See [ADR-0008](adr/0008-venue-creation-limit.md).
+
+| Mode | Who creates venues |
+| --- | --- |
+| `open` | Any signed-in account. |
+| `first-user` | Only the owner, the account that claimed the instance. The owner may create several venues. |
+| `closed` | Only the owner, if an account is marked as one. |
+
+Any other account gets `403` with the code `venue_creation_closed`, an invited `admin` included. It keeps full access to the venues it belongs to. API keys never create venues.
+
+- **New instance.** Run under `first-user`, sign up, and create your first venue. That account is the owner. Then add staff with invitations. To close the instance for good, set `SIGNUP=closed` and restart. The owner keeps the right to create venues. `closed` cannot start an instance with no account, because nobody can sign up.
+- **Upgrading an instance that ran under `open`.** No account is marked as owner, so under `first-user` or `closed` nobody can create a venue until you mark one. Existing venues, staff and keys keep working. Mark your own account, once:
+
+  ```sh
+  oc exec db psql -U opencovers opencovers -c "UPDATE \"user\" SET first_signup = true WHERE email = 'you@example.com'"
+  ```
+
+  Only one account can hold the mark. If it fails, an account already holds it. Or set `SIGNUP=open` for as long as you need, which also lets anyone sign up, then set it back.
+- **Upgrading an instance that ran under `first-user`.** Its first account is already the owner. Nothing to do.
 
 ## Rate limiting
 
