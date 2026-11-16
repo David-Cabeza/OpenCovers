@@ -60,7 +60,8 @@ Caddy is the only proxy in front of the API. Its `reverse_proxy` directive repla
 - `compose.prod.yaml` defaults to `first-user`. Any other value stops the API at startup. See [Sign-up control](deploy.md#sign-up-control) and [ADR-0005](adr/0005-signup-control.md).
 - Agents and integrations use API keys sent in the `apikey` header. The API stores only the SHA-256 hash of each key.
 - Roles are `read`, `write` and `admin`. A `read` key cannot call a write method. Configuration, tables, services, keys, guest merges and the floor plan require `admin`.
-- Staff are added with invitations. An invitation is single use, expires, and its token is shown once and stored only as a hash. Only a venue `admin` with a staff session creates one. The API does not rate limit redemption attempts, and the staff app has no invitation screen yet.
+- `POST /v1/venues` follows `SIGNUP`. Under `first-user` and `closed` only the owner can create a venue, and an invited account cannot. API keys never can. See [Who can create a venue](deploy.md#who-can-create-a-venue).
+- Staff are added with invitations. An invitation is single use, expires, and its token is shown once and stored only as a hash. Only a venue `admin` with a staff session creates one. Redemption attempts are rate limited per address (see known gap 2), and the staff app has no invitation screen yet.
 - A key is granted to specific venues. A request for a venue the key does not hold returns not found.
 - Give each agent the lowest role that works. The venue keys endpoint accepts only `read` and `write`.
 
@@ -180,7 +181,7 @@ Close these before you serve real guests, or accept the risk knowingly.
    - The first visitor to a fresh `first-user` instance becomes the owner. Register your own account before you publish the address.
    - Upgrading changes the compose default from open to `first-user`. An instance that already has accounts closes to new sign-ups on its next `up`. An instance with no accounts stays claimable. If you relied on open sign-up, set `SIGNUP=open` in `.env.prod`.
    - Staff are added with an invitation through the API, with no SQL. The staff app has no screen for invitations yet, so an admin calls the API by hand, see [Adding staff](deploy.md#adding-staff). The API can list and revoke invitations but cannot list or remove members. See [ADR-0006](adr/0006-staff-invitations.md).
-   - Accounts can still create venues. Any account, an invited one included, can create a venue of its own with `POST /v1/venues`. Venue data stays isolated, but a closed instance is not closed to venue creation by people you invite. Restrict who you invite until the project limits venue creation.
+   - Venue creation follows `SIGNUP`. Under `first-user` and `closed`, only the owner, the account that claimed the instance, can create a venue. Any other account, an invited `admin` included, gets `403 venue_creation_closed` and keeps its own venues. API keys never create venues. Under `open` any account can, so only `first-user` and `closed` limit it. This does not stop an invited `admin` from running the venue it holds, which includes keys and more invitations. An instance whose accounts were created under `open` has no owner, so nobody can create a venue under `first-user` or `closed` until you mark one, see [Who can create a venue](deploy.md#who-can-create-a-venue). The rate limits in gap 2 do not cover `POST /v1/venues`, so venue creation is not rate limited. See [ADR-0008](adr/0008-venue-creation-limit.md).
    - If two first sign-ups arrive at the same moment, the database lets one commit. The loser gets a generic failure from the database error, not the `SIGNUP_CLOSED` message. Sign-up is rate limited per address. See gap 2.
 2. **Rate limiting covers credentials only.** The API limits three kinds of call per client address, in memory. Defaults are in brackets. See [ADR-0007](adr/0007-rate-limiting.md) and [Rate limiting](deploy.md#rate-limiting).
    - Sign-in and every other write under `/api/auth` except sign-up (30 per 15 minutes).
@@ -208,7 +209,7 @@ Close these before you serve real guests, or accept the risk knowingly.
 - [ ] `oc ps` shows only `web` with published ports, and all three services report `healthy`.
 - [ ] `curl -I https://your-domain/` shows the headers listed under Security headers, and `curl https://your-domain/health` returns `{"ok":true,"service":"opencovers"}`.
 - [ ] `oc exec api printenv TRUST_PROXY` prints `true`, and 31 wrong sign-ins from one machine to `/api/auth/sign-in/email` end in `429` with a `Retry-After` header. Wait 15 minutes before you sign in yourself.
-- [ ] `SIGNUP` is `first-user` or `closed` (check `oc exec api printenv SIGNUP`), you registered your own account before publishing the address, and you know how you will add staff.
+- [ ] `SIGNUP` is `first-user` or `closed` (check `oc exec api printenv SIGNUP`), you registered your own account before publishing the address, you know how you will add staff, and you know which account is the owner who can create venues.
 - [ ] A backup ran, the dump left the machine, and you restored it on a spare machine.
 - [ ] `WEBHOOK_ALLOW_INSECURE` is unset.
 - [ ] Each agent key has the lowest role it needs and a named `principal`.

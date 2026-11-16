@@ -17,6 +17,18 @@ export function signupMode(
   );
 }
 
+export async function mayCreateVenue(
+  db: NodePgDatabase<typeof schema>,
+  mode: SignupMode,
+  userId: string,
+): Promise<boolean> {
+  if (mode === "open") return true;
+  const result = await db.execute<{ owner: boolean }>(
+    sql`SELECT first_signup AS owner FROM "user" WHERE id = ${userId}`,
+  );
+  return result.rows[0]?.owner === true;
+}
+
 export type SignupDecision =
   | { allowed: false }
   | { allowed: true; firstSignup: boolean };

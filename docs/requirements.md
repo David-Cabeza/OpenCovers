@@ -240,11 +240,17 @@ A venue `admin` can add staff without touching the database. An invitation grant
 
 Acceptance: conformance case C27. Concurrent redemptions of one token produce one membership and at most one account. Every failed redemption gets the same answer and names no venue. Under `SIGNUP=closed` a sign-up without a valid invitation still fails with `SIGNUP_CLOSED`.
 
-### REQ-C4 Rate limits on credential paths
+### REQ-C5 Rate limits on credential paths
 
 Sign-in and every other write under `/api/auth`, sign-up, and invitation redemption are limited per client address, with a separate budget for each. A refused call returns `429`, the code `rate_limited` and a `Retry-After` header, the same whatever the request names. Reads and `/health` are not limited. The limits and the trusted proxy are settings, and a fork that changes nothing is limited. The limits are per process and per address. They do not stop an attacker who holds many addresses, and they do not cover other `/v1` routes. See [ADR-0007](adr/0007-rate-limiting.md).
 
 Acceptance: conformance case C28.
+
+### REQ-C6 Venue creation limit
+
+On an instance that is not `SIGNUP=open`, an invited account never creates a venue, whatever its role. Under `first-user` and `closed` only the owner, the account that claimed the instance, creates venues, and may create several. Any other account fails with `venue_creation_closed` and nothing is written. A key never creates a venue. Listing and reading venues does not change. See ADR-0008.
+
+Acceptance: conformance case C29. Under `first-user` and `closed`, an account invited as `read`, `write`, or `admin` cannot create a venue, and the first owner can. Under `open` nothing changes.
 
 ## Conformance cases
 

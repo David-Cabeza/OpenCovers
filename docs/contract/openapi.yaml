@@ -18,6 +18,82 @@ security:
   - ApiKeyAuth: []
 
 paths:
+  /venues:
+    get:
+      operationId: venue.list
+      summary: List the venues the signed-in account belongs to
+      description: |
+        Needs a staff session. A key fails with `unauthorized`. Returns only
+        the venues where the account holds a membership, with its role in
+        each. The `SIGNUP` mode does not change it.
+      security: []
+      responses:
+        "200":
+          description: The account's venues, by name
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [venues]
+                properties:
+                  venues:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, timezone, enabled, role]
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        timezone: { type: string }
+                        enabled: { type: boolean }
+                        role: { type: string, enum: [read, write, admin] }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: venue.create
+      summary: Create a venue
+      description: |
+        Needs a staff session. A key of any role, with or without a session,
+        never creates a venue, and a request with only a key fails with
+        `unauthorized`. The creator becomes `admin` of the new venue.
+
+        Who may call it depends on the instance's `SIGNUP` mode. Under
+        `open` any signed-in account may. Under `first-user` and `closed`
+        only the owner may, the account that claimed the instance under
+        `first-user`. Any other account, an invited one included, even with
+        the `admin` role in an existing venue, fails with `403` and
+        `venue_creation_closed`, and nothing is created. That check runs
+        before the body is validated. See ADR-0008.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                id: { type: string, description: "Optional slug. A random id is used when absent." }
+                name: { type: string, minLength: 1 }
+                timezone: { type: string, description: "An IANA zone name." }
+      responses:
+        "201":
+          description: The venue was created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [venue]
+                properties:
+                  venue:
+                    type: object
+                    required: [id, name]
+                    properties:
+                      id: { type: string }
+                      name: { type: string }
+        default:
+          $ref: "#/components/responses/Error"
+
   /venues/{venueId}/availability:
     get:
       operationId: reservation.availability
@@ -1638,3 +1714,4 @@ components:
         - invalid_invitation
         - invitation_not_found
         - invitation_redeemed
+        - venue_creation_closed
