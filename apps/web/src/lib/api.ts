@@ -350,6 +350,12 @@ export const api = {
       { method: "DELETE" },
     ),
 
+  redeemInvitation: (token: string) =>
+    request<{ membership: { venueId: string; role: Role } }>("/v1/invitations/redeem", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+
   agenda: (venueId: string, date: string) =>
     request<{ reservations: Reservation[] }>(
       `/v1/venues/${venueId}/agenda?date=${date}`,
