@@ -98,7 +98,7 @@ A table `invitations` with the columns above, a foreign key to `venues` with del
 
 ### Scope
 
-No email sending, no staff screen in `apps/web`, no way to list or remove members, and no change to `POST /v1/venues`. Those are separate changes. The contract gains the invitation routes. Better Auth routes stay outside `docs/contract/`, and the sign-up header is documented in `docs/deploy.md`.
+No email sending, no staff screen in `apps/web`, no way to list or remove members (see [ADR-0009](0009-venue-members.md)), and no change to `POST /v1/venues`. Those are separate changes. The contract gains the invitation routes. Better Auth routes stay outside `docs/contract/`, and the sign-up header is documented in `docs/deploy.md`.
 
 ## Consequences
 

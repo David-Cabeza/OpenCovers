@@ -915,6 +915,79 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/members:
+    get:
+      operationId: member.list
+      summary: List the venue's staff members
+      description: |
+        Admin only, and only through a staff session. A key of any role, an
+        `admin` key included, fails with `forbidden`, and so does any other
+        session role. The list shows each member's `userId`, `name`, `email`,
+        and `role`, ordered by email, and only for this venue. It holds no
+        sign-in or session data and no start date. Not exposed through MCP.
+        See ADR-0009.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The venue's members
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [members]
+                properties:
+                  members:
+                    type: array
+                    items: { $ref: "#/components/schemas/Member" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/members/{userId}:
+    delete:
+      operationId: member.remove
+      summary: Remove a member from the venue
+      description: |
+        Admin only, and only through a staff session. Deletes the person's
+        membership in this venue. Their next request to the venue fails with
+        `venue_not_found`. Their account, their sessions, and their other
+        venues are untouched. API keys and webhooks they created are not
+        affected, because a key belongs to an integration and not to a user.
+
+        A venue always keeps at least one `admin`. A removal that would leave
+        none, including an admin removing themselves, fails with
+        `last_admin` and changes nothing. Concurrent removals are serialized,
+        so of two admins removing each other one succeeds. An admin may
+        remove themselves when another admin remains.
+
+        A `userId` that is unknown, or is a member of another venue only,
+        fails with `member_not_found`, the same answer for both. There is no
+        role change. Remove the member and invite them again. A removal is
+        not recorded in the event feed. See ADR-0009.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The membership that was removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [member]
+                properties:
+                  member:
+                    type: object
+                    required: [userId, role]
+                    properties:
+                      userId: { type: string }
+                      role: { $ref: "#/components/schemas/Role" }
+        default:
+          $ref: "#/components/responses/Error"
+
   /invitations/redeem:
     post:
       operationId: invitation.redeem
@@ -1504,6 +1577,15 @@ components:
       type: string
       enum: [read, write, admin]
 
+    Member:
+      type: object
+      required: [userId, name, email, role]
+      properties:
+        userId: { type: string }
+        name: { type: string }
+        email: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+
     Invitation:
       type: object
       required: [id, role, email, status, createdAt, expiresAt, redeemedAt, revokedAt]
@@ -1715,3 +1797,5 @@ components:
         - invitation_not_found
         - invitation_redeemed
         - venue_creation_closed
+        - member_not_found
+        - last_admin

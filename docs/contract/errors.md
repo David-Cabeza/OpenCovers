@@ -54,6 +54,11 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 
 A sign-up with a bad `X-Invitation-Token` fails on the auth route with `403` and the code `INVALID_INVITATION`. Auth routes are outside this contract.
 
+## Members
+
+- `member_not_found`: the user is not a member of this venue. An unknown id and a member of another venue only give the same answer.
+- `last_admin`: the removal would leave the venue with no `admin`, so nothing changed. An admin removing themselves is the same case when no other admin remains.
+
 ## Idempotency and outcome
 
 - `idempotency_in_flight`: a write with this key is already running.
