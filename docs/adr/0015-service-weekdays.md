@@ -1,4 +1,4 @@
-# ADR-0014: Service weekdays
+# ADR-0015: Service weekdays
 
 - Status: Accepted
 - Date: 2026-11-16
