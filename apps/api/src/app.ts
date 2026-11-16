@@ -62,6 +62,14 @@ import { isRating } from "./lib/rating";
 import { isReconfirmation } from "./lib/reconfirmation";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
 import {
+  etagMatches,
+  etagOf,
+  getJsonLd,
+  getProfile,
+  parseProfileInput,
+  setProfile,
+} from "./lib/public-profile";
+import {
   decodeGuestCursor,
   encodeGuestCursor,
   getGuest,
@@ -116,6 +124,7 @@ const HTTP_STATUS: Record<string, number> = {
   invalid_transition: 409,
   already_cancelled: 409,
   notice_address_required: 409,
+  public_profile_incomplete: 409,
   party_size_too_large: 400,
   party_size_too_small: 400,
   outside_hours: 400,
@@ -141,6 +150,39 @@ app.use("*", createRateLimiter(rateLimitConfigFromEnv()).middleware);
 app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
 
 app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// Public and unauthenticated by design (ADR-0012). It must stay above the
+// venue auth middleware below. GET is not rate limited (ADR-0007).
+const NOT_FOUND_BODY = JSON.stringify({ code: "venue_not_found", message: "venue_not_found" });
+
+app.options("/v1/venues/:venueId/public.jsonld", (c) =>
+  c.body(null, 204, {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+  }),
+);
+
+app.get("/v1/venues/:venueId/public.jsonld", async (c) => {
+  const doc = await getJsonLd(db, c.req.param("venueId"));
+  if (!doc) {
+    return c.body(NOT_FOUND_BODY, 404, {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "public, max-age=60",
+    });
+  }
+  const body = JSON.stringify(doc);
+  const etag = etagOf(body);
+  const headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Cache-Control": "public, max-age=300",
+    ETag: etag,
+    Vary: "Accept-Encoding",
+  };
+  if (etagMatches(c.req.header("if-none-match"), etag)) return c.body(null, 304, headers);
+  return c.body(body, 200, { ...headers, "Content-Type": "application/ld+json; charset=utf-8" });
+});
 
 app.use("/v1/venues/:venueId/*", async (c, next) => {
   const venueId = c.req.param("venueId");
@@ -934,6 +976,26 @@ app.put("/v1/venues/:venueId/config", adminOnly, async (c) => {
   });
   if (!result.ok) return mapError(c, result.code);
   return c.json(result.config);
+});
+
+app.get("/v1/venues/:venueId/public-profile", async (c) => {
+  const profile = await getProfile(db, c.req.param("venueId"));
+  if (!profile) return mapError(c, "venue_not_found");
+  return c.json(profile);
+});
+
+app.put("/v1/venues/:venueId/public-profile", adminOnly, async (c) => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return error(c, "invalid_request", 400);
+  }
+  const input = parseProfileInput(body);
+  if (!input) return error(c, "invalid_request", 400);
+  const result = await setProfile(db, c.req.param("venueId"), input);
+  if (!result.ok) return mapError(c, result.code);
+  return c.json(result.profile);
 });
 
 app.get("/v1/venues/:venueId/webhooks", async (c) => {

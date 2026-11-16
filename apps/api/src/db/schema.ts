@@ -9,6 +9,7 @@ import {
   boolean,
   check,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -38,8 +39,25 @@ export const venues = pgTable("venues", {
   phoneCountry: text("phone_country"),
   turnTimes: jsonb("turn_times").$type<TurnTime[]>().notNull().default([]),
   overbookingCeiling: integer("overbooking_ceiling").notNull().default(0),
+  publicProfileEnabled: boolean("public_profile_enabled").notNull().default(false),
+  publicStreet: text("public_street"),
+  publicLocality: text("public_locality"),
+  publicPostalCode: text("public_postal_code"),
+  publicRegion: text("public_region"),
+  publicCountry: text("public_country"),
+  publicPhone: text("public_phone"),
+  publicWebsiteUrl: text("public_website_url"),
+  publicBookingUrl: text("public_booking_url"),
+  publicCuisine: text("public_cuisine"),
+  publicPriceRange: text("public_price_range"),
+  publicLatitude: doublePrecision("public_latitude"),
+  publicLongitude: doublePrecision("public_longitude"),
 }, (t) => [
   check("venues_overbooking_ceiling", sql`${t.overbookingCeiling} >= 0 AND ${t.overbookingCeiling} <= 1000`),
+  check(
+    "venues_public_geo",
+    sql`(${t.publicLatitude} IS NULL) = (${t.publicLongitude} IS NULL) AND (${t.publicLatitude} IS NULL OR (${t.publicLatitude} BETWEEN -90 AND 90 AND ${t.publicLongitude} BETWEEN -180 AND 180))`,
+  ),
 ]);
 
 export const services = pgTable(

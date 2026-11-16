@@ -152,7 +152,7 @@ Today a guest can only book through a platform or an agent. This phase gives ven
 - A curated theme registry in the repository, reviewed through pull requests. [M]
 - Localization of the staff app and the widget. [L, split it]
 - A PWA mode for a tablet at the host stand. [M]
-- Local search visibility for venue pages. schema.org Restaurant (LocalBusiness) JSON-LD generated from venue data (name, public address, opening hours from the configured hours, services, a ReserveAction pointing at the booking page), rendered in the HTML of the page that hosts the widget or in a hosted page, because content inside an iframe is not read as the venue's page. Booking completes without leaving the venue's site. The venue schema has no public street address today. It has only `noticeAddress`, the restaurant's address for guest notices, so a public address field is a prerequisite. [M]
+- Local search visibility for venue pages. Partly done (ADR-0012, C33): a separate opt-in public profile and a public `GET /v1/venues/{venueId}/public.jsonld` that returns schema.org Restaurant JSON-LD with address, phone, cuisine, hours from the configured services and a ReserveAction when a booking URL is set. The venue puts it in the HTML of its own page with a small server-side snippet. Still pending: a staff form for the public profile, per-weekday hours, and rendering it in the page that hosts the widget or in a hosted page, because content inside an iframe is not read as the venue's page. Booking completes without leaving the venue's site once the widget ships. [M]
 
 Exit criterion: a venue puts a branded booking page on its own site without writing code.
 

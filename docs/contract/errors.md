@@ -10,6 +10,10 @@ Every error response is `{"code": "...", "message": "..."}`. The `code` is one o
 - `waitlist_entry_not_found`: the waitlist entry does not exist, or the caller cannot see it.
 - `guest_not_found`: the guest does not exist, belongs to another venue, was merged into another guest, or was cleared by retention. Indistinguishable from not found.
 
+## Public profile
+
+- `public_profile_incomplete`: the public profile cannot be turned on without a venue name, `street`, `locality` and `country`, or a `latitude` was given without a `longitude` (or the reverse). `409`. Nothing changed.
+
 ## Auth
 
 - `unauthorized`: the caller is not authenticated.
