@@ -14,6 +14,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Tailwind](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss&logoColor=white)
+[![npm](https://img.shields.io/npm/v/@opencovers/mcp?label=npm%20%40opencovers%2Fmcp&color=cb3837)](https://www.npmjs.com/package/@opencovers/mcp)
 ![MCP](https://img.shields.io/badge/MCP-server-7c3aed)
 ![Status](https://img.shields.io/badge/status-pre--alpha-ffb020)
 [![License](https://img.shields.io/badge/License-Apache_2.0-d97757)](LICENSE)
@@ -53,7 +54,7 @@ A venue admin invites staff and removes members from the staff app, with the rol
 
 ### 🤖 An MCP server
 
-The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly.
+The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly. It is published on npm as [`@opencovers/mcp`](https://www.npmjs.com/package/@opencovers/mcp) and listed in the official MCP registry as `io.github.David-Cabeza/opencovers`. Run it with `npx -y @opencovers/mcp`.
 
 ### 🧭 The room, covered
 
@@ -114,7 +115,7 @@ pnpm dev               # API :3000 · staff app :5173 · site :5174
 
 Open <http://localhost:5173>, sign up, and create a venue. The public site is at <http://localhost:5174>. The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-To run the MCP server, see [apps/mcp](apps/mcp/README.md). Create an agent key from the staff app under **Setup → API keys**.
+To run the MCP server, use `npx -y @opencovers/mcp` or see [apps/mcp](apps/mcp/README.md). Create an agent key from the staff app under **Setup → API keys**.
 
 ## Setting up on a new machine
 
