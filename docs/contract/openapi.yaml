@@ -499,7 +499,7 @@ paths:
         and the same headers. The document holds the venue name, the public
         address, the optional `url`, `telephone`, `servesCuisine`,
         `priceRange` and `geo`, one `openingHoursSpecification` entry per
-        service (all seven days), and a `ReserveAction` only when
+        service (each for its own `days`), and a `ReserveAction` only when
         `bookingUrl` is set. It never holds `noticeAddress`, an email, a key
         or guest data. It carries `ETag` and `Cache-Control: public,
         max-age=300`, and `If-None-Match` gets `304`.
@@ -556,7 +556,15 @@ paths:
       description: |
         A limit left out keeps its stored value, and null clears it. A limit
         that is not an integer of at least 1, or a minimum above the maximum
-        after the update, fails with `invalid_request`. Admin only. Any other
+        after the update, fails with `invalid_request`. `days` is a non-empty
+        list of distinct ISO weekdays, 1 (Monday) to 7 (Sunday). It defaults to
+        all seven for a new service, and a call that leaves it out keeps the
+        stored value. An empty list, null, a value outside 1 to 7 or a
+        duplicate fails with `invalid_request`. A service belongs to the day it
+        opens, so the part of an overnight service after midnight follows the
+        weekday of the previous date. Availability omits a service on a day it
+        does not serve, and a create for a time only that service covers fails
+        with `outside_hours`, walk-ins included. Admin only. Any other
         role fails with `forbidden`. Not exposed through MCP.
       parameters:
         - $ref: "#/components/parameters/venueId"
@@ -573,6 +581,7 @@ paths:
                 openEnd: { type: string, example: "23:00" }
                 minPartySize: { type: integer, minimum: 1, nullable: true }
                 maxPartySize: { type: integer, minimum: 1, nullable: true }
+                days: { $ref: "#/components/schemas/ServiceDays" }
       responses:
         "200":
           description: The venue's services after the update
@@ -1301,7 +1310,7 @@ components:
       type: object
       description: |
         One rule that blocks the time. Reasons come in this fixed order:
-        `outside_hours` with rule `hours`, then rule `slot_grid`, then rule
+        `outside_hours` with rule `hours` or `weekday`, then rule `slot_grid`, then rule
         `last_seating`, then `lead_time_violation`, then
         `beyond_booking_horizon`, then `date_blocked`, then the service limit
         as `party_size_too_small` or `party_size_too_large` with rule
@@ -1320,6 +1329,7 @@ components:
         details:
           oneOf:
             - $ref: "#/components/schemas/ExplainHours"
+            - $ref: "#/components/schemas/ExplainWeekday"
             - $ref: "#/components/schemas/ExplainSlotGrid"
             - $ref: "#/components/schemas/ExplainLastSeating"
             - $ref: "#/components/schemas/ExplainLeadTime"
@@ -1345,6 +1355,30 @@ components:
               name: { type: string }
               openStart: { type: string }
               openEnd: { type: string }
+
+    ExplainWeekday:
+      type: object
+      description: |
+        Details of `outside_hours` when a service covers the time by its hours
+        but none serves the weekday of the date. A service belongs to the day
+        it opens, so the weekday checked for the part of an overnight service
+        after midnight is the one of the previous date, while `weekday` here is
+        the one of `date`.
+      required: [rule, date, weekday, services]
+      properties:
+        rule: { type: string, enum: [weekday] }
+        date: { type: string, format: date }
+        weekday: { type: integer, minimum: 1, maximum: 7 }
+        services:
+          type: array
+          items:
+            type: object
+            required: [name, openStart, openEnd, days]
+            properties:
+              name: { type: string }
+              openStart: { type: string }
+              openEnd: { type: string }
+              days: { $ref: "#/components/schemas/ServiceDays" }
 
     ExplainSlotGrid:
       type: object
@@ -2016,10 +2050,20 @@ components:
           example:
             - { from: "2026-12-24", to: "2026-12-26" }
 
+    ServiceDays:
+      type: array
+      minItems: 1
+      maxItems: 7
+      uniqueItems: true
+      items: { type: integer, minimum: 1, maximum: 7 }
+      description: ISO weekdays the service opens on, 1 (Monday) to 7 (Sunday). All seven when not set.
+      example: [4, 5, 6]
+
     Service:
       type: object
-      required: [name, openStart, openEnd]
+      required: [name, openStart, openEnd, days]
       properties:
+        days: { $ref: "#/components/schemas/ServiceDays" }
         name: { type: string }
         openStart: { type: string, example: "19:00" }
         openEnd: { type: string, example: "23:00" }

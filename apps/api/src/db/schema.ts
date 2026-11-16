@@ -16,6 +16,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -80,9 +81,16 @@ export const services = pgTable(
     openEnd: text("open_end").notNull(),
     minPartySize: integer("min_party_size"),
     maxPartySize: integer("max_party_size"),
+    // ISO weekdays (1 Monday to 7 Sunday) the service opens on. An overnight service
+    // belongs to the day it opens. All seven by default.
+    days: smallint("days").array().notNull().default(sql`'{1,2,3,4,5,6,7}'::smallint[]`),
   },
   (t) => [
     primaryKey({ columns: [t.venueId, t.name] }),
+    check(
+      "services_days",
+      sql`cardinality(${t.days}) BETWEEN 1 AND 7 AND ${t.days} <@ ARRAY[1,2,3,4,5,6,7]::smallint[]`,
+    ),
     check(
       "services_party_size_limits",
       sql`(${t.minPartySize} IS NULL OR ${t.minPartySize} >= 1) AND (${t.maxPartySize} IS NULL OR ${t.maxPartySize} >= 1) AND (${t.minPartySize} IS NULL OR ${t.maxPartySize} IS NULL OR ${t.minPartySize} <= ${t.maxPartySize})`,

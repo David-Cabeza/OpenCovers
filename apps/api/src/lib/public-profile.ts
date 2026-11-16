@@ -166,7 +166,7 @@ export async function setProfile(db: Db, venueId: string, input: ProfileInput): 
   return { ok: true, profile: merged };
 }
 
-const ALL_DAYS = [
+const WEEKDAY_URLS = [
   "https://schema.org/Monday",
   "https://schema.org/Tuesday",
   "https://schema.org/Wednesday",
@@ -184,7 +184,7 @@ export async function getJsonLd(db: Db, venueId: string): Promise<JsonLd | null>
   if (!v || !v.publicProfileEnabled) return null;
   const p = profileOf(v);
   const rows = await db
-    .select({ openStart: services.openStart, openEnd: services.openEnd })
+    .select({ openStart: services.openStart, openEnd: services.openEnd, days: services.days })
     .from(services)
     .where(eq(services.venueId, venueId))
     .orderBy(services.openStart, services.openEnd);
@@ -212,7 +212,7 @@ export async function getJsonLd(db: Db, venueId: string): Promise<JsonLd | null>
   if (rows.length > 0) {
     doc.openingHoursSpecification = rows.map((r) => ({
       "@type": "OpeningHoursSpecification",
-      dayOfWeek: ALL_DAYS,
+      dayOfWeek: [...r.days].sort((a, b) => a - b).map((d) => WEEKDAY_URLS[d - 1]),
       opens: r.openStart,
       closes: r.openEnd,
     }));

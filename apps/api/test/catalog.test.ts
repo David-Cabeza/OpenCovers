@@ -46,19 +46,19 @@ describe("catalog", () => {
     await upsertService(db, "cat", { name: "lunch", openStart: "12:00", openEnd: "16:00" });
     await upsertService(db, "cat", { name: "dinner", openStart: "19:00", openEnd: "23:00" });
     expect(await listServices(db, "cat")).toEqual([
-      { name: "lunch", openStart: "12:00", openEnd: "16:00" },
-      { name: "dinner", openStart: "19:00", openEnd: "23:00" },
+      { name: "lunch", openStart: "12:00", openEnd: "16:00", days: [1, 2, 3, 4, 5, 6, 7] },
+      { name: "dinner", openStart: "19:00", openEnd: "23:00", days: [1, 2, 3, 4, 5, 6, 7] },
     ]);
 
     await upsertService(db, "cat", { name: "lunch", openStart: "12:30", openEnd: "16:00" });
     expect(await listServices(db, "cat")).toEqual([
-      { name: "lunch", openStart: "12:30", openEnd: "16:00" },
-      { name: "dinner", openStart: "19:00", openEnd: "23:00" },
+      { name: "lunch", openStart: "12:30", openEnd: "16:00", days: [1, 2, 3, 4, 5, 6, 7] },
+      { name: "dinner", openStart: "19:00", openEnd: "23:00", days: [1, 2, 3, 4, 5, 6, 7] },
     ]);
 
     await deleteService(db, "cat", "dinner");
     expect(await listServices(db, "cat")).toEqual([
-      { name: "lunch", openStart: "12:30", openEnd: "16:00" },
+      { name: "lunch", openStart: "12:30", openEnd: "16:00", days: [1, 2, 3, 4, 5, 6, 7] },
     ]);
   });
 

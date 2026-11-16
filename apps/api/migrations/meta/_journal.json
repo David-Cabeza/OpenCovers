@@ -218,6 +218,13 @@
       "when": 1794862630512,
       "tag": "0030_lame_vance_astro",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794868200327,
+      "tag": "0031_stiff_lizard",
+      "breakpoints": true
     }
   ]
 }
