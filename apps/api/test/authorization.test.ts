@@ -88,6 +88,7 @@ const ADMIN_ROUTES: Route[] = [
       fromEmail: "attacker@example.com",
       phoneCountry: "FR",
       turnTimes: [{ upTo: 2, minutes: 15 }],
+      overbookingCeiling: 500,
     },
     status: 200,
   },

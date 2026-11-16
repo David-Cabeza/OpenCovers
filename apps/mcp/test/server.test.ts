@@ -109,6 +109,13 @@ describe("opencovers MCP server", () => {
     }
   });
 
+  it("tells the caller that seating needs a table", async () => {
+    const { tools } = await client.listTools();
+    const description = tools.find((t) => t.name === "reservation.status")?.description ?? "";
+    expect(description).toContain("table_required");
+    expect(description).toContain("reservation.modify");
+  });
+
   it("accepts a rating from 1 to 5 on create, walk-in and modify", async () => {
     const { tools } = await client.listTools();
     for (const name of ["reservation.create", "reservation.walk_in", "reservation.modify"]) {

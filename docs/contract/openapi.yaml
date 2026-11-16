@@ -231,7 +231,9 @@ paths:
         A modify that changes only `guest.consent` and/or `rating` is also
         accepted on `attended`. `cancelled` and `no_show` reject every modify
         with `invalid_transition`. A body with only consent or rating sends no
-        email to the guest.
+        email to the guest. A modify that would leave a `seated` reservation
+        without tables fails with `table_required`. A table that another
+        booking holds fails with `slot_taken`.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/reservationId"
@@ -273,7 +275,11 @@ paths:
       summary: Move a reservation to a new status
       description: |
         The engine enforces the allowed transitions. An invalid transition
-        fails with `invalid_transition`.
+        fails with `invalid_transition`. A move to `seated` also needs the
+        reservation to hold at least one table, and fails with
+        `table_required` when it holds none, as an overbooked booking does.
+        Staff assign a table with a modify first. The failed call writes
+        nothing, so the same key can be sent again after the assignment.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/reservationId"
@@ -1415,6 +1421,7 @@ components:
         - party_size_too_large
         - party_size_too_small
         - no_suitable_table
+        - table_required
         - outside_hours
         - lead_time_violation
         - email_required

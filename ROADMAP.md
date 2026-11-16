@@ -130,6 +130,7 @@ Availability
 - A slot grid with per-day overrides. [M]
 - Done: an endpoint that explains why a slot is unavailable (C20). A staff app view of the explanation is pending. [S]
 - Done: reconfirmation status on a reservation (C25, migration 0024).
+- Done: a reservation cannot be seated without a table (C26, no migration).
 
 Staff and floor
 - Done: a pre-shift view in the staff app for a service and date. Its note column is not wired to `commentary` yet, and allergies wait for the legal review. [S]

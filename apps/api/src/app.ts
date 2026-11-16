@@ -88,6 +88,7 @@ const HTTP_STATUS: Record<string, number> = {
   unmerge_unavailable: 409,
   slot_taken: 409,
   no_suitable_table: 409,
+  table_required: 409,
   invalid_transition: 409,
   already_cancelled: 409,
   notice_address_required: 409,

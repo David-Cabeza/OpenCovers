@@ -1,8 +1,9 @@
 # ADR-0004: Overbooking ceiling enforced in application code
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-15
 - Deciders: David Cabeza
+- Accepted: 2026-11-15
 
 ## Context
 
@@ -41,6 +42,10 @@ The justification, in order:
 
 This is a judgment about how to read the design rule. If the rule is read as "application code never enforces any cap", the ceiling breaks it, and the alternatives below apply.
 
+Decision note, 2026-11-15. The maintainer accepted this record in the 2026-11-15 session, on one condition. Only the venue's responsible person, the `admin` role, can configure the ceiling. This is already enforced. `PUT /venues/{venueId}/config` is guarded by `adminOnly` in `apps/api/src/app.ts`, so a `read` or `write` key or session fails with `forbidden` and the ceiling does not change. `apps/api/test/overbooking.test.ts` ("needs an admin key") shows a `write` key getting `403` and the stored ceiling staying at 0. The `PUT /config` case in `apps/api/test/authorization.test.ts` sends `overbookingCeiling` with a `write` key and a `read` key, checks the venue state is unchanged, and then shows the `admin` key changing it.
+
+The maintainer also decided that a reservation cannot be seated without a table, so an overbooked booking has to get a real table before it is seated. Conformance case C26 and the error `table_required` carry that rule.
+
 ## Consequences
 
 What becomes easier:
@@ -55,12 +60,12 @@ What becomes harder, and what we accept:
 - The sum is conservative. It counts every overlapping booking without tables, not only those that coincide in time. It can refuse a booking that a time-sliced count would accept.
 - Availability and explain read the sum without the lock. They show a time as bookable exactly when a create would succeed at that instant, so a concurrent create can still win the last cover and the loser gets `no_suitable_table`.
 - Reads return `tables: []` for an overbooked booking. The array was already allowed to be empty, but code that assumes a booking holds at least one table must change.
-- Seating an overbooked booking is allowed and needs no table. `ALLOWED_TRANSITIONS` checks only status, so a `seated` booking can have no table and still counts against the ceiling until it is attended, a no-show, or cancelled. Tables are not forced at seating.
-- Nothing assigns tables to an overbooked booking when a table frees up. Staff do it with a modify.
+- An overbooked booking cannot be seated until it holds a table. A move to `seated` with no active table allocation fails with `table_required` (HTTP 409, conformance case C26), and so does a modify that would leave a `seated` booking without tables. The system always knows which real table a seated party occupies. A booking without tables keeps counting against the ceiling until staff assign a table and seat it, or it is a no-show or cancelled. A walk-in is unaffected, because it is seated at creation with its tables.
+- Nothing assigns tables to an overbooked booking when a table frees up. Staff do it with a modify, which the exclusion constraint checks, and then seat it. The staff app needs a way to assign a table before this is usable from the screen.
 - The staff app (`apps/web`) is untouched. It shows an overbooked booking without a table, and a display for it is a follow-up.
 - One behavior change at the default. A modify that sends `tables: []` used to release every table and now fails with `no_suitable_table` at ceiling 0, because it would leave a booking without tables. Nothing in the API tests, the MCP tool (`min(1)`) or the staff app sends it.
 - The ceiling is venue-wide, not per service or zone. It never applies to a walk-in, to a create that names its tables, or to a party larger than the venue.
-- `docs/contract/openapi.yaml`, `conformance.md` (C24), `conformance-status.md`, `errors.md`, `mcp.md` and REQ-B7 carry the rule, as the conventions require.
+- `docs/contract/openapi.yaml`, `conformance.md` (C24), `conformance-status.md`, `errors.md`, `mcp.md` and REQ-B7 carry the rule, and C26 and REQ-B6 carry the seating rule, as the conventions require.
 
 ## Alternatives considered
 

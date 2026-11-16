@@ -329,7 +329,8 @@ export function createServer(): McpServer {
     "reservation.status",
     {
       title: "Set reservation status",
-      description: "Advance a reservation status: seat, mark attended, or mark no-show.",
+      description:
+        "Advance a reservation status: seat, mark attended, or mark no-show. Seating needs a table: a booking without tables fails with table_required, so assign one with reservation.modify first.",
       annotations: { idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
