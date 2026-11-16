@@ -11,6 +11,7 @@ import { Topbar } from "./layout/topbar";
 import { PacingView } from "./pacing/pacing-view";
 import { PreShiftView } from "./preshift/pre-shift-view";
 import { SetupView } from "./setup/setup-view";
+import { TeamView } from "./team/team-view";
 import { EmptyVenues } from "./venue/empty-venues";
 import { WaitlistView } from "./waitlist/waitlist-view";
 
@@ -35,7 +36,7 @@ export function Dashboard() {
 
   return (
     <div className="flex min-h-dvh">
-      <Sidebar active={active} onSelect={setActive} />
+      <Sidebar active={active} onSelect={setActive} role={role} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar email={session?.user.email} />
         <main className="flex-1 p-6 lg:p-8 print:p-0">
@@ -54,6 +55,7 @@ export function Dashboard() {
               {active === "availability" && <AvailabilityView venueId={venueId} />}
               {active === "waitlist" && <WaitlistView venueId={venueId} />}
               {active === "pacing" && <PacingView venueId={venueId} />}
+              {active === "team" && role === "admin" && <TeamView venueId={venueId} />}
               {active === "setup" && <SetupView venueId={venueId} role={role} />}
             </>
           ) : null}

@@ -65,7 +65,7 @@ Upgrading an existing stack:
 
 A venue `admin` adds staff with an invitation, with no change to `SIGNUP` and no SQL. It works under `open`, `first-user` and `closed`. See [ADR-0006](adr/0006-staff-invitations.md).
 
-The API is ready. The staff app screen is not built yet, so for now an admin calls the API with a signed-in session. Invitations are created through a staff session. An API key, an `admin` key included, is refused.
+An admin creates and revokes invitations on the Team screen of the staff app, or through the API with a signed-in session. Redeeming still goes through the API. Invitations are created through a staff session. An API key, an `admin` key included, is refused.
 
 1. The admin signs in and creates the invitation. Give an `email` to hold it for one address, or leave it out for an open link. It expires after 72 hours unless `expiresInHours` says otherwise, up to 336.
 
@@ -129,7 +129,7 @@ A budget is `max/window`, with a window in `s`, `m` or `h`. An unknown value sto
 
 ### Seeing and removing staff
 
-A venue `admin` with a staff session lists who has access and removes someone. An API key is refused, an `admin` key included. The staff app has no screen for this yet. See [ADR-0009](adr/0009-venue-members.md).
+A venue `admin` with a staff session lists who has access and removes someone. An API key is refused, an `admin` key included. The Team screen of the staff app does both. See [ADR-0009](adr/0009-venue-members.md).
 
 ```sh
 curl https://your-domain/v1/venues/VENUE_ID/members -H 'Cookie: SESSION_COOKIE'

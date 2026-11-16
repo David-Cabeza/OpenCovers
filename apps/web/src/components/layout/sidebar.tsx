@@ -5,9 +5,11 @@ import {
   GaugeIcon,
   LayoutGridIcon,
   SettingsIcon,
+  UserCogIcon,
   UsersIcon,
 } from "lucide-react";
 import { cn } from "cn";
+import type { Role } from "@/lib/api";
 
 export type ViewId =
   | "agenda"
@@ -16,9 +18,15 @@ export type ViewId =
   | "waitlist"
   | "preshift"
   | "pacing"
-  | "setup";
+  | "setup"
+  | "team";
 
-const NAV: { id: ViewId; label: string; icon: typeof CalendarDaysIcon }[] = [
+const NAV: {
+  id: ViewId;
+  label: string;
+  icon: typeof CalendarDaysIcon;
+  adminOnly?: boolean;
+}[] = [
   { id: "agenda", label: "Agenda", icon: CalendarDaysIcon },
   { id: "preshift", label: "Pre-shift", icon: ClipboardListIcon },
   { id: "floor", label: "Floor plan", icon: LayoutGridIcon },
@@ -26,14 +34,17 @@ const NAV: { id: ViewId; label: string; icon: typeof CalendarDaysIcon }[] = [
   { id: "waitlist", label: "Waitlist", icon: UsersIcon },
   { id: "pacing", label: "Pacing", icon: GaugeIcon },
   { id: "setup", label: "Settings", icon: SettingsIcon },
+  { id: "team", label: "Team", icon: UserCogIcon, adminOnly: true },
 ];
 
 export function Sidebar({
   active,
   onSelect,
+  role,
 }: {
   active: ViewId;
   onSelect: (view: ViewId) => void;
+  role?: Role;
 }) {
   return (
     <aside className="flex w-60 print:hidden shrink-0 flex-col border-r bg-background">
@@ -45,7 +56,7 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
-        {NAV.map((item) => (
+        {NAV.filter((item) => !item.adminOnly || role === "admin").map((item) => (
           <button
             key={item.id}
             type="button"
