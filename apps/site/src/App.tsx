@@ -22,7 +22,7 @@ const bands = [
   },
   {
     s: "Tu agente de IA puede reservar.",
-    c: "El servidor MCP expone 18 herramientas (reservation.*, waitlist.* y venue.*) a Claude, Cursor y otros hosts.",
+    c: "El servidor MCP expone 18 herramientas (reservation.*, waitlist.* y venue.*) a Claude, Cursor y otros hosts. Se instala con npx.",
     on: "var(--f4)",
   },
   {
@@ -123,7 +123,7 @@ const faqs = [
   {
     t: "Agentes",
     q: "¿Cómo lo opera un agente de IA?",
-    a: "Con el servidor MCP incluido: el mismo catálogo de 18 herramientas que la API, expuesto por stdio.",
+    a: "Con el servidor MCP incluido: el mismo catálogo de 18 herramientas que la API, expuesto por stdio. Está publicado en npm: npx -y @opencovers/mcp.",
   },
   {
     t: "Pagos",
