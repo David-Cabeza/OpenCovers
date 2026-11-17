@@ -12,7 +12,7 @@ type Env = Record<string, string | undefined>;
  * exception that lets the staff app's dev server proxy `/w/*`. `off`: production without `WIDGET_ADDRESS`.
  * `host`: only requests for that host get the widget.
  */
-export type WidgetServing = { kind: "any" } | { kind: "off" } | { kind: "host"; host: string };
+export type WidgetServing = { kind: "any" } | { kind: "off" } | { kind: "host"; host: string; origin: string };
 
 function hostOf(address: string): URL | null {
   try {
@@ -38,7 +38,18 @@ export function widgetServingFromEnv(env: Env = process.env): WidgetServing {
       `WIDGET_ADDRESS (${url.hostname}) must be a host name of its own, not the staff app's (ADR-0017, Q1).`,
     );
   }
-  return { kind: "host", host: url.host };
+  return { kind: "host", host: url.host, origin: url.origin };
+}
+
+/**
+ * The origin of a link the API builds to `/r`: `WIDGET_ADDRESS`, or, outside production without it, the API's own
+ * `BETTER_AUTH_URL`, which then serves `/r` on any host. Never the request's `Host`, which the sender chooses.
+ * Null when the API serves no widget.
+ */
+export function widgetOrigin(serving: WidgetServing, env: Env = process.env): string | null {
+  if (serving.kind === "host") return serving.origin;
+  if (serving.kind === "off") return null;
+  return hostOf(env.BETTER_AUTH_URL?.trim() || "http://localhost:3000")?.origin ?? null;
 }
 
 export function servesWidgetOn(serving: WidgetServing, requestUrl: string): boolean {

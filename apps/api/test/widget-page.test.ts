@@ -9,7 +9,7 @@ import { migrateDb } from "../src/db/migrate";
 import { services, tables, venues } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
 import { auth } from "../src/lib/auth";
-import { widgetServingFromEnv, servesWidgetOn } from "../src/lib/widget-page";
+import { widgetOrigin, widgetServingFromEnv, servesWidgetOn } from "../src/lib/widget-page";
 
 const POLICY =
   "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' https: data:; " +
@@ -261,13 +261,21 @@ describe("where the widget is served (ADR-0017, Q1)", () => {
     const env = { NODE_ENV: "production", BETTER_AUTH_URL: "https://app.example.com" };
     for (const address of ["book.example.com", "https://book.example.com", "https://Book.Example.com:443"]) {
       const serving = widgetServingFromEnv({ ...env, WIDGET_ADDRESS: address });
-      expect(serving).toEqual({ kind: "host", host: "book.example.com" });
+      expect(serving).toEqual({ kind: "host", host: "book.example.com", origin: "https://book.example.com" });
       expect(servesWidgetOn(serving, "https://book.example.com/w/pk_x")).toBe(true);
       expect(servesWidgetOn(serving, "https://app.example.com/w/pk_x")).toBe(false);
+      expect(widgetOrigin(serving, env)).toBe("https://book.example.com");
     }
     const local = widgetServingFromEnv({ WIDGET_ADDRESS: "http://127.0.0.1:8080", BETTER_AUTH_URL: "http://localhost" });
     expect(servesWidgetOn(local, "http://127.0.0.1:8080/w/pk_x")).toBe(true);
     expect(servesWidgetOn(local, "http://127.0.0.1/w/pk_x")).toBe(false);
+    expect(widgetOrigin(local)).toBe("http://127.0.0.1:8080");
+  });
+
+  it("builds emailed links on the widget origin, the API itself in development, and none without a widget", () => {
+    expect(widgetOrigin({ kind: "off" }, { BETTER_AUTH_URL: "https://app.example.com" })).toBeNull();
+    expect(widgetOrigin({ kind: "any" }, {})).toBe("http://localhost:3000");
+    expect(widgetOrigin({ kind: "any" }, { BETTER_AUTH_URL: "http://localhost:4000/" })).toBe("http://localhost:4000");
   });
 
   it("refuses to start with the widget on the staff app's host name, whatever the port", () => {

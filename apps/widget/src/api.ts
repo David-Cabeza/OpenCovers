@@ -24,6 +24,8 @@ export interface PublicConfig {
   maxAdvanceDays: number | null;
   askConsent: boolean;
   challenge: FormChallenge;
+  /** Whether the venue can email a lost link. Without it the widget does not offer the resend. */
+  linkResend: boolean;
 }
 
 /** The guest view (`PublicReservation`), the answer of the create and of every self-service route. */
@@ -122,6 +124,12 @@ export function publicApi(bookingKey: string, fetcher: Fetch = (input, init) => 
           challenge,
           solution,
         }),
+      }),
+    resendLink: (email: string) =>
+      call<{ accepted: true }>(fetcher, `${base}/self-service/resend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
       }),
   };
 }

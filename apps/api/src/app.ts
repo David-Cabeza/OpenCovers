@@ -70,8 +70,10 @@ import {
   widgetEmbedScript,
   widgetHeaders,
   widgetHtml,
+  widgetOrigin,
   widgetServingFromEnv,
 } from "./lib/widget-page";
+import { canResend, parseResendEmail, resendLinks } from "./lib/link-resend";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/signup";
 import { changeMemberRole, listMembers, removeMember } from "./lib/members";
@@ -217,6 +219,8 @@ app.get("/v1/venues/:venueId/public.jsonld", async (c) => {
 // The guest channel of ADR-0017. No credentials, no cookie, no session, no CORS: the widget calls these
 // from its own origin, which proxies /v1/public to the API. A guest is not a principal.
 const challenges = createChallengeVerifier(challengeConfig);
+const widgetServing = widgetServingFromEnv();
+const linkOrigin = widgetOrigin(widgetServing);
 
 // Self-service routes come before `/v1/public/:bookingKey`, which would otherwise read `self-service` as a key.
 // The token names one reservation of one venue, so these routes take neither id.
@@ -290,7 +294,19 @@ app.get("/v1/public/:bookingKey", async (c) => {
   const bookingKey = c.req.param("bookingKey");
   const target = await resolveBookingKey(db, bookingKey);
   if (!target) return error(c, "venue_not_found");
-  return c.json(await publicConfig(db, target, issueChallenge(challengeConfig, bookingKey)));
+  const challenge = issueChallenge(challengeConfig, bookingKey);
+  return c.json(await publicConfig(db, target, challenge, canResend(target.venue, linkOrigin)));
+});
+
+// A lost link (ADR-0017 stage 12). The answer is the same whatever the address matches, and it is sent before
+// any lookup of the address: the work starts on a later turn of the event loop.
+app.post("/v1/public/:bookingKey/self-service/resend", async (c) => {
+  const target = await resolveBookingKey(db, c.req.param("bookingKey"));
+  if (!target) return error(c, "venue_not_found");
+  const email = parseResendEmail(await c.req.json().catch(() => null));
+  if (!email) return error(c, "invalid_request");
+  setImmediate(() => void resendLinks(db, target, email, linkOrigin));
+  return c.json({ accepted: true }, 202);
 });
 
 app.get("/v1/public/:bookingKey/availability", async (c) => {
@@ -347,7 +363,6 @@ app.post("/v1/public/:bookingKey/reservations", async (c) => {
 
 // The widget page (ADR-0017 section 1). The API serves it, not Caddy, because `frame-ancestors` is per venue.
 // Not rate limited. An unknown, rotated or disabled key, and a host that is not the widget's, read alike.
-const widgetServing = widgetServingFromEnv();
 const widgetDist = () => process.env.WIDGET_DIST || defaultWidgetDist();
 const widgetNotFound = (c: any) => c.body(NOT_FOUND_HTML, 404, widgetHeaders([]));
 const widgetNotBuilt = (c: any) => {

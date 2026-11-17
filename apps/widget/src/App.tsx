@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "rea
 import { selfServiceUrl, type Created, type Failure, type PublicApi, type PublicConfig } from "./api";
 import { addDays, formatDate, isoWeekday, todayLocal } from "./dates";
 import { explain, type Explanation } from "./errors";
+import { LostLink } from "./LostLink";
 import type { Translate } from "./messages";
 import { solveInBackground } from "./pow";
 import { createSubmitter, createTicketSource } from "./submit";
@@ -60,6 +61,7 @@ export function App({ api, t, locale }: { api: PublicApi; t: Translate; locale: 
           onDone={(created) => setPhase({ kind: "done", config: phase.config, created })}
         />
       )}
+      {phase.kind === "booking" && phase.config.linkResend && <LostLink api={api} t={t} />}
       {phase.kind === "done" && <Confirmation t={t} locale={locale} created={phase.created} />}
     </main>
   );

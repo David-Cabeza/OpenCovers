@@ -6,6 +6,11 @@ import type { MessageId } from "./messages";
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE = /^\+?[\d\s().-]+$/;
 
+export function emailLooksValid(value: string): boolean {
+  const email = value.trim();
+  return email.length <= 254 && EMAIL.test(email);
+}
+
 export function contactLooksValid(value: string): boolean {
   const contact = value.trim();
   if (contact.length === 0 || contact.length > 254) return false;
