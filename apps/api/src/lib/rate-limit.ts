@@ -3,7 +3,16 @@ import type { Context, MiddlewareHandler } from "hono";
 import { isIP } from "node:net";
 import { ERRORS, errorBody } from "./errors";
 
-export const RULE_NAMES = ["auth", "signup", "invitation", "venue_creation"] as const;
+export const RULE_NAMES = [
+  "auth",
+  "signup",
+  "invitation",
+  "venue_creation",
+  "public_read",
+  "public_booking",
+  "public_venue",
+  "self_service",
+] as const;
 export type RuleName = (typeof RULE_NAMES)[number];
 
 export interface Rule {
@@ -18,6 +27,10 @@ export const DEFAULT_RULES: Rules = {
   signup: { max: 5, windowMs: 60 * 60_000 },
   invitation: { max: 10, windowMs: 15 * 60_000 },
   venue_creation: { max: 10, windowMs: 60 * 60_000 },
+  public_read: { max: 300, windowMs: 15 * 60_000 },
+  public_booking: { max: 10, windowMs: 60 * 60_000 },
+  public_venue: { max: 100, windowMs: 60 * 60_000 },
+  self_service: { max: 60, windowMs: 15 * 60_000 },
 };
 
 export interface RateLimitConfig {
@@ -37,6 +50,10 @@ const RULE_ENV: Record<RuleName, string> = {
   signup: "RATE_LIMIT_SIGNUP",
   invitation: "RATE_LIMIT_INVITATION",
   venue_creation: "RATE_LIMIT_VENUE_CREATION",
+  public_read: "RATE_LIMIT_PUBLIC_READ",
+  public_booking: "RATE_LIMIT_PUBLIC_BOOKING",
+  public_venue: "RATE_LIMIT_PUBLIC_VENUE",
+  self_service: "RATE_LIMIT_PUBLIC_SELF_SERVICE",
 };
 
 const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
@@ -99,9 +116,27 @@ function normalizePath(path: string): string {
   return path.replace(/\/{2,}/g, "/").replace(/\/+$/, "") || "/";
 }
 
+// ADR-0017: the one prefix whose reads are limited, because public availability runs a table search for anyone.
+function publicRules(method: string, path: string): RuleName[] {
+  const read = method === "GET" || method === "HEAD";
+  const rest = path.slice("/v1/public/".length).split("/");
+  if (rest[0] === "self-service") return read ? ["public_read", "self_service"] : ["self_service"];
+  if (read) return ["public_read"];
+  const tail = rest.slice(1).join("/");
+  return method === "POST" && (tail === "reservations" || tail === "self-service/resend")
+    ? ["public_booking", "public_venue"]
+    : [];
+}
+
+/** The booking key a `public_venue` budget is kept for. Every other rule is kept per client address. */
+function bookingKeyOf(rawPath: string): string {
+  return normalizePath(rawPath).slice("/v1/public/".length).split("/")[0] ?? "";
+}
+
 export function rulesFor(method: string, rawPath: string, hasInvitationToken: boolean): RuleName[] {
-  if (SAFE_METHODS.has(method.toUpperCase())) return [];
   const path = normalizePath(rawPath);
+  if (path.startsWith("/v1/public/")) return publicRules(method.toUpperCase(), path);
+  if (SAFE_METHODS.has(method.toUpperCase())) return [];
   if (path === "/v1/invitations/redeem") return ["invitation"];
   if (path === "/v1/venues" && method.toUpperCase() === "POST") return ["venue_creation"];
   if (path === "/api/auth" || path.startsWith("/api/auth/")) {
@@ -199,9 +234,9 @@ export function createRateLimiter(config: RateLimitConfig, options: RateLimitOpt
     counters.set(key, { count: 1, expiresAt: at + rule.windowMs });
   }
 
-  function consume(names: RuleName[], client: string, at: number): number {
+  function consume(names: RuleName[], subjectOf: (name: RuleName) => string, at: number): number {
     const live = names.map((name) => {
-      const key = `${name}|${client}`;
+      const key = `${name}|${subjectOf(name)}`;
       const counter = counters.get(key);
       return { key, rule: config.rules[name], counter: counter && at < counter.expiresAt ? counter : undefined };
     });
@@ -221,7 +256,9 @@ export function createRateLimiter(config: RateLimitConfig, options: RateLimitOpt
     if (!config.enabled) return next();
     const names = rulesFor(c.req.method, c.req.path, Boolean(c.req.header(INVITATION_HEADER)?.trim()));
     if (names.length === 0) return next();
-    const retryAfter = consume(names, clientOf(c), now());
+    const client = clientOf(c);
+    const subjectOf = (name: RuleName) => (name === "public_venue" ? `venue:${bookingKeyOf(c.req.path)}` : client);
+    const retryAfter = consume(names, subjectOf, now());
     if (retryAfter === 0) return next();
     return c.json(
       { ...errorBody("rate_limited"), message: "Too many requests. Try again later." },

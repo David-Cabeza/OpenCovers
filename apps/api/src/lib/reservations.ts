@@ -54,7 +54,23 @@ export interface CreateReservationInput {
   bookedVia?: string;
   basis?: string;
   ownerPrincipal?: string;
+  channel?: Channel;
 }
+
+/** The online limits of ADR-0017 that tighten a venue's own rules for the public channel. */
+export interface OnlineRules {
+  services: string[] | null;
+  weekdays: number[] | null;
+  minPartySize: number;
+  maxPartySize: number;
+  leadTimeMinutes: number;
+  maxAdvanceDays: number | null;
+  maxOpenBookingsPerContact: number | null;
+}
+
+export type Channel = { kind: "staff" } | { kind: "public"; rules: OnlineRules };
+
+const STAFF: Channel = { kind: "staff" };
 
 export interface WalkInInput {
   date?: string;
@@ -231,6 +247,7 @@ export type WriteErrorCode =
   | "beyond_booking_horizon"
   | "date_blocked"
   | "guest_booking_limit"
+  | "online_booking_limit"
   | "booking_declined"
   | "venue_not_found";
 
@@ -273,6 +290,38 @@ async function venueOf(db: Db, venueId: string) {
 
 type VenueRow = typeof venues.$inferSelect;
 type ServiceRow = typeof services.$inferSelect;
+
+const stricterHorizon = (a: number | null, b: number | null) => (a === null ? b : b === null ? a : Math.min(a, b));
+
+/**
+ * The venue and services as the channel sees them. The public channel narrows
+ * them with the online limits and turns the overbooking ceiling off, so every
+ * reason function below applies the online rules without knowing about them.
+ */
+export function applyChannel(
+  venue: VenueRow,
+  serviceRows: ServiceRow[],
+  channel: Channel,
+): { venue: VenueRow; serviceRows: ServiceRow[] } {
+  if (channel.kind === "staff") return { venue, serviceRows };
+  const { rules } = channel;
+  return {
+    venue: {
+      ...venue,
+      overbookingCeiling: 0,
+      leadTimeMinutes: Math.max(venue.leadTimeMinutes, rules.leadTimeMinutes),
+      maxAdvanceDays: stricterHorizon(venue.maxAdvanceDays, rules.maxAdvanceDays),
+    },
+    serviceRows: serviceRows
+      .filter((s) => rules.services === null || rules.services.includes(s.name))
+      .map((s) => ({
+        ...s,
+        days: rules.weekdays === null ? s.days : s.days.filter((d) => rules.weekdays!.includes(d)),
+        minPartySize: Math.max(s.minPartySize ?? 1, rules.minPartySize),
+        maxPartySize: Math.min(s.maxPartySize ?? rules.maxPartySize, rules.maxPartySize),
+      })),
+  };
+}
 
 interface SlotRequest {
   date: string;
@@ -660,9 +709,15 @@ export async function createReservation(
   input: CreateReservationInput,
   key: string,
 ): Promise<WriteResult> {
-  const venue = await venueOf(db, venueId);
-  if (!venue) return { ok: false, code: "venue_not_found" };
-  const serviceRows = await db.select().from(services).where(eq(services.venueId, venueId));
+  const storedVenue = await venueOf(db, venueId);
+  if (!storedVenue) return { ok: false, code: "venue_not_found" };
+  const channel = input.channel ?? STAFF;
+  const { venue, serviceRows } = applyChannel(
+    storedVenue,
+    await db.select().from(services).where(eq(services.venueId, venueId)),
+    channel,
+  );
+  const openCap = channel.kind === "public" ? channel.rules.maxOpenBookingsPerContact : null;
   const zone = input.zone ?? "";
   const request: SlotRequest = {
     date: input.date,
@@ -715,6 +770,11 @@ export async function createReservation(
           sql`select pg_advisory_xact_lock(hashtextextended(${`guest-day:${venueId}:${contactKey.kind}:${contactKey.value}:${input.date}`}, 0))`,
         );
       }
+      if (openCap !== null && contactKey) {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`online-open:${venueId}:${contactKey.kind}:${contactKey.value}`}, 0))`,
+        );
+      }
       const guest = contactKey
         ? await linkGuest(tx, venueId, contactKey, input.guestName ?? "", startsAt, input.ownerPrincipal ?? "")
         : null;
@@ -732,11 +792,28 @@ export async function createReservation(
           );
         if (held >= cap) throw new ReservationError("guest_booking_limit");
       }
+      if (openCap !== null && guest) {
+        const [{ held }] = await tx
+          .select({ held: count() })
+          .from(reservations)
+          .where(
+            and(
+              eq(reservations.venueId, venueId),
+              eq(reservations.guestId, guest.id),
+              eq(reservations.bookedVia, "widget"),
+              eq(reservations.status, "booked"),
+              gt(reservations.startsAt, sql`now()`),
+            ),
+          );
+        if (held >= openCap) throw new ReservationError("online_booking_limit");
+      }
       let tableIds = input.tableIds ?? [];
       if (autoAssign) {
         const fit = await tableReasons(tx, venueId, startsAt, endsAt, input.partySize, zone);
         if (fit.ok) {
           tableIds = fit.tableIds;
+        } else if (channel.kind === "public" && fit.reason.code === "no_suitable_table") {
+          throw new ReservationError("slot_taken");
         } else if (
           fit.reason.code === "no_suitable_table" &&
           !request.walkIn &&
@@ -1324,6 +1401,29 @@ export async function getAvailability(db: Db, venueId: string, date: string, par
     result[name] = slots.map((s) => ({ time: s.time, available: s.available, type: "free" }));
   }
   return result;
+}
+
+/** The local times a public create would accept now for this date and party, ascending, each once. */
+export async function publicTimes(
+  db: Db,
+  venueId: string,
+  date: string,
+  partySize: number,
+  rules: OnlineRules,
+): Promise<string[]> {
+  const stored = await venueOf(db, venueId);
+  if (!stored) return [];
+  const { venue, serviceRows } = applyChannel(
+    stored,
+    await db.select().from(services).where(eq(services.venueId, venueId)),
+    { kind: "public", rules },
+  );
+  const grid = await gridAvailability(db, venue, serviceRows, date, partySize, "");
+  const times = Object.values(grid)
+    .flat()
+    .filter((s) => s.available && s.date === date)
+    .map((s) => s.time);
+  return [...new Set(times)].sort();
 }
 
 export async function explainSlot(
