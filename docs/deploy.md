@@ -56,8 +56,8 @@ The widget must live on a host name of its own, never the staff app's, so the st
 
 What each part does:
 
-- Caddy's widget site block forwards `/w/*` and `/v1/public/*` to the API and answers everything else with `404`. The staff site block answers `/w/*` with `404` and keeps `X-Frame-Options: DENY` and `frame-ancestors 'none'` on every path.
-- The API writes the page per venue, because the page's `Content-Security-Policy` lists the origins allowed to frame it: `frame-ancestors 'self'` and the venue's `allowedOrigins`, or `'none'` when the list is empty, which allows only top-level use. It sends no `X-Frame-Options`. It also serves the widget's built files under `/w/assets/`. The API image builds the widget, so nothing else needs copying.
+- Caddy's widget site block forwards `/w/*`, `/r` and `/v1/public/*` to the API and answers everything else with `404`. The staff site block answers `/w/*` and `/r` with `404` and keeps `X-Frame-Options: DENY` and `frame-ancestors 'none'` on every path.
+- The API writes the page per venue, because the page's `Content-Security-Policy` lists the origins allowed to frame it: `frame-ancestors 'self'` and the venue's `allowedOrigins`, or `'none'` when the list is empty, which allows only top-level use. It sends no `X-Frame-Options`. It also serves the widget's built files under `/w/assets/`. The guest's self-service link, `https://book.example.com/r#TOKEN`, opens the same build at `/r`, which no site may frame. The token stays in the fragment, so it never reaches Caddy, the API or their logs. The API image builds the widget, so nothing else needs copying.
 - The API serves the page only for requests to the `WIDGET_ADDRESS` host. Without `WIDGET_ADDRESS`, a production API (`NODE_ENV=production`, as in the image) serves no widget page, and Caddy's widget block listens for `widget.invalid`, a name that never resolves. An API whose `WIDGET_ADDRESS` has the host name of `BETTER_AUTH_URL` or of a `TRUSTED_ORIGINS` entry refuses to start, whatever the port.
 - A venue's site that sends its own `Content-Security-Policy` must allow the widget origin in `frame-src`.
 
@@ -65,7 +65,7 @@ What each part does:
 
 Upgrading an existing stack: nothing changes until you set `WIDGET_ADDRESS`. The API image is now built in two stages, the first of which builds the widget, so the first `--build` takes longer.
 
-In local development there is no second origin. The staff app's dev server proxies `/w/*` to the API, and the widget opens at `http://localhost:5173/w/BOOKING_KEY`. `pnpm dev` rebuilds the widget on change.
+In local development there is no second origin. The staff app's dev server proxies `/w/*` and `/r` to the API, the widget opens at `http://localhost:5173/w/BOOKING_KEY`, and its confirmation links to `http://localhost:5173/r#TOKEN`. `pnpm dev` rebuilds the widget on change.
 
 ## Sign-up control
 

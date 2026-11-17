@@ -20,8 +20,8 @@ info:
     docs/adr/0017-booking-widget-and-self-service-link.md: `public_read`,
     `public_booking`, `public_venue` and `self_service`.
 
-    Paths are relative to `/v1`, except `/w/{bookingKey}`, which is served
-    at the root of the widget origin.
+    Paths are relative to `/v1`, except `/w/{bookingKey}` and `/r`, which
+    are served at the root of the widget origin.
 
     The routes under `/public/` are the guest-facing booking channel. They
     need no credentials, read no cookie or session, and are not exposed
@@ -2213,6 +2213,63 @@ paths:
           headers:
             Content-Security-Policy:
               schema: { type: string }
+          content:
+            text/html:
+              schema: { type: string }
+
+  /r:
+    servers:
+      - url: /
+        description: The widget origin (`WIDGET_ADDRESS`), not under `/v1`.
+    get:
+      operationId: widget.selfServicePage
+      summary: The self-service page, where a guest views, changes or cancels one booking
+      description: |
+        Not JSON. The guest's link is `/r#<token>`. The token rides in the
+        fragment, which the browser never sends, so this route never sees it
+        and answers the same HTML shell for every booking. The page reads the
+        token from the fragment, removes the fragment from the address bar,
+        keeps the token in memory only, and calls the self-service routes
+        with it in `X-Self-Service-Token`. A link that does not work shows
+        one message whatever the reason.
+
+        The shell loads the same widget build as `widget.page`, from
+        `/w/assets/`, sets no cookie, and is not rate limited. It is served
+        on the hosts `widget.page` is served on, and a request for any other
+        host gets the `404` page of `widget.page`. It is never framed: it
+        sends `X-Frame-Options: DENY` and the policy of `widget.page` with
+        `frame-ancestors 'none'`, whatever any venue allows. It also sends
+        `Cache-Control: no-store`, `X-Robots-Tag: noindex`,
+        `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff`,
+        and the HTML holds `<meta name="robots" content="noindex">`.
+        Not exposed through MCP.
+      security: []
+      parameters:
+        - name: lang
+          in: query
+          required: false
+          description: A supported widget locale for the page. Without it the page uses the venue's `locale` from the guest view. Any other value is ignored.
+          schema: { type: string, example: en }
+      responses:
+        "200":
+          description: The self-service HTML shell
+          headers:
+            Content-Security-Policy:
+              description: The `widget.page` policy with `frame-ancestors 'none'`.
+              schema: { type: string }
+            X-Frame-Options:
+              schema: { type: string, enum: [DENY] }
+            X-Robots-Tag:
+              schema: { type: string, enum: [noindex] }
+            Referrer-Policy:
+              schema: { type: string, enum: [no-referrer] }
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            text/html:
+              schema: { type: string }
+        "404":
+          description: A host other than the widget's. The `404` page and headers of `widget.page`.
           content:
             text/html:
               schema: { type: string }
