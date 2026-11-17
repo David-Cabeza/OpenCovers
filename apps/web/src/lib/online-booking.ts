@@ -261,3 +261,21 @@ export function embedSnippet(origin: string, key: string): string {
   const base = origin.trim().replace(/\/+$/, "");
   return `<iframe src="${base}/w/${key}" title="Reservas" width="100%" height="640" style="border:0"></iframe>`;
 }
+
+/** The widget address as an origin without a trailing slash, or null when it is not one (http or https, no path). */
+export function widgetOrigin(input: string): string | null {
+  const t = input.trim().replace(/\/+$/, "");
+  try {
+    const u = new URL(t);
+    if ((u.protocol !== "https:" && u.protocol !== "http:") || u.origin !== t) return null;
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
+/** The recommended snippet: `embed.js` adds an iframe that follows the widget's height. */
+export function scriptSnippet(origin: string, key: string): string {
+  const base = origin.trim().replace(/\/+$/, "");
+  return `<script src="${base}/w/embed.js" data-key="${key}" async></script>`;
+}
