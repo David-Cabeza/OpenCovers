@@ -5,7 +5,7 @@ import { z } from "zod";
 import { request } from "./client.js";
 import { type ToolResult, fail } from "./fail.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 function ok(data: unknown): ToolResult {
   return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
