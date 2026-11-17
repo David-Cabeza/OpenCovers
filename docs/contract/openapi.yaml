@@ -90,6 +90,10 @@ paths:
         `venue_creation_closed`, and nothing is created. That check runs
         before the body is validated. See ADR-0008.
 
+        The server always generates the venue id. A body with an `id` key
+        fails with `invalid_request` and creates nothing, so a caller cannot
+        probe which ids exist in other accounts.
+
         The call is rate limited per client address, 10 per hour by default
         (`RATE_LIMIT_VENUE_CREATION`). The limit runs before the session and
         the body are read, so a call that fails with `unauthorized`, `403` or
@@ -106,9 +110,15 @@ paths:
               type: object
               required: [name]
               properties:
-                id: { type: string, description: "Optional slug. A random id is used when absent." }
                 name: { type: string, minLength: 1 }
-                timezone: { type: string, description: "An IANA zone name." }
+                timezone:
+                  type: string
+                  description: |
+                    An IANA zone name, `Europe/Madrid` for example. Absent or
+                    null means `UTC`. A value that is not a string, or that
+                    is not a zone the server's time zone database knows, fails
+                    with `invalid_request` and nothing is created. The zone is
+                    stored as given.
       responses:
         "201":
           description: The venue was created

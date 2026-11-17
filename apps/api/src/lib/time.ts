@@ -1,10 +1,18 @@
-export function normalizeTimeZone(timezone: string): string {
+// A zone name the runtime's Intl accepts, which is the check every date calculation here relies on. Besides IANA
+// names it takes `UTC`, `Etc/GMT+1`, case variants and offsets such as `+01:00`, and each of those works below.
+export function isValidTimeZone(timezone: unknown): timezone is string {
+  if (typeof timezone !== "string") return false;
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone });
-    return timezone;
+    return true;
   } catch {
-    return "UTC";
+    return false;
   }
+}
+
+// Read-time fallback only. Venue creation rejects an invalid zone, so a stored zone is valid.
+export function normalizeTimeZone(timezone: string): string {
+  return isValidTimeZone(timezone) ? timezone : "UTC";
 }
 
 // The dates the engine takes. Outside them a booking's end, its link expiry or a time-zone shift leaves the
