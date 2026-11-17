@@ -41,8 +41,8 @@ describe("TeamView", () => {
 
   it("lists members with their role", async () => {
     setup();
-    const row = (await screen.findByText("bo@example.com")).closest("tr") as HTMLElement;
-    expect(within(row).getByText("write")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Role of bo@example.com")).toHaveValue("write");
+    expect(screen.getByLabelText("Role of ana@example.com")).toHaveValue("admin");
     expect(screen.getByText("ana@example.com")).toBeInTheDocument();
   });
 
@@ -72,6 +72,56 @@ describe("TeamView", () => {
     expect(await screen.findByText(
       "A venue needs at least one admin. Make someone else an admin first.",
     )).toBeInTheDocument();
+  });
+
+  it("changes a member's role from the selector", async () => {
+    const { api, user } = setup({
+      "PATCH /v1/venues/v1/members/u2": { body: { member: { userId: "u2", role: "admin" } } },
+    });
+    await user.selectOptions(await screen.findByLabelText("Role of bo@example.com"), "admin");
+    await waitFor(() =>
+      expect(api.calls("PATCH", "/v1/venues/v1/members/u2")).toHaveLength(1),
+    );
+    expect(api.calls("PATCH", "/v1/venues/v1/members/u2")[0].body).toEqual({ role: "admin" });
+    expect(await screen.findByText("Role updated")).toBeInTheDocument();
+  });
+
+  it("surfaces last_admin when demoting the only admin", async () => {
+    const { user } = setup({
+      "PATCH /v1/venues/v1/members/u1": { status: 409, body: { code: "last_admin" } },
+    });
+    await user.selectOptions(await screen.findByLabelText("Role of ana@example.com"), "read");
+    expect(await screen.findByText(
+      "A venue needs at least one admin. Make someone else an admin first.",
+    )).toBeInTheDocument();
+  });
+
+  it("offers Make creator only to the instance creator, for other members", async () => {
+    const { api, user } = setup({
+      "GET /v1/account": { body: { account: { userId: "u1", isCreator: true } } },
+      "POST /v1/account/transfer-creator": { body: { creator: { userId: "u2" } } },
+    });
+    expect(
+      await screen.findByRole("button", { name: "Make bo@example.com the venue creator" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Make ana@example.com the venue creator" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Make bo@example.com the venue creator" }));
+    expect(api.calls("POST", "/v1/account/transfer-creator")).toHaveLength(0);
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", { name: "Make creator" }),
+    );
+    await waitFor(() =>
+      expect(api.calls("POST", "/v1/account/transfer-creator")).toHaveLength(1),
+    );
+    expect(api.calls("POST", "/v1/account/transfer-creator")[0].body).toEqual({ userId: "u2" });
+  });
+
+  it("hides Make creator from everyone else", async () => {
+    setup({ "GET /v1/account": { body: { account: { userId: "u1", isCreator: false } } } });
+    await screen.findByText("bo@example.com");
+    expect(screen.queryByRole("button", { name: /venue creator/ })).not.toBeInTheDocument();
   });
 
   it("creates an invitation and shows the token once", async () => {

@@ -58,7 +58,7 @@ It has no "since when" field. `venue_memberships` has no created-at column, and 
 
 - **Venue isolation.** The route resolves the target only inside the path's venue. A user id that is unknown, belongs to no membership here, or is a member of another venue only, fails with `member_not_found` (404). Those cases are indistinguishable.
 - **Self-removal.** An admin may remove themselves, which is how an admin leaves, unless they are the last admin.
-- **Role change is out of scope.** There is no demotion route. Remove, then invite again at the lower role. Redeeming an invitation never lowers a role, so a person who stays a member cannot be demoted by inviting them. This is the smallest model. If a role change is added later, it must take the same lock as removal and refuse to demote the last admin.
+- **Role change is out of scope here.** [ADR-0016](0016-member-roles-and-creator-transfer.md) adds it. This ADR had no demotion route. Remove, then invite again at the lower role. Redeeming an invitation never lowers a role, so a person who stays a member cannot be demoted by inviting them. This is the smallest model. If a role change is added later, it must take the same lock as removal and refuse to demote the last admin.
 
 ### The last admin
 

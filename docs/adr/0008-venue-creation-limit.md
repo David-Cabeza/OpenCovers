@@ -73,7 +73,7 @@ No migration and no data step.
 - Venue creation is not rate limited. [ADR-0007](0007-rate-limiting.md) covers credential paths only, and `POST /v1/venues` is not one. The owner can create venues without a bound.
 - Under `open` nothing is limited, as before.
 - An owner who invites a person as `admin` still gives that person full control of the invited venue, including keys and further invitations. The limit is on creating venues, not on administering the one they hold.
-- The mark is one row. There is no way to hand ownership to another account except SQL. A transfer flow is a separate decision.
+- The mark is one row. There is no way to hand ownership to another account except SQL. A transfer flow is a separate decision, now [ADR-0016](0016-member-roles-and-creator-transfer.md).
 - If the marked account is deleted, a `first-user` instance is empty again only when no other account exists. With other accounts present, nobody can create venues until the operator marks one. ADR-0005 notes that nothing in the product deletes accounts.
 - The staff app shows the refusal as the code, as it does for any API error. A friendlier message is a separate change.
 

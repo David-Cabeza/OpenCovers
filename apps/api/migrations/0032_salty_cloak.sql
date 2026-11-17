@@ -1,0 +1,2 @@
+ALTER TABLE "membership_audit" DROP CONSTRAINT "membership_audit_action";--> statement-breakpoint
+ALTER TABLE "membership_audit" ADD CONSTRAINT "membership_audit_action" CHECK ("membership_audit"."action" IN ('invited', 'invite_revoked', 'redeemed', 'member_removed', 'role_changed', 'creator_transferred'));

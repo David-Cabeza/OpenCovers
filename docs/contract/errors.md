@@ -65,8 +65,8 @@ A sign-up with a bad `X-Invitation-Token` fails on the auth route with `403` and
 
 ## Members
 
-- `member_not_found`: the user is not a member of this venue. An unknown id and a member of another venue only give the same answer. Not retryable.
-- `last_admin`: the removal would leave the venue with no `admin`, so nothing changed. An admin removing themselves is the same case when no other admin remains. Not retryable.
+- `member_not_found`: the user is not a member of this venue. An unknown id and a member of another venue only give the same answer. On `POST /v1/account/transfer-creator` it means the target is not a member of any venue the caller administers. Not retryable.
+- `last_admin`: the removal or role change would leave the venue with no `admin`, so nothing changed. An admin removing themselves is the same case when no other admin remains. Not retryable.
 
 ## Idempotency and outcome
 

@@ -1054,6 +1054,59 @@ paths:
           $ref: "#/components/responses/Error"
 
   /venues/{venueId}/members/{userId}:
+    patch:
+      operationId: member.setRole
+      summary: Change a member's role
+      description: |
+        Admin only, and only through a staff session. Sets the person's role
+        in this venue to `admin`, `write`, or `read`. The new role applies on
+        their next request. Setting the role they already hold succeeds and
+        changes and records nothing.
+
+        A venue always keeps at least one `admin`. A change that would leave
+        none, including an admin demoting themselves as the only admin, fails
+        with `last_admin` and changes nothing. It takes the same lock as
+        removal, so concurrent changes and removals are serialized. An admin
+        may demote themselves when another admin remains.
+
+        A `userId` that is unknown, or is a member of another venue only,
+        fails with `member_not_found`. A role outside the three fails with
+        `invalid_request`. A change writes one `role_changed` row to the
+        membership audit log with the new role. Keys the person made, and
+        their sessions, are not touched. See ADR-0016.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { $ref: "#/components/schemas/Role" }
+      responses:
+        "200":
+          description: The member with the role they now hold
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [member]
+                properties:
+                  member:
+                    type: object
+                    required: [userId, role]
+                    properties:
+                      userId: { type: string }
+                      role: { $ref: "#/components/schemas/Role" }
+        default:
+          $ref: "#/components/responses/Error"
+
     delete:
       operationId: member.remove
       summary: Remove a member from the venue
@@ -1079,9 +1132,9 @@ paths:
         remove themselves when another admin remains.
 
         A `userId` that is unknown, or is a member of another venue only,
-        fails with `member_not_found`, the same answer for both. There is no
-        role change. Remove the member and invite them again. A removal is
-        not recorded in the event feed. See ADR-0009 and ADR-0011.
+        fails with `member_not_found`, the same answer for both. To change a
+        role instead, see `member.setRole`. A removal is not recorded in the
+        event feed. See ADR-0009 and ADR-0011.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - name: userId
@@ -1113,6 +1166,78 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /account:
+    get:
+      operationId: account.get
+      summary: Say whether the signed-in account is the instance's venue creator
+      description: |
+        Needs a staff session. A key fails with `forbidden`. `isCreator` is
+        true for the one account that may create venues under
+        `SIGNUP=first-user` and `SIGNUP=closed` (ADR-0008). It does not
+        depend on the `SIGNUP` mode.
+      responses:
+        "200":
+          description: The caller's account
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [account]
+                properties:
+                  account:
+                    type: object
+                    required: [userId, isCreator]
+                    properties:
+                      userId: { type: string }
+                      isCreator: { type: boolean }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /account/transfer-creator:
+    post:
+      operationId: account.transferCreator
+      summary: Hand the venue creator mark to another account
+      description: |
+        Only the current creator, through a staff session. A key, and any
+        other account, an admin included, fails with `forbidden`. The target
+        must be a member of at least one venue the caller administers. Any
+        other `userId`, an unknown one included, fails with `member_not_found`.
+        A missing or empty `userId` fails with `invalid_request`.
+
+        On success the target is the creator and the caller is not. The swap
+        runs in one transaction, so there is never zero or two creators, and
+        of two concurrent transfers by the creator one wins and the other
+        fails with `forbidden`. Naming yourself succeeds and changes nothing.
+        One `creator_transferred` row is written to the audit log of each
+        venue the two accounts share where the caller is `admin`. The caller
+        keeps every membership. Only the new creator can hand the mark back.
+        See ADR-0016.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: string }
+      responses:
+        "200":
+          description: The new creator
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [creator]
+                properties:
+                  creator:
+                    type: object
+                    required: [userId]
+                    properties:
+                      userId: { type: string }
+        default:
+          $ref: "#/components/responses/Error"
+
   /venues/{venueId}/audit:
     get:
       operationId: audit.list
@@ -1122,7 +1247,7 @@ paths:
         `write` session or key fails with `forbidden`, and a caller outside
         the venue fails with `venue_not_found`. Entries are newest first. The
         log records invitations created, revoked, and redeemed, and member
-        removals (ADR-0010). It holds ids and a role only, never an email, a
+        removals (ADR-0010), role changes, and creator transfers (ADR-0016). It holds ids and a role only, never an email, a
         name, an invitation token, or a key. Pass `nextCursor` back as
         `cursor` for the next page. It is null on the last page. A cursor from
         another venue or a malformed one, and a bad `limit`, fail with
@@ -1804,14 +1929,20 @@ components:
         id: { type: string }
         action:
           type: string
-          enum: [invited, invite_revoked, redeemed, member_removed]
+          enum:
+            [invited, invite_revoked, redeemed, member_removed, role_changed, creator_transferred]
         actorUserId: { type: string, nullable: true }
         targetUserId:
           type: string
           nullable: true
-          description: The account that redeemed, or the member removed.
+          description: |
+            The account that redeemed, the member removed, the member whose
+            role changed, or the new creator.
         invitationId: { type: string, nullable: true }
-        role: { type: string, nullable: true }
+        role:
+          type: string
+          nullable: true
+          description: The new role for `role_changed`. Null for `creator_transferred`.
         occurredAt: { type: string, format: date-time }
 
     Invitation:

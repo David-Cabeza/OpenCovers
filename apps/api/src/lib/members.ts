@@ -25,6 +25,51 @@ export async function listMembers(db: Db, venueId: string): Promise<MemberView[]
   return rows.map((r) => ({ ...r, role: r.role as Role }));
 }
 
+export type ChangeRoleResult =
+  | { ok: true; member: { userId: string; role: Role }; changed: boolean }
+  | { ok: false; code: "venue_not_found" | "member_not_found" | "last_admin" };
+
+export async function changeMemberRole(
+  db: Db,
+  venueId: string,
+  actorId: string,
+  targetId: string,
+  role: Role,
+): Promise<ChangeRoleResult> {
+  return db.transaction(async (tx) => {
+    const admins = await tx
+      .select({ userId: venueMemberships.userId })
+      .from(venueMemberships)
+      .where(and(eq(venueMemberships.venueId, venueId), eq(venueMemberships.role, "admin")))
+      .orderBy(asc(venueMemberships.userId))
+      .for("update");
+    if (!admins.some((a) => a.userId === actorId)) {
+      return { ok: false, code: "venue_not_found" };
+    }
+    const [target] = await tx
+      .select({ role: venueMemberships.role })
+      .from(venueMemberships)
+      .where(and(eq(venueMemberships.venueId, venueId), eq(venueMemberships.userId, targetId)))
+      .limit(1);
+    if (!target) return { ok: false, code: "member_not_found" };
+    if (target.role === role) return { ok: true, member: { userId: targetId, role }, changed: false };
+    if (target.role === "admin" && admins.length === 1) {
+      return { ok: false, code: "last_admin" };
+    }
+    await tx
+      .update(venueMemberships)
+      .set({ role })
+      .where(and(eq(venueMemberships.venueId, venueId), eq(venueMemberships.userId, targetId)));
+    await recordMembershipAudit(tx, venueId, {
+      action: "role_changed",
+      actorUserId: actorId,
+      targetUserId: targetId,
+      role,
+    });
+    return { ok: true, member: { userId: targetId, role }, changed: true };
+  });
+}
+
 export type RemoveResult =
   | {
       ok: true;
