@@ -1,6 +1,6 @@
 # ADR-0018: Guest blocklist on keyed hashes of the contact
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-17
 - Deciders: David Cabeza
 
@@ -253,13 +253,15 @@ This ADR changes no code and no contract. The implementation for #66 then change
 - **A separate audit table.** Rejected. `membership_audit` already holds the venue's admin decisions with ids only.
 - **Soft-delete entries to keep removal history.** Rejected. The hash would stay stored after its purpose ended. The audit row already records the removal.
 
-## Open questions for the owner
+## Decisions on the open questions
 
-1. **The explanation criterion in #66.** This ADR declines to show a blocked guest as unavailable in the explanation, because it cannot be done without a free membership test. Recommendation: amend the acceptance criterion to "refused in create, and the explanation stays anonymous".
-2. **How long an entry lives.** `retention_days` from creation, 400 days by default, or a separate setting. Recommendation: reuse `retention_days` now. Add a setting only when a venue asks, because no route sets `retention_days` today either.
-3. **Admin keys and bulk import.** A venue moving from another system may want to import a list. Recommendation: no key access for now. If an import is needed, add a staff-session route that takes contacts in the body and hashes them on receipt.
-4. **A staff override on create.** Recommendation: none. An admin removes the entry, and a walk-in already bypasses the list.
-5. **The reason codes.** Recommendation: `no_show`, `late_cancellation`, `conduct`, `other`, nullable. No code that alleges a crime, because that is a more sensitive kind of data.
-6. **Report existing bookings on add.** An add by guest id could return how many `booked` bookings the guest holds, so the admin can decide whether to cancel them. Recommendation: yes, as a count in the response, computed from the guest record and not stored.
-7. **The production fallback for `BLOCKLIST_KEY`.** The API could refuse to start with `NODE_ENV=production` and the development value, which `BETTER_AUTH_SECRET` does not do today. Recommendation: match `BETTER_AUTH_SECRET` here, and change both in one separate change.
-8. **Legal review.** Keeping an entry after erasure rests on legitimate interest. Recommendation: accept the design now and add the question to the Phase 7 legal review that ADR-0003 already depends on, before the first real venue.
+The owner accepted this ADR with the recommendations below.
+
+1. **The explanation criterion in #66.** Amended to "refused in create, and the explanation stays anonymous".
+2. **How long an entry lives.** `retention_days` from creation. No separate setting until a venue asks.
+3. **Admin keys and bulk import.** No key access. If an import is needed, a staff-session route that hashes contacts on receipt.
+4. **A staff override on create.** None. An admin removes the entry first.
+5. **The reason codes.** `no_show`, `late_cancellation`, `conduct`, `other`, nullable. No code that alleges a crime.
+6. **Report existing bookings on add.** Yes, as a count of `booked` bookings in the response, computed and not stored.
+7. **The production fallback for `BLOCKLIST_KEY`.** Match `BETTER_AUTH_SECRET` for now. Both change together in a separate change.
+8. **Legal review.** The design stands. The question joins the Phase 7 legal review that ADR-0003 depends on, before the first real venue.
