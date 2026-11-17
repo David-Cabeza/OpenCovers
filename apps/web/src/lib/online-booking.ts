@@ -268,7 +268,7 @@ export function parseForm(
 
 export function embedSnippet(origin: string, key: string): string {
   const base = origin.trim().replace(/\/+$/, "");
-  return `<iframe src="${base}/w/${key}" title="Reservas" width="100%" height="640" style="border:0"></iframe>`;
+  return `<iframe src="${base}/w/${key}" title="Book a table" width="100%" height="640" style="border:0"></iframe>`;
 }
 
 /** The widget address as an origin without a trailing slash, or null when it is not one (http or https, no path). */

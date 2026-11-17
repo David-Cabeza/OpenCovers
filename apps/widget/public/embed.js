@@ -24,7 +24,7 @@
 
   var iframe = document.createElement("iframe");
   iframe.src = origin + "/w/" + key;
-  iframe.title = script.getAttribute("data-title") || "Reservas";
+  iframe.title = script.getAttribute("data-title") || "Book a table";
   iframe.setAttribute("loading", "lazy");
   iframe.style.display = "block";
   iframe.style.width = "100%";

@@ -7,7 +7,7 @@ import type { Translate } from "./messages";
 import { solveInBackground } from "./pow";
 import { createSubmitter, createTicketSource } from "./submit";
 import { applyTheme } from "./theme";
-import { Field, inputClass, Logo, primaryButton, secondaryButton, Section } from "./ui";
+import { Field, inputClass, primaryButton, secondaryButton, Section, VenueHeader } from "./ui";
 import { checkDetails, type DetailErrors } from "./validate";
 
 type Phase =
@@ -20,7 +20,7 @@ type Times =
   | { kind: "pick-date" }
   | { kind: "closed" }
   | { kind: "loading" }
-  | { kind: "loaded"; times: string[] }
+  | { kind: "loaded"; times: string[]; reason: "past_date" | "beyond_horizon" | null }
   | { kind: "failed"; failure: Failure };
 
 type Sending = null | { kind: "checking" } | { kind: "sending" };
@@ -45,7 +45,7 @@ export function App({ api, t, locale }: { api: PublicApi; t: Translate; locale: 
 
   return (
     <main className="mx-auto w-full max-w-md p-4 text-text">
-      {"config" in phase && <Logo theme={phase.config.venue.theme} venue={phase.config.venue.name} />}
+      {"config" in phase && <VenueHeader venue={phase.config.venue} />}
       {phase.kind === "loading" && <p role="status">{t("loading")}</p>}
       {phase.kind === "unavailable" && (
         <Section title={t("unavailable.title")}>
@@ -130,7 +130,7 @@ function BookingForm(props: {
     setTimes({ kind: "loading" });
     void api.availability(date, party).then((result) => {
       if (!live) return;
-      setTimes(result.ok ? { kind: "loaded", times: result.value.times } : { kind: "failed", failure: result.failure });
+      setTimes(result.ok ? { kind: "loaded", times: result.value.times, reason: result.value.reason ?? null } : { kind: "failed", failure: result.failure });
     });
     return () => {
       live = false;
@@ -362,7 +362,7 @@ function BookingForm(props: {
   );
 }
 
-function TimeList(props: {
+export function TimeList(props: {
   times: Times;
   t: Translate;
   party: number;
@@ -376,7 +376,11 @@ function TimeList(props: {
   if (times.kind === "closed") return <p role="status">{t("times.closed")}</p>;
   if (times.kind === "loading") return <p role="status">{t("times.loading")}</p>;
   if (times.kind === "failed") return <p role="status">{props.explain(times.failure)}</p>;
-  if (times.times.length === 0) return <p role="status">{t("times.none", { n: props.party })}</p>;
+  if (times.times.length === 0) {
+    if (times.reason === "past_date") return <p role="status">{t("times.pastDate")}</p>;
+    if (times.reason === "beyond_horizon") return <p role="status">{t("times.tooFar")}</p>;
+    return <p role="status">{t("times.none", { n: props.party })}</p>;
+  }
   return (
     <div className="flex flex-wrap gap-2">
       {times.times.map((time) => (

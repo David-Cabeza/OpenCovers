@@ -86,7 +86,7 @@ describe("embed.js", () => {
     const { node, before } = page.inserted[0];
     expect(before).toBe(script.next);
     expect(node.src).toBe(`${WIDGET}/w/${KEY}`);
-    expect(node.title).toBe("Reservas");
+    expect(node.title).toBe("Book a table");
     expect(node.attributes).toEqual({ loading: "lazy" });
     expect(node.style).toEqual({ display: "block", width: "100%", height: "640px", border: "0" });
   });

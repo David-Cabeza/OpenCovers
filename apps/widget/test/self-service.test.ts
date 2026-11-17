@@ -19,6 +19,7 @@ const view: PublicReservation = {
   date: "2030-06-01",
   time: "21:00",
   partySize: 2,
+  maxPartySize: 8,
   status: "booked",
   version: 3,
   guest: { name: "Ana", contact: "a***@example.com" },

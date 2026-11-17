@@ -327,6 +327,7 @@ describe("C48 self-service read and the guest view", () => {
       date: SATURDAY,
       time: "20:00",
       partySize: 2,
+      maxPartySize: 8,
       status: "booked",
       version: 1,
       guest: { name: "Ana García", contact: "a***@example.com" },

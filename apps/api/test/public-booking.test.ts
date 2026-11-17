@@ -229,7 +229,7 @@ describe("C42 public availability", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("no-store");
     const answer = await res.json();
-    expect(Object.keys(answer).sort()).toEqual(["date", "partySize", "times"]);
+    expect(Object.keys(answer).sort()).toEqual(["date", "partySize", "reason", "times"]);
     expect(answer.times[0]).toBe("20:00");
     expect(answer.times).toEqual([...answer.times].sort());
     expect(answer.times).toHaveLength(12);
@@ -304,6 +304,7 @@ describe("C43 public create and attribution", () => {
         date: SATURDAY,
         time: "20:00",
         partySize: 2,
+        maxPartySize: 8,
         status: "booked",
         version: 1,
         guest: { name: "Ana García", contact: "a***@example.com" },
