@@ -83,6 +83,10 @@ describe("rateLimitConfigFromEnv", () => {
       signup: { max: 5, windowMs: 60 * 60_000 },
       invitation: { max: 10, windowMs: 15 * 60_000 },
       venue_creation: { max: 10, windowMs: 60 * 60_000 },
+      public_read: { max: 300, windowMs: 15 * 60_000 },
+      public_booking: { max: 10, windowMs: 60 * 60_000 },
+      public_venue: { max: 100, windowMs: 60 * 60_000 },
+      self_service: { max: 60, windowMs: 15 * 60_000 },
     });
   });
 
@@ -423,5 +427,88 @@ describe("what is limited", () => {
     const out = await statuses(20, () => call(app, "POST", SIGN_IN, { ip: "203.0.113.1" }));
     expect(new Set(out)).toEqual(new Set([200]));
     expect(limiter.size()).toBe(0);
+  });
+});
+
+describe("public routes (C52)", () => {
+  const KEY_A = "pk_AAAAAAAAAAAAAAAAAAAAAA";
+  const KEY_B = "pk_BBBBBBBBBBBBBBBBBBBBBB";
+  const CREATE_A = `/v1/public/${KEY_A}/reservations`;
+
+  it("limits every GET under /v1/public by address with public_read", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_PUBLIC_READ: "2/1m" });
+    const paths = [`/v1/public/${KEY_A}`, `/v1/public/${KEY_A}/availability?date=2030-06-01&partySize=2`, `/v1/public//${KEY_B}/`];
+    const out = await statuses(3, (i) => call(app, "GET", paths[i]!, { ip: "203.0.113.70" }));
+    expect(out).toEqual([200, 200, 429]);
+    expect((await call(app, "GET", `/v1/public/${KEY_A}`, { ip: "203.0.113.71" })).status).toBe(200);
+  });
+
+  it("limits public creates and resends by address with public_booking", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_PUBLIC_BOOKING: "2/1h" });
+    const paths = [CREATE_A, `/v1/public/${KEY_B}/self-service/resend`, `${CREATE_A}/`];
+    const out = await statuses(3, (i) => call(app, "POST", paths[i]!, { ip: "203.0.113.72" }));
+    expect(out).toEqual([200, 200, 429]);
+  });
+
+  it("limits public creates per booking key across addresses with public_venue, and nothing else", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_PUBLIC_VENUE: "3/1h" });
+    const out = await statuses(4, (i) => call(app, "POST", CREATE_A, { ip: `203.0.113.${80 + i}` }));
+    expect(out).toEqual([200, 200, 200, 429]);
+    expect((await call(app, "POST", `/v1/public/${KEY_B}/reservations`, { ip: "203.0.113.90" })).status).toBe(200);
+    expect((await call(app, "GET", `/v1/public/${KEY_A}`, { ip: "203.0.113.91" })).status).toBe(200);
+    expect((await call(app, "POST", "/v1/venues/v1/reservations", { ip: "203.0.113.92" })).status).toBe(200);
+  });
+
+  it("counts a request that matches two rules on both, and charges neither when one is spent", async () => {
+    const { app, limiter } = build({ ...TRUST, RATE_LIMIT_PUBLIC_BOOKING: "1/1h", RATE_LIMIT_PUBLIC_VENUE: "5/1h" });
+    expect((await call(app, "POST", CREATE_A, { ip: "203.0.113.93" })).status).toBe(200);
+    expect(limiter.size()).toBe(2);
+    expect((await call(app, "POST", CREATE_A, { ip: "203.0.113.93" })).status).toBe(429);
+    const others = await statuses(4, (i) => call(app, "POST", CREATE_A, { ip: `203.0.113.${94 + i}` }));
+    expect(others).toEqual([200, 200, 200, 200]);
+    expect((await call(app, "POST", CREATE_A, { ip: "203.0.113.99" })).status).toBe(429);
+  });
+
+  it("limits the self-service routes with self_service, and reads also with public_read", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_PUBLIC_SELF_SERVICE: "2/1m", RATE_LIMIT_PUBLIC_READ: "1/1m" });
+    expect((await call(app, "GET", "/v1/public/self-service", { ip: "203.0.113.100" })).status).toBe(200);
+    expect((await call(app, "GET", "/v1/public/self-service", { ip: "203.0.113.100" })).status).toBe(429);
+    expect((await call(app, "POST", "/v1/public/self-service/cancel", { ip: "203.0.113.100" })).status).toBe(200);
+    expect((await call(app, "POST", "/v1/public/self-service/modify", { ip: "203.0.113.100" })).status).toBe(429);
+  });
+
+  it("leaves the JSON-LD route, the widget page and staff routes to their own rules", async () => {
+    const { app } = build({
+      ...TRUST,
+      RATE_LIMIT_PUBLIC_READ: "1/1m",
+      RATE_LIMIT_PUBLIC_BOOKING: "1/1m",
+      RATE_LIMIT_PUBLIC_VENUE: "1/1m",
+      RATE_LIMIT_PUBLIC_SELF_SERVICE: "1/1m",
+    });
+    for (const [method, path] of [
+      ["GET", "/v1/venues/v1/public.jsonld"],
+      ["GET", `/w/${KEY_A}`],
+      ["GET", "/v1/venues/v1/availability"],
+      ["POST", "/v1/venues/v1/reservations"],
+    ] as const) {
+      const out = await statuses(3, () => call(app, method, path, { ip: "203.0.113.110" }));
+      expect(new Set(out), `${method} ${path}`).toEqual(new Set([200]));
+    }
+  });
+
+  it("reads the four RATE_LIMIT_PUBLIC_* settings and rejects a bad value at startup", () => {
+    const config = rateLimitConfigFromEnv({
+      RATE_LIMIT_PUBLIC_READ: "5/1m",
+      RATE_LIMIT_PUBLIC_BOOKING: "6/2h",
+      RATE_LIMIT_PUBLIC_VENUE: "7/3h",
+      RATE_LIMIT_PUBLIC_SELF_SERVICE: "8/4m",
+    });
+    expect(config.rules.public_read).toEqual({ max: 5, windowMs: 60_000 });
+    expect(config.rules.public_booking).toEqual({ max: 6, windowMs: 2 * 3_600_000 });
+    expect(config.rules.public_venue).toEqual({ max: 7, windowMs: 3 * 3_600_000 });
+    expect(config.rules.self_service).toEqual({ max: 8, windowMs: 4 * 60_000 });
+    for (const name of ["RATE_LIMIT_PUBLIC_READ", "RATE_LIMIT_PUBLIC_BOOKING", "RATE_LIMIT_PUBLIC_VENUE", "RATE_LIMIT_PUBLIC_SELF_SERVICE"]) {
+      expect(() => rateLimitConfigFromEnv({ [name]: "lots" })).toThrow(new RegExp(name));
+    }
   });
 });
