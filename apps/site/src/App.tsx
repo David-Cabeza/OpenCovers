@@ -328,9 +328,9 @@ function Intro() {
           <i style={{ background: "#ff5f57" }} />
           <i style={{ background: "#febc2e" }} />
           <i style={{ background: "#28c840" }} />
-          <b>OpenCovers — Demo Bistro</b>
+          <b>OpenCovers — La Taberna del Faro</b>
         </div>
-        <video autoPlay muted loop playsInline preload="metadata" poster="/media/floor-plan.webp" aria-label="Demo del plano de sala y la agenda de OpenCovers">
+        <video autoPlay muted loop playsInline preload="metadata" poster="/media/opencovers-demo-poster.webp" aria-label="Demo de OpenCovers: agenda del día, reservas desde el widget y el servidor MCP rechazando una doble reserva">
           <source src="/media/opencovers-demo.mp4" type="video/mp4" />
         </video>
       </div>
