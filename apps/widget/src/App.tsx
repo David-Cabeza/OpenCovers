@@ -5,7 +5,8 @@ import { explain, type Explanation } from "./errors";
 import type { Translate } from "./messages";
 import { solveInBackground } from "./pow";
 import { createSubmitter, createTicketSource } from "./submit";
-import { Field, inputClass, primaryButton, secondaryButton, Section } from "./ui";
+import { applyTheme } from "./theme";
+import { Field, inputClass, Logo, primaryButton, secondaryButton, Section } from "./ui";
 import { checkDetails, type DetailErrors } from "./validate";
 
 type Phase =
@@ -32,6 +33,7 @@ export function App({ api, t, locale }: { api: PublicApi; t: Translate; locale: 
       if (!live) return;
       if (result.ok) {
         document.title = t("page.title", { venue: result.value.venue.name });
+        applyTheme(result.value.venue.theme, document.documentElement.style);
         setPhase({ kind: "booking", config: result.value });
       } else setPhase({ kind: "unavailable" });
     });
@@ -42,6 +44,7 @@ export function App({ api, t, locale }: { api: PublicApi; t: Translate; locale: 
 
   return (
     <main className="mx-auto w-full max-w-md p-4 text-text">
+      {"config" in phase && <Logo theme={phase.config.venue.theme} venue={phase.config.venue.name} />}
       {phase.kind === "loading" && <p role="status">{t("loading")}</p>}
       {phase.kind === "unavailable" && (
         <Section title={t("unavailable.title")}>

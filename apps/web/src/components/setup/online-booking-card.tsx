@@ -28,12 +28,20 @@ import { useServices } from "@/hooks/use-services";
 import { api } from "@/lib/api";
 import { errorMessage, isApiError } from "@/lib/error-message";
 import {
+  COLOR_KEYS,
+  FONTS,
+  FONT_STACKS,
   LOCALES,
+  defaultThemeForm,
   embedSnippet,
+  isLogoUrl,
   parseForm,
   toForm,
+  type ColorKey,
+  type Font,
   type FormErrors,
   type OnlineBookingForm,
+  type ThemeForm,
 } from "@/lib/online-booking";
 import { WEEKDAYS } from "@/lib/weekdays";
 
@@ -44,6 +52,49 @@ type NumberKey =
   | "maxAdvanceDays"
   | "selfServiceCutoffMinutes"
   | "maxOpenBookingsPerContact";
+
+const COLOR_LABELS: Record<ColorKey, string> = {
+  primary: "Buttons",
+  onPrimary: "Button text",
+  background: "Background",
+  surface: "Panels",
+  text: "Text",
+  muted: "Secondary text",
+  border: "Borders",
+};
+
+const FONT_LABELS: Record<Font, string> = { system: "System", serif: "Serif", rounded: "Rounded" };
+
+/**
+ * A small likeness of the booking page. The staff app's CSP loads no image from other sites, so a valid logo
+ * address shows as a placeholder here and loads only in the widget.
+ */
+function ThemePreview({ theme }: { theme: ThemeForm }) {
+  const c = theme.colors;
+  const radius = `${Math.min(24, Math.max(0, Number(theme.radius) || 0))}px`;
+  return (
+    <div
+      aria-label="Preview of the booking page"
+      role="img"
+      className="space-y-3 border p-4 text-sm"
+      style={{ background: c.background, color: c.text, fontFamily: FONT_STACKS[theme.font], borderColor: c.border, borderRadius: radius }}
+    >
+      {isLogoUrl(theme.logoUrl.trim()) && (
+        <div className="flex h-8 w-20 items-center justify-center border border-dashed text-xs" style={{ borderColor: c.border, color: c.muted }}>
+          Logo
+        </div>
+      )}
+      <p className="text-base font-semibold">Book a table</p>
+      <p style={{ color: c.muted }}>Pick a day and a time.</p>
+      <div className="border px-3 py-2" style={{ background: c.surface, borderColor: c.border, borderRadius: radius }}>
+        20:00 · 2 people
+      </div>
+      <div className="px-3 py-2 text-center font-medium" style={{ background: c.primary, color: c.onPrimary, borderRadius: radius }}>
+        Book
+      </div>
+    </div>
+  );
+}
 
 async function copyText(text: string, done: string) {
   try {
@@ -64,6 +115,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
   const [incomplete, setIncomplete] = useState(false);
   const [host, setHost] = useState(window.location.origin);
   const [confirmRotate, setConfirmRotate] = useState(false);
+  const [lowContrast, setLowContrast] = useState<number | null>(null);
 
   useEffect(() => {
     if (data) {
@@ -80,8 +132,8 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
       queryClient.setQueryData(["online-booking", venueId], settings);
       setIncomplete(false);
       toast.success("Online booking saved");
-      if (warnings.some((w) => w.code === "low_contrast"))
-        toast.warning("The theme text color has low contrast against its background.");
+      const low = warnings.find((w) => w.code === "low_contrast");
+      setLowContrast(low ? (low.ratio ?? 0) : null);
     },
     onError: (err) => {
       if (isApiError(err, "online_booking_incomplete")) {
@@ -122,6 +174,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
     }
     setErrors({});
     setIncomplete(false);
+    setLowContrast(null);
     if (Object.keys(result.update).length === 0) {
       toast.success("Nothing to save");
       return;
@@ -140,7 +193,11 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
     };
   }
 
-  function error(key: keyof OnlineBookingForm) {
+  function setTheme(patch: Partial<ThemeForm>) {
+    if (form) setForm({ ...form, theme: { ...form.theme, ...patch } });
+  }
+
+  function error(key: keyof FormErrors) {
     return errors[key] ? (
       <p id={`ob-${key}-error`} role="alert" className="text-sm text-destructive">
         {errors[key]}
@@ -319,6 +376,95 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                 on its own address.
               </p>
             </div>
+
+            <fieldset className="space-y-4">
+              <legend className="text-sm font-medium">Look of the booking page</legend>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {COLOR_KEYS.map((k) => (
+                      <div key={k} className="flex items-center gap-2">
+                        <input
+                          id={`ob-color-${k}`}
+                          type="color"
+                          value={form.theme.colors[k]}
+                          onChange={(e) => setTheme({ colors: { ...form.theme.colors, [k]: e.target.value } })}
+                          className="h-8 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent"
+                        />
+                        <Label htmlFor={`ob-color-${k}`} className="font-normal">
+                          {COLOR_LABELS[k]}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  {error("themeColors")}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="ob-radius">Corner radius (px)</Label>
+                      <Input
+                        id="ob-radius"
+                        inputMode="numeric"
+                        value={form.theme.radius}
+                        aria-invalid={errors.themeRadius ? true : undefined}
+                        aria-describedby={errors.themeRadius ? "ob-themeRadius-error" : undefined}
+                        onChange={(e) => setTheme({ radius: e.target.value })}
+                      />
+                      {error("themeRadius")}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ob-font">Font</Label>
+                      <select
+                        id="ob-font"
+                        value={form.theme.font}
+                        onChange={(e) => setTheme({ font: e.target.value as Font })}
+                        className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                      >
+                        {FONTS.map((f) => (
+                          <option key={f} value={f}>
+                            {FONT_LABELS[f]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ob-logo">Logo address</Label>
+                    <Input
+                      id="ob-logo"
+                      placeholder="https://example.com/logo.png"
+                      value={form.theme.logoUrl}
+                      aria-invalid={errors.themeLogoUrl ? true : undefined}
+                      aria-describedby={errors.themeLogoUrl ? "ob-themeLogoUrl-error" : undefined}
+                      onChange={(e) => setTheme({ logoUrl: e.target.value })}
+                    />
+                    {error("themeLogoUrl")}
+                    <p className="text-sm text-muted-foreground">
+                      Optional. An https address of an image. Each guest's browser loads it from that
+                      address, without telling it which page asked.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setForm({ ...form, theme: defaultThemeForm() })}
+                  >
+                    Reset look to defaults
+                  </Button>
+                </div>
+                <ThemePreview theme={form.theme} />
+              </div>
+              {lowContrast !== null && (
+                <div
+                  role="alert"
+                  className="rounded-md border border-amber-500/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100"
+                >
+                  Saved, but the text color has a contrast of {lowContrast}:1 against the background.
+                  WCAG AA asks for at least 4.5:1, so some guests may find the booking page hard to
+                  read. Pick a darker text or a lighter background, or the other way round.
+                </div>
+              )}
+            </fieldset>
 
             <Button onClick={submit} disabled={save.isPending}>
               {save.isPending ? "Saving…" : "Save online booking"}

@@ -156,6 +156,12 @@ describe("C40 public surface and venue isolation", () => {
     for (const leak of [v.id, "owner@example.com", "dinner", v.admin]) expect(text).not.toContain(leak);
   });
 
+  it("returns the venue's theme as stored, colors in lower case", async () => {
+    const theme = { colors: { primary: "#aa0000", text: "#111111" }, radius: 0, font: "rounded", logoUrl: "https://cdn.example.com/logo.png?v=2" };
+    const v = await makeVenue({ settings: { theme: { ...theme, colors: { primary: "#AA0000", text: "#111111" } } } });
+    expect((await (await getPublic(v.key)).json()).venue.theme).toEqual(theme);
+  });
+
   it("answers an unknown, malformed, rotated or disabled key with the same 404 on every route", async () => {
     const rotated = await makeVenue();
     const rotation = await app.request(`/v1/venues/${rotated.id}/online-booking/rotate-key`, {

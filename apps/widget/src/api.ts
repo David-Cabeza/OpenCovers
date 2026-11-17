@@ -11,6 +11,8 @@ export interface PublicVenue {
   name: string;
   locale: string;
   phone: string | null;
+  /** Read through `theme.ts`, which checks every value again before use. */
+  theme?: unknown;
 }
 
 export interface PublicConfig {

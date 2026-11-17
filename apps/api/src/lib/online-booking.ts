@@ -9,6 +9,9 @@ export const FONTS = ["system", "serif", "rounded"] as const;
 export const COLOR_KEYS = ["primary", "onPrimary", "background", "surface", "text", "muted", "border"] as const;
 export const MAX_ORIGINS = 10;
 const MAX_LOGO_URL = 2048;
+/** The widget's built-in text and background colors (`apps/widget/src/styles.css`), used for a key a theme leaves out. */
+export const DEFAULT_TEXT = "#1c1b19";
+export const DEFAULT_BACKGROUND = "#ffffff";
 
 export interface Theme {
   colors?: Partial<Record<(typeof COLOR_KEYS)[number], string>>;
@@ -135,7 +138,7 @@ function parseTheme(v: unknown): Theme | null {
       out.font = val as (typeof FONTS)[number];
     } else if (k === "logoUrl") {
       if (val === null) continue;
-      if (typeof val !== "string" || val.length > MAX_LOGO_URL) return null;
+      if (typeof val !== "string" || val.length > MAX_LOGO_URL || /[\s\x00-\x1f\x7f]/.test(val)) return null;
       try {
         const u = new URL(val);
         if (u.protocol !== "https:" || u.username !== "" || u.password !== "" || u.hostname === "") return null;
@@ -225,11 +228,10 @@ function luminance(hex: string): number {
   return 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
 }
 
-/** Warns when both text and background are set and their contrast is below WCAG AA. */
+/** Warns when the text color, as the widget shows it, has a contrast below WCAG AA against the background. */
 export function contrastWarnings(theme: Theme): Warning[] {
-  const fg = theme.colors?.text;
-  const bg = theme.colors?.background;
-  if (!fg || !bg) return [];
+  const fg = theme.colors?.text ?? DEFAULT_TEXT;
+  const bg = theme.colors?.background ?? DEFAULT_BACKGROUND;
   const [a, b] = [luminance(fg), luminance(bg)];
   const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   if (ratio >= 4.5) return [];
