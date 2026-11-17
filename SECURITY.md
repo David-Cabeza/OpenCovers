@@ -6,7 +6,7 @@ OpenCovers is pre-alpha. No version is supported for production use.
 
 ## Report a vulnerability
 
-The repository is private until the public launch. Before the public launch, the maintainer enables GitHub private vulnerability reporting. Until then, ask [@David-Cabeza](https://github.com/David-Cabeza) for a private channel. Do not open a public issue.
+Report vulnerabilities privately through GitHub: open the [Security tab](https://github.com/David-Cabeza/OpenCovers/security) and choose **Report a vulnerability**. Do not open a public issue or a public pull request for a vulnerability.
 
 Include:
 
