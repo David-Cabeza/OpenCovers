@@ -46,19 +46,27 @@ Staff sign in with Better Auth and get a per-venue role. Platforms and AI agents
 
 ### 🎛️ Control of the room and the book
 
-An explicit overbooking ceiling per venue (default 0, enforced under a per-venue lock), a booking note of up to 500 characters, a reconfirmation status on each reservation, and a rule that a reservation cannot be seated without a table. The staff app has a pre-shift view for a service and date, and an endpoint explains why a slot is closed.
+An explicit overbooking ceiling per venue (default 0, enforced under a per-venue lock), a booking note of up to 500 characters, a reconfirmation status on each reservation, and a rule that a reservation cannot be seated without a table. An optional booking policy per venue limits how far ahead a guest can book, caps one guest's active bookings per day, and blocks dates. Each service runs on the weekdays you choose. The staff app has a pre-shift view for a service and date, and an endpoint explains why a slot is closed.
 
 ### 👥 Staff access you control
 
-A venue admin invites staff and removes members from the staff app, with the roles `read`, `write`, and `admin` applied to keys and sessions. Sign-up is controlled with the `SIGNUP` setting, only the owner creates venues on closed instances, and sign-in, sign-up and invitation redemption are rate limited.
+A venue admin invites staff, changes their roles, and removes members from the staff app, with the roles `read`, `write`, and `admin` applied to keys and sessions. Removing a member revokes the keys they made for the venue, and their sessions when they belong to no other venue. The Team screen shows an audit log of these changes. Sign-up is controlled with the `SIGNUP` setting, only the owner creates venues on closed instances, and sign-in, sign-up and invitation redemption are rate limited.
 
 ### 🤖 An MCP server
 
-The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly. It is published on npm as [`@opencovers/mcp`](https://www.npmjs.com/package/@opencovers/mcp) and listed in the official MCP registry as `io.github.David-Cabeza/opencovers`. Run it with `npx -y @opencovers/mcp`.
+The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly. It is published on npm as [`@opencovers/mcp`](https://www.npmjs.com/package/@opencovers/mcp) and listed in the official MCP registry as `io.github.David-Cabeza/opencovers`. Run it with `npx -y @opencovers/mcp`. Every reservation and waitlist write tool takes an idempotency key, so an agent that retries after a timeout does not book twice. Each error tells the agent whether a retry can succeed.
 
 ### 🧭 The room, covered
 
-Walk-ins, a waitlist, zones, and automatic table assignment. The engine seats guests now, holds them in a queue, and assigns tables so platforms and agents never think about floor plans.
+Walk-ins, a waitlist, zones, and automatic table assignment. The engine seats guests now, holds them in a queue, and assigns tables so platforms and agents never think about floor plans. A waitlist entry is seated once, even when two requests try to seat it at the same time.
+
+### 🙋 Guests
+
+The engine keeps one guest record per venue, matched by normalized email or phone. The API lists and reads guests, and an admin merges and unmerges them with an audit trail. Through the API, an admin can also block a contact. The blocklist stores a keyed hash of the contact, and a new booking from that contact is refused with `booking_declined`. There is no guest screen in the staff app yet.
+
+### 🌐 Online booking (in progress)
+
+A venue can take bookings on its own website ([ADR-0017](docs/adr/0017-booking-widget-and-self-service-link.md)). In **Setup → Online booking**, an admin turns it on, sets the online limits and the allowed sites, and copies an `<iframe>` snippet. The widget at `/w/{bookingKey}` books through public routes under `/v1/public` that need no account, with a proof-of-work challenge and rate limits. After booking, the guest gets a private link to a page at `/r` that shows the booking and lets them change the party size or the note, or cancel. Parts not built yet include the link in the confirmation email, the theme, the consent question, and an optional CAPTCHA. A venue can also publish an opt-in public profile as schema.org Restaurant JSON-LD for its own pages.
 
 ### 🪑 A visual floor plan
 
@@ -74,7 +82,7 @@ Register an HTTPS endpoint and the engine pushes every reservation event to it: 
 
 ### 🧹 Erasure built in
 
-Erase guest data by contact or principal, and get back counts. Tombstones keep the hashes, never the personal values.
+An admin erases a guest's data by guest record or by principal, and gets back counts. Tombstones keep the hashes, never the personal values. An hourly job erases guest data past the venue's retention period.
 
 ## How it works
 
@@ -91,11 +99,15 @@ flowchart LR
     subgraph mcp["MCP server · stdio"]
         TOOLS[18 tools]
     end
+    subgraph widget["Booking widget · /w and /r"]
+        GUEST[Book · view · change · cancel]
+    end
     DB[(PostgreSQL<br/>GiST exclusion)]
 
     UI -- "session cookie" --> AUTH
     UI -- "HTTP /v1" --> DOMAIN
     TOOLS -- "apikey" --> KEYS
+    GUEST -- "HTTP /v1/public" --> DOMAIN
     DOMAIN --> DB
     KEYS --> DB
 ```
@@ -179,7 +191,7 @@ The staff app in action — the agenda, the floor plan, and the floor editor.
 ```
 apps/api     the reservation engine and the HTTP API
 apps/web     the staff app
-apps/widget  the guest booking widget, served by the API at /w/{bookingKey}
+apps/widget  the guest booking widget and self-service page, served by the API at /w/{bookingKey} and /r
 apps/mcp     the MCP server
 apps/site    the public website
 docs/        the contract, ADRs, and requirements
@@ -202,7 +214,7 @@ OpenCovers has no hosting vendor dependency. It needs PostgreSQL and a Node.js p
 
 ## Status
 
-Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — 52 conformance cases pass (C1 to C38, C41, C42, C46 to C49 and C52 to C59), signed webhooks included. 17 cases (C39 to C55) specify the booking widget and self-service link, whose contract is written. The online booking settings (ADR-0017 stage 2), the public booking API for config, availability and create (stage 3), the guest self-service link to read, change and cancel a booking (stage 4) the booking widget with its framed page (stage 5) and the guest's self-service page (stage 6) are built: of those 17, ten pass and seven are partial (C39, C40, C43, C44, C45, C50, C51). A deployment is prepared (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
+Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — 52 conformance cases pass (C1 to C38, C41, C42, C46 to C49 and C52 to C59), signed webhooks included. 17 cases (C39 to C55) specify the booking widget and self-service link, whose contract is written. Stages 2 to 7 of ADR-0017 are built. They are the online booking settings, the public booking API for config, availability and create, the guest self-service link to read, change and cancel a booking, the booking widget with its framed page, the guest's self-service page, and the Online booking card in Setup. Of those 17 cases, ten pass and seven are partial (C39, C40, C43, C44, C45, C50, C51). A deployment is prepared (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
 
 ## Contributing
 
