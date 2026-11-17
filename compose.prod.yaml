@@ -36,6 +36,14 @@ services:
       RATE_LIMIT_SIGNUP: ${RATE_LIMIT_SIGNUP:-}
       RATE_LIMIT_INVITATION: ${RATE_LIMIT_INVITATION:-}
       RATE_LIMIT_VENUE_CREATION: ${RATE_LIMIT_VENUE_CREATION:-}
+      RATE_LIMIT_PUBLIC_READ: ${RATE_LIMIT_PUBLIC_READ:-}
+      RATE_LIMIT_PUBLIC_BOOKING: ${RATE_LIMIT_PUBLIC_BOOKING:-}
+      RATE_LIMIT_PUBLIC_VENUE: ${RATE_LIMIT_PUBLIC_VENUE:-}
+      RATE_LIMIT_PUBLIC_SELF_SERVICE: ${RATE_LIMIT_PUBLIC_SELF_SERVICE:-}
+      PUBLIC_POW_DIFFICULTY: ${PUBLIC_POW_DIFFICULTY:-}
+      PUBLIC_CHALLENGE_SECRET: ${PUBLIC_CHALLENGE_SECRET:-}
+      # Unset, the API serves no widget page. Set, it serves it only for requests to that host (ADR-0017, Q1).
+      WIDGET_ADDRESS: ${WIDGET_ADDRESS:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
     healthcheck:
@@ -54,6 +62,8 @@ services:
       - api
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-http://localhost}
+      # Caddy needs an address for the widget block. The default host never resolves, so the block serves nothing.
+      WIDGET_ADDRESS: ${WIDGET_ADDRESS:-http://widget.invalid}
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
       interval: 10s

@@ -8,6 +8,7 @@ OpenCovers does not depend on a hosting vendor. The engine needs PostgreSQL and 
 | --- | --- | --- |
 | API (`apps/api`) | Node.js process (Hono) | PostgreSQL 16 or newer, Node.js 22 |
 | Staff app (`apps/web`) | Static Vite build | Any static host or web server |
+| Booking widget (`apps/widget`) | Vite build that the API serves at `/w/{bookingKey}` | A second host name with HTTPS (`WIDGET_ADDRESS`) |
 | MCP server (`apps/mcp`) | stdio process that talks to the API over HTTPS | Node.js 22, an API key |
 | Site (`apps/site`) | Static Vite build | Any static host. The project's own copy is on GitHub Pages at opencovers.dev. |
 
@@ -23,7 +24,7 @@ pnpm db:migrate
 
 ## Quick start with Docker Compose
 
-`compose.prod.yaml` runs the whole engine on any machine with Docker. It starts PostgreSQL, the API, and Caddy, which serves the staff app and forwards `/api/*` and `/v1/*` to the API. Everything shares one origin.
+`compose.prod.yaml` runs the whole engine on any machine with Docker. It starts PostgreSQL, the API, and Caddy, which serves the staff app and forwards `/api/*` and `/v1/*` to the API. The staff app and the API share one origin. The guest booking widget has a second one, see [Booking widget](#booking-widget).
 
 ```sh
 cp .env.prod.example .env.prod
@@ -41,7 +42,30 @@ Before you serve real guests, read the [hardening guide](hardening.md). It cover
 
 To use an external PostgreSQL instead, remove the `db` service and its `depends_on` entry, and set `DATABASE_URL` on the `api` service to your connection string.
 
-Without Docker, build the staff app with `pnpm --filter @opencovers/web build`, serve `apps/web/dist` from any static host, and forward `/api/*` and `/v1/*` to the API. Add the staff app's origin to `TRUSTED_ORIGINS`.
+Without Docker, build the staff app with `pnpm --filter @opencovers/web build`, serve `apps/web/dist` from any static host, and forward `/api/*` and `/v1/*` to the API. Add the staff app's origin to `TRUSTED_ORIGINS`. For the widget, build it with `pnpm --filter @opencovers/widget build` where the API runs, and follow [Booking widget](#booking-widget).
+
+## Booking widget
+
+Guests book through a page that venues embed with an `<iframe>`, or link to: `https://book.example.com/w/BOOKING_KEY`. A venue admin turns online booking on and gets the booking key in the staff app or through `PUT /v1/venues/VENUE_ID/online-booking`. See [ADR-0017](adr/0017-booking-widget-and-self-service-link.md).
+
+The widget must live on a host name of its own, never the staff app's, so the staff session cookie stays out of its reach.
+
+1. Point a second name, such as `book.example.com`, at the same machine.
+2. Set `WIDGET_ADDRESS=book.example.com` in `.env.prod` and restart the stack. Caddy gets a certificate for it as it does for `SITE_ADDRESS`. Use a real domain: browsers run the widget's proof of work only over HTTPS (or on `localhost`), so on plain HTTP the widget cannot book.
+3. Open `https://book.example.com/w/BOOKING_KEY`.
+
+What each part does:
+
+- Caddy's widget site block forwards `/w/*` and `/v1/public/*` to the API and answers everything else with `404`. The staff site block answers `/w/*` with `404` and keeps `X-Frame-Options: DENY` and `frame-ancestors 'none'` on every path.
+- The API writes the page per venue, because the page's `Content-Security-Policy` lists the origins allowed to frame it: `frame-ancestors 'self'` and the venue's `allowedOrigins`, or `'none'` when the list is empty, which allows only top-level use. It sends no `X-Frame-Options`. It also serves the widget's built files under `/w/assets/`. The API image builds the widget, so nothing else needs copying.
+- The API serves the page only for requests to the `WIDGET_ADDRESS` host. Without `WIDGET_ADDRESS`, a production API (`NODE_ENV=production`, as in the image) serves no widget page, and Caddy's widget block listens for `widget.invalid`, a name that never resolves. An API whose `WIDGET_ADDRESS` has the host name of `BETTER_AUTH_URL` or of a `TRUSTED_ORIGINS` entry refuses to start, whatever the port.
+- A venue's site that sends its own `Content-Security-Policy` must allow the widget origin in `frame-src`.
+
+`bash scripts/check-caddy-widget.sh` runs the shipped Caddyfile in Caddy with Docker and checks the headers of both site blocks.
+
+Upgrading an existing stack: nothing changes until you set `WIDGET_ADDRESS`. The API image is now built in two stages, the first of which builds the widget, so the first `--build` takes longer.
+
+In local development there is no second origin. The staff app's dev server proxies `/w/*` to the API, and the widget opens at `http://localhost:5173/w/BOOKING_KEY`. `pnpm dev` rebuilds the widget on change.
 
 ## Sign-up control
 
@@ -123,8 +147,6 @@ The API limits sign-in, sign-up, invitation redemption and venue creation per cl
 | `RATE_LIMIT_PUBLIC_VENUE` | `100/1h` | The same routes, per booking key, all addresses together. Whoever spends it stops online booking in that venue until the window ends. Staff bookings are untouched. |
 | `RATE_LIMIT_PUBLIC_SELF_SERVICE` | `60/15m` | Every `/v1/public/self-service` request, per client address. |
 
-`compose.prod.yaml` does not pass the four `RATE_LIMIT_PUBLIC_*` variables to the API yet, so their defaults apply there until the widget stage of ADR-0017 adds them with its site block.
-
 A budget is `max/window`, with a window in `s`, `m` or `h`. An unknown value stops the API at startup and names the variable. An empty value means the default.
 
 - The compose stack sets `TRUST_PROXY=true`. Caddy replaces any client `X-Forwarded-For` with the address it sees, so a client cannot pick its own address. Do not publish the `api` port.
@@ -177,3 +199,5 @@ The API reads these variables regardless of host:
 | `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION`, `RATE_LIMIT_VENUE_CREATION`, `RATE_LIMIT_PUBLIC_READ`, `RATE_LIMIT_PUBLIC_BOOKING`, `RATE_LIMIT_PUBLIC_VENUE`, `RATE_LIMIT_PUBLIC_SELF_SERVICE` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |
 | `PUBLIC_POW_DIFFICULTY` | no | Proof-of-work bits for a public booking, 0 to 32. Default `12`. `0` turns the proof of work off and keeps the signed challenge. See ADR-0017. |
 | `PUBLIC_CHALLENGE_SECRET` | no | Signs the public form challenge, at least 32 characters. Default: a random key per process, which is enough for one API process. Set it when several serve the widget. |
+| `WIDGET_ADDRESS` | no | The booking widget's host, such as `book.example.com`. Caddy and the API both read it. Unset, a production API serves no widget page. It must not share the staff app's host name. See Booking widget. |
+| `WIDGET_DIST` | no | The widget build the API serves. Default: `apps/widget/dist` in the repository, which the image fills. |
