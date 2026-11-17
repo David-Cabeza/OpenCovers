@@ -24,27 +24,38 @@ require("http").createServer((req, res) => {
     headers["Content-Security-Policy"] = "default-src '"'self'"'; frame-ancestors '"'none'"'";
     headers["X-Frame-Options"] = "DENY";
   }
-  res.writeHead(200, headers);
-  res.end(`upstream xff=${req.headers["x-forwarded-for"]}`);
+  let bytes = 0;
+  req.on("data", (chunk) => (bytes += chunk.length));
+  req.on("end", () => {
+    res.writeHead(200, headers);
+    res.end(`upstream xff=${req.headers["x-forwarded-for"]} bytes=${bytes}`);
+  });
 }).listen(3000)' >/dev/null
 docker run -d --name "$name-caddy" --network "$name" --network-alias caddy \
   -e SITE_ADDRESS=http://staff.test -e WIDGET_ADDRESS=http://book.test \
   -v "$caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine >/dev/null
 sleep 2
 
-# Prints the status line, the headers and the body of one request through Caddy, a 404 included.
+# Prints the status line, the headers and the body of one request through Caddy, a 404 included. With a third
+# argument it POSTs that many bytes, with a Content-Length, or chunked when the fourth argument is "chunked".
 get() {
   docker exec "$name-api" node -e '
-const [host, path] = process.argv.slice(1);
-require("http").get({ host: "caddy", port: 80, path, headers: { Host: host, "X-Forwarded-For": "203.0.113.9" } }, (res) => {
-  let body = "";
-  res.on("data", (chunk) => (body += chunk));
+const [host, path, size, mode] = process.argv.slice(1);
+const headers = { Host: host, "X-Forwarded-For": "203.0.113.9" };
+const body = size ? Buffer.alloc(Number(size), 32) : null;
+if (body && mode !== "chunked") headers["Content-Length"] = body.length;
+const req = require("http").request({ host: "caddy", port: 80, path, method: body ? "POST" : "GET", headers }, (res) => {
+  let text = "";
+  res.on("data", (chunk) => (text += chunk));
   res.on("end", () => {
     console.log(`HTTP/1.1 ${res.statusCode}`);
     for (const [k, v] of Object.entries(res.headers)) console.log(`${k}: ${v}`);
-    console.log(body);
+    console.log(text);
   });
-});' "$1" "$2"
+});
+req.on("error", (err) => console.log(`request error ${err.code}`));
+if (body) for (let at = 0; at < body.length; at += 16384) req.write(body.subarray(at, at + 16384));
+req.end();' "$@"
 }
 
 failures=0
@@ -85,6 +96,22 @@ out=$(get book.test "/r?lang=en")
 check "widget /r: 200 from the API" "upstream" "$out" yes
 check "widget /r: the API's frame-ancestors 'none'" "Content-Security-Policy: .*frame-ancestors 'none'" "$out" yes
 check "widget /r: the API's X-Frame-Options DENY" "X-Frame-Options: DENY" "$out" yes
+
+out=$(get book.test /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA/reservations 65536)
+check "widget body of 64 KB: reaches the API" "bytes=65536" "$out" yes
+for mode in length chunked; do
+  out=$(get book.test /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA/reservations 65537 "$mode")
+  check "widget body over 64 KB ($mode): 413" "HTTP/1.1 413" "$out" yes
+  check "widget body over 64 KB ($mode): not passed whole to the API" "bytes=65537" "$out" no
+done
+
+out=$(get staff.test /v1/venues 1048576)
+check "staff body of 1 MB: reaches the API" "bytes=1048576" "$out" yes
+for mode in length chunked; do
+  out=$(get staff.test /v1/venues 1048577 "$mode")
+  check "staff body over 1 MB ($mode): 413" "HTTP/1.1 413" "$out" yes
+  check "staff body over 1 MB ($mode): not passed whole to the API" "bytes=1048577" "$out" no
+done
 
 for path in / /r/ /api/auth/get-session /v1/venues/x/reservations /index.html; do
   out=$(get book.test "$path")
