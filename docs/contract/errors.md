@@ -16,6 +16,16 @@ Every error response is `{"code": "...", "message": "...", "retryable": true|fal
 
 - `public_profile_incomplete`: the public profile cannot be turned on without a venue name, `street`, `locality` and `country`, or a `latitude` was given without a `longitude` (or the reverse). `409`. Nothing changed. Not retryable.
 
+## Online booking and the self-service link
+
+The guest-facing routes under `/v1/public/` and the `online-booking` settings. See [ADR-0017](../adr/0017-booking-widget-and-self-service-link.md). An unknown, rotated or disabled booking key answers `venue_not_found`, as an unknown venue does.
+
+- `online_booking_incomplete`: online booking cannot be turned on without a venue name and at least one service bookable online, meaning a service named in `services` (any service when it is null) that opens on at least one of the online `weekdays`. `409`. Nothing changed. Not retryable.
+- `online_booking_limit`: the contact already holds the venue's `maxOpenBookingsPerContact` future `booked` bookings made online. Public create only. `409`. Nothing is booked. Not retryable.
+- `self_service_link_invalid`: the self-service token does not work. It is missing or malformed, its id is unknown, its secret is wrong, or the link expired, was revoked, or belongs to an erased booking. One answer for every cause, which names no venue and no booking. `404`. Not retryable.
+- `self_service_closed`: the booking can no longer be changed or cancelled through the link, because it is not `booked` or it starts within the venue's `selfServiceCutoffMinutes`. Reading through the link still works. `409`. Not retryable.
+- `reservation_changed`: the `version` sent with a self-service modify is not the stored version, because the booking changed after the guest read it. Read it again, then send the change with the new version. `409`. Nothing changed. Not retryable.
+
 ## Auth
 
 - `unauthorized`: the caller is not authenticated. Not retryable.
@@ -24,11 +34,11 @@ Every error response is `{"code": "...", "message": "...", "retryable": true|fal
 
 ## Rate limiting
 
-- `rate_limited`: the caller sent too many requests of a limited kind. The response is `429` with a `Retry-After` header in whole seconds, the wait before retrying. The body is the same whatever the request named. The limited calls are sign-in and other writes under `/api/auth`, sign-up, and invitation redemption. See [ADR-0007](../adr/0007-rate-limiting.md). Retryable.
+- `rate_limited`: the caller sent too many requests of a limited kind. The response is `429` with a `Retry-After` header in whole seconds, the wait before retrying. The body is the same whatever the request named. The limited calls are sign-in and other writes under `/api/auth`, sign-up, invitation redemption, venue creation, and every request under `/v1/public/` (rules `public_read`, `public_booking`, `public_venue` and `self_service`). See [ADR-0007](../adr/0007-rate-limiting.md) and [ADR-0017](../adr/0017-booking-widget-and-self-service-link.md). Retryable.
 
 ## Availability and allocation
 
-- `slot_taken`: the requested time is no longer available and no other eligible table remains. Not retryable.
+- `slot_taken`: the requested time is no longer available and no other eligible table remains. A public create gets it whenever no free table combination fits the party at that time, because the public channel never uses the overbooking ceiling. Not retryable.
 - `party_size_too_large`: the party exceeds the venue's capacity, or the maximum of the service that covers the time. Not retryable.
 - `party_size_too_small`: the party is below the minimum of the service that covers the time. Not retryable.
 - `no_suitable_table`: no table combination fits the party, and the venue's overbooking ceiling leaves no room for it. A modify that would leave a booking without tables beyond that ceiling fails with it too. Not retryable.

@@ -13,7 +13,23 @@ info:
     429 with the code `rate_limited` and a `Retry-After` header. The limited
     calls are the sign-in and sign-up routes under /api/auth, invitation
     redemption and venue creation (`POST /venues`). They are listed in
-    docs/adr/0007-rate-limiting.md.
+    docs/adr/0007-rate-limiting.md. Every request under `/public/` is also
+    limited, `GET` included, by the four rules of
+    docs/adr/0017-booking-widget-and-self-service-link.md: `public_read`,
+    `public_booking`, `public_venue` and `self_service`.
+
+    Paths are relative to `/v1`, except `/w/{bookingKey}`, which is served
+    at the root of the widget origin.
+
+    The routes under `/public/` are the guest-facing booking channel. They
+    need no credentials, read no cookie or session, and are not exposed
+    through MCP. A guest names a venue with its public booking key, which
+    is a lookup handle and not a secret, and names one booking with a
+    self-service token in the `X-Self-Service-Token` header. No public
+    response holds another guest's data, a table id, a zone, a reservation
+    id, a guest id, attribution, a key other than the booking key it was
+    called with, or an unmasked contact. Every answer under `/public/`, an
+    error included, sends `Cache-Control: no-store` and no CORS headers.
 
 security:
   - ApiKeyAuth: []
@@ -1346,6 +1362,555 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/online-booking:
+    get:
+      operationId: venue.getOnlineBooking
+      summary: Read the venue's online booking settings and public booking key
+      description: |
+        Any role of the venue reads them, with a key or a staff session.
+        `bookingKey` is null until online booking is first turned on. The
+        values are the ones the venue set. The public channel applies the
+        stricter of each online value and the venue's own rule, as
+        `OnlineBooking` describes. Not exposed through MCP. See
+        docs/adr/0017-booking-widget-and-self-service-link.md, section 5.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The online booking settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OnlineBooking" }
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: venue.setOnlineBooking
+      summary: Update the venue's online booking settings
+      description: |
+        Admin only. Any other role fails with `forbidden` and changes
+        nothing. Partial update: a field that is absent keeps its value, and
+        `null` clears a nullable field to its default. `bookingKey` is read
+        only and is ignored in the body. Every invalid field fails with
+        `invalid_request` and changes nothing, including a `confirmationMode`
+        other than `auto` (`approval` is reserved until stage 14 of
+        ADR-0017).
+
+        Setting `enabled` to true needs a venue name and at least one
+        service bookable online, a service named in `services` (any service
+        when null) that opens on at least one of the online `weekdays`. Without
+        them it fails with `online_booking_incomplete`. The first enable
+        creates `bookingKey`. Turning online booking off keeps the key, and
+        turning it on again uses the same key. While it is off every route
+        under `/public/{bookingKey}` and the widget page answer as for an
+        unknown key. Self-service links do not depend on the key or on the
+        flag, so a guest keeps reading, changing and cancelling a booking
+        already made.
+
+        A save whose `theme` text color has a contrast below 4.5:1 against
+        its background color succeeds and returns a `low_contrast` warning.
+        A change never alters a booking that already exists. Not exposed
+        through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OnlineBookingUpdate" }
+      responses:
+        "200":
+          description: The settings as stored, with any warnings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OnlineBookingSaved" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/online-booking/rotate-key:
+    post:
+      operationId: venue.rotateBookingKey
+      summary: Replace the venue's public booking key
+      description: |
+        Admin only. Any other role fails with `forbidden`. Mints a new
+        `bookingKey` and retires the old one at once, with no grace period,
+        so every embed of the old key answers as for an unknown key. It
+        works whether online booking is on or off, and gives a venue that
+        never had a key its first one, without turning online booking on.
+        Self-service links keep working.
+
+        The route takes no `Idempotency-Key`, as the config and catalog
+        routes take none. A repeated call rotates again, and the end state is
+        the same: one current key that no earlier embed holds. Read the
+        current key with `GET /online-booking`. Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The settings with the new key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OnlineBooking" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/reservations/{reservationId}/self-service-link:
+    post:
+      operationId: reservation.reissueSelfServiceLink
+      summary: Issue a new self-service link for a booking
+      description: |
+        Needs the `write` or `admin` role. A `read` role fails with
+        `forbidden`. It revokes the reservation's current self-service link,
+        mints a new one in the same transaction, and returns the new token
+        once, so staff can read the link to a guest on the phone. It is the
+        only staff route that returns a token. When `notificationsEnabled` is
+        on and the contact is an email, it sends one `self_service_link`
+        email for the new link.
+
+        Only a `booked` reservation gets a link. Any other status fails with
+        `invalid_transition`, so a cancelled booking never gets a new link. A
+        reservation of another venue fails with `reservation_not_found`. The
+        reservation's version does not change and no event is emitted,
+        because the link is not reservation data.
+
+        The engine stores only a hash of the token, so it cannot return a
+        token twice. Every call, a repeat of the same `Idempotency-Key`
+        included, revokes the current link and returns a new token. A key
+        already used for another kind of write fails with `invalid_request`.
+        Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/reservationId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      responses:
+        "200":
+          description: The new token
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SelfServiceLinkIssued" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /public/{bookingKey}:
+    get:
+      operationId: public.getConfig
+      summary: Read the widget configuration of a venue
+      description: |
+        Public. Needs no credentials and reads no cookie or session. It
+        returns the venue's display name, locale, theme, the public phone
+        when the public profile holds one, the online party limits, the
+        weekdays with an online service, the effective lead time and
+        horizon, whether the consent question is shown, the confirmation
+        mode, and a fresh form challenge. It never holds the venue id, an
+        address, `noticeAddress`, an email, a key other than the booking key
+        in the path, or any booking.
+
+        An unknown key, a rotated key, a key that does not match the key
+        format, and a venue with online booking off all give the same `404`
+        with `venue_not_found`, the same body and the same headers. Every
+        answer sends `Cache-Control: no-store`, because the challenge is new
+        each time. Limited by `public_read`. Not exposed through MCP.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/bookingKey"
+      responses:
+        "200":
+          description: The widget configuration
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicConfig" }
+        "404":
+          $ref: "#/components/responses/PublicVenueNotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /public/{bookingKey}/availability:
+    get:
+      operationId: public.availability
+      summary: List the times a guest can book online for a date and party size
+      description: |
+        Public, with no credentials. Returns only the times a public create
+        would accept now, sorted, with no service names, table ids, zones,
+        counts of free covers or seats, or anything about other bookings. It
+        runs the same reason functions as the staff availability and the
+        create, with the online limits on top: the online services and
+        weekdays, the online party limits, and the stricter of the online
+        and the venue's lead time and horizon. A time that only the
+        overbooking ceiling could fill is never listed.
+
+        A date with no bookable time, a blocked date, a date past the
+        horizon, and a party outside the online limits give an empty list,
+        not an error. A malformed date or a `partySize` that is not an
+        integer of at least 1 fails with `invalid_request`. It takes no
+        contact, so it cannot tell whether a contact holds bookings, and it
+        does not apply the per-contact caps or the guest blocklist. An
+        unknown or disabled key gives `venue_not_found` as
+        `public.getConfig` does. Limited by `public_read`. Not exposed
+        through MCP.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/bookingKey"
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: partySize
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: The bookable times
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicAvailability" }
+        "404":
+          $ref: "#/components/responses/PublicVenueNotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /public/{bookingKey}/reservations:
+    post:
+      operationId: public.createReservation
+      summary: Book online as a guest
+      description: |
+        Public, with no credentials. It calls the same create as the staff
+        route, in one transaction, with three differences. The channel turns
+        the overbooking ceiling off, the online limits apply, and the engine
+        sets `bookedVia: "widget"`, `ownerPrincipal: "widget"` and
+        `basis: "service"`. Attribution fields in the body are ignored. The
+        booking is `booked` at once. It always holds a table, and when no
+        free table combination fits the party at that time the create fails
+        with `slot_taken`, whatever the venue's ceiling. A body that names
+        `tables`, `zone`, `rating` or `reconfirmation` fails with
+        `invalid_request`.
+
+        The guest's contact must normalize to an email or a phone, otherwise
+        `invalid_request`. The contact is held to two caps. The venue's
+        `maxActivePerGuestPerDay` fails with `guest_booking_limit`. The
+        online `maxOpenBookingsPerContact`, which counts the contact's future
+        `booked` bookings made online, fails with `online_booking_limit`.
+        When both are reached, `guest_booking_limit` comes first. The guest blocklist of ADR-0018 applies as it does to any create. The
+        other failures are the staff create's: `outside_hours`,
+        `lead_time_violation`, `beyond_booking_horizon`, `date_blocked`,
+        `party_size_too_small` and `party_size_too_large`, with the online
+        services, weekdays, party limits, lead time and horizon applied on
+        top of the venue's.
+
+        Bot protection. `honeypot` must be absent or empty. `challenge` must
+        be one the config route issued for this booking key, at least 3
+        seconds and at most 30 minutes old, with an intact signature and a
+        nonce not used in the last 30 minutes, and `solution` must solve it.
+        When the operator sets `PUBLIC_CAPTCHA`, `captchaToken` must verify.
+        Every one of these failures is `invalid_request`, the same answer as
+        any malformed body.
+
+        Idempotency. The `Idempotency-Key` must be a UUID, otherwise
+        `invalid_request`. It is stored apart from staff keys, so it can
+        replay only a public create of the same venue. A repeat of the key
+        returns the booking it created, with no second booking, event or
+        confirmation, and skips the challenge check. Because the engine keeps
+        only a hash of the token, a repeat revokes the booking's link and
+        returns a new token, and sends one `self_service_link` email when
+        email is on. A repeat for a booking that is no longer `booked`
+        returns it with `selfServiceToken: null` and mints nothing.
+
+        The answer is the guest view and the self-service token, which is
+        shown only here. It emits one `created` event. With
+        `notificationsEnabled` on it sends the `confirmation`, carrying the
+        self-service link when the contact is an email, and a `notice` to
+        the venue. An unknown or disabled key gives `venue_not_found`.
+        Limited by `public_booking` and `public_venue`. Not exposed through
+        MCP.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/bookingKey"
+        - $ref: "#/components/parameters/publicIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PublicReservationCreate" }
+      responses:
+        "200":
+          description: The booking as the guest sees it, and its self-service token
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicReservationCreated" }
+        "404":
+          $ref: "#/components/responses/PublicVenueNotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /public/{bookingKey}/self-service/resend:
+    post:
+      operationId: public.resendSelfServiceLink
+      summary: Ask for new self-service links by email
+      description: |
+        Public, with no credentials. Stage 12 of ADR-0017, gated on email
+        being on. It always answers `202` with the same body and headers,
+        whether or not a booking matches, and does its work after the
+        answer. When `notificationsEnabled` is on and the normalized email
+        matches future `booked` bookings of the venue, it rotates each one's
+        link and sends the new links in `self_service_link` emails to the
+        address stored on the booking. Otherwise it does nothing. A body
+        without a string `email` fails with `invalid_request`. An unknown or
+        disabled key gives `venue_not_found`. Limited by `public_booking`
+        and `public_venue`, and per contact inside the work it does. Not
+        exposed through MCP.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/bookingKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, maxLength: 254 }
+      responses:
+        "202":
+          description: Accepted, whether or not a booking matched
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted]
+                properties:
+                  accepted: { type: boolean, enum: [true] }
+        "404":
+          $ref: "#/components/responses/PublicVenueNotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /public/self-service:
+    get:
+      operationId: public.readBooking
+      summary: Read the booking a self-service token names
+      description: |
+        Public. The token in `X-Self-Service-Token` is the only credential,
+        and it names one reservation of one venue. No route takes a venue id
+        or a reservation id. Returns the guest view. Reading works until the
+        link expires, 48 hours after the booking ends, or is revoked, also
+        after a staff cancel and after the start time.
+
+        A missing or malformed token, an unknown link id, a wrong secret, an
+        expired or revoked link, and a link of an erased booking all fail
+        with `404` and `self_service_link_invalid`, the same body and
+        headers. Every answer, a failure included, sends
+        `Cache-Control: no-store`. Limited by `public_read` and
+        `self_service`. Not exposed through MCP.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/selfServiceToken"
+      responses:
+        "200":
+          description: The booking as the guest sees it
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicReservation" }
+        "404":
+          $ref: "#/components/responses/SelfServiceLinkInvalid"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /public/self-service/modify:
+    post:
+      operationId: public.modifyBooking
+      summary: Change the party size, note or consent of the booking a token names
+      description: |
+        Public, with the token in `X-Self-Service-Token`. It calls the same
+        modify as the staff route, so a change bumps the version by one and
+        emits one `modified` event, and the same value changes nothing. Only
+        `partySize`, `commentary` and `guest.consent` can change. A body that
+        names `date`, `time`, `tables`, `zone`, `rating` or `reconfirmation`
+        fails with `invalid_request`. To move a booking a guest cancels and
+        books again.
+
+        The checks run in this order. A malformed body or an
+        `Idempotency-Key` that is not a UUID fails with `invalid_request`. A
+        token that does not work fails with `self_service_link_invalid`. A
+        repeat of the key returns the result of the first call. A booking
+        that is not `booked`, or that starts within `selfServiceCutoffMinutes`
+        of now, fails with `self_service_closed`. A `version` other than the
+        stored one fails with `reservation_changed`. Then the rules: a party
+        size outside the online party limits or the service limits fails
+        with `party_size_too_small` or `party_size_too_large`, and a party
+        that no free table combination fits fails with `no_suitable_table`,
+        because the public channel never uses the overbooking ceiling.
+
+        A modify does not rotate the link and does not change attribution.
+        With `notificationsEnabled` on, a change of the party size sends one
+        `confirmation` for the new version, with no link. Limited by
+        `self_service`. Not exposed through MCP.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/selfServiceToken"
+        - $ref: "#/components/parameters/publicIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PublicReservationModify" }
+      responses:
+        "200":
+          description: The booking after the change
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicReservation" }
+        "404":
+          $ref: "#/components/responses/SelfServiceLinkInvalid"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /public/self-service/cancel:
+    post:
+      operationId: public.cancelBooking
+      summary: Cancel the booking a token names
+      description: |
+        Public, with the token in `X-Self-Service-Token`. It calls the same
+        cancel as the staff route, frees the tables, bumps the version and
+        emits one `cancelled` event. In the same transaction it revokes the
+        link and mints no new one. The answer is the cancelled guest view,
+        the last answer the link gives, with no token. With
+        `notificationsEnabled` on it sends a `cancellation`, with no link,
+        to the guest and a `notice` to the venue.
+
+        The checks run in the order of `public.modifyBooking`, with no
+        version check. A booking that is not `booked`, a staff cancel
+        included, or that starts within `selfServiceCutoffMinutes`, fails
+        with `self_service_closed`.
+
+        Replay. A repeat of the same cancel, with the same `Idempotency-Key`
+        and the same token, returns the stored result, the same cancelled
+        guest view, although the cancel revoked that token. It changes
+        nothing, emits no event and sends no email. It works until the link
+        would have expired. Any other call with the revoked token, a read, a
+        modify, or a cancel with another key, fails with
+        `self_service_link_invalid`. Limited by `self_service`. Not exposed
+        through MCP.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/selfServiceToken"
+        - $ref: "#/components/parameters/publicIdempotencyKey"
+      responses:
+        "200":
+          description: The cancelled booking as the guest sees it
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicReservation" }
+        "404":
+          $ref: "#/components/responses/SelfServiceLinkInvalid"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /w/{bookingKey}:
+    servers:
+      - url: /
+        description: The widget origin (`WIDGET_ADDRESS`), not under `/v1`.
+    get:
+      operationId: widget.page
+      summary: The widget page, an HTML shell to embed in an iframe or open top-level
+      description: |
+        Not JSON. The API serves a small HTML shell that loads the widget's
+        hashed assets from `/assets/`. It needs no credentials, sets no
+        cookie, and is not rate limited. In production it is served only from
+        the widget origin, never from the staff app's origin. In local
+        development the staff app's dev server proxies `/w/*` to the API.
+
+        Framing. The answer sends no `X-Frame-Options`. Its
+        `Content-Security-Policy` has `frame-ancestors 'self'` followed by
+        the venue's `allowedOrigins`, or `frame-ancestors 'none'` when the
+        list is empty, so the page then works only top-level. The rest of the
+        policy is `default-src 'self'; script-src 'self'; connect-src 'self';
+        img-src 'self' https: data:; style-src 'self' 'unsafe-inline';
+        base-uri 'none'; form-action 'self'; object-src 'none'`, plus the
+        CAPTCHA vendor's hosts when the operator sets `PUBLIC_CAPTCHA`. It
+        also sends `X-Robots-Tag: noindex`, `Referrer-Policy: no-referrer`
+        and `X-Content-Type-Options: nosniff`, and the HTML holds
+        `<meta name="robots" content="noindex">`. The page never emits
+        JSON-LD.
+
+        An unknown key, a rotated key and a venue with online booking off get
+        the same `404` HTML page and headers, with `frame-ancestors 'none'`.
+        Not exposed through MCP.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/bookingKey"
+        - name: lang
+          in: query
+          required: false
+          description: A supported widget locale. It wins over the venue's `locale`. Any other value is ignored.
+          schema: { type: string, example: en }
+      responses:
+        "200":
+          description: The widget HTML shell
+          headers:
+            Content-Security-Policy:
+              description: With `frame-ancestors` built from the venue's `allowedOrigins`.
+              schema: { type: string }
+            X-Robots-Tag:
+              schema: { type: string, enum: [noindex] }
+            Referrer-Policy:
+              schema: { type: string, enum: [no-referrer] }
+            X-Content-Type-Options:
+              schema: { type: string, enum: [nosniff] }
+          content:
+            text/html:
+              schema: { type: string }
+        "404":
+          description: Unknown, rotated or disabled key. The same page and headers, with `frame-ancestors 'none'`.
+          headers:
+            Content-Security-Policy:
+              schema: { type: string }
+          content:
+            text/html:
+              schema: { type: string }
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -1384,8 +1949,61 @@ components:
       required: true
       schema: { type: string }
       description: A client-generated key. Repeating it returns the original result.
+    bookingKey:
+      name: bookingKey
+      in: path
+      required: true
+      description: |
+        The venue's public booking key, `pk_` and 16 random bytes in
+        base64url without padding. Public by design, it names the venue and
+        authenticates nothing. A value that does not match the format is
+        answered as an unknown key.
+      schema: { type: string, pattern: "^pk_[A-Za-z0-9_-]{22}$", example: pk_7Hc2kQ9xLmN3pR5tV8wY1z }
+    publicIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        A random UUID the client generates once per submit and repeats on a
+        retry. Any other value fails with `invalid_request`. The engine
+        stores it under a `public:` prefix, apart from the keys of staff and
+        integrations, so a public request can replay only a public request
+        of the same venue.
+      schema: { type: string, format: uuid }
+    selfServiceToken:
+      name: X-Self-Service-Token
+      in: header
+      required: true
+      description: |
+        The self-service token, `<linkId>.<secret>`: a random UUID, a dot,
+        and 32 random bytes in base64url without padding. The guest's link
+        carries it in the URL fragment, `/r#<token>`, which the browser
+        never sends to a server, and the page sends it in this header. A
+        missing or malformed value fails with `self_service_link_invalid`.
+      schema:
+        type: string
+        pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[A-Za-z0-9_-]{43}$"
 
   responses:
+    PublicVenueNotFound:
+      description: |
+        Unknown, rotated or malformed booking key, or online booking is off.
+        The same body and headers for every cause. The code is
+        `venue_not_found`.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    SelfServiceLinkInvalid:
+      description: |
+        The token does not work, for any cause. The same body and headers for
+        every cause, with `Cache-Control: no-store`. The code is
+        `self_service_link_invalid`.
+      headers:
+        Cache-Control:
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
     Error:
       description: An error
       content:
@@ -1832,8 +2450,10 @@ components:
           description: Set by the engine from the authenticated channel.
         ownerPrincipal:
           type: string
+          description: Set by the engine. `widget` for a booking made through the public channel.
         bookedVia:
           type: string
+          description: Set by the engine. `widget` for a booking made through the public channel.
         source:
           type: string
         createdAt:
@@ -2235,6 +2855,489 @@ components:
         erasedWaitlistEntries:
           type: integer
 
+    ConfirmationMode:
+      type: string
+      example: auto
+      x-extensible-enum: [auto, approval]
+      description: |
+        How an online booking is confirmed. An open set of values, not a
+        closed enum. `auto` means every online booking is `booked` at once
+        when there is room. It is the only value a write accepts now.
+        `approval` is reserved for stage 14 of ADR-0017, and a write of it,
+        or of any other value, fails with `invalid_request` until then.
+        Clients must accept any value on read and must treat every value
+        other than `auto` as not automatic confirmation.
+
+    WidgetLocale:
+      type: string
+      example: es
+      x-extensible-enum: [es, en]
+      description: |
+        A widget locale. `es` and `en` in the first release. More may be
+        added, so clients must accept any value on read. A write of a locale
+        the engine does not support fails with `invalid_request`.
+
+    Theme:
+      type: object
+      additionalProperties: false
+      description: |
+        Validated data only, with a closed set of keys. No key takes CSS,
+        HTML, script, a template or a font URL. A key that is absent uses the
+        built-in default. Colors read back in lower case. An unknown key or
+        an invalid value fails with `invalid_request`.
+      properties:
+        colors:
+          type: object
+          additionalProperties: false
+          properties:
+            primary: { $ref: "#/components/schemas/HexColor" }
+            onPrimary: { $ref: "#/components/schemas/HexColor" }
+            background: { $ref: "#/components/schemas/HexColor" }
+            surface: { $ref: "#/components/schemas/HexColor" }
+            text: { $ref: "#/components/schemas/HexColor" }
+            muted: { $ref: "#/components/schemas/HexColor" }
+            border: { $ref: "#/components/schemas/HexColor" }
+        radius:
+          type: integer
+          minimum: 0
+          maximum: 24
+          description: Corner radius in pixels.
+        font:
+          type: string
+          enum: [system, serif, rounded]
+          description: One of the font stacks shipped with the widget.
+        logoUrl:
+          type: string
+          format: uri
+          maxLength: 2048
+          nullable: true
+          description: https only, with no credentials. The widget shows it as an image.
+
+    HexColor:
+      type: string
+      pattern: "^#[0-9A-Fa-f]{6}$"
+      example: "#1f6f5c"
+
+    OnlineBooking:
+      type: object
+      description: |
+        A venue's online booking settings. The public channel applies each
+        online limit on top of the venue's own rules and never relaxes them:
+        the effective lead time is the larger of `leadTimeMinutes` and the
+        venue's, the effective horizon is the smaller of `maxAdvanceDays`
+        and the venue's, the effective party limits are the narrower of the
+        online and the service limits, and a time is bookable online only in
+        a service named in `services` (any when null) on a weekday that is in
+        both `weekdays` (all when null) and the service's own `days`.
+      required:
+        - enabled
+        - bookingKey
+        - allowedOrigins
+        - services
+        - weekdays
+        - minPartySize
+        - maxPartySize
+        - leadTimeMinutes
+        - maxAdvanceDays
+        - selfServiceCutoffMinutes
+        - maxOpenBookingsPerContact
+        - confirmationMode
+        - askConsent
+        - locale
+        - theme
+      properties:
+        enabled:
+          type: boolean
+          default: false
+        bookingKey:
+          type: string
+          nullable: true
+          readOnly: true
+          pattern: "^pk_[A-Za-z0-9_-]{22}$"
+          description: |
+            Created on the first enable and replaced by `rotate-key`. Null
+            before that. Public, not a secret.
+        allowedOrigins:
+          type: array
+          maxItems: 10
+          default: []
+          description: |
+            The sites allowed to frame the widget page. Each entry is
+            `https://host` or `https://host:port`, with no path, query,
+            fragment, wildcard or credentials, and the host reads back in
+            lower case. Duplicates are merged. An empty list allows only
+            top-level use. These origins are for framing only. The JSON
+            routes send no CORS headers.
+          items:
+            type: string
+            pattern: "^https://[^/?#@*\\s:]+(:[0-9]{1,5})?$"
+            example: https://www.example.com
+        services:
+          type: array
+          nullable: true
+          default: null
+          minItems: 1
+          items: { type: string }
+          description: |
+            The names of the services bookable online, or null for all. A
+            name that is not a service of the venue fails with
+            `invalid_request`. A service deleted later stops being bookable.
+        weekdays:
+          type: array
+          nullable: true
+          default: null
+          minItems: 1
+          maxItems: 7
+          uniqueItems: true
+          items: { type: integer, minimum: 1, maximum: 7 }
+          description: |
+            ISO weekdays bookable online, 1 (Monday) to 7 (Sunday), or null
+            for all. A day is bookable only when the service also opens on it.
+        minPartySize:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 1
+        maxPartySize:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 8
+          description: At least `minPartySize`, otherwise `invalid_request`.
+        leadTimeMinutes:
+          type: integer
+          minimum: 0
+          maximum: 10080
+          default: 0
+        maxAdvanceDays:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 1000
+          default: null
+        selfServiceCutoffMinutes:
+          type: integer
+          minimum: 0
+          maximum: 10080
+          default: 120
+          description: |
+            A guest modify or cancel through the link fails with
+            `self_service_closed` from this many minutes before the start.
+        maxOpenBookingsPerContact:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 20
+          default: 2
+          description: |
+            The most future `booked` bookings made online that one contact,
+            by its normalized key, may hold in the venue. A public create over
+            it fails with `online_booking_limit`. Bookings staff made are not
+            counted. Null sets no limit.
+        confirmationMode:
+          $ref: "#/components/schemas/ConfirmationMode"
+        askConsent:
+          type: boolean
+          default: false
+          description: |
+            Whether the widget shows the contact-consent question. Off, the
+            public channel records no consent and the booking reads
+            `unknown`. The consent text waits for legal review (REQ-N4).
+        locale:
+          $ref: "#/components/schemas/WidgetLocale"
+        theme:
+          $ref: "#/components/schemas/Theme"
+
+    OnlineBookingUpdate:
+      type: object
+      minProperties: 1
+      description: |
+        A partial update of `OnlineBooking`. Absent fields keep their value,
+        `null` resets a nullable field, and `theme: null` resets the theme
+        to the built-in defaults. A `theme` object replaces the stored one.
+        `bookingKey` is ignored.
+      properties:
+        enabled: { type: boolean }
+        allowedOrigins: { type: array, maxItems: 10, items: { type: string } }
+        services: { type: array, nullable: true, minItems: 1, items: { type: string } }
+        weekdays:
+          type: array
+          nullable: true
+          minItems: 1
+          maxItems: 7
+          uniqueItems: true
+          items: { type: integer, minimum: 1, maximum: 7 }
+        minPartySize: { type: integer, minimum: 1, maximum: 100 }
+        maxPartySize: { type: integer, minimum: 1, maximum: 100 }
+        leadTimeMinutes: { type: integer, minimum: 0, maximum: 10080 }
+        maxAdvanceDays: { type: integer, nullable: true, minimum: 0, maximum: 1000 }
+        selfServiceCutoffMinutes: { type: integer, minimum: 0, maximum: 10080 }
+        maxOpenBookingsPerContact: { type: integer, nullable: true, minimum: 1, maximum: 20 }
+        confirmationMode: { $ref: "#/components/schemas/ConfirmationMode" }
+        askConsent: { type: boolean }
+        locale: { $ref: "#/components/schemas/WidgetLocale" }
+        theme:
+          allOf:
+            - $ref: "#/components/schemas/Theme"
+          nullable: true
+
+    OnlineBookingSaved:
+      allOf:
+        - $ref: "#/components/schemas/OnlineBooking"
+        - type: object
+          required: [warnings]
+          properties:
+            warnings:
+              type: array
+              description: Advice that did not stop the save. Empty when there is none.
+              items:
+                type: object
+                required: [code, message]
+                properties:
+                  code:
+                    type: string
+                    enum: [low_contrast]
+                    description: The theme's text color has a contrast below 4.5:1 (WCAG AA) against its background color.
+                  message: { type: string }
+                  ratio: { type: number, example: 3.2 }
+
+    PublicVenue:
+      type: object
+      required: [name, locale, theme, phone]
+      description: What the widget shows about the venue. No id, address, email or key.
+      properties:
+        name:
+          type: string
+          description: The venue's display name.
+        locale: { $ref: "#/components/schemas/WidgetLocale" }
+        theme: { $ref: "#/components/schemas/Theme" }
+        phone:
+          type: string
+          nullable: true
+          description: The phone of the venue's public profile, or null when it holds none.
+
+    FormChallenge:
+      type: object
+      required: [nonce, issuedAt, difficulty, signature]
+      description: |
+        A proof-of-work challenge for one public create. The client sends it
+        back unchanged. The signature is an HMAC under a server key over the
+        nonce, the issue time, the difficulty and the booking key, so a
+        challenge works only for the key it was issued for. The solution is
+        a decimal counter such that SHA-256 of the UTF-8 string
+        `<nonce>:<solution>` starts with `difficulty` zero bits.
+      properties:
+        nonce:
+          type: string
+          description: 16 random bytes in base64url.
+        issuedAt:
+          type: string
+          format: date-time
+        difficulty:
+          type: integer
+          minimum: 0
+          maximum: 32
+          description: The number of leading zero bits the solution must give. A measured instance setting (ADR-0017, Q7).
+        signature:
+          type: string
+
+    PublicConfig:
+      type: object
+      required:
+        - venue
+        - minPartySize
+        - maxPartySize
+        - weekdays
+        - leadTimeMinutes
+        - maxAdvanceDays
+        - askConsent
+        - confirmationMode
+        - challenge
+        - captcha
+      properties:
+        venue: { $ref: "#/components/schemas/PublicVenue" }
+        minPartySize:
+          type: integer
+          description: The online minimum. A service may narrow it.
+        maxPartySize:
+          type: integer
+          description: The online maximum. A service may narrow it. A larger party is sent to the venue's phone.
+        weekdays:
+          type: array
+          items: { type: integer, minimum: 1, maximum: 7 }
+          description: The ISO weekdays on which at least one online service opens, ascending.
+        leadTimeMinutes:
+          type: integer
+          description: The effective lead time, the larger of the online and the venue's.
+        maxAdvanceDays:
+          type: integer
+          nullable: true
+          description: The effective horizon, the smaller of the online and the venue's. Null for none.
+        askConsent: { type: boolean }
+        confirmationMode: { $ref: "#/components/schemas/ConfirmationMode" }
+        challenge: { $ref: "#/components/schemas/FormChallenge" }
+        captcha:
+          type: object
+          nullable: true
+          description: Null unless the operator sets `PUBLIC_CAPTCHA`.
+          required: [provider, siteKey]
+          properties:
+            provider: { type: string, enum: [turnstile, hcaptcha] }
+            siteKey: { type: string }
+
+    PublicAvailability:
+      type: object
+      required: [date, partySize, times]
+      properties:
+        date: { type: string, format: date }
+        partySize: { type: integer }
+        times:
+          type: array
+          description: The bookable local times, ascending, each listed once.
+          items: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "21:30" }
+
+    PublicConsent:
+      type: string
+      enum: [unknown, granted]
+      description: |
+        The consent the public channel accepts. A ticked box sends `granted`
+        and an unticked box sends `unknown`, because an untouched box is not
+        a refusal. `denied` fails with `invalid_request`. It is ignored, and
+        no consent is recorded, when the venue's `askConsent` is off.
+
+    PublicReservationCreate:
+      type: object
+      required: [date, time, partySize, guest, challenge, solution]
+      description: |
+        `tables`, `zone`, `rating` and `reconfirmation` fail with
+        `invalid_request`. `basis`, `ownerPrincipal`, `bookedVia`, `source`
+        and `service` are ignored. There is no allergy, diet or health field.
+      properties:
+        date: { type: string, format: date }
+        time: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "21:30" }
+        partySize: { type: integer, minimum: 1 }
+        guest:
+          type: object
+          required: [name, contact]
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 100
+              description: Trimmed, 1 to 100 characters.
+            contact:
+              type: string
+              maxLength: 254
+              description: One email or one phone. It must normalize as REQ-G2 says, otherwise `invalid_request`.
+            consent: { $ref: "#/components/schemas/PublicConsent" }
+        commentary:
+          $ref: "#/components/schemas/Commentary"
+        honeypot:
+          type: string
+          maxLength: 0
+          description: The hidden form field. Any non-empty value fails with `invalid_request`.
+        challenge: { $ref: "#/components/schemas/FormChallenge" }
+        solution:
+          type: string
+          pattern: "^[0-9]{1,16}$"
+          description: The proof-of-work counter for `challenge`, in decimal.
+        captchaToken:
+          type: string
+          description: Required, and verified, only when the operator sets `PUBLIC_CAPTCHA`.
+
+    PublicReservationModify:
+      type: object
+      required: [version]
+      minProperties: 2
+      description: |
+        `date`, `time`, `tables`, `zone`, `rating` and `reconfirmation` fail
+        with `invalid_request`.
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          description: The version of the guest view the guest saw. Another value fails with `reservation_changed`.
+        partySize: { type: integer, minimum: 1 }
+        commentary: { $ref: "#/components/schemas/Commentary" }
+        guest:
+          type: object
+          properties:
+            consent: { $ref: "#/components/schemas/PublicConsent" }
+
+    PublicReservation:
+      type: object
+      description: |
+        The guest view of one booking. It holds no reservation id, guest id,
+        table, zone, service, attribution, version history, or other
+        guest's data, and the contact is masked.
+      required:
+        - venue
+        - date
+        - time
+        - partySize
+        - status
+        - version
+        - guest
+        - commentary
+        - consent
+        - changeableUntil
+        - linkExpiresAt
+      properties:
+        venue: { $ref: "#/components/schemas/PublicVenue" }
+        date: { type: string, format: date }
+        time: { type: string, example: "21:30" }
+        partySize: { type: integer }
+        status: { $ref: "#/components/schemas/ReservationStatus" }
+        version:
+          type: integer
+          minimum: 1
+          description: The current version, sent back with a modify.
+        guest:
+          type: object
+          required: [name, contact]
+          properties:
+            name: { type: string }
+            contact:
+              type: string
+              description: |
+                Masked. An email shows the first character of its local part,
+                `***`, `@` and the domain (`a***@example.com`). A phone shows
+                `***` and its last two digits (`***56`).
+        commentary: { $ref: "#/components/schemas/Commentary" }
+        consent: { $ref: "#/components/schemas/Consent" }
+        changeableUntil:
+          type: string
+          format: date-time
+          description: The start minus `selfServiceCutoffMinutes`. From then on a modify or cancel fails with `self_service_closed`.
+        linkExpiresAt:
+          type: string
+          format: date-time
+          description: 48 hours after the booking ends. From then on the link fails with `self_service_link_invalid`.
+
+    PublicReservationCreated:
+      type: object
+      required: [reservation, selfServiceToken]
+      properties:
+        reservation: { $ref: "#/components/schemas/PublicReservation" }
+        selfServiceToken:
+          type: string
+          nullable: true
+          description: |
+            The token for the guest's link, shown once and never stored in
+            clear. Null only on a repeat for a booking that is no longer
+            `booked`.
+
+    SelfServiceLinkIssued:
+      type: object
+      required: [selfServiceToken, linkExpiresAt]
+      properties:
+        selfServiceToken:
+          type: string
+          description: The new token, shown once. The previous link stops working.
+        linkExpiresAt:
+          type: string
+          format: date-time
+
     Error:
       type: object
       required: [code, message, retryable]
@@ -2294,3 +3397,8 @@ components:
         - venue_creation_closed
         - member_not_found
         - last_admin
+        - online_booking_incomplete
+        - online_booking_limit
+        - self_service_link_invalid
+        - self_service_closed
+        - reservation_changed

@@ -394,3 +394,10 @@ David Cabeza answered Q1 to Q4 on 2026-11-17. The others have a gate in the stag
 - **Q11. Legal basis.** Legal review. Is `basis: "service"` right for a booking a guest makes directly, and what text must the widget show before submit (venue identity, privacy notice link)?
 - **Q12. Actor in events.** Should events record who made a change (staff, key, guest link), as a separate contract change?
 - **Q13. Default online party maximum.** This record proposes 8. Confirm or change.
+
+## Amendment 2026-11-17: cancel replay and an open confirmation mode
+
+David Cabeza made two decisions while the stage 1 contract was written. The status above does not change. The contract encodes both (cases C50 and C39).
+
+- **A replayed guest cancel returns its result.** A guest cancel still revokes the link and issues no new one. A repeat of that same cancel, with the same `Idempotency-Key` and the same, now revoked, token, returns the stored cancel result, the cancelled guest view, and changes nothing. It does not return `self_service_link_invalid`. Any other call with the revoked token, a read, a modify, or a cancel with another key, gets the generic `self_service_link_invalid`. This keeps the idempotency rule for a guest whose cancel response was lost.
+- **`confirmationMode` is an open set of values.** Only `auto` is accepted on write. `approval`, and any other value, fails with `invalid_request` until stage 14. Clients must treat any value other than `auto` as not automatic confirmation. `openapi.yaml` marks the field as an extensible enum, not a closed one, so adding `approval` later does not break a client that validates responses.
