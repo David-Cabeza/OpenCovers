@@ -15,6 +15,7 @@ import * as schema from "../db/schema";
 import type { CountryCode } from "libphonenumber-js";
 import type { DateRange } from "./booking-policy";
 import { consentColumns } from "./consent";
+import { countBlocklistEntries, guestContactKeys } from "./blocklist";
 import { normalizeContact, venueCountry } from "./contact";
 import { forgetMergeState, movedAtMerge } from "./guests";
 import { ratingColumns } from "./rating";
@@ -51,6 +52,7 @@ export interface ErasureResult {
   erasedReservations: number;
   erasedGuests: number;
   erasedWaitlistEntries: number;
+  blocklistEntriesKept: number;
 }
 
 export async function createVenue(
@@ -200,7 +202,7 @@ export async function erase(
 ): Promise<ErasureResult> {
   const venue = (await db.select().from(venues).where(eq(venues.id, venueId)).limit(1))[0];
   if (!venue || (!guestId && !principal)) {
-    return { erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0 };
+    return { erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 };
   }
   return db.transaction(async (tx) => {
     const byId = guestId
@@ -277,6 +279,10 @@ export async function erase(
       erasedReservations: matches.length,
       erasedGuests: targetIds.length,
       erasedWaitlistEntries,
+      blocklistEntriesKept: await countBlocklistEntries(tx, venueId, [
+        ...targets.flatMap(guestContactKeys),
+        ...(contactKey ? [contactKey] : []),
+      ]),
     };
   });
 }

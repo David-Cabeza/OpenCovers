@@ -197,7 +197,7 @@ describe("booking note", () => {
     ).json();
 
     const res = await post("/erasure", { guestId: "eva-note@example.com" }, "commentary-admin-key");
-    expect(await res.json()).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0 });
+    expect(await res.json()).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 });
 
     expect((await get(`/reservations/${created.id}`)).commentary).toBe("");
   });

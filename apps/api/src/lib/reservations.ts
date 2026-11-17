@@ -11,6 +11,7 @@ import {
   venues,
 } from "../db/schema";
 import * as schema from "../db/schema";
+import { countBlocklistEntries } from "./blocklist";
 import { blockedRange } from "./booking-policy";
 import { normalizeCommentary } from "./commentary";
 import { consentColumns, type Consent } from "./consent";
@@ -229,6 +230,7 @@ export type WriteErrorCode =
   | "beyond_booking_horizon"
   | "date_blocked"
   | "guest_booking_limit"
+  | "booking_declined"
   | "venue_not_found";
 
 export type WriteResult =
@@ -776,6 +778,10 @@ export async function createReservation(
           startsAt,
           endsAt,
         });
+      }
+      // ADR-0018: last, after the allocations, so a closed, full or taken time fails as it would for anyone.
+      if (!request.walkIn && contactKey && (await countBlocklistEntries(tx, venueId, [contactKey])) > 0) {
+        throw new ReservationError("booking_declined");
       }
       await tx.insert(idempotencyKeys).values({
         key,

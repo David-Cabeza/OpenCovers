@@ -42,7 +42,9 @@ Every tool sets `readOnlyHint`, `destructiveHint` and `idempotentHint` explicitl
 
 A tool error reads `API error <status>: <code>` followed by ` (retryable)` or ` (not retryable)`, taken from the `retryable` field of the HTTP error. See [errors.md](errors.md).
 
-Reservation writes carry an idempotency key and return the reservation. Erasure needs an `admin` key, and a key without it gets `forbidden`. It returns the counts of erased reservations, guest records, and waitlist entries. Reads never mutate.
+Reservation writes carry an idempotency key and return the reservation. Erasure needs an `admin` key, and a key without it gets `forbidden`. It returns the counts of erased reservations, guest records, and waitlist entries, and `blocklistEntriesKept`, the guest blocklist entries that match the erased guests and stay in place. Reads never mutate.
+
+`reservation.create` fails with `booking_declined` (409, not retryable) when the guest's contact is on the venue's guest blocklist (ADR-0018). Tell the guest the venue cannot take the booking and to contact the venue directly. Do not retry with the same contact. `reservation.walk_in` and `waitlist.seat` are never declined.
 
 Reads return `guest.guestId` when the reservation is linked to a guest record of the venue. `reservation.erasure` takes that id as `guestId`. A `guestId` that is not a guest record is read as a contact. That fallback is deprecated and kept for one version. `erasedGuests` counts guest records deleted, so a contact that matches no record reports 0. Erasure by `principal` also deletes the guest records whose every visit that principal owned, and keeps a guest who still has a visit owned by another principal.
 

@@ -115,6 +115,24 @@ export async function findBlocklistEntries(
     );
 }
 
+/** The venue's entries that match any of the contacts, under every configured key. */
+export async function countBlocklistEntries(
+  db: Pick<Db, "select">,
+  venueId: string,
+  contacts: readonly ContactKey[],
+): Promise<number> {
+  const digests = contacts.flatMap((key) => blocklistDigests(blocklistKeys, venueId, key));
+  return (await findBlocklistEntries(db, venueId, digests)).length;
+}
+
+/** A guest record's stored email and phone, already normalized. */
+export function guestContactKeys(guest: { email: string | null; phone: string | null }): ContactKey[] {
+  return [
+    ...(guest.email ? [{ kind: "email" as const, value: guest.email }] : []),
+    ...(guest.phone ? [{ kind: "phone" as const, value: guest.phone }] : []),
+  ];
+}
+
 /** A position in the list: `created_at` in epoch microseconds, as Postgres stores it, and the id. */
 export interface BlocklistCursor {
   micros: string;
@@ -251,10 +269,7 @@ async function resolveSubject(db: Pick<Db, "select">, venue: Venue, subject: Blo
     family.push(...fresh);
     frontier = fresh.map((g) => g.id);
   }
-  const keys = family.flatMap((g): ContactKey[] => [
-    ...(g.email ? [{ kind: "email" as const, value: g.email }] : []),
-    ...(g.phone ? [{ kind: "phone" as const, value: g.phone }] : []),
-  ]);
+  const keys = family.flatMap(guestContactKeys);
   return { ok: true, keys, guestIds: family.map((g) => g.id) };
 }
 
