@@ -56,7 +56,7 @@ The dispatcher calls the same Hono app in process (`app.request`) and never make
 
 ### Authorization server
 
-Better Auth is the authorization server, through its OAuth provider plugin (`@better-auth/oauth-provider`) and its Client ID Metadata Document plugin (`@better-auth/cimd`). Both are published at 1.7.25 and require `better-auth` 1.7.25 or later, so issue #67 upgrades `better-auth` from 1.7.18. The plugins need new tables, added to `apps/api/src/db/schema.ts` and migrated with `pnpm db:generate`.
+Better Auth is the authorization server, through its OAuth provider plugin (`@better-auth/oauth-provider`) and its Client ID Metadata Document plugin (`@better-auth/cimd`). Both exist at 1.7.18 and later. Issue #67 uses 1.7.25 and upgrades `better-auth` from 1.7.18, because 1.7.21 fixed in-flight opaque access tokens surviving refresh token reuse and 1.7.23 stopped a failed PKCE check from consuming the code. The plugins need new tables, added to `apps/api/src/db/schema.ts` and migrated with `pnpm db:generate`.
 
 A person authenticates with the staff sign-in that exists today, email and password through Better Auth. No second login system exists. The authorization server metadata advertises `code_challenge_methods_supported: ["S256"]`, `client_id_metadata_document_supported: true` and no `registration_endpoint`.
 
@@ -81,20 +81,20 @@ PKCE is required for every client, with `S256` only. A request with no `code_cha
 
 Access tokens are opaque so that each call looks the token up in the database. That lookup is what makes revocation take effect on the next call. A JWT would stay valid until it expired.
 
-Every refresh issues a new refresh token and invalidates the old one. A rotated refresh token presented again is treated as theft. The whole grant is revoked, every token of it stops working, and an `agent_revoked` audit row is written. The reuse interval is 0. Refresh never extends the grant beyond 90 days from consent.
+Every refresh issues a new refresh token and invalidates the old one. A rotated refresh token presented again is treated as theft. The whole grant is revoked, every token of it stops working, and an `agent_revoked` audit row is written. The reuse interval is 0. The plugin has no absolute limit, and each rotation sets the new refresh token to 30 days from now (verified in part 1 of #67). So the grant table stores the grant's expiry, `/mcp` refuses a token whose grant is past it, and a before hook on the token endpoint refuses a refresh after it. Refresh never extends the grant beyond 90 days from consent.
 
 The access token audience is the canonical resource URI. `/mcp` refuses a token whose audience differs, one that has expired, and one whose grant no longer exists, all with `401` and a `WWW-Authenticate` header that names the Protected Resource Metadata URL. Tokens are accepted only in the `Authorization: Bearer` header. A token in the query string is refused, and a Better Auth session cookie on `/mcp` grants nothing.
 
 ### Scopes
 
-Two scopes, and nothing else.
+Two scopes that reach the API, and one that does not.
 
 | Scope | Maps to role | Allows |
 | --- | --- | --- |
 | `opencovers:read` | `read` | The read tools below. |
 | `opencovers:write` | `write` | The read tools and the write tools below. It includes `opencovers:read`. |
 
-No scope maps to `admin`. An authorization request for any other scope, `opencovers:admin` included, fails with `invalid_scope`. The Protected Resource Metadata lists both scopes in `scopes_supported`.
+No scope maps to `admin`. The plugin issues a refresh token only when the request includes `offline_access` (verified in part 1 of #67), so that scope is also accepted. It grants no API access, it is not shown on the consent screen, and the endpoint treats it as the request for a refresh token. An authorization request for any other scope, `opencovers:admin` included, fails with `invalid_scope`. The Protected Resource Metadata lists both scopes in `scopes_supported`.
 
 The role a call runs with is the lower of the scope's role and the person's current membership role in that venue, read on every call. A `read` member who grants `opencovers:write` still gets `read`. An `admin` member who grants `opencovers:write` gets `write`. A write tool called with an `opencovers:read` token fails with HTTP `403` and `error="insufficient_scope", scope="opencovers:write"`, so the client can ask for more. A write tool called by a `read` member with a write token fails as a tool error, `API error 403: forbidden`, because more scope would not help.
 
@@ -148,7 +148,9 @@ The staff app serves the consent screen. The person signs in there if they have 
 - the venue choices, and that access ends after 90 days or when revoked;
 - what the agent can never do: manage staff, keys or webhooks, change settings, or erase guest data.
 
-The person can lower `opencovers:write` to `opencovers:read` before approving. Every authorization request shows the screen. Consent is never skipped because an earlier one exists. A refresh needs no screen.
+The person can lower `opencovers:write` to `opencovers:read` before approving. Every authorization request shows the screen. Consent is never skipped because an earlier one exists. The plugin skips the screen by default when an earlier consent covers the scopes, so #67 overrides that. A refresh needs no screen.
+
+The plugin has other defaults that differ from this ADR, and #67 overrides each: an authorization request without `resource` is accepted and yields a token with no audience, so `resource` is required. A request with no `scope` gets both scopes, so a request without scope fails with `invalid_scope`. The plugin's own opaque token validation also checks that the consenting staff session has not expired. `/mcp` must not use it, or an agent would lose access when the person's browser session ends. `/mcp` validates the token row and the grant.
 
 ### Revocation
 
@@ -252,6 +254,10 @@ These are properties of libraries this ADR has not run. Issue #67 tests each one
 - **Allow erasure remotely with the write scope, as the HTTP route allows a write key.** Rejected. Erasure is irreversible, and a hosted agent's token is the weakest credential in the system.
 - **Hide tools from `tools/list` by scope.** Rejected. The client would not learn that more scope exists. Listing all 16 and answering `insufficient_scope` lets it ask for more.
 - **Use the email as the principal, as a session does.** Keeps records readable. Rejected for now. It puts staff emails into more rows and hides which agent acted. Kept as an open question.
+
+## Amendment after part 1 of #67
+
+Running the plugins against PostgreSQL settled five of the six points under "What issue #67 must verify" as written: opaque hashed tokens, `getSession` refusing an access token, `iss` in the response, PKCE `S256` only, and `invalid_scope`. Reuse of a rotated refresh token deletes every refresh and access token the client holds for that person, which is wider than one grant. This is accepted, because it errs toward revoking. Two points differed from this ADR and are amended above: the `offline_access` scope, and the 90 day cap. The CSP `form-action` check and the SDK protocol version are still open for parts 2 and 3.
 
 ## Decisions on the open questions
 
