@@ -152,25 +152,25 @@ A change to any of these paths needs the extra review listed next to it. Agents 
 
 **These are settings the maintainer applies by hand in the GitHub UI. Agents must not change them, and must not ask for a token that could.**
 
-- [ ] **Branch protection for `main`** (Settings, Branches, or a ruleset):
+- [x] **Branch protection for `main`** (Settings, Branches, or a ruleset):
   - Require a pull request before merging.
   - Require the `test` status check to pass. Add `dependency-review` once it has run green on a few PRs.
   - Block force pushes.
   - Block deletion.
   - Do **not** turn on "required approvals". GitHub does not let the author of a pull request approve it, and agents push as the maintainer's account, so every agent PR is authored by the maintainer. A required approval would block every merge, or push the maintainer to bypass protection on each PR, which trains the habit the rule is meant to stop. The pull request requirement and the required check still force every change through review and CI. Turn approvals on when a second maintainer exists.
-- [ ] **Actions, fork pull request workflows** (Settings, Actions, General): require approval for all outside collaborators, not only first-time contributors.
-- [ ] **Actions, allowed actions**: allow actions created by GitHub and by verified creators, or a pinned list. Today any action is allowed.
-- [ ] **Actions, workflow permissions**: keep the default at read repository contents. Keep "Allow GitHub Actions to create and approve pull requests" off.
-- [ ] **Dependency graph**: enable it (Settings, Advanced Security). Today it is off. Then add the repository variable `DEPENDENCY_REVIEW` with the value `enabled` (Settings, Secrets and variables, Actions, Variables). Until both are done, `dependency-review.yml` is skipped, because without the graph the action fails on every pull request.
-- [ ] **Dependabot alerts**: enable. Today they are off.
-- [ ] **Dependabot security updates**: enable. Today they are off.
-- [ ] **Private vulnerability reporting**: enable, then update [SECURITY.md](../SECURITY.md), which still describes the repository as private.
-- [ ] **Secret scanning and push protection**: keep enabled (already on).
+- [x] **Actions, fork pull request workflows** (Settings, Actions, General): require approval for all outside collaborators, not only first-time contributors.
+- [x] **Actions, allowed actions**: allow actions created by GitHub and by verified creators, or a pinned list. Set on 2026-11-17: GitHub actions plus `pnpm/action-setup@*`.
+- [x] **Actions, workflow permissions**: keep the default at read repository contents. Keep "Allow GitHub Actions to create and approve pull requests" off.
+- [x] **Dependency graph**: enable it (Settings, Advanced Security). Enabled on 2026-11-17. Then add the repository variable `DEPENDENCY_REVIEW` with the value `enabled` (Settings, Secrets and variables, Actions, Variables). Until both are done, `dependency-review.yml` is skipped, because without the graph the action fails on every pull request.
+- [x] **Dependabot alerts**: enable. Enabled on 2026-11-17.
+- [x] **Dependabot security updates**: enable. Enabled on 2026-11-17.
+- [x] **Private vulnerability reporting**: enabled on 2026-11-17, and [SECURITY.md](../SECURITY.md) points reporters to the Security tab.
+- [x] **Secret scanning and push protection**: keep enabled (already on).
 - [ ] **Two-factor authentication** on the maintainer account, with a hardware security key or passkey as the primary method and recovery codes stored offline.
 - [ ] **Signed commits**: optional. Useful once more than one person pushes. Agents pushing as the maintainer would need the signing key, so weigh that before turning it on.
 - [ ] **Deploy keys, tokens and apps**: review Settings, Deploy keys, the account's personal access tokens, and installed GitHub Apps and OAuth apps. Remove what is unused. Prefer fine-grained tokens scoped to this repository with an expiry.
 - [ ] **Interaction limits**: during a spam wave, limit interactions to prior contributors for 24 hours to a week (Settings, Moderation options).
-- [ ] **Block and report spam accounts**: from the account's profile, block the user and report abuse to GitHub.
+- [x] **Block and report spam accounts**: from the account's profile, block the user and report abuse to GitHub.
 
 ## 7. Incident steps
 
