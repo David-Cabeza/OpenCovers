@@ -57,7 +57,7 @@ const modules = [
     name: "Agenda",
     tag: "Sala",
     body: "Las reservas del día con su estado y quién las hizo. Mover, cancelar o sentar.",
-    img: "/media/agenda.png",
+    img: "/media/agenda.webp",
     pos: "18% 28%",
     alt: "Agenda del día en la app de sala",
   },
@@ -65,7 +65,7 @@ const modules = [
     name: "Lista de espera y walk-ins",
     tag: "Sala",
     body: "Los dos flujos físicos más comunes en sala, con el ritmo del servicio a la vista.",
-    img: "/media/agenda.png",
+    img: "/media/agenda.webp",
     pos: "70% 60%",
     alt: "Agenda con lista de espera",
   },
@@ -73,7 +73,7 @@ const modules = [
     name: "Plano de sala",
     tag: "Sala",
     body: "Mesas con sillas y símbolos de barra, cocina, puerta y planta, sobre suelo de madera.",
-    img: "/media/floor-plan.png",
+    img: "/media/floor-plan.webp",
     pos: "26% 50%",
     alt: "Plano de sala con mesas y sillas",
   },
@@ -81,7 +81,7 @@ const modules = [
     name: "Zonas y asignación",
     tag: "Motor",
     body: "Disponibilidad por zona y mesa automática cuando el cliente solo dice hora y personas.",
-    img: "/media/floor-plan.png",
+    img: "/media/floor-plan.webp",
     pos: "78% 40%",
     alt: "Plano con zonas",
   },
@@ -89,7 +89,7 @@ const modules = [
     name: "Editor de plano",
     tag: "Sala",
     body: "Arrastra, rota 90° y redimensiona con ajuste a rejilla.",
-    img: "/media/floor-editor.png",
+    img: "/media/floor-editor.webp",
     pos: "40% 50%",
     alt: "Editor del plano de sala",
   },
@@ -330,7 +330,7 @@ function Intro() {
           <i style={{ background: "#28c840" }} />
           <b>OpenCovers — Demo Bistro</b>
         </div>
-        <video autoPlay muted loop playsInline preload="metadata" poster="/media/floor-plan.png" aria-label="Demo del plano de sala y la agenda de OpenCovers">
+        <video autoPlay muted loop playsInline preload="metadata" poster="/media/floor-plan.webp" aria-label="Demo del plano de sala y la agenda de OpenCovers">
           <source src="/media/opencovers-demo.mp4" type="video/mp4" />
         </video>
       </div>
