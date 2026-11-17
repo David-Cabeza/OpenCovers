@@ -63,3 +63,7 @@ Record a decision that changes the architecture, the contract, or a security pro
 ## Security
 
 Do not open a public issue for a vulnerability. Follow [SECURITY.md](SECURITY.md).
+
+[docs/collaboration-security.md](docs/collaboration-security.md) sets the rules for contributions, dependencies and AI agents in this repository. It lists what gets closed on sight, what a new dependency must justify, and which paths need extra review. Read it before you add a dependency or touch `.github/`.
+
+To report spam or a promotional issue, use "Report content" in the issue or comment menu, which sends it to GitHub, and do not reply to it. The maintainer closes spam without discussion.
