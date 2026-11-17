@@ -280,7 +280,7 @@ Acceptance: conformance case C33. The venue embeds the document in the HTML of i
 
 An agent can tell from an error alone whether repeating the same call can succeed. Every error body carries `retryable`, true when the same request, unchanged, may succeed later and false when the caller must change something first. The MCP tool error text says which. Every MCP tool declares `readOnlyHint`, `destructiveHint` and `idempotentHint` explicitly, so a client does not have to guess from the MCP defaults.
 
-Acceptance: conformance case C34. There is no version-conflict error, because writes carry no expected version.
+Acceptance: conformance case C34. Staff and integration writes carry no expected version, so they never get a version conflict. Only the guest modify of REQ-P7 carries one, and fails with `reservation_changed`.
 
 ### REQ-C12 Per-venue booking policy
 
@@ -306,6 +306,58 @@ The account that may create venues on a `first-user` or `closed` instance can ha
 
 Acceptance: conformance case C38. An instance that never had a creator, because its accounts were made under `open`, still marks its first creator with the one-time step in the deploy guide.
 
+## Public booking channel
+
+A guest books, and later reads, changes or cancels that booking, on the venue's own site, with no account. The design is [ADR-0017](adr/0017-booking-widget-and-self-service-link.md). These requirements and cases C39 to C55 are the contract for it. None of it is built yet.
+
+### REQ-P1 Online booking settings and the public booking key
+
+A venue turns online booking on and shapes it with its own settings, kept apart from the venue config and the public profile: the sites allowed to frame the widget, the services and weekdays bookable online, the online party limits, lead time and horizon, the self-service cutoff, the open bookings one contact may hold online, the confirmation mode, the consent question, the widget locale and a theme of validated tokens. Any role reads them, and only an admin changes them. Turning it on creates a public booking key, `pk_` and 16 random bytes, that names the venue and authenticates nothing. An admin replaces it with a rotation, and the old key stops at once. The confirmation mode is an open set of values. Only `auto` is accepted now, and a client treats any other value as not automatic confirmation. An online limit never relaxes a rule of the venue.
+
+Acceptance: conformance case C39. Every invalid setting fails with `invalid_request` and changes nothing, `approval` included. Turning online booking on without a venue name or a bookable service fails with `online_booking_incomplete`.
+
+### REQ-P2 A separate public surface
+
+Every guest route sits under `/v1/public/`, outside the venue auth middleware, so no reorder of routes can widen or narrow it. The routes need no credentials and read no cookie or session. An unknown, rotated or disabled booking key is indistinguishable from any other unknown key. The widget page is an HTML shell served per venue, framed only by the venue's allowed origins, never indexed, and served in production from its own origin, while the staff app keeps refusing every frame. No public route is exposed through MCP.
+
+Acceptance: conformance cases C40 and C41. A public request with a staff cookie gets the same answer as one without, and the framing header of the widget page lists exactly the venue's allowed origins.
+
+### REQ-P3 The public channel books by the same rules
+
+Public availability and the public create run the same transaction and the same reason functions as staff bookings, with the online limits on top, so they agree with each other and with the staff rules. The public channel never uses the overbooking ceiling, so every online booking holds a table, and it never lets the guest choose a table or zone. The engine sets the attribution, `bookedVia` and `ownerPrincipal` `widget` and `basis` `service`. Public availability returns times and nothing else. Every online booking is `booked` at once when there is room. Public writes emit the same events as staff writes.
+
+Acceptance: conformance cases C42 and C43. A time is listed exactly when a public create for it would succeed, and a time only the ceiling could fill is never listed.
+
+### REQ-P4 Public idempotency is isolated
+
+Every public write needs an `Idempotency-Key` that is a UUID, stored apart from the keys of staff and integrations, so a public request can replay only a public request of the same venue. A repeated create returns the original booking and a new self-service token, because the engine cannot return a token twice.
+
+Acceptance: conformance case C44. A public create with a key that a staff create used returns nothing of the staff booking.
+
+### REQ-P5 Abuse resistance
+
+Public routes are rate limited per client address, `GET` included, and public creates also per venue, by four rules that extend REQ-C5. A public create carries a honeypot and a signed proof-of-work challenge, and an operator may add a CAPTCHA, and every failed check gets the same answer as a malformed body. One contact may hold only a few open online bookings, and the per-day cap of REQ-C12 applies too. The caps say that a contact is at a cap. That leak is accepted and bounded by the rate limits.
+
+Acceptance: conformance cases C45, C46 and C52.
+
+### REQ-P6 The self-service link
+
+A booking made online gets a capability link for that one booking. The token is a random link id and a 256-bit secret, travels in the URL fragment and a header, and is stored only as a SHA-256 hash compared in constant time. Every failure, whatever its cause, gets the same `self_service_link_invalid`. The link expires 48 hours after the booking ends. It rotates on a repeated create, a staff reissue and a lost-link resend, never on a guest change. A guest cancel revokes it and issues none, yet a repeat of that same cancel, with the same key and token, returns the stored result. A staff cancel keeps it readable. Erasure and retention end it.
+
+Acceptance: conformance cases C47, C50, C51 and C53. A scan of the database and the logs finds no token, and a reservation never has two working links.
+
+### REQ-P7 What a guest may do through the link
+
+A guest reads the booking, changes the party size, the note or consent, or cancels, with no venue id or reservation id in the request. A change or cancel works only while the booking is `booked` and its start is more than the venue's cutoff away, and otherwise fails with `self_service_closed`. A guest change carries the version the guest saw and fails with `reservation_changed` when the booking changed since. A guest cannot move a booking. They cancel and book again.
+
+Acceptance: conformance cases C48, C49 and C50.
+
+### REQ-P8 Guest data on the public channel
+
+The public channel collects the minimum of REQ-G1: a name, one contact that normalizes, the party size, date and time, an optional note that is not for health data, and consent only when the venue asks, never recorded as a refusal. It shows the guest's contact masked and never another guest's data, a table, a zone, an internal id or attribution. The guest blocklist applies to a public create as to any create.
+
+Acceptance: conformance cases C48, C54 and C55.
+
 ## Conformance cases
 
 The conformance cases are the acceptance tests for the contract. The first set:
@@ -327,3 +379,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C36: a service's optional `days` (all seven by default) limit create, availability, the explanation and the public opening hours to those weekdays in the venue time zone, an overnight service follows the day it opens, a walk-in is held to them, and the three paths agree.
 - C37: a venue admin changes a member's role through a session, the last admin cannot be demoted even under concurrent changes, the same role is a no-op, and each change writes one audit row.
 - C38: the venue creator hands the creator mark to a member of a venue they administer in one transaction, nobody else can, and an ineligible target is refused.
+- C39 to C55: the public booking channel of ADR-0017. Online booking settings and a rotatable booking key (C39), a credential-free surface where an unknown key looks like any other (C40), a widget page framed only by allowed origins (C41), availability and create that agree and never overbook (C42, C43), isolated public idempotency (C44), bot protection and caps (C45, C46), a hash-only self-service token with one failure answer (C47), the masked guest view, guest modify and guest cancel with its replay rule (C48 to C50), link rotation (C51), public rate limits (C52), links ended by erasure and retention (C53), the blocklist (C54) and minimal guest data (C55).

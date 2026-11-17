@@ -44,6 +44,12 @@ export const ERRORS = {
   confirmation_required: { status: 409, retryable: false },
   approval_required: { status: 409, retryable: false },
   stale_second_factor: { status: 403, retryable: false },
+  // The public booking channel of ADR-0017. In the contract, not emitted until stages 2 to 4.
+  online_booking_incomplete: { status: 409, retryable: false },
+  online_booking_limit: { status: 409, retryable: false },
+  self_service_link_invalid: { status: 404, retryable: false },
+  self_service_closed: { status: 409, retryable: false },
+  reservation_changed: { status: 409, retryable: false },
 } as const satisfies Record<string, { status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503; retryable: boolean }>;
 
 export type ErrorCode = keyof typeof ERRORS;

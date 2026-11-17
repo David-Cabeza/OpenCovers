@@ -9,6 +9,13 @@ export const MESSAGES: Record<string, string> = {
   reservation_not_found: "This reservation no longer exists.",
   waitlist_entry_not_found: "This waitlist entry no longer exists.",
   guest_not_found: "This guest no longer exists.",
+  // Online booking and the self-service link
+  online_booking_incomplete:
+    "Add the venue name and make at least one service bookable online before turning online booking on.",
+  online_booking_limit: "This contact already has the most online bookings allowed at this venue.",
+  self_service_link_invalid: "This booking link no longer works.",
+  self_service_closed: "This booking can no longer be changed online. Contact the venue.",
+  reservation_changed: "This booking changed since it was loaded. Reload it and try again.",
   // Auth
   unauthorized: "Your session has ended. Sign in again.",
   forbidden: "Only an admin can do this.",
