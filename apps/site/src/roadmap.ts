@@ -102,7 +102,7 @@ export const today: Today[] = [
   { area: "Mesas y sala", now: "Zonas, combinaciones, asignación automática y editor visual.", target: "Planos por servicio y estado en vivo.", phase: "10" },
   { area: "Clientes", now: "Una ficha por local, emparejada por email o teléfono, con fusión y lista de bloqueados por API. Aún sin pantalla en la app de sala.", target: "Ficha con historial, notas, alergias y etiquetas.", phase: "10" },
   { area: "Lista de espera", now: "Existe en la app de sala.", target: "Página con QR y aviso de mesa lista.", phase: "11" },
-  { area: "Cara al cliente", now: "En curso: widget de reservas, rutas públicas y enlace para ver, cambiar o cancelar. Aún sin enlace en el email ni temas.", target: "Widget, enlace de autogestión y temas.", phase: "11" },
+  { area: "Cara al cliente", now: "En curso: widget de reservas, rutas públicas y enlace para ver, cambiar o cancelar. El local ya pone sus colores, su fuente y su logo en el widget, y un script opcional ajusta la altura del iframe. Aún sin enlace en el email.", target: "Widget, enlace de autogestión y temas.", phase: "11" },
   { area: "No-shows y pagos", now: "Cambios de estado y estado de reconfirmación.", target: "Depósitos, garantías y reembolsos.", phase: "12" },
   { area: "Mensajes", now: "Confirmación por email, desactivada por defecto.", target: "Email, SMS y WhatsApp con automatizaciones.", phase: "13" },
   { area: "Opiniones", now: "Ninguna.", target: "Encuesta tras la visita con consentimiento.", phase: "13" },
