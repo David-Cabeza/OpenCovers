@@ -188,14 +188,30 @@ A quick walkthrough of the agenda and the floor plan.
 
 ## Screenshots
 
-The staff app in action — the agenda, the floor plan, and the floor editor.
+The staff app in action: the agenda, the floor plan, the floor editor, the waitlist, the online booking settings and the team screen. All screens show the invented demo venue "La Taberna del Faro" (`pnpm demo:seed`), running locally.
 
 <p align="center">
-  <img src="docs/assets/agenda.png" alt="Agenda" width="420">
-  <img src="docs/assets/floor-plan.png" alt="Floor plan" width="420">
+  <img src="docs/assets/agenda.webp" alt="Agenda for the day: a table of reservations with guest, party size, table and status (booked, seated, attended, cancelled, no-show)" width="420">
+  <img src="docs/assets/floor-plan.webp" alt="Live floor plan of a restaurant: tables with chairs on a wooden floor, with the seated parties highlighted" width="420">
 </p>
 <p align="center">
-  <img src="docs/assets/floor-editor.png" alt="Floor editor" width="700">
+  <img src="docs/assets/floor-editor.webp" alt="Floor editor: tables and room elements (bar, kitchen, door, plant) arranged on the floor plan" width="700">
+</p>
+<p align="center">
+  <img src="docs/assets/waitlist.webp" alt="Waitlist: two parties waiting for a table, each with a Seat button" width="700">
+</p>
+<p align="center">
+  <img src="docs/assets/online-booking.webp" alt="Setup, Online booking card: rules for online bookings, theme controls with a live preview, the public booking key and the embed code" width="560">
+</p>
+<p align="center">
+  <img src="docs/assets/team.webp" alt="Team screen: members with their roles, invitations and the audit log" width="700">
+</p>
+
+The guest-facing pages, in Spanish because the demo venue is configured in Spanish. The booking widget and the self-service page are still in progress, so treat them as a preview.
+
+<p align="center">
+  <img src="docs/assets/widget.webp" alt="Booking widget at /w/ with the guest details step: name, email or phone, optional comment and a Book button" width="280">
+  <img src="docs/assets/self-service.webp" alt="Self-service page for one booking, with the booking details and buttons to change the party size or cancel" width="280">
 </p>
 
 ## Repository layout
