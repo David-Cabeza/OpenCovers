@@ -36,6 +36,8 @@ import {
   embedSnippet,
   isLogoUrl,
   parseForm,
+  scriptSnippet,
+  widgetOrigin,
   toForm,
   type ColorKey,
   type Font,
@@ -221,7 +223,9 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
   }
 
   const key = data?.bookingKey ?? null;
+  const hostOk = widgetOrigin(host) !== null;
   const snippet = key ? embedSnippet(host, key) : "";
+  const script = key ? scriptSnippet(host, key) : "";
 
   return (
     <Card>
@@ -521,13 +525,47 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     where your OpenCovers installation is served. The page path is{" "}
                     <code>/w/{key}</code>.
                   </p>
-                  <Label htmlFor="ob-snippet">Embed code</Label>
+                  {!hostOk && (
+                    <p className="text-sm text-destructive" role="alert">
+                      Enter the address as https://host, with no path.
+                    </p>
+                  )}
+
+                  <Label htmlFor="ob-script">Embed code with automatic height (recommended)</Label>
+                  <div className="flex gap-2">
+                    <Textarea
+                      id="ob-script"
+                      readOnly
+                      rows={2}
+                      value={script}
+                      aria-invalid={!hostOk}
+                      className="font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      aria-label="Copy script embed code"
+                      disabled={!hostOk}
+                      onClick={() => void copyText(script, "Embed code copied")}
+                    >
+                      <CopyIcon className="size-4" />
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Use this where your website lets you paste a script. The booking page takes the
+                    height it needs. If your website sets a Content-Security-Policy, it must allow
+                    the booking page address in <code>script-src</code> and <code>frame-src</code>.
+                  </p>
+
+                  <Label htmlFor="ob-snippet">Embed code with a fixed height</Label>
                   <div className="flex gap-2">
                     <Textarea
                       id="ob-snippet"
                       readOnly
                       rows={3}
                       value={snippet}
+                      aria-invalid={!hostOk}
                       className="font-mono"
                     />
                     <Button
@@ -535,11 +573,17 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                       variant="outline"
                       size="icon"
                       aria-label="Copy embed code"
+                      disabled={!hostOk}
                       onClick={() => void copyText(snippet, "Embed code copied")}
                     >
                       <CopyIcon className="size-4" />
                     </Button>
                   </div>
+                  <p className="text-sm text-muted-foreground">
+                    Use this when your website builder removes scripts. If your website sets a
+                    Content-Security-Policy, it must allow the booking page address in{" "}
+                    <code>frame-src</code>.
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     The embedding website also has to be listed above.
                   </p>

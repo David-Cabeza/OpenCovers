@@ -134,27 +134,75 @@ describe("OnlineBookingCard", () => {
     expect(screen.getByText(/has to open on at least one ticked day/)).toBeInTheDocument();
   });
 
-  it("shows the key, copies it, and shows the embed code only while enabled", async () => {
+  it("shows the key and copies it", async () => {
     const user = userEvent.setup();
     setup({ enabled: true, bookingKey: "pk_abc123" });
     renderWithApp(<OnlineBookingCard venueId="v1" />);
     await loaded();
 
     expect(await screen.findByLabelText("Public booking key")).toHaveValue("pk_abc123");
-    expect(screen.getByLabelText("Embed code")).toHaveValue(
-      `<iframe src="${window.location.origin}/w/pk_abc123" title="Reservas" width="100%" height="640" style="border:0"></iframe>`,
+    const writeText = vi.spyOn(navigator.clipboard, "writeText");
+    await user.click(screen.getByRole("button", { name: "Copy key" }));
+    expect(writeText).toHaveBeenCalledWith("pk_abc123");
+  });
+
+  it("shows both embed snippets with the shared address, and copies each", async () => {
+    const user = userEvent.setup();
+    setup({ enabled: true, bookingKey: "pk_abc123" });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    const o = window.location.origin;
+    const script = screen.getByLabelText(/Embed code with automatic height/);
+    const frame = screen.getByLabelText("Embed code with a fixed height");
+    expect(script).toHaveValue(`<script src="${o}/w/embed.js" data-key="pk_abc123" async></script>`);
+    expect(frame).toHaveValue(
+      `<iframe src="${o}/w/pk_abc123" title="Reservas" width="100%" height="640" style="border:0"></iframe>`,
     );
 
     const host = screen.getByLabelText("Address of the booking page");
     await user.clear(host);
     await user.type(host, "https://reservas.example.com/");
-    expect(screen.getByLabelText("Embed code")).toHaveValue(
+    expect(script).toHaveValue(
+      '<script src="https://reservas.example.com/w/embed.js" data-key="pk_abc123" async></script>',
+    );
+    expect(frame).toHaveValue(
       '<iframe src="https://reservas.example.com/w/pk_abc123" title="Reservas" width="100%" height="640" style="border:0"></iframe>',
     );
 
     const writeText = vi.spyOn(navigator.clipboard, "writeText");
-    await user.click(screen.getByRole("button", { name: "Copy key" }));
-    expect(writeText).toHaveBeenCalledWith("pk_abc123");
+    await user.click(screen.getByRole("button", { name: "Copy script embed code" }));
+    expect(writeText).toHaveBeenLastCalledWith(
+      '<script src="https://reservas.example.com/w/embed.js" data-key="pk_abc123" async></script>',
+    );
+    await user.click(screen.getByRole("button", { name: "Copy embed code" }));
+    expect(writeText).toHaveBeenLastCalledWith((frame as HTMLTextAreaElement).value);
+  });
+
+  it("flags an address that is not an origin and disables both copy buttons", async () => {
+    const user = userEvent.setup();
+    setup({ enabled: true, bookingKey: "pk_abc123" });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    expect(screen.queryByText(/Enter the address as https:\/\/host/)).not.toBeInTheDocument();
+    const host = screen.getByLabelText("Address of the booking page");
+    await user.clear(host);
+    await user.type(host, "https://reservas.example.com/path");
+    expect(screen.getByText(/Enter the address as https:\/\/host/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy script embed code" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Copy embed code" })).toBeDisabled();
+  });
+
+  it("tells which Content-Security-Policy directives each snippet needs", async () => {
+    setup({ enabled: true, bookingKey: "pk_abc123" });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    expect(screen.getByText(/lets you paste a script/).textContent).toMatch(/script-src and frame-src/);
+    const fallback = screen.getByText(/removes scripts/).textContent ?? "";
+    expect(fallback).toMatch(/frame-src/);
+    expect(fallback).not.toMatch(/script-src/);
   });
 
   it("hides the embed code while online booking is off, even with a key", async () => {
@@ -163,7 +211,8 @@ describe("OnlineBookingCard", () => {
     await loaded();
 
     expect(await screen.findByLabelText("Public booking key")).toHaveValue("pk_abc123");
-    expect(screen.queryByLabelText("Embed code")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Embed code with a fixed height")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Embed code with automatic height/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Address of the booking page")).not.toBeInTheDocument();
   });
 
@@ -191,7 +240,10 @@ describe("OnlineBookingCard", () => {
 
     await waitFor(() => expect(api.calls("POST", ROTATE)).toHaveLength(1));
     await waitFor(() => expect(screen.getByLabelText("Public booking key")).toHaveValue("pk_new"));
-    expect((screen.getByLabelText("Embed code") as HTMLTextAreaElement).value).toContain("/w/pk_new");
+    expect((screen.getByLabelText("Embed code with a fixed height") as HTMLTextAreaElement).value).toContain("/w/pk_new");
+    expect((screen.getByLabelText(/Embed code with automatic height/) as HTMLTextAreaElement).value).toContain(
+      'data-key="pk_new"',
+    );
   });
 
   it("shows a friendly message when the rotate is refused", async () => {
