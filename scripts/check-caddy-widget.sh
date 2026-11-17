@@ -20,6 +20,11 @@ require("http").createServer((req, res) => {
   if (req.url.startsWith("/w/")) {
     headers["Content-Security-Policy"] = "default-src '"'self'"'; frame-ancestors '"'self'"' https://casa.example";
   }
+  if (req.url === "/w/embed.js") {
+    headers["Content-Type"] = "text/javascript; charset=utf-8";
+    headers["Cross-Origin-Resource-Policy"] = "cross-origin";
+    delete headers["Content-Security-Policy"];
+  }
   if (req.url.split("?")[0] === "/r") {
     headers["Content-Security-Policy"] = "default-src '"'self'"'; frame-ancestors '"'none'"'";
     headers["X-Frame-Options"] = "DENY";
@@ -82,6 +87,17 @@ check "widget /w/*: the API's frame-ancestors" "frame-ancestors 'self' https://c
 check "widget /w/*: no frame-ancestors 'none'" "frame-ancestors 'none'" "$out" no
 check "widget /w/*: client X-Forwarded-For replaced" "xff=203.0.113.9" "$out" no
 check "widget: no Server header" "^ *Server:" "$out" no
+
+out=$(get staff.test /w/embed.js)
+check "staff /w/embed.js: 404" "HTTP/1.1 404" "$out" yes
+check "staff /w/embed.js: never reaches the API" "upstream" "$out" no
+
+out=$(get book.test /w/embed.js)
+check "widget /w/embed.js: 200 from the API" "upstream" "$out" yes
+check "widget /w/embed.js: the API's script type" "Content-Type: text/javascript" "$out" yes
+check "widget /w/embed.js: the API's Cross-Origin-Resource-Policy" "Cross-Origin-Resource-Policy: cross-origin" "$out" yes
+check "widget /w/embed.js: nosniff" "X-Content-Type-Options: nosniff" "$out" yes
+check "widget /w/embed.js: no X-Frame-Options" "X-Frame-Options" "$out" no
 
 out=$(get book.test /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA)
 check "widget /v1/public/*: 200 from the API" "upstream" "$out" yes

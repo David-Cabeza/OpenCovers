@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { sql } from "drizzle-orm";
@@ -26,6 +26,7 @@ function fakeWidgetBuild(): string {
   writeFileSync(path.join(dist, "assets", "main-AbC123.js"), "console.log('widget')");
   writeFileSync(path.join(dist, "assets", "main-XyZ789.css"), "body{}");
   writeFileSync(path.join(dist, "secret.txt"), "outside the assets folder");
+  writeFileSync(path.join(dist, "embed.js"), "/* embed */");
   return dist;
 }
 
@@ -201,6 +202,49 @@ describe("GET /w/assets/{file}", () => {
       expect(await res.text()).not.toContain("outside");
     }
     expect((await app.request("/w/assets/../secret.txt")).status).toBe(404);
+  });
+});
+
+describe("GET /w/embed.js (stage 10)", () => {
+  it("serves the script loadable from any site, with a short cache and its content hash", async () => {
+    const res = await app.request("/w/embed.js");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("/* embed */");
+    const etag = res.headers.get("etag")!;
+    expect(etag).toMatch(/^"[A-Za-z0-9_-]{22}"$/);
+    expect(Object.fromEntries(res.headers)).toEqual({
+      "content-type": "text/javascript; charset=utf-8",
+      "cache-control": "public, max-age=300",
+      etag,
+      "x-content-type-options": "nosniff",
+      "cross-origin-resource-policy": "cross-origin",
+    });
+
+    for (const tag of [etag, `W/${etag}`, `"other", ${etag}`]) {
+      const again = await app.request("/w/embed.js", { headers: { "if-none-match": tag } });
+      expect(again.status, tag).toBe(304);
+      expect(await again.text()).toBe("");
+    }
+    expect((await app.request("/w/embed.js", { headers: { "if-none-match": '"other"' } })).status).toBe(200);
+  });
+
+  it("answers a new hash after the build changes, and 404 without a build", async () => {
+    const before = (await app.request("/w/embed.js")).headers.get("etag");
+    const dist = process.env.WIDGET_DIST!;
+    writeFileSync(path.join(dist, "embed.js"), "/* embed, rebuilt */");
+    utimesSync(path.join(dist, "embed.js"), new Date(), new Date(Date.now() + 5000));
+    const after = await app.request("/w/embed.js");
+    expect(await after.text()).toBe("/* embed, rebuilt */");
+    expect(after.headers.get("etag")).not.toBe(before);
+
+    process.env.WIDGET_DIST = mkdtempSync(path.join(tmpdir(), "oc-widget-empty-"));
+    try {
+      const missing = await app.request("/w/embed.js");
+      expect(missing.status).toBe(404);
+      expect(missing.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    } finally {
+      process.env.WIDGET_DIST = dist;
+    }
   });
 });
 

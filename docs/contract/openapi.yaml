@@ -26,8 +26,8 @@ info:
     trusted origin of the instance, and with `invalid_request` when its
     body is not `application/json`.
 
-    Paths are relative to `/v1`, except `/w/{bookingKey}` and `/r`, which
-    are served at the root of the widget origin.
+    Paths are relative to `/v1`, except `/w/embed.js`, `/w/{bookingKey}`
+    and `/r`, which are served at the root of the widget origin.
 
     The routes under `/public/` are the guest-facing booking channel. They
     need no credentials, read no cookie or session, and are not exposed
@@ -2172,6 +2172,64 @@ paths:
           $ref: "#/components/responses/RateLimited"
         default:
           $ref: "#/components/responses/Error"
+
+  /w/embed.js:
+    servers:
+      - url: /
+        description: The widget origin (`WIDGET_ADDRESS`), not under `/v1`.
+    get:
+      operationId: widget.embedScript
+      summary: The optional script that frames the widget page and sets its height
+      description: |
+        Not JSON. A venue's page loads it with
+        `<script src="https://book.example.com/w/embed.js" data-key="pk_..." async></script>`.
+        The script adds an iframe of `widget.page` for `data-key` right after
+        its own tag, on the origin the script was loaded from, and adds
+        nothing when `data-key` is not a booking key. `data-title` sets the
+        iframe's title.
+
+        Height message. The framed widget page, and only it, posts
+        `{"type": "opencovers:height", "height": <number>}` to its parent,
+        with the target origin `*`, on load and when its height changes. The
+        message has no other key and never carries guest data. The script
+        uses a message only when its `origin` is the widget origin, its
+        `source` is the script's own iframe, and its data has exactly those
+        two keys with that `type` and a finite `height` not below 0. It sets
+        the iframe's height to that value rounded up, kept between 100 and
+        6000 pixels, and ignores every other message.
+
+        Served on the hosts `widget.page` is served on, and a request for any
+        other host, or to a production API without `WIDGET_ADDRESS`, gets a
+        plain `404`. No credentials, no cookie, no CORS header (a plain
+        `<script>` needs none), not rate limited.
+        Not exposed through MCP.
+      security: []
+      responses:
+        "200":
+          description: The script
+          headers:
+            Content-Type:
+              schema: { type: string, enum: [text/javascript; charset=utf-8] }
+            Cache-Control:
+              description: The URL has no version, so the cache is short and revalidates by `ETag`.
+              schema: { type: string, enum: ["public, max-age=300"] }
+            ETag:
+              description: A hash of the script's content.
+              schema: { type: string }
+            X-Content-Type-Options:
+              schema: { type: string, enum: [nosniff] }
+            Cross-Origin-Resource-Policy:
+              schema: { type: string, enum: [cross-origin] }
+          content:
+            text/javascript:
+              schema: { type: string }
+        "304":
+          description: "`If-None-Match` names the current `ETag`."
+        "404":
+          description: A host other than the widget's, a production API without `WIDGET_ADDRESS`, or no widget build.
+          content:
+            text/plain:
+              schema: { type: string }
 
   /w/{bookingKey}:
     servers:

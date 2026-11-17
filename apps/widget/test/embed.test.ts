@@ -1,0 +1,170 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { runInNewContext } from "node:vm";
+import { beforeEach, describe, expect, it } from "vitest";
+
+// public/embed.js runs on the venue's page. It is run here against a small fake of the few DOM calls it makes.
+
+const source = readFileSync(path.resolve(import.meta.dirname, "../public/embed.js"), "utf8");
+const WIDGET = "https://book.example.com";
+const KEY = "pk_7Hc2AbCdEfGhIjKlMnOpQr";
+
+interface FakeFrame {
+  src: string;
+  title: string;
+  attributes: Record<string, string>;
+  style: Record<string, string>;
+  contentWindow: object | null;
+  setAttribute(name: string, value: string): void;
+}
+
+let page: {
+  inserted: { node: FakeFrame; before: unknown }[];
+  listeners: ((event: unknown) => void)[];
+  warnings: string[];
+};
+
+beforeEach(() => {
+  page = { inserted: [], listeners: [], warnings: [] };
+});
+
+function scriptTag(attributes: Record<string, string>, src = `${WIDGET}/w/embed.js`) {
+  const attrs = { ...attributes };
+  const next = { name: "next sibling" };
+  return {
+    src,
+    next,
+    attrs,
+    nextSibling: next,
+    getAttribute: (name: string) => (name in attrs ? attrs[name] : null),
+    hasAttribute: (name: string) => name in attrs,
+    setAttribute: (name: string, value: string) => {
+      attrs[name] = value;
+    },
+    parentNode: {
+      insertBefore: (node: FakeFrame, before: unknown) => page.inserted.push({ node, before }),
+    },
+  };
+}
+
+function run(script: ReturnType<typeof scriptTag> | null) {
+  const document = {
+    currentScript: script,
+    createElement: (tag: string): FakeFrame => {
+      expect(tag).toBe("iframe");
+      return {
+        src: "",
+        title: "",
+        attributes: {},
+        style: {},
+        contentWindow: { name: "widget window" },
+        setAttribute(name, value) {
+          this.attributes[name] = value;
+        },
+      };
+    },
+  };
+  const window = {
+    addEventListener: (type: string, listener: (event: unknown) => void) => {
+      expect(type).toBe("message");
+      page.listeners.push(listener);
+    },
+  };
+  const console = { warn: (text: string) => page.warnings.push(text) };
+  runInNewContext(source, { document, window, console, URL });
+}
+
+const post = (event: { origin: string; source: unknown; data: unknown }) => {
+  for (const listener of page.listeners) listener(event);
+};
+
+describe("embed.js", () => {
+  it("puts one iframe for the key right after its own tag, on the script's origin", () => {
+    const script = scriptTag({ "data-key": KEY });
+    run(script);
+    expect(page.inserted).toHaveLength(1);
+    const { node, before } = page.inserted[0];
+    expect(before).toBe(script.next);
+    expect(node.src).toBe(`${WIDGET}/w/${KEY}`);
+    expect(node.title).toBe("Reservas");
+    expect(node.attributes).toEqual({ loading: "lazy" });
+    expect(node.style).toEqual({ display: "block", width: "100%", height: "640px", border: "0" });
+  });
+
+  it("takes the title from data-title", () => {
+    run(scriptTag({ "data-key": KEY, "data-title": "Book a table" }));
+    expect(page.inserted[0].node.title).toBe("Book a table");
+  });
+
+  it("adds nothing for a missing or malformed data-key", () => {
+    for (const key of [undefined, "", "sk_7Hc2AbCdEfGhIjKlMnOpQr", `${KEY}/../x`, `${KEY}?a=b`, "pk_short", `"><img>`]) {
+      run(scriptTag(key === undefined ? {} : { "data-key": key }));
+    }
+    expect(page.inserted).toHaveLength(0);
+    expect(page.listeners).toHaveLength(0);
+    expect(page.warnings).toHaveLength(7);
+  });
+
+  it("does nothing without a current script, or when the same tag runs again", () => {
+    run(null);
+    const script = scriptTag({ "data-key": KEY });
+    run(script);
+    run(script);
+    expect(page.inserted).toHaveLength(1);
+  });
+
+  it("sets the height from a message of the widget's origin, from its own iframe, of the exact shape", () => {
+    run(scriptTag({ "data-key": KEY }));
+    const frame = page.inserted[0].node;
+    const from = (data: unknown, origin = WIDGET, source: unknown = frame.contentWindow) => post({ origin, source, data });
+
+    from({ type: "opencovers:height", height: 812.4 });
+    expect(frame.style.height).toBe("813px");
+
+    from({ type: "opencovers:height", height: 300 }, "https://evil.example");
+    from({ type: "opencovers:height", height: 300 }, "http://book.example.com");
+    from({ type: "opencovers:height", height: 300 }, WIDGET, { name: "another window" });
+    from({ type: "opencovers:height", height: 300 }, WIDGET, null);
+    from({ type: "opencovers:height", height: 300, guest: "x" });
+    from({ type: "opencovers:size", height: 300 });
+    from({ type: "opencovers:height", height: "300" });
+    from({ type: "opencovers:height" });
+    from({ height: 300 });
+    from(["opencovers:height", 300]);
+    from("opencovers:height:300");
+    from(300);
+    from(null);
+    from({ type: "opencovers:height", height: Number.NaN });
+    from({ type: "opencovers:height", height: Number.POSITIVE_INFINITY });
+    from({ type: "opencovers:height", height: -5 });
+    expect(frame.style.height).toBe("813px");
+  });
+
+  it("clamps a height to 100 to 6000 pixels", () => {
+    run(scriptTag({ "data-key": KEY }));
+    const frame = page.inserted[0].node;
+    post({ origin: WIDGET, source: frame.contentWindow, data: { type: "opencovers:height", height: 1e12 } });
+    expect(frame.style.height).toBe("6000px");
+    post({ origin: WIDGET, source: frame.contentWindow, data: { type: "opencovers:height", height: 0 } });
+    expect(frame.style.height).toBe("100px");
+  });
+
+  it("ignores messages once its iframe has left the page", () => {
+    run(scriptTag({ "data-key": KEY }));
+    const frame = page.inserted[0].node;
+    frame.contentWindow = null;
+    post({ origin: WIDGET, source: null, data: { type: "opencovers:height", height: 900 } });
+    expect(frame.style.height).toBe("640px");
+  });
+
+  it("keeps two widgets on one page apart", () => {
+    const other = "pk_ZZZZZZZZZZZZZZZZZZZZZZ";
+    run(scriptTag({ "data-key": KEY }));
+    run(scriptTag({ "data-key": other }));
+    const [a, b] = page.inserted.map((entry) => entry.node);
+    expect([a.src, b.src]).toEqual([`${WIDGET}/w/${KEY}`, `${WIDGET}/w/${other}`]);
+
+    post({ origin: WIDGET, source: b.contentWindow, data: { type: "opencovers:height", height: 1200 } });
+    expect([a.style.height, b.style.height]).toEqual(["640px", "1200px"]);
+  });
+});

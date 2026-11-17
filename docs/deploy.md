@@ -61,6 +61,20 @@ What each part does:
 - The API serves the page only for requests to the `WIDGET_ADDRESS` host. Without `WIDGET_ADDRESS`, a production API (`NODE_ENV=production`, as in the image) serves no widget page, and Caddy's widget block listens for `widget.invalid`, a name that never resolves. An API whose `WIDGET_ADDRESS` has the host name of `BETTER_AUTH_URL` or of a `TRUSTED_ORIGINS` entry refuses to start, whatever the port.
 - A venue's site that sends its own `Content-Security-Policy` must allow the widget origin in `frame-src`.
 
+### Automatic height with `embed.js`
+
+A plain `<iframe>` keeps the height it is given. A venue that can paste a script tag gets an iframe that takes the widget's height instead:
+
+```html
+<script src="https://book.example.com/w/embed.js" data-key="BOOKING_KEY" async></script>
+```
+
+The script adds the iframe right after its own tag, loads `https://book.example.com/w/BOOKING_KEY` (the origin the script came from), and sets the iframe's height as the widget's content changes. `data-title` sets the iframe's accessible title (default `Reservas`). A `data-key` that is not a booking key (`pk_...`) adds nothing and logs a warning. Several tags on one page each get their own iframe.
+
+- The framed widget posts `{"type": "opencovers:height", "height": <pixels>}` to its parent, and nothing else. `embed.js` uses a message only when it comes from the widget origin and from its own iframe and has exactly those two keys, and keeps the height between 100 and 6000 pixels. No guest data crosses `postMessage`.
+- The API serves `/w/embed.js` from the widget build with `Content-Type: text/javascript`, `nosniff`, `Cross-Origin-Resource-Policy: cross-origin` and `Cache-Control: public, max-age=300` with an `ETag`, because the URL has no version. It follows the rules of the page: only on the `WIDGET_ADDRESS` host, never on the staff host, and not at all from a production API without `WIDGET_ADDRESS`. Caddy's existing `/w/*` rules cover it.
+- The venue's site still needs its origin in `allowedOrigins`, and with a `Content-Security-Policy` of its own it must allow the widget origin in both `script-src` and `frame-src`.
+
 `bash scripts/check-caddy-widget.sh` runs the shipped Caddyfile in Caddy with Docker and checks the headers of both site blocks.
 
 Upgrading an existing stack: nothing changes until you set `WIDGET_ADDRESS`. The API image is now built in two stages, the first of which builds the widget, so the first `--build` takes longer.
