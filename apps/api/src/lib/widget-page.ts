@@ -72,6 +72,16 @@ export function widgetHeaders(allowedOrigins: readonly string[]): Record<string,
   };
 }
 
+/**
+ * The self-service page `/r`. It is never framed, by any venue, because it holds a guest's capability token: no
+ * framing at all, and `X-Frame-Options: DENY` for browsers that ignore `frame-ancestors`.
+ */
+export function selfServiceHeaders(): Record<string, string> {
+  return { ...widgetHeaders([]), "X-Frame-Options": "DENY" };
+}
+
+export const SELF_SERVICE_TITLES: Record<string, string> = { es: "Tu reserva", en: "Your booking" };
+
 export interface WidgetAssets {
   scripts: string[];
   styles: string[];

@@ -61,3 +61,16 @@ it("serves the widget page and assets on the widget host only; the staff host ge
   expect(staff.headers.get("content-security-policy")).toMatch(/frame-ancestors 'none'$/);
   expect((await app.request("http://app.example.com/w/assets/main-A1.js")).status).toBe(404);
 });
+
+it("serves the self-service page /r on the widget host only, and the staff host gets the same 404", async () => {
+  const widget = await app.request("http://book.example.com/r?lang=en");
+  expect(widget.status).toBe(200);
+  expect(widget.headers.get("content-security-policy")).toMatch(/frame-ancestors 'none'$/);
+  expect(widget.headers.get("x-frame-options")).toBe("DENY");
+
+  const staff = await app.request("http://app.example.com/r?lang=en");
+  const unknown = await app.request("http://book.example.com/w/pk_AAAAAAAAAAAAAAAAAAAAAA");
+  expect(staff.status).toBe(404);
+  expect(Object.fromEntries(staff.headers)).toEqual(Object.fromEntries(unknown.headers));
+  expect(await staff.text()).toBe(await unknown.text());
+});

@@ -20,6 +20,10 @@ require("http").createServer((req, res) => {
   if (req.url.startsWith("/w/")) {
     headers["Content-Security-Policy"] = "default-src '"'self'"'; frame-ancestors '"'self'"' https://casa.example";
   }
+  if (req.url.split("?")[0] === "/r") {
+    headers["Content-Security-Policy"] = "default-src '"'self'"'; frame-ancestors '"'none'"'";
+    headers["X-Frame-Options"] = "DENY";
+  }
   res.writeHead(200, headers);
   res.end(`upstream xff=${req.headers["x-forwarded-for"]}`);
 }).listen(3000)' >/dev/null
@@ -73,7 +77,16 @@ check "widget /v1/public/*: 200 from the API" "upstream" "$out" yes
 check "widget /v1/public/*: frame-ancestors 'none'" "Content-Security-Policy: .*frame-ancestors 'none'" "$out" yes
 check "widget /v1/public/*: no X-Frame-Options" "X-Frame-Options" "$out" no
 
-for path in / /api/auth/get-session /v1/venues/x/reservations /index.html; do
+out=$(get staff.test "/r?lang=en")
+check "staff /r: 404" "HTTP/1.1 404" "$out" yes
+check "staff /r: never reaches the API" "upstream" "$out" no
+
+out=$(get book.test "/r?lang=en")
+check "widget /r: 200 from the API" "upstream" "$out" yes
+check "widget /r: the API's frame-ancestors 'none'" "Content-Security-Policy: .*frame-ancestors 'none'" "$out" yes
+check "widget /r: the API's X-Frame-Options DENY" "X-Frame-Options: DENY" "$out" yes
+
+for path in / /r/ /api/auth/get-session /v1/venues/x/reservations /index.html; do
   out=$(get book.test "$path")
   check "widget $path: 404, not proxied" "HTTP/1.1 404" "$out" yes
 done

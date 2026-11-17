@@ -25,6 +25,10 @@
 		respond 404
 	}
 
+	handle /r {
+		respond 404
+	}
+
 	handle /v1/* {
 		reverse_proxy {$API_UPSTREAM:api:3000}
 	}
@@ -52,6 +56,11 @@
 	header @https Strict-Transport-Security "max-age=31536000"
 
 	handle /w/* {
+		reverse_proxy {$API_UPSTREAM:api:3000}
+	}
+
+	# The self-service page. The API sends its headers, frame-ancestors 'none' among them.
+	handle /r {
 		reverse_proxy {$API_UPSTREAM:api:3000}
 	}
 

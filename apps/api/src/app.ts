@@ -60,6 +60,8 @@ import {
   defaultWidgetDist,
   NOT_FOUND_HTML,
   readWidgetAsset,
+  SELF_SERVICE_TITLES,
+  selfServiceHeaders,
   servesWidgetOn,
   widgetAssets,
   widgetHeaders,
@@ -336,6 +338,13 @@ app.post("/v1/public/:bookingKey/reservations", async (c) => {
 const widgetServing = widgetServingFromEnv();
 const widgetDist = () => process.env.WIDGET_DIST || defaultWidgetDist();
 const widgetNotFound = (c: any) => c.body(NOT_FOUND_HTML, 404, widgetHeaders([]));
+const widgetNotBuilt = (c: any) => {
+  console.error(`widget page: no build in ${widgetDist()}. Run pnpm --filter @opencovers/widget build.`);
+  return c.body("The booking widget is not built.", 503, {
+    ...widgetHeaders([]),
+    "Content-Type": "text/plain; charset=utf-8",
+  });
+};
 
 app.get("/w/assets/:file", (c) => {
   const asset = servesWidgetOn(widgetServing, c.req.url) && readWidgetAsset(widgetDist(), c.req.param("file"));
@@ -354,13 +363,7 @@ app.get("/w/:bookingKey", async (c) => {
   const target = await resolveBookingKey(db, c.req.param("bookingKey"));
   if (!target) return widgetNotFound(c);
   const assets = widgetAssets(widgetDist());
-  if (!assets) {
-    console.error(`widget page: no build in ${widgetDist()}. Run pnpm --filter @opencovers/widget build.`);
-    return c.body("The booking widget is not built.", 503, {
-      ...widgetHeaders([]),
-      "Content-Type": "text/plain; charset=utf-8",
-    });
-  }
+  if (!assets) return widgetNotBuilt(c);
   const lang = c.req.query("lang");
   const html = widgetHtml({
     lang: lang && (LOCALES as readonly string[]).includes(lang) ? lang : target.settings.locale,
@@ -368,6 +371,18 @@ app.get("/w/:bookingKey", async (c) => {
     assets,
   });
   return c.body(html, 200, widgetHeaders(target.settings.allowedOrigins));
+});
+
+// The self-service page (ADR-0017 section 2, stage 6), the same widget build. The token rides in the fragment and
+// never reaches this route, so the page is the same for every booking and reads the booking itself. It answers on
+// the hosts `/w/*` answers on, and is never framed.
+app.get("/r", (c) => {
+  if (!servesWidgetOn(widgetServing, c.req.url)) return widgetNotFound(c);
+  const assets = widgetAssets(widgetDist());
+  if (!assets) return widgetNotBuilt(c);
+  const query = c.req.query("lang");
+  const lang = query && Object.hasOwn(SELF_SERVICE_TITLES, query) ? query : "es";
+  return c.body(widgetHtml({ lang, title: SELF_SERVICE_TITLES[lang], assets }), 200, selfServiceHeaders());
 });
 
 app.use("/v1/venues/:venueId/*", async (c, next) => {
