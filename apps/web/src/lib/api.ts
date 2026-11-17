@@ -1,3 +1,4 @@
+import type { OnlineBooking, OnlineBookingSaved, OnlineBookingUpdate } from "@/lib/online-booking";
 import type { PublicProfile } from "@/lib/public-profile";
 
 export type Role ="read" | "write" | "admin";
@@ -357,6 +358,21 @@ export const api = {
       method: "PUT",
       headers: { "Idempotency-Key": crypto.randomUUID() },
       body: JSON.stringify(body),
+    }),
+
+  getOnlineBooking: (venueId: string) =>
+    request<OnlineBooking>(`/v1/venues/${venueId}/online-booking`),
+
+  setOnlineBooking: (venueId: string, body: OnlineBookingUpdate) =>
+    request<OnlineBookingSaved>(`/v1/venues/${venueId}/online-booking`, {
+      method: "PUT",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify(body),
+    }),
+
+  rotateBookingKey: (venueId: string) =>
+    request<OnlineBooking>(`/v1/venues/${venueId}/online-booking/rotate-key`, {
+      method: "POST",
     }),
 
   listVenueKeys: (venueId: string) =>
