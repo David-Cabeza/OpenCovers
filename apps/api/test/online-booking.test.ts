@@ -7,6 +7,7 @@ import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
 import { services, venueOnlineBooking, venues } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
+import { DEFAULT_BACKGROUND, DEFAULT_TEXT } from "../src/lib/online-booking";
 
 const KEY = /^pk_[A-Za-z0-9_-]{22}$/;
 
@@ -215,6 +216,33 @@ describe("online booking settings", () => {
       { theme: { logoUrl: "https://user:pw@example.com/l.png" } },
       { theme: { logoUrl: `https://example.com/${"a".repeat(2048)}` } },
       { theme: { logoUrl: "javascript:alert(1)" } },
+      { theme: [] },
+      { theme: { colors: ["#ffffff"] } },
+      { theme: { colors: { primary: null } } },
+      { theme: { colors: { primary: "red; background:url(https://evil.example/x)" } } },
+      { theme: { colors: { background: "#ffffff;}body{display:none" } } },
+      { theme: { colors: { text: "var(--x)" } } },
+      { theme: { colors: { text: "rgb(0,0,0)" } } },
+      { theme: { colors: { text: "#00000000" } } },
+      { theme: { colors: { text: ` #000000` } } },
+      { theme: { radius: "8px" } },
+      { theme: { radius: "8" } },
+      { theme: { radius: 1e9 } },
+      { theme: { font: "serif; } body { background: red" } },
+      { theme: { font: "<script>alert(1)</script>" } },
+      { theme: { font: ["serif"] } },
+      { theme: { logoUrl: "data:image/svg+xml,<svg onload=alert(1)>" } },
+      { theme: { logoUrl: "JavaScript:alert(1)" } },
+      { theme: { logoUrl: "//evil.example/l.png" } },
+      { theme: { logoUrl: "https://" } },
+      { theme: { logoUrl: " https://example.com/l.png" } },
+      { theme: { logoUrl: "https://example.com/l.png\n<script>" } },
+      { theme: { logoUrl: 'https://example.com/l.png" onerror="alert(1)' } },
+      { theme: { logoUrl: { href: "https://example.com/l.png" } } },
+      { theme: { css: "body{}", colors: { text: "#000000" } } },
+      { theme: { template: "{{name}}" } },
+      { theme: { html: "<b>x</b>" } },
+      { theme: { colors: Object.fromEntries(Array.from({ length: 5000 }, (_, i) => [`k${i}`, "#000000"])) } },
       { locale: "en", maxPartySize: 500 },
     ];
     for (const body of bad) {
@@ -266,6 +294,27 @@ describe("online booking settings", () => {
     const ok = await put("oa", "oa-admin", { theme: { colors: { text: "#000000", background: "#ffffff" } } });
     expect((await ok.json()).warnings).toEqual([]);
     await put("oa", "oa-admin", { theme: null });
+  });
+
+  it("checks a color the theme leaves out against the widget's built-in one", async () => {
+    const dark = await put("oa", "oa-admin", { theme: { colors: { background: "#222222" } } });
+    expect(dark.status).toBe(200);
+    expect((await dark.json()).warnings).toEqual([expect.objectContaining({ code: "low_contrast" })]);
+    const pale = await (await put("oa", "oa-admin", { theme: { colors: { text: "#eeeeee" } } })).json();
+    expect(pale.warnings).toEqual([expect.objectContaining({ code: "low_contrast" })]);
+    expect(pale.theme).toEqual({ colors: { text: "#eeeeee" } });
+    const edge = await (await put("oa", "oa-admin", { theme: { colors: { text: "#767676" } } })).json();
+    expect(edge.warnings).toEqual([]);
+    const below = await (await put("oa", "oa-admin", { theme: { colors: { text: "#777777" } } })).json();
+    expect(below.warnings[0].ratio).toBe(4.48);
+    expect((await (await put("oa", "oa-admin", { theme: { radius: 4 } })).json()).warnings).toEqual([]);
+    expect((await (await put("oa", "oa-admin", { theme: null })).json()).warnings).toEqual([]);
+  });
+
+  it("keeps the built-in contrast colors equal to the widget's stylesheet", () => {
+    const css = readFileSync(path.resolve(import.meta.dirname, "../../widget/src/styles.css"), "utf8");
+    expect(css).toContain(`--oc-text: ${DEFAULT_TEXT};`);
+    expect(css).toContain(`--oc-background: ${DEFAULT_BACKGROUND};`);
   });
 });
 

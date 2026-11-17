@@ -1,6 +1,9 @@
-import { screen, waitFor } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_THEME, FONT_STACKS, isLogoUrl } from "@/lib/online-booking";
 import { mockApi, renderWithApp, resetApiMocks } from "@/test/mock-api";
 import { OnlineBookingCard } from "./online-booking-card";
 import { SetupView } from "./setup-view";
@@ -209,6 +212,139 @@ describe("OnlineBookingCard", () => {
 
     expect(await screen.findByText("Only an admin can rotate the booking key.")).toBeInTheDocument();
     expect(screen.getByLabelText("Public booking key")).toHaveValue("pk_old");
+  });
+
+  it("shows the built-in look when the venue has no theme", async () => {
+    setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    expect(screen.getByLabelText("Buttons")).toHaveValue(DEFAULT_THEME.colors.primary);
+    expect(screen.getByLabelText("Text")).toHaveValue(DEFAULT_THEME.colors.text);
+    expect(screen.getByLabelText("Corner radius (px)")).toHaveValue("8");
+    expect(screen.getByLabelText("Font")).toHaveValue("system");
+    expect(screen.getByLabelText("Logo address")).toHaveValue("");
+    expect(screen.getByRole("img", { name: "Preview of the booking page" })).toHaveStyle({
+      background: DEFAULT_THEME.colors.background,
+    });
+  });
+
+  it("sends only the theme keys that differ from the built-in look, and the preview follows", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    fireEvent.change(screen.getByLabelText("Buttons"), { target: { value: "#aa0000" } });
+    fireEvent.change(screen.getByLabelText("Background"), { target: { value: "#fafafa" } });
+    await user.clear(screen.getByLabelText("Corner radius (px)"));
+    await user.type(screen.getByLabelText("Corner radius (px)"), "0");
+    await user.selectOptions(screen.getByLabelText("Font"), "serif");
+    await user.type(screen.getByLabelText("Logo address"), "https://cdn.example.com/logo.png");
+    const preview = screen.getByRole("img", { name: "Preview of the booking page" });
+    expect(preview).toHaveStyle({ background: "#fafafa", borderRadius: "0px" });
+    expect(within(preview).getByText("Book")).toHaveStyle({ background: "#aa0000" });
+    expect(within(preview).getByText("Logo")).toBeInTheDocument();
+    expect(preview.querySelector("img")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0].body).toEqual({
+      theme: {
+        colors: { primary: "#aa0000", background: "#fafafa" },
+        radius: 0,
+        font: "serif",
+        logoUrl: "https://cdn.example.com/logo.png",
+      },
+    });
+  });
+
+  it("refuses a logo that is not an https image address and sends nothing", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await user.type(screen.getByLabelText("Logo address"), "http://example.com/l.png");
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+    expect(
+      await screen.findByText("An https address of an image, with no spaces, up to 2048 characters."),
+    ).toBeInTheDocument();
+    for (const bad of [
+      "http://example.com/l.png",
+      "javascript:alert(1)",
+      "data:image/png;base64,AAAA",
+      "https://user:pw@example.com/l.png",
+      "https://example.com/a b.png",
+      `https://example.com/${"a".repeat(2048)}`,
+    ]) {
+      expect(isLogoUrl(bad), bad).toBe(false);
+    }
+    expect(isLogoUrl("https://cdn.example.com/logo.png")).toBe(true);
+    await user.clear(screen.getByLabelText("Corner radius (px)"));
+    await user.type(screen.getByLabelText("Corner radius (px)"), "30");
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+    expect(await screen.findByText("Whole number of pixels from 0 to 24.")).toBeInTheDocument();
+    expect(api.calls("PUT", PATH)).toHaveLength(0);
+  });
+
+  it("resets the look to the built-in defaults with theme null", async () => {
+    const user = userEvent.setup();
+    const api = setup({ theme: { colors: { primary: "#aa0000" }, font: "rounded" } } as Partial<typeof SETTINGS>, {
+      [`PUT ${PATH}`]: { body: { ...SETTINGS, warnings: [] } },
+    });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await waitFor(() => expect(screen.getByLabelText("Buttons")).toHaveValue("#aa0000"));
+    await user.click(screen.getByRole("button", { name: "Reset look to defaults" }));
+    expect(screen.getByLabelText("Font")).toHaveValue("system");
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0].body).toEqual({ theme: null });
+  });
+
+  it("shows the contrast warning after a save that the engine accepted with low_contrast", async () => {
+    const user = userEvent.setup();
+    setup({}, {
+      [`PUT ${PATH}`]: (r) => ({
+        body: {
+          ...SETTINGS,
+          ...(r.body as object),
+          warnings: [{ code: "low_contrast", message: "low", ratio: 1.24 }],
+        },
+      }),
+    });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "#dddddd" } });
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+
+    const alert = await screen.findByText(/contrast of 1.24:1 against the background/);
+    expect(alert).toHaveTextContent("Saved, but");
+    expect(alert).toHaveTextContent("4.5:1");
+  });
+
+  it("keeps the built-in look equal to the widget's stylesheet", () => {
+    const css = readFileSync(path.resolve(import.meta.dirname, "../../../../widget/src/styles.css"), "utf8");
+    const vars = {
+      primary: "--oc-primary",
+      onPrimary: "--oc-on-primary",
+      background: "--oc-background",
+      surface: "--oc-surface",
+      text: "--oc-text",
+      muted: "--oc-muted",
+      border: "--oc-border",
+    } as const;
+    for (const [key, name] of Object.entries(vars)) {
+      expect(css).toContain(`${name}: ${DEFAULT_THEME.colors[key as keyof typeof vars]};`);
+    }
+    expect(css).toContain(`--oc-radius: ${DEFAULT_THEME.radius}px;`);
+    expect(css).toContain(`--oc-font: ${FONT_STACKS.system};`);
+    const widgetTheme = readFileSync(path.resolve(import.meta.dirname, "../../../../widget/src/theme.ts"), "utf8");
+    for (const stack of Object.values(FONT_STACKS)) expect(widgetTheme).toContain(`'${stack}'`);
   });
 
   it("is only shown to an admin in the Setup view", async () => {

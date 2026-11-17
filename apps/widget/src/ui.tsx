@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { logoSrc } from "./theme";
 
 /**
  * A step with its heading. `focus` moves focus to the heading when the step appears after a guest action. The
@@ -28,6 +29,13 @@ const buttonClass =
 export const primaryButton = `${buttonClass} w-full bg-primary text-on-primary`;
 export const secondaryButton = `${buttonClass} border border-border bg-surface text-text`;
 export const dangerButton = `${buttonClass} w-full bg-danger text-on-primary`;
+
+/** The venue's logo from its theme, or nothing when the theme has no valid `https` logo. */
+export function Logo({ theme, venue }: { theme: unknown; venue: string }) {
+  const src = logoSrc(theme);
+  if (!src) return null;
+  return <img src={src} alt={venue} referrerPolicy="no-referrer" decoding="async" className="mb-4 h-12 w-auto max-w-full object-contain" />;
+}
 
 export function Field(props: { id: string; label: string; hint?: string; error?: string; children: ReactNode }) {
   return (

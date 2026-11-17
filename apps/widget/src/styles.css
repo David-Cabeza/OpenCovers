@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Theme tokens with built-in defaults. Stage 9 of ADR-0017 sets them per venue from validated theme data. */
+/* Theme tokens with built-in defaults. `theme.ts` sets them per venue from validated theme data. */
 :root {
   --oc-primary: #1f4d3a;
   --oc-on-primary: #ffffff;

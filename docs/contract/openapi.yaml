@@ -1730,6 +1730,8 @@ paths:
 
         A save whose `theme` text color has a contrast below 4.5:1 against
         its background color succeeds and returns a `low_contrast` warning.
+        A color the theme leaves out counts as the widget's built-in one
+        (text `#1c1b19`, background `#ffffff`).
         A change never alters a booking that already exists. Not exposed
         through MCP.
       parameters:
@@ -3469,7 +3471,10 @@ components:
           format: uri
           maxLength: 2048
           nullable: true
-          description: https only, with no credentials. The widget shows it as an image.
+          description: |
+            https only, with a host, no credentials and no whitespace or
+            control characters. The widget shows it as an image with no
+            referrer, and the guest's browser fetches it from that address.
 
     HexColor:
       type: string
@@ -3665,7 +3670,7 @@ components:
                   code:
                     type: string
                     enum: [low_contrast]
-                    description: The theme's text color has a contrast below 4.5:1 (WCAG AA) against its background color.
+                    description: The theme's text color has a contrast below 4.5:1 (WCAG AA) against its background color, either one the built-in color when the theme leaves it out.
                   message: { type: string }
                   ratio: { type: number, example: 3.2 }
 
