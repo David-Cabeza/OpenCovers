@@ -129,7 +129,7 @@ Consequence. The API image sets `NODE_ENV=production`, and `compose.prod.yaml` a
 ### What is not covered
 
 - **A distributed attacker.** The key is the address. Many addresses mean many budgets. There is no per-account lockout, because it would let an attacker lock a staff member out. There is no CAPTCHA and no second factor.
-- **Every other `/v1` route.** Reservation writes, key creation, webhooks and `POST /v1/venues` are not limited. Agents with a valid key are expected to be busy.
+- **Every other `/v1` route.** Reservation writes, key creation and webhooks are not limited. `POST /v1/venues` is limited since the 2026-11-17 amendment below. Agents with a valid key are expected to be busy.
 - **Reads.** Session reads, availability and the event feed are not limited.
 - **Request size.** The hardening guide still lists body limits.
 - **A shared address.** One abusive person on a venue's network spends the budget of everyone behind that address.
@@ -157,3 +157,11 @@ An edge limit, such as a CDN or a Caddy build with a rate-limit module, stays a 
 - **Lock the account after repeated failures.** Rejected. It hands an attacker a way to lock out any staff member.
 - **A sliding window or token bucket.** Rejected. More state for a smoother edge that does not change the decision.
 - **Default off, opt in.** Rejected. A fork that changes nothing would stay unprotected, which is the problem this ADR exists to fix.
+
+## Amendment 2026-11-17: venue creation
+
+`POST /v1/venues` is now limited by a fourth rule, `venue_creation`, with the same limiter, response, client address and `TRUST_PROXY` handling. The default is 10 per hour per client address, set by `RATE_LIMIT_VENUE_CREATION` as `max/window`. It is rare for an owner to create more than a few venues in an hour, and a restaurant group seeding a dozen fits one window, while a script that creates thousands is stopped. ADR-0008 left this open ("the owner can create venues without a bound").
+
+- It runs before the session and the body are read, so a call that fails with `unauthorized`, `403 venue_creation_closed` or `invalid_request` spends budget like one that creates a venue. This follows "every request counts, whatever its outcome" above, and it keeps the refusal independent of the account, as the No oracle driver requires. The cost is that a refused account behind a shared address spends the budget of that address.
+- The route takes no `Idempotency-Key`, so there is no replay to exempt. A repeated call is a new call and counts.
+- `GET /v1/venues` and every other `/v1/venues/{venueId}/...` route are unaffected. Only the exact path `POST /v1/venues`, after the slash normalization, matches.

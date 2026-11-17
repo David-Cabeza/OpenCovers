@@ -108,7 +108,7 @@ Any other account gets `403` with the code `venue_creation_closed`, an invited `
 
 ## Rate limiting
 
-The API limits sign-in, sign-up and invitation redemption per client address. It keeps the counters in memory. A refused call returns `429` with the code `rate_limited` and a `Retry-After` header. [ADR-0007](adr/0007-rate-limiting.md) has the design and the measured behavior of Better Auth's own limiter.
+The API limits sign-in, sign-up, invitation redemption and venue creation per client address. It keeps the counters in memory. A refused call returns `429` with the code `rate_limited` and a `Retry-After` header. [ADR-0007](adr/0007-rate-limiting.md) has the design and the measured behavior of Better Auth's own limiter.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -117,6 +117,7 @@ The API limits sign-in, sign-up and invitation redemption per client address. It
 | `RATE_LIMIT_AUTH` | `30/15m` | Sign-in and every other write under `/api/auth` except sign-up. |
 | `RATE_LIMIT_SIGNUP` | `5/1h` | Sign-up. |
 | `RATE_LIMIT_INVITATION` | `10/15m` | `POST /v1/invitations/redeem` and a sign-up that carries `X-Invitation-Token`. |
+| `RATE_LIMIT_VENUE_CREATION` | `10/1h` | `POST /v1/venues`. Every call counts, including one refused with `401`, `403` or `400`. |
 
 A budget is `max/window`, with a window in `s`, `m` or `h`. An unknown value stops the API at startup and names the variable. An empty value means the default.
 
@@ -167,4 +168,4 @@ The API reads these variables regardless of host:
 | `SIGNUP` | no | `open` (default), `first-user` or `closed`. See Sign-up control. |
 | `RATE_LIMIT` | no | `on` or `off`. Default `on` in `compose.prod.yaml`. See Rate limiting. |
 | `TRUST_PROXY` | no | `false` (default) or `true`. See Rate limiting. |
-| `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |
+| `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION`, `RATE_LIMIT_VENUE_CREATION` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |

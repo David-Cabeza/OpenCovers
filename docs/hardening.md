@@ -147,13 +147,13 @@ Read the commit log or release notes before you update. A pre-alpha release can 
 
 The API code adds none of the following. See known gaps.
 
-- Rate limiting on `/v1/*`.
+- Rate limiting on `/v1/*`, except venue creation (`POST /v1/venues`).
 - Request body size limits.
 - Account lockout or two-factor sign-in.
 
 What the code does provide:
 
-- Rate limits per client address on sign-in and other writes under `/api/auth`, on sign-up, and on invitation redemption, kept in memory. They are on when `NODE_ENV=production` or `RATE_LIMIT=on`, and the compose stack sets both. Outside Docker the operator must set one of them. See known gap 2.
+- Rate limits per client address on sign-in and other writes under `/api/auth`, on sign-up, on invitation redemption, and on venue creation, kept in memory. They are on when `NODE_ENV=production` or `RATE_LIMIT=on`, and the compose stack sets both. Outside Docker the operator must set one of them. See known gap 2.
 - Security headers, set by `apps/web/Caddyfile` on every response from the `web` service. See Security headers below.
 
 - Webhook targets are checked before delivery. Plain `http` and private addresses are rejected unless `WEBHOOK_ALLOW_INSECURE=true`. Never set that variable in production. The API logs a warning at startup when it is on.
@@ -186,15 +186,16 @@ Close these before you serve real guests, or accept the risk knowingly.
    - The first visitor to a fresh `first-user` instance becomes the owner. Register your own account before you publish the address.
    - Upgrading changes the compose default from open to `first-user`. An instance that already has accounts closes to new sign-ups on its next `up`. An instance with no accounts stays claimable. If you relied on open sign-up, set `SIGNUP=open` in `.env.prod`.
    - Staff are added with an invitation through the API, with no SQL. The Team screen of the staff app creates and revokes invitations, lists and removes members, and changes their roles. An invitee redeems from the invite link in the staff app, see [Adding staff](deploy.md#adding-staff). The API can list and revoke invitations, list and remove members, and change roles. Removing a person revokes the keys they made, with the limits in gap 5. See [ADR-0006](adr/0006-staff-invitations.md), [ADR-0009](adr/0009-venue-members.md) and [ADR-0011](adr/0011-member-removal-revocation.md).
-   - Venue creation follows `SIGNUP`. Under `first-user` and `closed`, only the owner, the account that claimed the instance, can create a venue. Any other account, an invited `admin` included, gets `403 venue_creation_closed` and keeps its own venues. API keys never create venues. Under `open` any account can, so only `first-user` and `closed` limit it. This does not stop an invited `admin` from running the venue it holds, which includes keys and more invitations. An instance whose accounts were created under `open` has no owner, so nobody can create a venue under `first-user` or `closed` until you mark one with the one SQL step in [Who can create a venue](deploy.md#who-can-create-a-venue). Once an owner exists, they hand the role over through the API, see [ADR-0016](adr/0016-member-roles-and-creator-transfer.md). The rate limits in gap 2 do not cover `POST /v1/venues`, so venue creation is not rate limited. See [ADR-0008](adr/0008-venue-creation-limit.md).
+   - Venue creation follows `SIGNUP`. Under `first-user` and `closed`, only the owner, the account that claimed the instance, can create a venue. Any other account, an invited `admin` included, gets `403 venue_creation_closed` and keeps its own venues. API keys never create venues. Under `open` any account can, so only `first-user` and `closed` limit it. This does not stop an invited `admin` from running the venue it holds, which includes keys and more invitations. An instance whose accounts were created under `open` has no owner, so nobody can create a venue under `first-user` or `closed` until you mark one with the one SQL step in [Who can create a venue](deploy.md#who-can-create-a-venue). Once an owner exists, they hand the role over through the API, see [ADR-0016](adr/0016-member-roles-and-creator-transfer.md). Venue creation is rate limited per client address by gap 2 (10 per hour). See [ADR-0008](adr/0008-venue-creation-limit.md).
    - If two first sign-ups arrive at the same moment, the database lets one commit. The loser gets a generic failure from the database error, not the `SIGNUP_CLOSED` message. Sign-up is rate limited per address. See gap 2.
-2. **Rate limiting covers credentials only.** The API limits three kinds of call per client address, in memory. Defaults are in brackets. See [ADR-0007](adr/0007-rate-limiting.md) and [Rate limiting](deploy.md#rate-limiting).
+2. **Rate limiting covers credentials and venue creation only.** The API limits four kinds of call per client address, in memory. Defaults are in brackets. See [ADR-0007](adr/0007-rate-limiting.md) and [Rate limiting](deploy.md#rate-limiting).
    - Sign-in and every other write under `/api/auth` except sign-up (30 per 15 minutes).
    - Sign-up (5 per hour).
    - `POST /v1/invitations/redeem` and a sign-up that carries `X-Invitation-Token` (10 per 15 minutes).
+   - `POST /v1/venues` (10 per hour). Every call counts, a refused one included.
 
    A refused call returns `429` with `rate_limited` and `Retry-After`, the same whatever the request names. Reads, `/health` and CORS preflights are never limited. What is **not** covered:
-   - Every other `/v1` route, including reservation writes, key creation, webhooks and `POST /v1/venues`.
+   - Every other `/v1` route, including reservation writes, key creation and webhooks.
    - An attacker with many addresses. The key is the address. There is no account lockout, no CAPTCHA and no second factor.
    - Several API instances and restarts. Counters live in the process, so a restart clears them and two instances count separately. Compose runs one.
    - A shared address. People behind one venue network share a budget.

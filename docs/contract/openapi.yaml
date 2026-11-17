@@ -11,8 +11,9 @@ info:
 
     Some calls are rate limited per client address. A refused call returns
     429 with the code `rate_limited` and a `Retry-After` header. The limited
-    calls are the sign-in and sign-up routes under /api/auth and invitation
-    redemption. They are listed in docs/adr/0007-rate-limiting.md.
+    calls are the sign-in and sign-up routes under /api/auth, invitation
+    redemption and venue creation (`POST /venues`). They are listed in
+    docs/adr/0007-rate-limiting.md.
 
 security:
   - ApiKeyAuth: []
@@ -64,6 +65,14 @@ paths:
         the `admin` role in an existing venue, fails with `403` and
         `venue_creation_closed`, and nothing is created. That check runs
         before the body is validated. See ADR-0008.
+
+        The call is rate limited per client address, 10 per hour by default
+        (`RATE_LIMIT_VENUE_CREATION`). The limit runs before the session and
+        the body are read, so a call that fails with `unauthorized`, `403` or
+        `invalid_request` also spends budget. The route takes no
+        `Idempotency-Key`, so a repeated call is a new call and counts.
+        A call over the limit fails with `429`, `rate_limited` and
+        `Retry-After`, and creates nothing. See ADR-0007.
       security: []
       requestBody:
         required: true
@@ -91,6 +100,8 @@ paths:
                     properties:
                       id: { type: string }
                       name: { type: string }
+        "429":
+          $ref: "#/components/responses/RateLimited"
         default:
           $ref: "#/components/responses/Error"
 

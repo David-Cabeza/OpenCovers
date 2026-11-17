@@ -11,6 +11,7 @@ process.env.TRUST_PROXY = "true";
 process.env.RATE_LIMIT_AUTH = "3/1h";
 process.env.RATE_LIMIT_SIGNUP = "2/1h";
 process.env.RATE_LIMIT_INVITATION = "4/1h";
+process.env.RATE_LIMIT_VENUE_CREATION = "3/1h";
 
 const { default: app } = await import("../src/app");
 
@@ -30,6 +31,8 @@ afterAll(() => {
   delete process.env.RATE_LIMIT_AUTH;
   delete process.env.RATE_LIMIT_SIGNUP;
   delete process.env.RATE_LIMIT_INVITATION;
+  delete process.env.RATE_LIMIT_VENUE_CREATION;
+  delete process.env.SIGNUP;
 });
 
 let counter = 0;
@@ -206,5 +209,67 @@ describe("rate limiting on the real app", () => {
     });
     expect(refused.status).toBe(429);
     expect(await db.select().from(user).where(sql`email = 'late@example.com'`)).toHaveLength(0);
+  });
+
+  describe("venue creation", () => {
+    function create(ip: string, cookie: string | undefined, body: unknown, headers: Record<string, string> = {}) {
+      return post("/v1/venues", ip, body, { ...(cookie ? { cookie } : {}), ...headers });
+    }
+
+    it("creates venues until the budget is spent, then answers 429 with Retry-After and creates nothing", async () => {
+      const cookie = await adminCookie("v-base");
+      const ip = freshIp();
+      const out: number[] = [];
+      for (let i = 0; i < 3; i += 1) out.push((await create(ip, cookie, { name: `V${i}` })).status);
+      expect(out).toEqual([201, 201, 201]);
+
+      const res = await create(ip, cookie, { name: "Over" });
+      expect(res.status).toBe(429);
+      expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+      expect(await res.json()).toEqual({ code: "rate_limited", message: expect.any(String), retryable: true });
+      const names = (await db.execute(sql`SELECT name FROM venues`)).rows.map((r) => r.name);
+      expect(names).not.toContain("Over");
+      expect(names).toHaveLength(4);
+    });
+
+    it("keys clients separately and leaves other routes alone", async () => {
+      const cookie = await adminCookie("v-other");
+      const spent = freshIp();
+      for (let i = 0; i < 4; i += 1) await create(spent, cookie, { name: `S${i}` });
+      expect((await create(spent, cookie, { name: "again" })).status).toBe(429);
+      expect((await create(freshIp(), cookie, { name: "elsewhere" })).status).toBe(201);
+
+      const list = await app.request("/v1/venues", { headers: { cookie, "x-forwarded-for": spent } });
+      expect(list.status).toBe(200);
+      expect((await signIn(spent, "nobody@example.com")).status).toBe(401);
+      const inv = await post("/v1/venues/v-other/invitations", spent, { role: "write" }, { cookie });
+      expect(inv.status).toBe(201);
+    });
+
+    it("counts refused creations: a 401 and a 403 venue_creation_closed spend the budget", async () => {
+      const cookie = await adminCookie("v-closed");
+      process.env.SIGNUP = "first-user";
+      const ip = freshIp();
+      expect((await create(ip, undefined, { name: "x" })).status).toBe(401);
+      const refused = await create(ip, cookie, { name: "x" });
+      expect(refused.status).toBe(403);
+      expect((await refused.json()).code).toBe("venue_creation_closed");
+      expect((await create(ip, cookie, { name: "x" })).status).toBe(403);
+      const limited = await create(ip, cookie, { name: "x" });
+      expect(limited.status).toBe(429);
+      expect((await limited.json()).code).toBe("rate_limited");
+    });
+
+    it("counts a replay of the same request: the route takes no Idempotency-Key, so every call spends budget", async () => {
+      const cookie = await adminCookie("v-replay");
+      const ip = freshIp();
+      const headers = { "idempotency-key": "same-key" };
+      const out: number[] = [];
+      for (let i = 0; i < 4; i += 1) {
+        out.push((await create(ip, cookie, { id: "slug-replay", name: "R" }, headers)).status);
+      }
+      expect(out[0]).toBe(201);
+      expect(out[3]).toBe(429);
+    });
   });
 });
