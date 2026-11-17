@@ -38,6 +38,8 @@ To serve a real domain, set `SITE_ADDRESS=app.example.com` and `PUBLIC_URL=https
 
 The API image applies migrations on boot. PostgreSQL is not published to the host.
 
+The API image installs production dependencies only (`pnpm install --prod`), so the test runner, the bundler, `drizzle-kit` and `typescript` are not in it. The image still runs the API from source with `tsx`, which is why `tsx` is a production dependency of `apps/api`. We chose that over compiling the API to JavaScript because it is a smaller change and the one remaining `esbuild` is `tsx`'s own. Compiling would also drop `tsx` and `esbuild`, at the cost of a build stage and a compiled migrate script. `.pnpmfile.cjs` removes `drizzle-kit` and `vitest` from `better-auth`'s optional peer dependencies, because pnpm otherwise links them into the image through `better-auth`.
+
 Before you serve real guests, read the [hardening guide](hardening.md). It covers secrets, backups, key rotation, updates and the known gaps.
 
 To use an external PostgreSQL instead, remove the `db` service and its `depends_on` entry, and set `DATABASE_URL` on the `api` service to your connection string.

@@ -3,7 +3,7 @@ FROM node:22-slim AS widget
 RUN corepack enable
 WORKDIR /app
 
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY .pnpmfile.cjs pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY apps/widget/package.json apps/widget/package.json
 
 RUN pnpm install --filter @opencovers/widget --frozen-lockfile
@@ -17,10 +17,10 @@ FROM node:22-slim
 RUN corepack enable
 WORKDIR /app
 
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY .pnpmfile.cjs pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY apps/api/package.json apps/api/package.json
 
-RUN pnpm install --filter @opencovers/api --frozen-lockfile
+RUN pnpm install --filter @opencovers/api --prod --frozen-lockfile
 
 COPY apps/api apps/api
 # The API writes the widget page and serves its assets under /w/ (ADR-0017 section 1).
