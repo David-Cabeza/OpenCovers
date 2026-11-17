@@ -22,7 +22,6 @@ import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
 import {
   guests,
-  idempotencyKeys,
   reservations,
   selfServiceLinks,
   sentEmails,
@@ -220,10 +219,10 @@ describe("guest modify emails are capped per reservation", () => {
 describe("public horizon and retention", () => {
   it("defaults the public horizon to 365 days when venue and online settings are null", async () => {
     const v = await makeVenue();
-    const res = await publicCreate(v.key, createBody(v.key, { date: "9999-12-28" }));
+    expect((await publicCreate(v.key, createBody(v.key, { date: "9999-12-28" }))).status).toBe(400);
+    const res = await publicCreate(v.key, createBody(v.key, { date: ahead(366) }));
     expect(res.status).toBe(400);
     expect((await res.json()).code).toBe("beyond_booking_horizon");
-    expect((await publicCreate(v.key, createBody(v.key, { date: ahead(366) }))).status).toBe(400);
     expect((await publicCreate(v.key, createBody(v.key, { date: ahead(365) }))).status).toBe(200);
     const cfg = await (await app.request(`/v1/public/${v.key}`)).json();
     expect(cfg.maxAdvanceDays).toBe(365);
@@ -244,16 +243,20 @@ describe("public horizon and retention", () => {
     expect((await created.json()).code).toBe("invalid_request");
     const walkIn = await staff(v, "/reservations/walk-in", { date: "9999-12-31", time: "22:00", partySize: 2 });
     expect(walkIn.status).toBe(400);
-    for (const path of [
-      "/availability?date=9999-12-31&partySize=2",
-      "/availability/explain?date=9999-12-31&time=22:00&partySize=2",
-      "/reservations?date=9999-12-31",
-    ]) {
-      const res = await app.request(`/v1/venues/${v.id}${path}`, { headers: { apikey: v.admin } });
-      expect(res.status, path).toBeLessThan(500);
+    for (const date of ["9999-12-31", "0001-01-01", "2030-02-30", "abc"]) {
+      for (const path of [
+        `/availability?date=${date}&partySize=2`,
+        `/availability/explain?date=${date}&time=22:00&partySize=2`,
+        `/agenda?date=${date}`,
+        `/pacing?date=${date}`,
+        `/floor?date=${date}&time=22:00`,
+      ]) {
+        const res = await app.request(`/v1/venues/${v.id}${path}`, { headers: { apikey: v.admin } });
+        expect([path, res.status]).toEqual([path, 400]);
+      }
+      const avail = await app.request(`/v1/public/${v.key}/availability?date=${date}&partySize=2`);
+      expect(avail.status).toBe(400);
     }
-    const avail = await app.request(`/v1/public/${v.key}/availability?date=9999-12-31&partySize=2`);
-    expect(avail.status).toBeLessThan(500);
   });
 
   it("does not let a stranger's future booking, cancelled, keep a guest from retention", async () => {
@@ -295,9 +298,8 @@ describe("erased bookings cannot be revived by a create replay", () => {
     expect(replay.status).toBe(400);
     expect(JSON.parse(text).code).toBe("invalid_request");
     expect(await db.select().from(selfServiceLinks).where(eq(selfServiceLinks.reservationId, b.id))).toHaveLength(0);
-    expect(
-      await db.select().from(idempotencyKeys).where(and(eq(idempotencyKeys.venueId, v.id), eq(idempotencyKeys.reservationId, b.id))),
-    ).toHaveLength(0);
+    expect(text).toBe(JSON.stringify({ code: "invalid_request", message: "invalid_request", retryable: false }));
+    expect(await db.select().from(reservations).where(eq(reservations.venueId, v.id))).toHaveLength(1);
   });
 
   it("refuses a staff reissue for an erased booking", async () => {

@@ -24,6 +24,7 @@ import { linkWorks, mintLink, revokeForCancel, rotateLink } from "./self-service
 import {
   addDays,
   formatTime,
+  isCalendarDate,
   isoWeekday,
   localDateTime,
   normalizeMinute,
@@ -314,6 +315,9 @@ type ServiceRow = typeof services.$inferSelect;
 
 const stricterHorizon = (a: number | null, b: number | null) => (a === null ? b : b === null ? a : Math.min(a, b));
 
+/** The public horizon when neither the venue nor its online settings set one (ADR-0017, amendment of 2026-11-17). */
+export const PUBLIC_DEFAULT_MAX_ADVANCE_DAYS = 365;
+
 /**
  * The venue and services as the channel sees them. The public channel narrows
  * them with the online limits and turns the overbooking ceiling off, so every
@@ -331,7 +335,7 @@ export function applyChannel(
       ...venue,
       overbookingCeiling: 0,
       leadTimeMinutes: Math.max(venue.leadTimeMinutes, rules.leadTimeMinutes),
-      maxAdvanceDays: stricterHorizon(venue.maxAdvanceDays, rules.maxAdvanceDays),
+      maxAdvanceDays: stricterHorizon(venue.maxAdvanceDays, rules.maxAdvanceDays) ?? PUBLIC_DEFAULT_MAX_ADVANCE_DAYS,
     },
     serviceRows: serviceRows
       .filter((s) => rules.services === null || rules.services.includes(s.name))
@@ -726,6 +730,17 @@ async function withTables(
   return rows.map((r) => toReservation(r, timezone, (byReservation.get(r.id) ?? []).sort()));
 }
 
+// An erased booking answers a public replay like a malformed body: nothing of it comes back (C53).
+async function isErased(tx: DbTx, venueId: string, id: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ erased: reservations.erased })
+    .from(reservations)
+    .where(and(eq(reservations.id, id), eq(reservations.venueId, venueId)));
+  return row?.erased ?? true;
+}
+
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 export async function createReservation(
   db: Db,
   venueId: string,
@@ -734,6 +749,7 @@ export async function createReservation(
 ): Promise<WriteResult> {
   const storedVenue = await venueOf(db, venueId);
   if (!storedVenue) return { ok: false, code: "venue_not_found" };
+  if (!isCalendarDate(input.date) || !TIME.test(input.time)) return { ok: false, code: "invalid_request" };
   const channel = input.channel ?? STAFF;
   const { venue, serviceRows } = applyChannel(
     storedVenue,
@@ -784,6 +800,9 @@ export async function createReservation(
       const existing = await claimKey(tx, venueId, key);
       if (existing) {
         if (existing.kind !== "create") throw new ReservationError("invalid_request");
+        if (channel.kind === "public" && (await isErased(tx, venueId, existing.reservationId))) {
+          throw new ReservationError("invalid_request");
+        }
         // Only a hash of the token is stored, so a public repeat cannot return the first token. It rotates.
         const link = channel.kind === "public" ? await rotateLink(tx, venueId, existing.reservationId) : undefined;
         return { id: existing.reservationId, version: existing.version, selfServiceToken: link && link.token };

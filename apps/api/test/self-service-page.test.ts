@@ -19,6 +19,7 @@ import { challengeConfigFromEnv, issueChallenge, solve } from "../src/lib/public
 // The widget's own client, so this drives the engine exactly as the /r page does.
 import { publicApi, selfServiceApi, type SelfServiceToken } from "../../widget/src/api";
 import { createKeyedAction } from "../../widget/src/submit";
+import { saturdayAhead } from "./dates";
 
 const POLICY =
   "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' https: data:; " +
@@ -136,7 +137,7 @@ describe("create, view, change and cancel through the widget's client", () => {
     const challenge = issueChallenge(challengeConfigFromEnv(), bookingKey, Date.now() - 10_000);
     const created = await publicApi(bookingKey, fetcher).create(
       crypto.randomUUID(),
-      { date: "2030-06-01", time: "20:00", partySize: 2, name: "Ana", contact: "ana@example.com", commentary: "", honeypot: "" },
+      { date: saturdayAhead(), time: "20:00", partySize: 2, name: "Ana", contact: "ana@example.com", commentary: "", honeypot: "" },
       challenge,
       solve(challenge),
     );

@@ -142,6 +142,7 @@ import {
   webhookPolicyFromEnv,
 } from "./lib/webhooks";
 import { ERRORS, errorBody, type ErrorCode } from "./lib/errors";
+import { isCalendarDate } from "./lib/time";
 import {
   addWaitlist,
   cancelWaitlist,
@@ -258,8 +259,8 @@ app.post("/v1/public/self-service/modify", async (c) => {
     storedKey(key),
   );
   if (!result.ok) return error(c, result.code);
-  if (input.partySize !== undefined) {
-    void notifyReservation(db, link.venueId, link.reservationId, result.version, "confirmation");
+  if (input.partySize !== undefined && result.version !== input.version) {
+    void notifyReservation(db, link.venueId, link.reservationId, result.version, "confirmation", { guestModify: true });
   }
   return guestAnswer(c, link);
 });
@@ -925,7 +926,7 @@ app.get("/v1/venues/:venueId/reservations", async (c) => {
 app.get("/v1/venues/:venueId/agenda", async (c) => {
   const venueId = c.req.param("venueId");
   const date = c.req.query("date");
-  if (!date) return error(c, "invalid_request");
+  if (!date || !isDate(date)) return error(c, "invalid_request");
   const reservations = await listByDate(db, venueId, date);
   return c.json({ reservations: reservations.map((r) => toApi(r, venueId)) });
 });
@@ -957,7 +958,7 @@ app.get("/v1/venues/:venueId/availability", async (c) => {
   const venueId = c.req.param("venueId");
   const date = c.req.query("date");
   const partySizeRaw = c.req.query("partySize");
-  if (!date || !partySizeRaw) return error(c, "invalid_request");
+  if (!date || !isDate(date) || !partySizeRaw) return error(c, "invalid_request");
   const partySize = parseInt(partySizeRaw, 10);
   if (Number.isNaN(partySize)) return error(c, "invalid_request");
   const availability = await getAvailability(db, venueId, date, partySize);
@@ -987,6 +988,9 @@ app.get("/v1/venues/:venueId/floor", async (c) => {
   const venueId = c.req.param("venueId");
   const date = c.req.query("date");
   const time = c.req.query("time");
+  if ((date !== undefined && !isDate(date)) || (time !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time))) {
+    return error(c, "invalid_request");
+  }
   const tables = await getFloorPlan(db, venueId, date, time);
   return c.json({ tables });
 });
@@ -994,7 +998,7 @@ app.get("/v1/venues/:venueId/floor", async (c) => {
 app.get("/v1/venues/:venueId/pacing", async (c) => {
   const venueId = c.req.param("venueId");
   const date = c.req.query("date");
-  if (!date) return error(c, "invalid_request");
+  if (!date || !isDate(date)) return error(c, "invalid_request");
   const pacing = await getPacing(db, venueId, date);
   return c.json({ pacing });
 });
@@ -1439,8 +1443,7 @@ function isRole(value: unknown): value is "read" | "write" | "admin" {
 }
 
 function isDate(value: string): boolean {
-  const ms = Date.parse(`${value}T00:00:00Z`);
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(ms) && new Date(ms).toISOString().startsWith(value);
+  return isCalendarDate(value);
 }
 
 function isPartyLimit(value: unknown): boolean {

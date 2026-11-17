@@ -272,6 +272,10 @@ paths:
         the lead time, or to the booking horizon and blocked dates of the
         venue. A date further ahead than `maxAdvanceDays` fails with
         `beyond_booking_horizon`, and a blocked date with `date_blocked`.
+        A `date` that is not a real `YYYY-MM-DD` calendar date, or is
+        outside `1900-01-01` to `9998-12-31`, and a `time` that is not
+        `HH:MM`, fail with `invalid_request`, here, on the walk-in and on
+        every query that takes a date (C60).
         A guest who already holds `maxActivePerGuestPerDay` active bookings
         on the date, found by the guest's contact, fails with
         `guest_booking_limit` (409). A booking without a usable contact is
@@ -2081,7 +2085,10 @@ paths:
 
         A modify does not rotate the link and does not change attribution.
         With `notificationsEnabled` on, a change of the party size sends one
-        `confirmation` for the new version, with no link. Limited by
+        `confirmation` for the new version, with no link, within a limit per
+        reservation: at most 3 such confirmations, at least 15 minutes apart
+        (C60). A modify past the limit, and one that changes nothing, still
+        answers as usual and sends nothing. Limited by
         `self_service`. Not exposed through MCP.
       security: []
       parameters:
@@ -2677,7 +2684,11 @@ components:
         lastVisitAt:
           type: string
           format: date-time
-          description: The start of the guest's latest reservation. Retention counts from it.
+          description: |
+            The start of the guest's latest reservation, never later than now:
+            a booking that has not started yet counts from the moment it was
+            made. Retention counts from it, and keeps a guest while any of its
+            bookings that is not cancelled ends inside the retention period.
 
     GuestDetail:
       allOf:
@@ -3404,7 +3415,7 @@ components:
         online limit on top of the venue's own rules and never relaxes them:
         the effective lead time is the larger of `leadTimeMinutes` and the
         venue's, the effective horizon is the smaller of `maxAdvanceDays`
-        and the venue's, the effective party limits are the narrower of the
+        and the venue's, or 365 days when both are null, the effective party limits are the narrower of the
         online and the service limits, and a time is bookable online only in
         a service named in `services` (any when null) on a weekday that is in
         both `weekdays` (all when null) and the service's own `days`.
@@ -3442,9 +3453,14 @@ components:
           default: []
           description: |
             The sites allowed to frame the widget page. Each entry is
-            `https://host` or `https://host:port`, with no path, query,
-            fragment, wildcard or credentials, and the host reads back in
-            lower case. Duplicates are merged. An empty list allows only
+            `https://host` or `https://host:port`, exactly as the origin of
+            that URL reads, so with no path, query, fragment, wildcard,
+            credentials, default port `:443` or trailing slash. The host is
+            letters, digits, hyphens and dots only (an international name in
+            its `xn--` form), and reads back in lower case. Any other value,
+            `;`, `,`, quotes and spaces included, fails with
+            `invalid_request`. The widget page leaves out of its
+            `frame-ancestors` any stored entry that does not pass this check. Duplicates are merged. An empty list allows only
             top-level use. These origins are for framing only. The JSON
             routes send no CORS headers.
           items:
@@ -3494,6 +3510,11 @@ components:
           minimum: 0
           maximum: 1000
           default: null
+          description: |
+            The online horizon in days. The public channel uses the smaller of
+            this and the venue's `maxAdvanceDays`. When both are null it uses
+            365 days, a default that never loosens a value either of them sets
+            (ADR-0017, amendment of 2026-11-17).
         selfServiceCutoffMinutes:
           type: integer
           minimum: 0
@@ -3651,7 +3672,9 @@ components:
         maxAdvanceDays:
           type: integer
           nullable: true
-          description: The effective horizon, the smaller of the online and the venue's. Null for none.
+          description: |
+            The effective horizon, the smaller of the online and the venue's,
+            or 365 when both are null (C60).
         askConsent: { type: boolean }
         confirmationMode: { $ref: "#/components/schemas/ConfirmationMode" }
         challenge: { $ref: "#/components/schemas/FormChallenge" }

@@ -194,7 +194,8 @@ describe("guest unmerge", () => {
     expect(target.mergedGuests).toEqual([]);
     expect(target.reservations.map((r: { id: string }) => r.id).sort()).toEqual([g.a1, later.id].sort());
     expect(new Date(target.lastVisitAt) > aBefore.lastVisitAt).toBe(true);
-    expect(target.lastVisitAt).toBe(new Date("2026-12-20T20:00:00Z").toISOString());
+    // A booking that has not happened yet counts from now, never from its future start.
+    expect(new Date(target.lastVisitAt).getTime()).toBeLessThanOrEqual(Date.now());
     expect((await guestRow(g.b)).mergedInto).toBeNull();
   });
 

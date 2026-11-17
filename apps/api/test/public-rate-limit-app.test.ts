@@ -5,6 +5,9 @@ import { migrateDb } from "../src/db/migrate";
 import { reservations, selfServiceLinks, services, tables, venues } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
 import { challengeConfigFromEnv, issueChallenge, solve } from "../src/lib/public-challenge";
+import { saturdayAhead } from "./dates";
+
+const SATURDAY = saturdayAhead();
 
 process.env.RATE_LIMIT = "on";
 process.env.TRUST_PROXY = "true";
@@ -58,7 +61,7 @@ function create(venue: string, ip: string) {
     method: "POST",
     headers: { "content-type": "application/json", "Idempotency-Key": crypto.randomUUID(), "x-forwarded-for": ip },
     body: JSON.stringify({
-      date: "2030-06-01",
+      date: SATURDAY,
       time: "20:00",
       partySize: 2,
       guest: { name: "Ana", contact: `${ip}@example.com` },
@@ -97,7 +100,7 @@ describe("C52 public limits in the app", () => {
         "Idempotency-Key": crypto.randomUUID(),
         "x-forwarded-for": "203.0.113.6",
       },
-      body: JSON.stringify({ date: "2030-06-01", time: "21:00", partySize: 2 }),
+      body: JSON.stringify({ date: SATURDAY, time: "21:00", partySize: 2 }),
     });
     expect(staff.status).toBe(200);
   });
@@ -133,7 +136,7 @@ describe("C52 self_service limit in the app", () => {
     const made = await app.request("/v1/venues/rl-b/reservations", {
       method: "POST",
       headers: { ...headers, "Idempotency-Key": crypto.randomUUID() },
-      body: JSON.stringify({ date: "2030-06-01", time: "22:00", partySize: 2, guest: { name: "Eva", contact: `${ip}@example.com` } }),
+      body: JSON.stringify({ date: SATURDAY, time: "22:00", partySize: 2, guest: { name: "Eva", contact: `${ip}@example.com` } }),
     });
     const { id } = await made.json();
     const issued = await app.request(`/v1/venues/rl-b/reservations/${id}/self-service-link`, {

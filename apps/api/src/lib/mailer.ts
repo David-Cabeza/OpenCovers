@@ -37,19 +37,19 @@ export async function sendEmail(
   }
 }
 
-// Placeholder templates. The wording and the legal basis are pending review.
+// Placeholder templates. The wording and the legal basis are pending review. Emails to the guest carry no
+// guest name: whoever books types it, so it would put a stranger's text, links included, in the guest's inbox.
 export function buildEmail(kind: EmailKind, c: EmailContext): { subject: string; text: string } {
-  const guest = c.guestName || "Cliente";
   switch (kind) {
     case "confirmation":
       return {
         subject: `Tu reserva está confirmada — ${c.date} a las ${c.time}`,
-        text: `Hola ${guest}, tu reserva para ${c.partySize} personas el ${c.date} a las ${c.time} está confirmada.`,
+        text: `Hola, tu reserva para ${c.partySize} personas el ${c.date} a las ${c.time} está confirmada.`,
       };
     case "cancellation":
       return {
         subject: `Tu reserva está cancelada — ${c.date} a las ${c.time}`,
-        text: `Hola ${guest}, tu reserva del ${c.date} a las ${c.time} ha sido cancelada.`,
+        text: `Hola, tu reserva del ${c.date} a las ${c.time} ha sido cancelada.`,
       };
     case "notice":
       return {

@@ -24,8 +24,10 @@ import { auth } from "../src/lib/auth";
 import { challengeConfigFromEnv, issueChallenge, solve } from "../src/lib/public-challenge";
 import { runRetention } from "../src/lib/retention";
 import { findLink } from "../src/lib/self-service";
+import { toTimestamp } from "../src/lib/time";
+import { saturdayAhead } from "./dates";
 
-const SATURDAY = "2030-06-01";
+const SATURDAY = saturdayAhead();
 const TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[A-Za-z0-9_-]{43}$/;
 const config = challengeConfigFromEnv();
 const LINK_INVALID = JSON.stringify({
@@ -319,7 +321,7 @@ describe("C48 self-service read and the guest view", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(res.headers.get("access-control-allow-origin")).toBeNull();
     const view = await res.json();
-    const start = Date.parse(`${SATURDAY}T18:00:00Z`);
+    const start = toTimestamp(SATURDAY, "20:00", "Europe/Madrid").getTime();
     expect(view).toEqual({
       venue: { name: `Casa ${venueCount}`, locale: "es", theme: {}, phone: "+34 600 000 000" },
       date: SATURDAY,

@@ -77,17 +77,17 @@ export async function mintLink(tx: DbTx, venueId: string, reservationId: string,
   return { token: `${id}.${secret}`, expiresAt };
 }
 
-/** Revokes the reservation's live link and mints a new one. Only a `booked` reservation gets one. */
+/** Revokes the reservation's live link and mints a new one. Only a `booked` reservation that is not erased gets one. */
 export async function rotateLink(tx: DbTx, venueId: string, reservationId: string): Promise<IssuedLink | null> {
   const current = (
     await tx
-      .select({ status: reservations.status, endsAt: reservations.endsAt })
+      .select({ status: reservations.status, endsAt: reservations.endsAt, erased: reservations.erased })
       .from(reservations)
       .where(and(eq(reservations.id, reservationId), eq(reservations.venueId, venueId)))
       .for("update")
       .limit(1)
   )[0];
-  if (!current || current.status !== "booked") return null;
+  if (!current || current.status !== "booked" || current.erased) return null;
   await tx
     .update(selfServiceLinks)
     .set({ revokedAt: sql`now()` })
@@ -144,14 +144,14 @@ export async function reissueLink(db: Db, venueId: string, reservationId: string
     }
     const current = (
       await tx
-        .select({ status: reservations.status, version: reservations.version })
+        .select({ status: reservations.status, version: reservations.version, erased: reservations.erased })
         .from(reservations)
         .where(and(eq(reservations.id, reservationId), eq(reservations.venueId, venueId)))
         .for("update")
         .limit(1)
     )[0];
     if (!current) return { ok: false, code: "reservation_not_found" };
-    if (current.status !== "booked") return { ok: false, code: "invalid_transition" };
+    if (current.status !== "booked" || current.erased) return { ok: false, code: "invalid_transition" };
     if (!existing) {
       await tx
         .insert(idempotencyKeys)

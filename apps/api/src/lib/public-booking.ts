@@ -6,14 +6,13 @@ import { getOnlineBooking, type OnlineBooking, type Theme } from "./online-booki
 import { isSolution, parseChallenge, type FormChallenge } from "./public-challenge";
 import { applyChannel, type OnlineRules } from "./reservations";
 import { linkExpiry } from "./self-service";
-import { formatTime } from "./time";
+import { formatTime, isCalendarDate } from "./time";
 import type { Db } from "./venue";
 
 // The guest-facing channel of ADR-0017. Nothing here returns an id, a table, a zone or attribution.
 
 const BOOKING_KEY = /^pk_[A-Za-z0-9_-]{22}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 const REFUSED_FIELDS = ["tables", "zone", "rating", "reconfirmation"] as const;
 const MODIFY_REFUSED_FIELDS = ["date", "time", ...REFUSED_FIELDS] as const;
@@ -119,11 +118,7 @@ export function isPublicIdempotencyKey(value: string | undefined): value is stri
 /** Public keys live apart from staff keys, so a public request can replay only a public request. */
 export const storedKey = (key: string) => `public:${key.toLowerCase()}`;
 
-export function isDate(value: unknown): value is string {
-  if (typeof value !== "string" || !DATE.test(value)) return false;
-  const ms = Date.parse(`${value}T00:00:00Z`);
-  return !Number.isNaN(ms) && new Date(ms).toISOString().startsWith(value);
-}
+export const isDate = isCalendarDate;
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
