@@ -6,8 +6,10 @@ info:
     OpenCovers is an independent reservations engine for restaurants.
     This contract defines the HTTP API. The MCP server exposes the same
     operations with the tool ids in docs/contract/mcp.md.
-    Every write carries an `Idempotency-Key` header and produces a monotonic
-    version. See docs/contract/errors.md for the error vocabulary.
+    Every reservation and waitlist write takes an `Idempotency-Key` header,
+    so a retry returns the first result instead of writing twice, and every
+    reservation write produces a monotonic version. See
+    docs/contract/errors.md for the error vocabulary.
 
     Some calls are rate limited per client address. A refused call returns
     429 with the code `rate_limited` and a `Retry-After` header. The limited
@@ -430,6 +432,102 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/waitlist:
+    get:
+      operationId: waitlist.list
+      summary: List the guests waiting for a table, oldest first
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The waiting entries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WaitlistEntries" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: waitlist.add
+      summary: Add a guest to the waitlist
+      description: |
+        With an `Idempotency-Key`, a repeat of the key in the venue adds
+        nothing and returns 201 with the current list, even when the body
+        differs, as a repeated create returns the original booking. A key
+        used before for another kind of write fails with `invalid_request`.
+        Without a key every call adds an entry.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/optionalIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [partySize]
+              properties:
+                partySize: { type: integer, minimum: 1 }
+                zone: { type: string }
+                guest:
+                  type: object
+                  properties:
+                    name: { type: string }
+                    contact: { type: string }
+      responses:
+        "201":
+          description: The waiting entries, the new one included
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WaitlistEntries" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/waitlist/{entryId}/seat:
+    post:
+      operationId: waitlist.seat
+      summary: Seat a waiting guest as a walk-in
+      description: |
+        Creates a seated reservation for the entry, as a walk-in does, and
+        marks the entry `seated`. A repeat of the key for the same entry
+        returns the same reservation. The key of a seat of another entry, or
+        of another kind of write, fails with `invalid_request`. An entry that
+        is no longer waiting fails with `invalid_transition`.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/entryId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      responses:
+        "200":
+          description: The new reservation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/waitlist/{entryId}/cancel:
+    post:
+      operationId: waitlist.cancel
+      summary: Remove a guest from the waitlist
+      description: |
+        With an `Idempotency-Key`, a repeat of the key for the same entry
+        changes nothing and returns 200 with the current list. The key of a
+        cancel of another entry, or of another kind of write, fails with
+        `invalid_request`. Without a key a second cancel fails with
+        `invalid_transition`.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/entryId"
+        - $ref: "#/components/parameters/optionalIdempotencyKey"
+      responses:
+        "200":
+          description: The waiting entries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WaitlistEntries" }
+        default:
+          $ref: "#/components/responses/Error"
+
   /venues/{venueId}/config:
     get:
       operationId: venue.getConfig
@@ -461,9 +559,11 @@ paths:
         most 366 valid dates or ranges also fail with `invalid_request`.
         Admin only. Any other role fails with `forbidden`. A policy change
         never cancels or alters a booking that already exists.
+
+        Takes no `Idempotency-Key`. The body replaces the fields it names,
+        so a repeat with the same body sets the same configuration.
       parameters:
         - $ref: "#/components/parameters/venueId"
-        - $ref: "#/components/parameters/idempotencyKey"
       requestBody:
         required: true
         content:
@@ -812,9 +912,11 @@ paths:
         entries that match the email or phone of a guest record it deleted,
         or the contact it was given. An admin removes an entry with
         `blocklist.remove`, and retention deletes it after its `expiresAt`.
+
+        Takes no `Idempotency-Key`. A repeat erases nothing more and reports
+        0 for what the first call erased.
       parameters:
         - $ref: "#/components/parameters/venueId"
-        - $ref: "#/components/parameters/idempotencyKey"
       requestBody:
         required: true
         content:
@@ -2150,7 +2252,27 @@ components:
       in: header
       required: true
       schema: { type: string }
-      description: A client-generated key. Repeating it returns the original result.
+      description: |
+        A client-generated key, scoped to the venue. Repeating it returns the
+        original result with no second write, and a duplicate sent while the
+        first is running waits for it. A key used for another kind of write
+        or another target fails with `invalid_request`. A write that fails
+        stores no key, so the same key can be sent again.
+    optionalIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string }
+      description: |
+        The same key as `idempotencyKey`, with the same semantics. Optional
+        here because these routes took no key before and existing callers
+        send none. A call without it is not deduplicated.
+    entryId:
+      name: entryId
+      in: path
+      required: true
+      schema: { type: string }
+      description: The waitlist entry id.
     bookingKey:
       name: bookingKey
       in: path
@@ -2841,6 +2963,28 @@ components:
             False when the entry was made under a key that is no longer
             configured, so it matches no booking. An admin removes it and
             adds the contact again.
+
+    WaitlistEntry:
+      type: object
+      required: [id, venueId, partySize, zone, guestName, guestContact, status, reservationId, createdAt]
+      properties:
+        id: { type: string }
+        venueId: { type: string }
+        partySize: { type: integer }
+        zone: { type: string }
+        guestName: { type: string }
+        guestContact: { type: string }
+        status: { type: string, enum: [waiting, seated, cancelled] }
+        reservationId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    WaitlistEntries:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/WaitlistEntry" }
 
     Invitation:
       type: object

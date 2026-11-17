@@ -68,6 +68,8 @@ Or from a clone of the repository:
 
 See [docs/contract/mcp.md](../../docs/contract/mcp.md) for the full catalog: availability, agenda, list, search, get, create, modify, cancel, status, events, erasure (admin key only), and venue config.
 
+Every write that books, changes a booking or touches the waitlist takes an optional `idempotencyKey`. To retry after a timeout or an error, send the same key as the first call, and the engine returns the first result instead of writing twice. Without a key each call is a new write.
+
 ## Publishing
 
 `pnpm --filter @opencovers/mcp build` compiles to `dist/`, and `prepack` does it automatically. The package is published to npm as `@opencovers/mcp` and listed in the official MCP registry through `server.json` (its `name` must match `mcpName` in `package.json`).

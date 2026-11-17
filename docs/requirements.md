@@ -98,6 +98,12 @@ A venue can set `overbookingCeiling`, the most covers it accepts without tables 
 
 Acceptance: conformance case C24. At 0 every booking holds tables, and a modify cannot release them all. Concurrent creates never take more than the ceiling. A table assigned to a booking over the ceiling is refused when another booking holds it.
 
+### REQ-B8 Retries never write twice
+
+Every reservation write and every waitlist write takes an idempotency key scoped to the venue, and an MCP write tool takes it as an optional `idempotencyKey`. A caller that retries after a timeout or an error with the same key gets the first result and no second booking or waitlist entry, also while the first call is still running. A key reused for a different write fails, and a write that fails keeps no key. The key stays optional on the MCP tools and on the waitlist add and cancel routes, so callers that send none keep working without deduplication. The venue configuration and erasure take no key, because a repeat of either changes nothing more. This narrows REQ-B4 to the writes where a repeat could add something.
+
+Acceptance: conformance case C58.
+
 ## Guest and client
 
 ### REQ-G1 Minimum data
@@ -390,3 +396,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C39 to C55: the public booking channel of ADR-0017. Online booking settings and a rotatable booking key (C39), a credential-free surface where an unknown key looks like any other (C40), a widget page framed only by allowed origins (C41), availability and create that agree and never overbook (C42, C43), isolated public idempotency (C44), bot protection and caps (C45, C46), a hash-only self-service token with one failure answer (C47), the masked guest view, guest modify and guest cancel with its replay rule (C48 to C50), link rotation (C51), public rate limits (C52), links ended by erasure and retention (C53), the blocklist (C54) and minimal guest data (C55).
 - C56: a venue admin session adds, lists, looks up and removes guest blocklist entries stored as keyed hashes, every key is refused, an add is idempotent and capped at 10,000 under concurrency, each change writes an id-only audit row, and no response holds a contact or a hash.
 - C57: a create for a contact on the venue's blocklist fails with `booking_declined` only where it would otherwise book and leaves nothing behind, walk-ins and waitlist seats are not checked, availability and the explanation never read the list, erasure keeps entries and reports `blocklistEntriesKept`, and retention deletes expired entries per venue.
+- C58: every reservation and waitlist write sent twice, or concurrently, with one `Idempotency-Key` returns the same answer and writes once, keys are scoped to the venue, a key reused for another write fails, a failed write keeps no key, and every MCP write tool sends the caller's `idempotencyKey` unchanged.
