@@ -4,10 +4,14 @@
 //   pnpm demo:seed
 //   ALLDAY=1 pnpm demo:seed      # one service 09:00-23:45, so walk-ins and the waitlist work at any hour
 //
-// Run it once against a fresh database. It stops with a clear message if the account already has
-// a venue with the demo name. The API generates the venue id and the script uses the one it returns.
+// It also fills the Team screen: a second member "Andres Roca" (role write, joined by redeeming an
+// invitation at sign-up) and one pending read invitation for sala@example.com, so the audit log has
+// invitation created and redeemed rows. All through the real routes.
+//
+// Run it once against a fresh database. A second run exits cleanly with a message because the
+// account already has a venue with the demo name, and creates nothing. The API generates the venue id and the script uses the one it returns.
 // Environment: BASE (default http://localhost:3000, must be localhost), EMAIL, PASSWORD,
-// OWNER_NAME. The default password is a local-development value that is public in the
+// OWNER_NAME, MEMBER_EMAIL, MEMBER_PASSWORD. The default passwords is a local-development value that is public in the
 // source. Every guest is invented and uses an example.com address.
 import { randomUUID } from "node:crypto";
 
@@ -15,6 +19,10 @@ const BASE = process.env.BASE ?? "http://localhost:3000";
 const EMAIL = process.env.EMAIL ?? "demo@opencovers.test";
 const PASSWORD = process.env.PASSWORD ?? "demo-password-123";
 const OWNER_NAME = process.env.OWNER_NAME ?? "Marta Quiroga";
+const MEMBER_NAME = "Andres Roca";
+const MEMBER_EMAIL = process.env.MEMBER_EMAIL ?? "andres.roca@example.com";
+const MEMBER_PASSWORD = process.env.MEMBER_PASSWORD ?? "demo-member-123";
+const PENDING_INVITE_EMAIL = "sala@example.com";
 const VENUE_NAME = "La Taberna del Faro";
 const TZ = "Europe/Madrid";
 const ALLDAY = process.env.ALLDAY === "1";
@@ -32,11 +40,17 @@ type Json = Record<string, any>;
 type Reply = { status: number; json: Json | undefined; text: string; headers: Headers };
 
 let cookie = "";
-async function api(method: string, path: string, opts: { body?: unknown; key?: boolean } = {}): Promise<Reply> {
+async function api(
+  method: string,
+  path: string,
+  opts: { body?: unknown; key?: boolean; cookie?: string; headers?: Record<string, string> } = {},
+): Promise<Reply> {
   const headers: Record<string, string> = { Origin: "http://localhost:5173" };
   if (opts.body !== undefined) headers["content-type"] = "application/json";
   if (opts.key) headers["Idempotency-Key"] = randomUUID();
-  if (cookie) headers.cookie = cookie;
+  const jar = opts.cookie ?? cookie;
+  if (jar) headers.cookie = jar;
+  Object.assign(headers, opts.headers);
   const res = await fetch(BASE + path, {
     method,
     headers,
@@ -92,6 +106,31 @@ if ((mine.venues ?? []).some((v: Json) => v.name === VENUE_NAME)) {
 const VENUE = must(await api("POST", "/v1/venues", { body: { name: VENUE_NAME, timezone: TZ } }), "create venue").venue.id as string;
 const V = `/v1/venues/${VENUE}`;
 console.log(`venue ${VENUE} created`);
+
+const cookieOf = (reply: Reply) =>
+  reply.headers
+    .getSetCookie()
+    .map((c) => c.split(";")[0])
+    .join("; ");
+
+const memberInvite = must(
+  await api("POST", `${V}/invitations`, { body: { role: "write", email: MEMBER_EMAIL } }),
+  "invitation for the second member",
+).invitation;
+let memberReply = await api("POST", "/api/auth/sign-up/email", {
+  body: { email: MEMBER_EMAIL, password: MEMBER_PASSWORD, name: MEMBER_NAME },
+  headers: { "x-invitation-token": memberInvite.token },
+});
+if (memberReply.status !== 200) {
+  memberReply = await api("POST", "/api/auth/sign-in/email", { body: { email: MEMBER_EMAIL, password: MEMBER_PASSWORD } });
+  must(memberReply, `sign up or sign in as ${MEMBER_EMAIL}`);
+  must(
+    await api("POST", "/v1/invitations/redeem", { body: { token: memberInvite.token }, cookie: cookieOf(memberReply) }),
+    "redeem the invitation as the second member",
+  );
+}
+must(await api("POST", `${V}/invitations`, { body: { role: "read", email: PENDING_INVITE_EMAIL } }), "pending invitation");
+console.log(`team: ${MEMBER_NAME} (write) joined, invitation for ${PENDING_INVITE_EMAIL} (read) pending`);
 
 const services = ALLDAY
   ? [{ name: "Todo el dia", openStart: "09:00", openEnd: "23:45", minPartySize: 1, maxPartySize: 12 }]
@@ -239,6 +278,7 @@ if (any) {
 
 console.log(`\nDone: ${created.length} reservations created.`);
 console.log(`Staff app:   http://localhost:5173  (sign in as ${EMAIL} / ${PASSWORD}, local demo password)`);
+console.log(`Second member (write): ${MEMBER_EMAIL} / ${MEMBER_PASSWORD}   (local demo password)`);
 if (onlineBooking?.bookingKey) {
   console.log(`Booking widget: http://localhost:5173/w/${onlineBooking.bookingKey}   (API direct: ${BASE}/w/${onlineBooking.bookingKey})`);
 }
