@@ -41,6 +41,18 @@ import {
   revokeInvitation,
 } from "./lib/invitations";
 import { createRateLimiter, rateLimitConfigFromEnv } from "./lib/rate-limit";
+import { findKey } from "./lib/idempotency";
+import {
+  guestView,
+  isDate as isPublicDate,
+  isPublicIdempotencyKey,
+  parsePublicCreate,
+  publicConfig,
+  resolveBookingKey,
+  rulesOf,
+  storedKey,
+} from "./lib/public-booking";
+import { challengeConfigFromEnv, createChallengeVerifier, issueChallenge } from "./lib/public-challenge";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/signup";
 import { changeMemberRole, listMembers, removeMember } from "./lib/members";
@@ -59,6 +71,7 @@ import {
   createReservation,
   explainSlot,
   getAvailability,
+  publicTimes,
   getEvents,
   getEventsWatermark,
   getFloorPlan,
@@ -127,6 +140,13 @@ type AppEnv = {
 };
 
 const app = new Hono<AppEnv>();
+const challengeConfig = challengeConfigFromEnv();
+
+// Above the limiter, so its 429 is not cached either (ADR-0017).
+app.use("/v1/public/*", async (c, next) => {
+  await next();
+  c.header("Cache-Control", "no-store");
+});
 
 app.use("*", createRateLimiter(rateLimitConfigFromEnv()).middleware);
 
@@ -165,6 +185,70 @@ app.get("/v1/venues/:venueId/public.jsonld", async (c) => {
   };
   if (etagMatches(c.req.header("if-none-match"), etag)) return c.body(null, 304, headers);
   return c.body(body, 200, { ...headers, "Content-Type": "application/ld+json; charset=utf-8" });
+});
+
+// The guest channel of ADR-0017. No credentials, no cookie, no session, no CORS: the widget calls these
+// from its own origin, which proxies /v1/public to the API. A guest is not a principal.
+const challenges = createChallengeVerifier(challengeConfig);
+
+app.get("/v1/public/:bookingKey", async (c) => {
+  const bookingKey = c.req.param("bookingKey");
+  const target = await resolveBookingKey(db, bookingKey);
+  if (!target) return error(c, "venue_not_found");
+  return c.json(await publicConfig(db, target, issueChallenge(challengeConfig, bookingKey)));
+});
+
+app.get("/v1/public/:bookingKey/availability", async (c) => {
+  const target = await resolveBookingKey(db, c.req.param("bookingKey"));
+  if (!target) return error(c, "venue_not_found");
+  const date = c.req.query("date");
+  const rawParty = c.req.query("partySize") ?? "";
+  if (!isPublicDate(date) || !/^[1-9]\d{0,5}$/.test(rawParty)) return error(c, "invalid_request");
+  const partySize = Number(rawParty);
+  const times = await publicTimes(db, target.venue.id, date, partySize, rulesOf(target.settings));
+  return c.json({ date, partySize, times });
+});
+
+app.post("/v1/public/:bookingKey/reservations", async (c) => {
+  const bookingKey = c.req.param("bookingKey");
+  const target = await resolveBookingKey(db, bookingKey);
+  if (!target) return error(c, "venue_not_found");
+  const key = c.req.header("Idempotency-Key");
+  if (!isPublicIdempotencyKey(key)) return error(c, "invalid_request");
+  const input = parsePublicCreate(await c.req.json().catch(() => null), target);
+  if (!input) return error(c, "invalid_request");
+  const venueId = target.venue.id;
+  const replay = await findKey(db, venueId, storedKey(key));
+  if (!replay && !challenges.verify(bookingKey, input.challenge, input.solution, key)) {
+    return error(c, "invalid_request");
+  }
+  const result = await createReservation(
+    db,
+    venueId,
+    {
+      date: input.date,
+      time: input.time,
+      partySize: input.partySize,
+      guestName: input.name,
+      guestContact: input.contact,
+      consent: input.consent,
+      commentary: input.commentary,
+      bookedVia: "widget",
+      basis: "service",
+      ownerPrincipal: "widget",
+      channel: { kind: "public", rules: rulesOf(target.settings) },
+    },
+    storedKey(key),
+  );
+  if (!result.ok) return error(c, result.code);
+  if (!replay) {
+    void notifyReservation(db, venueId, result.id, result.version, "confirmation");
+    void notifyReservation(db, venueId, result.id, result.version, "notice");
+  }
+  const reservation = await guestView(db, target, result.id);
+  if (!reservation) return error(c, "reservation_not_found");
+  // The self-service token is minted by stage 4 of ADR-0017. Until then no link exists to hand out.
+  return c.json({ reservation, selfServiceToken: null });
 });
 
 app.use("/v1/venues/:venueId/*", async (c, next) => {
