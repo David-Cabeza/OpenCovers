@@ -3,6 +3,7 @@ import { guestAudit, guestBlocklist, guests, membershipAudit, reservations, venu
 import { forgetMergeState } from "./guests";
 import { deleteLapsedInvitations } from "./invitations";
 import { pruneEvents } from "./reservations";
+import { deleteLapsedLinks } from "./self-service";
 import { eraseReservations, withMerged, type Db } from "./venue";
 
 export interface RetentionBatch {
@@ -20,6 +21,7 @@ export async function runRetention(
   batch: RetentionBatch = RETENTION_BATCH,
 ): Promise<void> {
   await deleteLapsedInvitations(db, now);
+  await deleteLapsedLinks(db, now);
   const all = await db.select({ id: venues.id, retentionDays: venues.retentionDays }).from(venues);
   for (const venue of all) {
     const cutoff = new Date(now.getTime() - venue.retentionDays * DAY_MS);

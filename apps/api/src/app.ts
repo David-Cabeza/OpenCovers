@@ -47,12 +47,15 @@ import {
   isDate as isPublicDate,
   isPublicIdempotencyKey,
   parsePublicCreate,
+  parseSelfServiceModify,
   publicConfig,
+  publicVenueOf,
   resolveBookingKey,
   rulesOf,
   storedKey,
 } from "./lib/public-booking";
 import { challengeConfigFromEnv, createChallengeVerifier, issueChallenge } from "./lib/public-challenge";
+import { findLink, reissueLink, type Link } from "./lib/self-service";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/signup";
 import { changeMemberRole, listMembers, removeMember } from "./lib/members";
@@ -191,6 +194,74 @@ app.get("/v1/venues/:venueId/public.jsonld", async (c) => {
 // from its own origin, which proxies /v1/public to the API. A guest is not a principal.
 const challenges = createChallengeVerifier(challengeConfig);
 
+// Self-service routes come before `/v1/public/:bookingKey`, which would otherwise read `self-service` as a key.
+// The token names one reservation of one venue, so these routes take neither id.
+const selfServiceToken = (c: any) => c.req.header("X-Self-Service-Token") as string | undefined;
+
+async function guestAnswer(c: any, link: Link) {
+  const target = await publicVenueOf(db, link.venueId);
+  const view = target && (await guestView(db, target, link.reservationId));
+  return view ? c.json(view) : error(c, "self_service_link_invalid");
+}
+
+app.get("/v1/public/self-service", async (c) => {
+  const link = await findLink(db, selfServiceToken(c));
+  if (!link || link.revokedAt) return error(c, "self_service_link_invalid");
+  return guestAnswer(c, link);
+});
+
+app.post("/v1/public/self-service/modify", async (c) => {
+  const key = c.req.header("Idempotency-Key");
+  const input = parseSelfServiceModify(await c.req.json().catch(() => null));
+  if (!isPublicIdempotencyKey(key) || !input) return error(c, "invalid_request");
+  const link = await findLink(db, selfServiceToken(c));
+  if (!link || link.revokedAt) return error(c, "self_service_link_invalid");
+  const target = await publicVenueOf(db, link.venueId);
+  if (!target) return error(c, "self_service_link_invalid");
+  const { settings } = target;
+  const result = await modifyReservation(
+    db,
+    link.venueId,
+    link.reservationId,
+    {
+      partySize: input.partySize,
+      commentary: input.commentary,
+      consent: settings.askConsent ? input.consent : undefined,
+      selfService: {
+        linkId: link.id,
+        cutoffMinutes: settings.selfServiceCutoffMinutes,
+        version: input.version,
+        rules: rulesOf(settings),
+      },
+    },
+    storedKey(key),
+  );
+  if (!result.ok) return error(c, result.code);
+  if (input.partySize !== undefined) {
+    void notifyReservation(db, link.venueId, link.reservationId, result.version, "confirmation");
+  }
+  return guestAnswer(c, link);
+});
+
+app.post("/v1/public/self-service/cancel", async (c) => {
+  const key = c.req.header("Idempotency-Key");
+  if (!isPublicIdempotencyKey(key)) return error(c, "invalid_request");
+  const link = await findLink(db, selfServiceToken(c));
+  // A revoked link answers only a repeat of the cancel that revoked it (ADR-0017, amendment of 2026-11-17).
+  if (!link || (link.revokedAt && link.cancelKey !== storedKey(key))) return error(c, "self_service_link_invalid");
+  const target = await publicVenueOf(db, link.venueId);
+  if (!target) return error(c, "self_service_link_invalid");
+  const result = await cancelReservation(db, link.venueId, link.reservationId, storedKey(key), {
+    linkId: link.id,
+    cutoffMinutes: target.settings.selfServiceCutoffMinutes,
+  });
+  if (!result.ok) return error(c, result.code);
+  const view = await guestView(db, target, link.reservationId);
+  if (!view) return error(c, "self_service_link_invalid");
+  if (!link.revokedAt) void notifyReservation(db, link.venueId, link.reservationId, view.version, "cancellation");
+  return c.json(view);
+});
+
 app.get("/v1/public/:bookingKey", async (c) => {
   const bookingKey = c.req.param("bookingKey");
   const target = await resolveBookingKey(db, bookingKey);
@@ -247,8 +318,7 @@ app.post("/v1/public/:bookingKey/reservations", async (c) => {
   }
   const reservation = await guestView(db, target, result.id);
   if (!reservation) return error(c, "reservation_not_found");
-  // The self-service token is minted by stage 4 of ADR-0017. Until then no link exists to hand out.
-  return c.json({ reservation, selfServiceToken: null });
+  return c.json({ reservation, selfServiceToken: result.selfServiceToken ?? null });
 });
 
 app.use("/v1/venues/:venueId/*", async (c, next) => {
@@ -723,6 +793,16 @@ app.post("/v1/venues/:venueId/reservations/:id/cancel", async (c) => {
   if (!reservation) return error(c, "reservation_not_found");
   void notifyReservation(db, venueId, id, reservation.version, "cancellation");
   return c.json(toApi(reservation, venueId), 200);
+});
+
+// The only staff route that returns a self-service token (ADR-0017). The read role is refused by the middleware.
+app.post("/v1/venues/:venueId/reservations/:id/self-service-link", async (c) => {
+  c.header("Cache-Control", "no-store");
+  const key = c.req.header("Idempotency-Key");
+  if (!key) return error(c, "invalid_request");
+  const result = await reissueLink(db, c.req.param("venueId"), c.req.param("id"), key);
+  if (!result.ok) return error(c, result.code);
+  return c.json({ selfServiceToken: result.link.token, linkExpiresAt: result.link.expiresAt.toISOString() });
 });
 
 app.post("/v1/venues/:venueId/reservations/:id/status", async (c) => {

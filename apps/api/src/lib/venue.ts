@@ -22,6 +22,7 @@ import { ratingColumns } from "./rating";
 import { reconfirmationColumns } from "./reconfirmation";
 import { normalizeTimeZone } from "./time";
 import { sha256Hex } from "./reservations";
+import { deleteLinks } from "./self-service";
 import type { TurnTime } from "./turn-times";
 
 export type Db = NodePgDatabase<typeof schema>;
@@ -292,6 +293,7 @@ export async function eraseReservations(
   venueId: string,
   rows: { id: string; version: number }[],
 ): Promise<void> {
+  await deleteLinks(tx, venueId, rows.map((m) => m.id));
   for (const m of rows) {
     const hash = await sha256Hex(m.id);
     await tx
@@ -307,7 +309,8 @@ export async function eraseReservations(
         erased: true,
       })
       .where(and(eq(reservations.venueId, venueId), eq(reservations.id, m.id)));
-    await tx.insert(tombstones).values({ reservationId: m.id, venueId, hash });
+    // A cancel already wrote this reservation's tombstone, with the same hash.
+    await tx.insert(tombstones).values({ reservationId: m.id, venueId, hash }).onConflictDoNothing();
     await tx.insert(events).values({
       venueId,
       type: "erased",

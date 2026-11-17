@@ -20,6 +20,7 @@ import { linkGuest } from "./guests";
 import { claimKey } from "./idempotency";
 import { ratingColumns, type Rating } from "./rating";
 import { reconfirmationColumns, type Reconfirmation } from "./reconfirmation";
+import { linkWorks, mintLink, revokeForCancel, rotateLink } from "./self-service";
 import {
   addDays,
   formatTime,
@@ -95,6 +96,13 @@ export interface ModifyReservationInput {
   rating?: Rating | null;
   commentary?: string;
   reconfirmation?: Reconfirmation;
+  selfService?: SelfServiceWrite & { version: number; rules: OnlineRules };
+}
+
+/** A guest write through a self-service link (ADR-0017). The checks run inside the write transaction. */
+export interface SelfServiceWrite {
+  linkId: string;
+  cutoffMinutes: number;
 }
 
 export interface Reservation {
@@ -249,15 +257,28 @@ export type WriteErrorCode =
   | "guest_booking_limit"
   | "online_booking_limit"
   | "booking_declined"
-  | "venue_not_found";
+  | "venue_not_found"
+  | "self_service_link_invalid"
+  | "self_service_closed"
+  | "reservation_changed";
 
+/** `selfServiceToken` is set only by a public create: the new link, or null on a repeat for a booking no longer `booked`. */
 export type WriteResult =
-  | { ok: true; id: string; version: number }
+  | { ok: true; id: string; version: number; selfServiceToken?: string | null }
   | { ok: false; code: WriteErrorCode };
 
 export type CancelResult =
   | { ok: true; hash: string }
-  | { ok: false; code: "reservation_not_found" | "already_cancelled" | "invalid_request" | "venue_not_found" };
+  | {
+      ok: false;
+      code:
+        | "reservation_not_found"
+        | "already_cancelled"
+        | "invalid_request"
+        | "venue_not_found"
+        | "self_service_link_invalid"
+        | "self_service_closed";
+    };
 
 const ACTIVE_STATUSES = ["booked", "seated"];
 const MODIFIABLE_STATUSES = [...ACTIVE_STATUSES, "attended"];
@@ -503,6 +524,7 @@ async function tableReasons(
   endsAt: Date,
   partySize: number,
   zone: string,
+  exceptId?: string,
 ): Promise<{ ok: true; tableIds: string[] } | { ok: false; reason: Reason }> {
   const allTables = await exec
     .select({ id: tables.id, seats: tables.seats })
@@ -529,6 +551,7 @@ async function tableReasons(
         eq(tableAllocations.active, true),
         lt(tableAllocations.startsAt, endsAt),
         gt(tableAllocations.endsAt, startsAt),
+        exceptId ? ne(tableAllocations.reservationId, exceptId) : undefined,
       ),
     );
   const busyIds = new Set(busy.map((b) => b.tableId));
@@ -761,7 +784,9 @@ export async function createReservation(
       const existing = await claimKey(tx, venueId, key);
       if (existing) {
         if (existing.kind !== "create") throw new ReservationError("invalid_request");
-        return { id: existing.reservationId, version: existing.version };
+        // Only a hash of the token is stored, so a public repeat cannot return the first token. It rotates.
+        const link = channel.kind === "public" ? await rotateLink(tx, venueId, existing.reservationId) : undefined;
+        return { id: existing.reservationId, version: existing.version, selfServiceToken: link && link.token };
       }
       const cap = request.walkIn ? null : venue.maxActivePerGuestPerDay;
       // linkGuest also row-locks the guest, but only as a side effect. This lock keeps count-then-insert serial on its own.
@@ -859,6 +884,7 @@ export async function createReservation(
       if (!request.walkIn && contactKey && (await countBlocklistEntries(tx, venueId, [contactKey])) > 0) {
         throw new ReservationError("booking_declined");
       }
+      const link = channel.kind === "public" ? await mintLink(tx, venueId, id, endsAt) : undefined;
       await tx.insert(idempotencyKeys).values({
         key,
         venueId,
@@ -872,9 +898,9 @@ export async function createReservation(
         reservationId: id,
         version: 1,
       });
-      return { id, version: 1 };
+      return { id, version: 1, selfServiceToken: link?.token };
     });
-    return { ok: true, id: result.id, version: result.version };
+    return { ok: true, ...result };
   } catch (error) {
     if (isExclusionViolation(error)) return { ok: false, code: "slot_taken" };
     if (error instanceof ReservationError) return { ok: false, code: error.code };
@@ -914,6 +940,48 @@ export async function walkIn(
   );
 }
 
+type ReservationRow = typeof reservations.$inferSelect;
+
+async function lockForGuest(tx: DbTx, venueId: string, id: string, linkId: string, cancelKey?: string) {
+  await tx
+    .select({ id: reservations.id })
+    .from(reservations)
+    .where(and(eq(reservations.id, id), eq(reservations.venueId, venueId)))
+    .for("update");
+  if (!(await linkWorks(tx, linkId, cancelKey))) throw new ReservationError("self_service_link_invalid");
+}
+
+function assertChangeable(current: ReservationRow, guest: SelfServiceWrite) {
+  const changeableUntil = current.startsAt.getTime() - guest.cutoffMinutes * 60_000;
+  if (current.status !== "booked" || Date.now() >= changeableUntil) throw new ReservationError("self_service_closed");
+}
+
+/**
+ * The tables a guest's new party size needs: undefined when the tables held still seat it, otherwise a free
+ * combination at the same time. The online party limits apply and the overbooking ceiling never does.
+ */
+async function guestTables(tx: DbTx, venueId: string, current: ReservationRow, partySize: number, rules: OnlineRules) {
+  const venue = (await tx.select().from(venues).where(eq(venues.id, venueId)).limit(1))[0];
+  const own = await tx
+    .select()
+    .from(services)
+    .where(and(eq(services.venueId, venueId), eq(services.name, current.service)));
+  const [service] = applyChannel(venue, own, { kind: "public", rules: { ...rules, services: null, weekdays: null } }).serviceRows;
+  const min = service?.minPartySize ?? rules.minPartySize;
+  const max = service?.maxPartySize ?? rules.maxPartySize;
+  if (partySize < min) throw new ReservationError("party_size_too_small");
+  if (partySize > max) throw new ReservationError("party_size_too_large");
+  const held = await tx
+    .select({ seats: tables.seats })
+    .from(tableAllocations)
+    .innerJoin(tables, eq(tables.id, tableAllocations.tableId))
+    .where(eq(tableAllocations.reservationId, current.id));
+  if (held.length > 0 && held.reduce((sum, t) => sum + t.seats, 0) >= partySize) return undefined;
+  const fit = await tableReasons(tx, venueId, current.startsAt, current.endsAt, partySize, current.zone, current.id);
+  if (!fit.ok) throw new ReservationError("no_suitable_table");
+  return fit.tableIds;
+}
+
 export async function modifyReservation(
   db: Db,
   venueId: string,
@@ -921,9 +989,11 @@ export async function modifyReservation(
   input: ModifyReservationInput,
   key: string,
 ): Promise<WriteResult> {
+  const guest = input.selfService;
   try {
     const version = await db.transaction(async (tx) => {
       const existing = await claimKey(tx, venueId, key);
+      if (guest) await lockForGuest(tx, venueId, id, guest.linkId);
       if (existing) {
         if (existing.kind !== "modify" || existing.reservationId !== id) {
           throw new ReservationError("invalid_request");
@@ -931,23 +1001,34 @@ export async function modifyReservation(
         return existing.version;
       }
       const current = (
-        await tx.select().from(reservations).where(and(eq(reservations.id, id), eq(reservations.venueId, venueId))).limit(1)
+        await tx
+          .select()
+          .from(reservations)
+          .where(and(eq(reservations.id, id), eq(reservations.venueId, venueId)))
+          .for("update")
+          .limit(1)
       )[0];
       if (!current) throw new ReservationError("reservation_not_found");
+      if (guest) {
+        assertChangeable(current, guest);
+        if (current.version !== guest.version) throw new ReservationError("reservation_changed");
+      }
       if (!MODIFIABLE_STATUSES.includes(current.status)) {
         throw new ReservationError("invalid_transition");
       }
 
       const partyChanged =
         input.partySize !== undefined && input.partySize !== current.partySize;
+      const tableIds =
+        guest && partyChanged ? await guestTables(tx, venueId, current, input.partySize!, guest.rules) : input.tableIds;
       let tablesChanged = false;
-      if (input.tableIds !== undefined) {
+      if (tableIds !== undefined) {
         const currentTables = await tx
           .select({ tableId: tableAllocations.tableId })
           .from(tableAllocations)
           .where(eq(tableAllocations.reservationId, id));
         const currentIds = currentTables.map((t) => t.tableId).sort();
-        const nextIds = [...input.tableIds].sort();
+        const nextIds = [...tableIds].sort();
         tablesChanged =
           currentIds.length !== nextIds.length ||
           currentIds.some((v, i) => v !== nextIds[i]);
@@ -961,14 +1042,14 @@ export async function modifyReservation(
       }
 
       const grows = partyChanged && input.partySize! > current.partySize;
-      if (tablesChanged && current.status === "seated" && input.tableIds!.length === 0) {
+      if (tablesChanged && current.status === "seated" && tableIds!.length === 0) {
         throw new ReservationError("table_required");
       }
 
       if (tablesChanged || grows) {
         const held =
-          input.tableIds !== undefined
-            ? input.tableIds.length
+          tableIds !== undefined
+            ? tableIds.length
             : (
                 await tx
                   .select({ tableId: tableAllocations.tableId })
@@ -1027,7 +1108,7 @@ export async function modifyReservation(
         .where(eq(reservations.id, id));
       if (tablesChanged) {
         await tx.delete(tableAllocations).where(eq(tableAllocations.reservationId, id));
-        for (const tableId of input.tableIds!) {
+        for (const tableId of tableIds!) {
           await tx.insert(tableAllocations).values({
             reservationId: id, venueId, tableId,
             startsAt: current.startsAt, endsAt: current.endsAt,
@@ -1040,22 +1121,26 @@ export async function modifyReservation(
     });
     return { ok: true, id, version };
   } catch (error) {
-    if (isExclusionViolation(error)) return { ok: false, code: "slot_taken" };
+    // A guest's party never uses the ceiling, so a table taken by a concurrent write leaves no fitting table.
+    if (isExclusionViolation(error)) return { ok: false, code: guest ? "no_suitable_table" : "slot_taken" };
     if (error instanceof ReservationError) return { ok: false, code: error.code };
     throw error;
   }
 }
 
+/** A guest cancel (`guest`) also revokes the link in the same transaction and mints none (ADR-0017, Q3). */
 export async function cancelReservation(
   db: Db,
   venueId: string,
   id: string,
   key: string,
+  guest?: SelfServiceWrite,
 ): Promise<CancelResult> {
   const hash = await sha256Hex(id);
   try {
     await db.transaction(async (tx) => {
       const existing = await claimKey(tx, venueId, key);
+      if (guest) await lockForGuest(tx, venueId, id, guest.linkId, key);
       if (existing) {
         if (existing.kind !== "cancel" || existing.reservationId !== id) {
           throw new ReservationError("invalid_request");
@@ -1063,9 +1148,15 @@ export async function cancelReservation(
         return;
       }
       const current = (
-        await tx.select().from(reservations).where(and(eq(reservations.id, id), eq(reservations.venueId, venueId))).limit(1)
+        await tx
+          .select()
+          .from(reservations)
+          .where(and(eq(reservations.id, id), eq(reservations.venueId, venueId)))
+          .for("update")
+          .limit(1)
       )[0];
       if (!current) throw new ReservationError("reservation_not_found");
+      if (guest) assertChangeable(current, guest);
       if (current.status === "cancelled") throw new ReservationError("already_cancelled");
       const nextVersion = current.version + 1;
       await tx.update(reservations).set({ status: "cancelled", version: nextVersion }).where(eq(reservations.id, id));
@@ -1073,14 +1164,14 @@ export async function cancelReservation(
       await tx.insert(tombstones).values({ reservationId: id, venueId, hash });
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "cancel", version: nextVersion });
       await tx.insert(events).values({ venueId, type: "cancelled", reservationId: id, version: nextVersion });
+      if (guest && !(await revokeForCancel(tx, guest.linkId, key))) {
+        throw new ReservationError("self_service_link_invalid");
+      }
     });
     return { ok: true, hash };
   } catch (error) {
     if (error instanceof ReservationError) {
-      return {
-        ok: false,
-        code: error.code as "reservation_not_found" | "already_cancelled" | "invalid_request",
-      };
+      return { ok: false, code: error.code as Extract<CancelResult, { ok: false }>["code"] };
     }
     throw error;
   }

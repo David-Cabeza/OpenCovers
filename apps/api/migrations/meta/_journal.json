@@ -253,6 +253,13 @@
       "when": 1794912562743,
       "tag": "0035_lumpy_bulldozer",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794924094657,
+      "tag": "0036_self_service_links",
+      "breakpoints": true
     }
   ]
 }
