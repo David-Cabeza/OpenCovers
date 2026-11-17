@@ -72,7 +72,7 @@ A fixed window per rule and client. The window opens at the first request and th
 | `false` (default) | The socket address Node sees. `X-Forwarded-For` is ignored. |
 | `true` | The last entry of `X-Forwarded-For`, which is the address the one trusted proxy saw. Earlier entries are client-controlled and ignored. If the entry is missing or not an IP, the socket address is used. |
 
-An IPv6 client is keyed by its first 64 bits, because one customer holds a whole `/64`. An IPv4-mapped address is read as IPv4. The API logs one warning when a forwarded header arrives and `TRUST_PROXY` is off, and one when it is on and the header is unusable.
+An IPv6 client is keyed by its first 48 bits (its first 64 bits until the amendment of 2026-11-17 below). An IPv4-mapped address is read as IPv4. The API logs one warning when a forwarded header arrives and `TRUST_PROXY` is off, and one when it is on and the header is unusable.
 
 `compose.prod.yaml` sets `TRUST_PROXY: ${TRUST_PROXY:-true}`. Caddy is the only door to the API, the `api` service publishes no port, and Caddy replaces the header with the peer address (measured above). Outside compose the default is `false`, because a client that reaches the API directly writes that header itself.
 
@@ -84,11 +84,11 @@ What happens when it is wrong:
 
 ### Storage
 
-An in-process `Map` keyed by `rule|client`, at most 10,000 keys. At the cap it drops expired keys (at most once a second), then the oldest key. There is no timer.
+One in-process `Map` per rule, keyed by client, at most 10,000 clients each. Expired counters go first, and a full table refuses new clients (the amendment of 2026-11-17 below; it used to drop the oldest key). There is no timer.
 
 - A restart clears every counter. Someone who can restart the API gets a fresh budget.
 - Two API instances count separately, so the real limit is the number of instances times the setting. Compose runs one.
-- Someone with more than 10,000 distinct addresses can push other clients' counters out. At that scale per-address limits do not help anyway.
+- Someone with more than 10,000 distinct addresses can fill a rule's table, and new clients of that rule are then refused until a window ends. At that scale per-address limits do not help anyway.
 
 The database was considered and rejected. It would need a table and a write on every auth call, and it only helps a multi-instance setup that this repository does not run. No migration is needed.
 
@@ -165,3 +165,14 @@ An edge limit, such as a CDN or a Caddy build with a rate-limit module, stays a 
 - It runs before the session and the body are read, so a call that fails with `unauthorized`, `403 venue_creation_closed` or `invalid_request` spends budget like one that creates a venue. This follows "every request counts, whatever its outcome" above, and it keeps the refusal independent of the account, as the No oracle driver requires. The cost is that a refused account behind a shared address spends the budget of that address.
 - The route takes no `Idempotency-Key`, so there is no replay to exempt. A repeated call is a new call and counts.
 - `GET /v1/venues` and every other `/v1/venues/{venueId}/...` route are unaffected. Only the exact path `POST /v1/venues`, after the slash normalization, matches.
+
+## Amendment 2026-11-17: fail closed, /48, and the HTTP layer
+
+A security review showed two ways to reset or spend a budget at no cost. One shared table of 10,000 keys dropped its oldest key when full, so 10,001 reads from new addresses erased a spent sign-in or `public_venue` budget. And a public create with a malformed body spent `public_venue` like a real booking.
+
+- **One table per rule, and a full table refuses.** Each rule keeps at most 10,000 clients. A rule has one window, so a table is ordered by expiry, and expired counters leave from its front. A new client of a full rule gets `429 rate_limited` with a `Retry-After` until the oldest window ends, and the API logs one warning naming the rule. A live counter is never dropped, so a flood of public reads cannot touch sign-in or `public_venue` counters. The cost: an attacker who fills a rule's table refuses new clients of that rule for one window. Memory stays bounded at 8 tables of 10,000 counters.
+- **IPv6 by `/48`.** One site commonly holds a `/48`, which is 65,536 `/64`s, enough to fill a table from one allocation. Keying by `/48` makes filling a table cost 10,000 allocations. Every rule uses it, sign-in included, because a fail-closed table is the target. The cost: clients that share a `/48`, such as some mobile carriers, share a budget. Raise the budget if that shows.
+- **`public_venue` is charged only for a create that reaches the booking.** A create that answers `400` (a malformed body, a failed challenge, a body over the size limit) or `404` (an unknown key) gives its `public_venue` charge back. The per-address `public_booking` charge stays, so junk costs the sender's own budget first, and unknown keys leave no counter behind. A solved challenge with a valid body still spends `public_venue`: the lever section 3 of ADR-0017 accepts stays, at the cost of the proof of work.
+- **Request bodies are capped.** The API reads at most 16 KB under `/v1/public/` and 256 KB elsewhere, and answers a larger body with `invalid_request`, before any route reads it. The widget's largest body is about 2 KB, and the staff app's is a config with 366 blocked date ranges, about 20 KB. The shipped Caddyfile caps bodies at 64 KiB on the widget site and 1 MiB on the staff site, above the API's limits, so a client normally sees the API's JSON error and Caddy answers `413` only beyond.
+- **Cookie writes need the staff origin.** A `POST`, `PUT`, `PATCH` or `DELETE` under `/v1/` (not `/v1/public/`) that carries a cookie and no `apikey` fails with `403 forbidden` when its `Origin` is not one of `BETTER_AUTH_URL` and `TRUSTED_ORIGINS`, and with `invalid_request` when it has a body that is not `application/json`. A page on a sibling origin, such as the widget host, can send a form or a `text/plain` fetch with the staff cookie and no preflight; this closes that. A request with no `Origin` passes, because browsers send one on every cross-origin write. Keys, the public routes and `/api/auth`, which Better Auth checks itself, are unchanged.
+

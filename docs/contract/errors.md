@@ -6,7 +6,7 @@ Every error response is `{"code": "...", "message": "...", "retryable": true|fal
 
 ## Request errors
 
-- `invalid_request`: the request is malformed or fails validation. Not retryable.
+- `invalid_request`: the request is malformed or fails validation. A body over 16 KB under `/v1/public/` or over 256 KB elsewhere gets it, and so does a staff write made with a session cookie whose body is not `application/json`. Not retryable.
 - `venue_not_found`: the venue does not exist, or the caller cannot see it. Indistinguishable from not found. Not retryable.
 - `reservation_not_found`: the reservation does not exist, or the caller cannot see it. Not retryable.
 - `waitlist_entry_not_found`: the waitlist entry does not exist, or the caller cannot see it. Not retryable.
@@ -29,7 +29,7 @@ The guest-facing routes under `/v1/public/` and the `online-booking` settings. S
 ## Auth
 
 - `unauthorized`: the caller is not authenticated. Not retryable.
-- `forbidden`: the caller is authenticated but lacks the role for the operation. Not retryable.
+- `forbidden`: the caller is authenticated but lacks the role for the operation, or made a write with a session cookie from an `Origin` the instance does not trust (`BETTER_AUTH_URL`, `TRUSTED_ORIGINS`). Not retryable.
 - `venue_creation_closed`: the instance does not let this account create a venue. Under `SIGNUP=first-user` and `SIGNUP=closed` only the owner may, so any other account, an invited one included, gets it with `403`. It is not `forbidden`, which is about a role in an existing venue. Nothing is created. Not retryable.
 
 ## Rate limiting

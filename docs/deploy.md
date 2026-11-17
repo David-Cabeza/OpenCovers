@@ -153,6 +153,14 @@ A budget is `max/window`, with a window in `s`, `m` or `h`. An unknown value sto
 - With `TRUST_PROXY=false` behind a proxy, every client shares the proxy's address, so one abuser refuses everyone. The API logs a warning when it sees the header in that state.
 - A CDN or second proxy in front of Caddy is not supported. All clients behind one edge address share a budget. Limit at the CDN, or accept that.
 - Counters live in the API process. A restart clears them, and two API instances count separately.
+- Each rule tracks at most 10,000 clients. When one is full, new clients of that rule get `429` until the oldest window ends, and the API logs a warning naming the rule. Spent budgets are never dropped to make room.
+- An IPv6 client is counted by its `/48`, so clients that share one, such as some mobile carriers, share a budget.
+- A public create that fails with `400` or `404` (a malformed body, a failed challenge, an unknown key) does not spend `RATE_LIMIT_PUBLIC_VENUE`. It still spends the sender's `RATE_LIMIT_PUBLIC_BOOKING`.
+
+### Request size and cross-site writes
+
+- The API refuses a request body over 16 KB under `/v1/public` and over 256 KB elsewhere with `400 invalid_request`. The shipped Caddyfile caps bodies at 64 KiB on the widget site and 1 MiB on the staff site (`request_body { max_size ... }`) and answers `413` beyond. Another proxy should set a similar cap.
+- A staff write made with the session cookie must come from `BETTER_AUTH_URL` or a `TRUSTED_ORIGINS` entry, when the browser sends an `Origin`, and carry `Content-Type: application/json` when it has a body. Otherwise it fails with `403 forbidden` or `400 invalid_request`. The staff app does this already. If the staff app is served from an origin missing from both, its writes fail. API keys and the MCP server are unaffected.
 - Staff in one venue usually share one public address. The defaults allow a shift change. Raise `RATE_LIMIT_AUTH` if a venue is large.
 - Behind a venue's shared network, one abusive device can spend the budget for everyone there until the window ends.
 - The limiter is off unless `NODE_ENV=production` or `RATE_LIMIT=on`, so `pnpm dev` needs no setting. The image and `compose.prod.yaml` set both. Outside Docker, set `NODE_ENV=production` or `RATE_LIMIT=on`, or the API runs with no limits. It logs one line at startup that says which.
@@ -192,12 +200,12 @@ The API reads these variables regardless of host:
 | `DATABASE_URL` | yes | `postgres://…` connection string. |
 | `BETTER_AUTH_SECRET` | yes | `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | yes | Public base URL of the API. |
-| `TRUSTED_ORIGINS` | yes | Comma-separated origins allowed to call auth (the staff app origin). |
+| `TRUSTED_ORIGINS` | yes | Comma-separated origins allowed to call auth and to send cookie-authenticated writes (the staff app origin). |
 | `SIGNUP` | no | `open` (default), `first-user` or `closed`. See Sign-up control. |
 | `RATE_LIMIT` | no | `on` or `off`. Default `on` in `compose.prod.yaml`. See Rate limiting. |
 | `TRUST_PROXY` | no | `false` (default) or `true`. See Rate limiting. |
 | `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION`, `RATE_LIMIT_VENUE_CREATION`, `RATE_LIMIT_PUBLIC_READ`, `RATE_LIMIT_PUBLIC_BOOKING`, `RATE_LIMIT_PUBLIC_VENUE`, `RATE_LIMIT_PUBLIC_SELF_SERVICE` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |
-| `PUBLIC_POW_DIFFICULTY` | no | Proof-of-work bits for a public booking, 0 to 32. Default `12`. `0` turns the proof of work off and keeps the signed challenge. See ADR-0017. |
-| `PUBLIC_CHALLENGE_SECRET` | no | Signs the public form challenge, at least 32 characters. Default: a random key per process, which is enough for one API process. Set it when several serve the widget. |
+| `PUBLIC_POW_DIFFICULTY` | no | Proof-of-work bits for a public booking, 0 to 32. Default `12`. `0` turns the proof of work off and keeps the signed challenge. The API logs the effective difficulty at startup, and a warning when it is `0` with `NODE_ENV=production`. See ADR-0017. |
+| `PUBLIC_CHALLENGE_SECRET` | no | Signs the public form challenge, at least 32 characters. Default: a random key per process, which is enough for one API process. Set it when several serve the widget. With `NODE_ENV=production` and no value, the API logs a warning at startup. |
 | `WIDGET_ADDRESS` | no | The booking widget's host, such as `book.example.com`. Caddy and the API both read it. Unset, a production API serves no widget page. It must not share the staff app's host name. See Booking widget. |
 | `WIDGET_DIST` | no | The widget build the API serves. Default: `apps/widget/dist` in the repository, which the image fills. |
