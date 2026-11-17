@@ -131,7 +131,7 @@ To run the MCP server, use `npx -y @opencovers/mcp` or see [apps/mcp](apps/mcp/R
 
 ## Setting up on a new machine
 
-Exact steps from a clean machine to a running stack. Intended layout: Ubuntu on WSL2, macOS, or any Linux. It has been exercised on macOS; the WSL2 path has not been run yet. Work inside the Linux file system (for WSL2, `~/projects`, not `/mnt/c`).
+Exact steps from a clean machine to a running stack. Intended layout: Ubuntu on WSL2, macOS, or any Linux. It has been exercised on macOS and, in a smoke test, on Ubuntu under WSL2 (Node 26.13.1, newer than the pinned 22 line; install, migrate, typecheck, tests and `pnpm dev` all passed). Work inside the Linux file system (for WSL2, `~/projects`, not `/mnt/c`).
 
 1. **Prerequisites**: git, Docker (Docker Desktop with WSL integration, or Docker Engine), and Node.js 22.9 or newer through [nvm](https://github.com/nvm-sh/nvm).
 2. **Clone** (SSH):
@@ -162,7 +162,19 @@ Exact steps from a clean machine to a running stack. Intended layout: Ubuntu on 
    ```
 6. **Environment**: none is needed locally. To override a default, `cp .env.example .env` and uncomment only what you change. Never commit `.env`.
 
-Notes: use `git config core.autocrlf input` only if you also edit on Windows outside WSL (the repo already normalizes to LF). A fresh machine starts with an empty database, so create a new venue after signing up. The brand kit in `docs/brand` needs Chrome or Chromium only if you regenerate it.
+Notes: use `git config core.autocrlf input` only if you also edit on Windows outside WSL (the repo already normalizes to LF). A fresh machine starts with an empty database, so create a new venue after signing up, or load a ready-made demo venue with `pnpm demo:seed` (see Demo data below). The brand kit in `docs/brand` needs Chrome or Chromium only if you regenerate it.
+
+## Demo data
+
+To record a video or try the staff app with a believable venue, start the stack and seed a fresh database:
+
+```sh
+pnpm db:migrate
+pnpm dev                 # in one terminal
+pnpm demo:seed           # in another
+```
+
+It creates the invented venue "La Taberna del Faro" through the HTTP API: two services, 12 tables in two zones with a floor plan, online booking, a public profile, about 25 reservations across today and the next three days (some seated, attended, no-show, cancelled or modified), a waitlist, a read key, a write key, a self-service link and an MCP host config. It prints the sign-in (`demo@opencovers.test`, a local-only demo password), the booking widget URL and the keys. All guests are invented and use `example.com` addresses. Run it once per database: it stops with a message if the venue exists. `ALLDAY=1 pnpm demo:seed` uses one service from 09:00 to 23:45 so walk-ins work at any hour. It refuses `NODE_ENV=production` and any non-local `BASE`. For a thin venue on an account you already have, use `pnpm db:seed-demo <email>`.
 
 ## Demo
 

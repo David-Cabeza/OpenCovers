@@ -15,6 +15,7 @@
     "db:generate": "pnpm --filter @opencovers/api db:generate",
     "db:migrate": "pnpm --filter @opencovers/api db:migrate",
     "check:publication": "bash scripts/check-publication.sh",
-    "db:seed-demo": "pnpm --filter @opencovers/api db:seed-demo"
+    "db:seed-demo": "pnpm --filter @opencovers/api db:seed-demo",
+    "demo:seed": "pnpm --filter @opencovers/api demo:seed"
   }
 }
