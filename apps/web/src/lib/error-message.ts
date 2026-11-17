@@ -33,6 +33,7 @@ export const MESSAGES: Record<string, string> = {
   beyond_booking_horizon: "That date is further ahead than this venue takes bookings.",
   date_blocked: "This venue takes no bookings on that date.",
   guest_booking_limit: "This guest already has the most bookings allowed on that date.",
+  booking_declined: "This contact is on the venue's blocklist. An admin can remove the entry to take the booking.",
   // Guest
   email_required: "Add the guest's email or phone to continue.",
   confirmation_required: "The guest has to confirm before this can be saved.",
@@ -65,6 +66,9 @@ export const MESSAGES: Record<string, string> = {
   webhook_not_found: "This webhook no longer exists.",
   webhook_url_rejected: "That URL cannot be used. It must be a public https address.",
   webhook_limit_reached: "This venue already has the maximum of 5 webhooks.",
+  // Blocklist
+  blocklist_entry_not_found: "This blocklist entry no longer exists.",
+  blocklist_limit_reached: "This venue's blocklist is full. Remove an entry first.",
 };
 
 const RATE_LIMITED = MESSAGES.rate_limited as string;

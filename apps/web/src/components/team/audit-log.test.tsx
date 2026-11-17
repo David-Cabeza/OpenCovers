@@ -18,6 +18,7 @@ const entry = (over: Partial<AuditEntry>): AuditEntry => ({
   targetUserId: null,
   invitationId: "inv12345678",
   role: "write",
+  blocklistEntryId: null,
   occurredAt: "2026-11-16T10:00:00Z",
   ...over,
 });
@@ -113,6 +114,36 @@ describe("AuditLog", () => {
       .closest("tr") as HTMLElement;
     expect(within(transferred).getByText("Ana")).toBeInTheDocument();
     expect(within(transferred).getByText("Bo")).toBeInTheDocument();
+  });
+
+  it("labels blocklist changes with the admin and the entry id", async () => {
+    setup({
+      body: {
+        entries: [
+          entry({
+            id: "a7",
+            action: "guest_unblocked",
+            invitationId: null,
+            role: null,
+            blocklistEntryId: "e2e2e2e2-0000",
+          }),
+          entry({
+            id: "a8",
+            action: "guest_blocked",
+            invitationId: null,
+            role: null,
+            blocklistEntryId: "e1e1e1e1-0000",
+          }),
+        ],
+        nextCursor: null,
+      },
+    });
+    const card = await auditCard();
+    const blocked = (await within(card).findByText("Guest blocked")).closest("tr") as HTMLElement;
+    expect(within(blocked).getByText("Ana")).toBeInTheDocument();
+    expect(within(blocked).getByText("e1e1e1e1…")).toBeInTheDocument();
+    const unblocked = within(card).getByText("Guest unblocked").closest("tr") as HTMLElement;
+    expect(within(unblocked).getByText("e2e2e2e2…")).toBeInTheDocument();
   });
 
   it("shows an empty state", async () => {

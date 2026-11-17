@@ -201,7 +201,7 @@ OpenCovers has no hosting vendor dependency. It needs PostgreSQL and a Node.js p
 
 ## Status
 
-Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — all 38 conformance cases for what is built pass, signed webhooks included. 17 more cases (C39 to C55) specify the booking widget and self-service link, whose contract is written and whose code is not. A deployment is prepared (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
+Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — all 39 conformance cases for what is built pass (C1 to C38 and C56), signed webhooks included. 17 more cases (C39 to C55) specify the booking widget and self-service link, whose contract is written and whose code is not. A deployment is prepared (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
 
 ## Contributing
 

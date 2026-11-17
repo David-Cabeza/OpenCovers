@@ -492,20 +492,28 @@ export const membershipAudit = pgTable(
       .references(() => venues.id, { onDelete: "cascade" }),
     action: text("action")
       .$type<
-        "invited" | "invite_revoked" | "redeemed" | "member_removed" | "role_changed" | "creator_transferred"
+        | "invited"
+        | "invite_revoked"
+        | "redeemed"
+        | "member_removed"
+        | "role_changed"
+        | "creator_transferred"
+        | "guest_blocked"
+        | "guest_unblocked"
       >()
       .notNull(),
     actorUserId: text("actor_user_id"),
     targetUserId: text("target_user_id"),
     invitationId: text("invitation_id"),
     role: text("role"),
+    blocklistEntryId: text("blocklist_entry_id"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("idx_membership_audit_venue").on(t.venueId, t.occurredAt),
     check(
       "membership_audit_action",
-      sql`${t.action} IN ('invited', 'invite_revoked', 'redeemed', 'member_removed', 'role_changed', 'creator_transferred')`,
+      sql`${t.action} IN ('invited', 'invite_revoked', 'redeemed', 'member_removed', 'role_changed', 'creator_transferred', 'guest_blocked', 'guest_unblocked')`,
     ),
   ],
 );

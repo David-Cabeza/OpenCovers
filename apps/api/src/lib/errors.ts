@@ -35,9 +35,12 @@ export const ERRORS = {
   webhook_not_found: { status: 404, retryable: false },
   webhook_url_rejected: { status: 400, retryable: false },
   webhook_limit_reached: { status: 409, retryable: false },
+  blocklist_entry_not_found: { status: 404, retryable: false },
+  blocklist_limit_reached: { status: 409, retryable: false },
   rate_limited: { status: 429, retryable: true },
   transient: { status: 500, retryable: true },
-  // The next six are in the vocabulary but no route emits them yet.
+  // The next seven are in the vocabulary but no route emits them yet.
+  booking_declined: { status: 409, retryable: false },
   idempotency_in_flight: { status: 409, retryable: true },
   unknown_outcome: { status: 503, retryable: true },
   email_required: { status: 400, retryable: false },
