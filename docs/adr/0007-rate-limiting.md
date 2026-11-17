@@ -1,6 +1,6 @@
 # ADR-0007: Rate limiting
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-16
 - Deciders: David Cabeza
 
