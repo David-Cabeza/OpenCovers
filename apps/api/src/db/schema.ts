@@ -545,4 +545,52 @@ export const guestBlocklist = pgTable(
   ],
 );
 
+export const venueOnlineBooking = pgTable(
+  "venue_online_booking",
+  {
+    venueId: text("venue_id")
+      .primaryKey()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(false),
+    bookingKey: text("booking_key"),
+    allowedOrigins: jsonb("allowed_origins").$type<string[]>().notNull().default([]),
+    services: jsonb("services").$type<string[]>(),
+    weekdays: smallint("weekdays").array(),
+    minPartySize: integer("min_party_size").notNull().default(1),
+    maxPartySize: integer("max_party_size").notNull().default(8),
+    leadTimeMinutes: integer("lead_time_minutes").notNull().default(0),
+    maxAdvanceDays: integer("max_advance_days"),
+    selfServiceCutoffMinutes: integer("self_service_cutoff_minutes").notNull().default(120),
+    maxOpenBookingsPerContact: integer("max_open_bookings_per_contact").default(2),
+    confirmationMode: text("confirmation_mode").notNull().default("auto"),
+    askConsent: boolean("ask_consent").notNull().default(false),
+    locale: text("locale").notNull().default("es"),
+    theme: jsonb("theme").$type<Record<string, unknown>>().notNull().default({}),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_venue_online_booking_key").on(t.bookingKey),
+    check("venue_online_booking_key", sql`${t.bookingKey} IS NULL OR ${t.bookingKey} ~ '^pk_[A-Za-z0-9_-]{22}$'`),
+    check(
+      "venue_online_booking_party",
+      sql`${t.minPartySize} BETWEEN 1 AND 100 AND ${t.maxPartySize} BETWEEN 1 AND 100 AND ${t.minPartySize} <= ${t.maxPartySize}`,
+    ),
+    check("venue_online_booking_lead", sql`${t.leadTimeMinutes} BETWEEN 0 AND 10080`),
+    check("venue_online_booking_horizon", sql`${t.maxAdvanceDays} IS NULL OR ${t.maxAdvanceDays} BETWEEN 0 AND 1000`),
+    check("venue_online_booking_cutoff", sql`${t.selfServiceCutoffMinutes} BETWEEN 0 AND 10080`),
+    check(
+      "venue_online_booking_open_cap",
+      sql`${t.maxOpenBookingsPerContact} IS NULL OR ${t.maxOpenBookingsPerContact} BETWEEN 1 AND 20`,
+    ),
+    check("venue_online_booking_mode", sql`${t.confirmationMode} = 'auto'`),
+    check("venue_online_booking_locale", sql`${t.locale} IN ('es', 'en')`),
+    check(
+      "venue_online_booking_weekdays",
+      sql`${t.weekdays} IS NULL OR (cardinality(${t.weekdays}) BETWEEN 1 AND 7 AND ${t.weekdays} <@ ARRAY[1,2,3,4,5,6,7]::smallint[])`,
+    ),
+    check("venue_online_booking_services", sql`${t.services} IS NULL OR jsonb_array_length(${t.services}) >= 1`),
+    check("venue_online_booking_origins", sql`jsonb_array_length(${t.allowedOrigins}) <= 10`),
+  ],
+);
+
 export const betterAuthSchema = { user, session, account, verification };

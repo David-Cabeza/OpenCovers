@@ -76,6 +76,7 @@ import { isCommentary } from "./lib/commentary";
 import { isRating } from "./lib/rating";
 import { isReconfirmation } from "./lib/reconfirmation";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
+import { getOnlineBooking, parseOnlineBookingInput, rotateBookingKey, setOnlineBooking } from "./lib/online-booking";
 import {
   etagMatches,
   etagOf,
@@ -1092,6 +1093,27 @@ app.put("/v1/venues/:venueId/public-profile", adminOnly, async (c) => {
   const result = await setProfile(db, c.req.param("venueId"), input);
   if (!result.ok) return error(c, result.code);
   return c.json(result.profile);
+});
+
+app.get("/v1/venues/:venueId/online-booking", async (c) => {
+  const settings = await getOnlineBooking(db, c.req.param("venueId"));
+  if (!settings) return error(c, "venue_not_found");
+  return c.json(settings);
+});
+
+app.put("/v1/venues/:venueId/online-booking", adminOnly, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const input = parseOnlineBookingInput(body);
+  if (!input) return error(c, "invalid_request");
+  const result = await setOnlineBooking(db, c.req.param("venueId"), input);
+  if (!result.ok) return error(c, result.code);
+  return c.json({ ...result.settings, warnings: result.warnings });
+});
+
+app.post("/v1/venues/:venueId/online-booking/rotate-key", adminOnly, async (c) => {
+  const result = await rotateBookingKey(db, c.req.param("venueId"));
+  if (!result.ok) return error(c, result.code);
+  return c.json(result.settings);
 });
 
 app.get("/v1/venues/:venueId/webhooks", async (c) => {

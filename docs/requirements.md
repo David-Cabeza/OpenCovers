@@ -322,13 +322,15 @@ Acceptance: conformance case C38. An instance that never had a creator, because 
 
 ## Public booking channel
 
-A guest books, and later reads, changes or cancels that booking, on the venue's own site, with no account. The design is [ADR-0017](adr/0017-booking-widget-and-self-service-link.md). These requirements and cases C39 to C55 are the contract for it. None of it is built yet.
+A guest books, and later reads, changes or cancels that booking, on the venue's own site, with no account. The design is [ADR-0017](adr/0017-booking-widget-and-self-service-link.md). These requirements and cases C39 to C55 are the contract for it. Only REQ-P1 is built, in part (stage 2 of the ADR).
 
 ### REQ-P1 Online booking settings and the public booking key
 
 A venue turns online booking on and shapes it with its own settings, kept apart from the venue config and the public profile: the sites allowed to frame the widget, the services and weekdays bookable online, the online party limits, lead time and horizon, the self-service cutoff, the open bookings one contact may hold online, the confirmation mode, the consent question, the widget locale and a theme of validated tokens. Any role reads them, and only an admin changes them. Turning it on creates a public booking key, `pk_` and 16 random bytes, that names the venue and authenticates nothing. An admin replaces it with a rotation, and the old key stops at once. The confirmation mode is an open set of values. Only `auto` is accepted now, and a client treats any other value as not automatic confirmation. An online limit never relaxes a rule of the venue.
 
 Acceptance: conformance case C39. Every invalid setting fails with `invalid_request` and changes nothing, `approval` included. Turning online booking on without a venue name or a bookable service fails with `online_booking_incomplete`.
+
+Status: partial. The settings, the key and its rotation are built and tested. That the old key stops resolving needs the public routes (C40, stage 3).
 
 ### REQ-P2 A separate public surface
 
