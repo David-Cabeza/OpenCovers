@@ -266,7 +266,7 @@ describe("rate limiting on the real app", () => {
       const headers = { "idempotency-key": "same-key" };
       const out: number[] = [];
       for (let i = 0; i < 4; i += 1) {
-        out.push((await create(ip, cookie, { id: "slug-replay", name: "R" }, headers)).status);
+        out.push((await create(ip, cookie, { name: "R" }, headers)).status);
       }
       expect(out[0]).toBe(201);
       expect(out[3]).toBe(429);

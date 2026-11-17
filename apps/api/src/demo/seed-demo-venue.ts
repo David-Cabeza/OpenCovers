@@ -4,9 +4,10 @@
 //   pnpm demo:seed
 //   ALLDAY=1 pnpm demo:seed      # one service 09:00-23:45, so walk-ins and the waitlist work at any hour
 //
-// Run it once against a fresh database. It stops with a clear message if the venue already exists.
+// Run it once against a fresh database. It stops with a clear message if the account already has
+// a venue with the demo name. The API generates the venue id and the script uses the one it returns.
 // Environment: BASE (default http://localhost:3000, must be localhost), EMAIL, PASSWORD,
-// OWNER_NAME, VENUE. The default password is a local-development value that is public in the
+// OWNER_NAME. The default password is a local-development value that is public in the
 // source. Every guest is invented and uses an example.com address.
 import { randomUUID } from "node:crypto";
 
@@ -14,7 +15,7 @@ const BASE = process.env.BASE ?? "http://localhost:3000";
 const EMAIL = process.env.EMAIL ?? "demo@opencovers.test";
 const PASSWORD = process.env.PASSWORD ?? "demo-password-123";
 const OWNER_NAME = process.env.OWNER_NAME ?? "Marta Quiroga";
-const VENUE = process.env.VENUE ?? "taberna-del-faro";
+const VENUE_NAME = "La Taberna del Faro";
 const TZ = "Europe/Madrid";
 const ALLDAY = process.env.ALLDAY === "1";
 
@@ -84,17 +85,11 @@ cookie = r.headers
   .join("; ");
 
 const mine = must(await api("GET", "/v1/venues"), "list venues");
-const exists = (mine.venues ?? []).some((v: Json) => v.id === VENUE);
-if (exists) {
-  console.error(`Venue "${VENUE}" already exists. Use a fresh database or set VENUE=another-id.`);
+if ((mine.venues ?? []).some((v: Json) => v.name === VENUE_NAME)) {
+  console.error(`Venue "${VENUE_NAME}" already exists for ${EMAIL}. Use a fresh database or another EMAIL.`);
   process.exit(1);
 }
-r = await api("POST", "/v1/venues", { body: { id: VENUE, name: "La Taberna del Faro", timezone: TZ } });
-if (r.status === 409 || r.status === 500) {
-  console.error(`Venue "${VENUE}" already exists under another account. Use a fresh database or set VENUE=another-id.`);
-  process.exit(1);
-}
-must(r, "create venue");
+const VENUE = must(await api("POST", "/v1/venues", { body: { name: VENUE_NAME, timezone: TZ } }), "create venue").venue.id as string;
 const V = `/v1/venues/${VENUE}`;
 console.log(`venue ${VENUE} created`);
 

@@ -73,8 +73,7 @@ async function venueCount(): Promise<number> {
 async function ownerWithVenue(venueId = "owner-venue"): Promise<Account> {
   process.env.SIGNUP = "first-user";
   const owner = await signUp();
-  const res = await call(owner, "POST", "/v1/venues", { id: venueId, name: venueId });
-  expect(res.status).toBe(201);
+  await createVenue(db, owner.id, { id: venueId, name: venueId });
   return owner;
 }
 
@@ -93,6 +92,60 @@ async function expectRefused(res: Response) {
     retryable: false,
   });
 }
+
+function rawPost(who: Caller, body: string) {
+  return app.request("/v1/venues", {
+    method: "POST",
+    headers: { Cookie: who.cookie ?? "", "content-type": "application/json" },
+    body,
+  });
+}
+
+describe("POST /v1/venues input", () => {
+  it("refuses a body that carries an id, even one nobody uses, and writes nothing", async () => {
+    const a = await signUp();
+    const res = await call(a, "POST", "/v1/venues", { id: "fresh-looking", name: "X" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("invalid_request");
+    expect(await venueCount()).toBe(0);
+  });
+
+  it("answers the same 400 for an id that exists in another account, so it never confirms one", async () => {
+    const a = await signUp();
+    const b = await signUp();
+    await createVenue(db, a.id, { id: "taken", name: "A" });
+    const forTaken = await call(b, "POST", "/v1/venues", { id: "taken", name: "B" });
+    const forFree = await call(b, "POST", "/v1/venues", { id: "free", name: "B" });
+    expect(forTaken.status).toBe(400);
+    expect(await forTaken.text()).toBe(await forFree.text());
+    expect(await venueCount()).toBe(1);
+  });
+
+  it("generates the id when none is sent, and lets two creates share a name", async () => {
+    const a = await signUp();
+    const first = (await (await postVenue(a, "Same")).json()).venue.id as string;
+    const second = (await (await postVenue(a, "Same")).json()).venue.id as string;
+    expect(first).toMatch(/^[0-9a-f-]{36}$/);
+    expect(second).not.toBe(first);
+    expect(await venueCount()).toBe(2);
+  });
+
+  it.each(["{not json", "", "[]", "null", "42", '"text"'])("answers 400 for the body %j", async (raw) => {
+    const a = await signUp();
+    const res = await rawPost(a, raw);
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("invalid_request");
+    expect(await venueCount()).toBe(0);
+  });
+
+  it("takes an invalid time zone as UTC, not as a server error", async () => {
+    const a = await signUp();
+    const res = await call(a, "POST", "/v1/venues", { name: "Z", timezone: "Not/AZone" });
+    expect(res.status).toBe(201);
+    const [row] = await db.select().from(venues);
+    expect(row!.timezone).toBe("UTC");
+  });
+});
 
 describe("SIGNUP=open", () => {
   it("lets any signed-in account create venues", async () => {

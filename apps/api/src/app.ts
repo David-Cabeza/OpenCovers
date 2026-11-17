@@ -465,12 +465,14 @@ app.post("/v1/venues", async (c) => {
   if (!(await mayCreateVenue(db, signupMode(), user.id))) {
     return error(c, "venue_creation_closed");
   }
-  const body = await c.req.json();
-  if (typeof body.name !== "string" || body.name.trim() === "") {
+  const body = await c.req.json().catch(() => null);
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return error(c, "invalid_request");
+  }
+  if ("id" in body || typeof body.name !== "string" || body.name.trim() === "") {
     return error(c, "invalid_request");
   }
   const { id } = await createVenue(db, user.id, {
-    id: typeof body.id === "string" ? body.id : undefined,
     name: body.name,
     timezone: typeof body.timezone === "string" ? body.timezone : undefined,
   });
