@@ -12,10 +12,10 @@
     "db:seed-demo": "tsx --env-file-if-exists=../../.env src/db/seed-demo.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.6",
-    "better-auth": "^1.7.18",
+    "@hono/node-server": "^2.1.8",
+    "better-auth": "^1.7.23",
     "drizzle-orm": "^0.45.4",
-    "hono": "^4.13.17",
+    "hono": "^4.13.18",
     "libphonenumber-js": "^1.13.16",
     "pg": "^8.23.1"
   },
