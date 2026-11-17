@@ -268,6 +268,18 @@ paths:
         on the date, found by the guest's contact, fails with
         `guest_booking_limit` (409). A booking without a usable contact is
         not counted against the cap.
+
+        A contact on the venue's guest blocklist (ADR-0018) fails with
+        `booking_declined` (409), whoever calls, a staff session included.
+        The check runs last, after the table search and the overbooking
+        room, so a closed, blocked, capped, full or taken time fails with
+        its own code for a blocked contact as for any other. A declined
+        create books nothing, keeps no guest record, stores no idempotency
+        key, emits no event and sends no email, so the same key books once
+        an admin removes the entry. A repeat of a create that succeeded
+        before the entry was added returns that booking. A booking without a
+        usable contact, a walk-in and a seat from the waitlist are not
+        checked. Availability and the explanation never consult the list.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -793,6 +805,13 @@ paths:
         the same way and emit the same `erased` events. A reservation with no
         guest record that holds a name or contact also expires, once its end
         is older than the retention period. It is blanked the same way.
+
+        Erasure keeps the venue's guest blocklist entries (ADR-0018). An
+        entry is not linked to a guest, and removing it on request would let
+        a blocked guest unblock themselves. `blocklistEntriesKept` counts the
+        entries that match the email or phone of a guest record it deleted,
+        or the contact it was given. An admin removes an entry with
+        `blocklist.remove`, and retention deletes it after its `expiresAt`.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/idempotencyKey"
@@ -3087,7 +3106,7 @@ components:
 
     ErasureResult:
       type: object
-      required: [erasedReservations, erasedGuests, erasedWaitlistEntries]
+      required: [erasedReservations, erasedGuests, erasedWaitlistEntries, blocklistEntriesKept]
       properties:
         erasedReservations:
           type: integer
@@ -3096,6 +3115,13 @@ components:
           description: Guest records deleted.
         erasedWaitlistEntries:
           type: integer
+        blocklistEntriesKept:
+          type: integer
+          description: |
+            Guest blocklist entries of the venue that match the guests this
+            erasure deleted or the contact it was given, and that stay in
+            place. A repeat that deletes no guest and was given no contact
+            reports 0.
 
     ConfirmationMode:
       type: string

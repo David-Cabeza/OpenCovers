@@ -196,7 +196,7 @@ describe("per-reservation reconfirmation", () => {
     ).json();
 
     const res = await post("/erasure", { guestId: "eva-reconf@example.com" }, "reconfirmation-admin-key");
-    expect(await res.json()).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0 });
+    expect(await res.json()).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 });
 
     const after = await get(`/reservations/${created.id}`);
     expect(after.reconfirmation).toBe("none");

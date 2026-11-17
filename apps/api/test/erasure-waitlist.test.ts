@@ -56,7 +56,7 @@ describe("erasure covers the waitlist", () => {
 
     const res = await erase(db, "wl-erase", "eva@example.com");
 
-    expect(res).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 2 });
+    expect(res).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 2, blocklistEntriesKept: 0 });
     expect(await waitlistContacts("wl-erase")).toEqual([]);
   });
 
@@ -66,7 +66,7 @@ describe("erasure covers the waitlist", () => {
 
     const res = await erase(db, "wl-only", "iker@example.com");
 
-    expect(res).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 1 });
+    expect(res).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 1, blocklistEntriesKept: 0 });
     expect(await listWaitlist(db, "wl-only")).toEqual([]);
   });
 
@@ -100,6 +100,6 @@ describe("erasure covers the waitlist", () => {
     await erase(db, "wl-again", "rui@example.com");
     const again = await erase(db, "wl-again", "rui@example.com");
 
-    expect(again).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0 });
+    expect(again).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 });
   });
 });

@@ -48,7 +48,7 @@ The guest-facing routes under `/v1/public/` and the `online-booking` settings. S
 - `beyond_booking_horizon`: the date is further ahead than the venue's `maxAdvanceDays`. Not retryable.
 - `date_blocked`: the venue takes no bookings on that date. Not retryable.
 - `guest_booking_limit`: the guest already holds the venue's `maxActivePerGuestPerDay` active bookings on that date. Create only, because availability does not know the guest. Not retryable.
-- `booking_declined`: the venue does not accept bookings for this contact. Show the guest a neutral message and send them to the venue directly. `409`. The body has no details: no reason, no date, no actor, and nothing about other entries. Create only, because availability does not know the guest. Reserved: no route emits it yet. Not retryable.
+- `booking_declined`: the venue does not accept bookings for this contact. Show the guest a neutral message and send them to the venue directly. `409`. The body has no details: no reason, no date, no actor, and nothing about other entries. Create only, because availability does not know the guest. A walk-in and a seat from the waitlist are never declined. Not retryable.
 
 `GET /availability/explain` returns `outside_hours`, `lead_time_violation`, `beyond_booking_horizon`, `date_blocked`, `party_size_too_small`, `party_size_too_large`, and `no_suitable_table` as reason codes in a `200` answer, with the same meaning.
 

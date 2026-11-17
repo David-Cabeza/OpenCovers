@@ -355,7 +355,7 @@ describe("guest erasure", () => {
 
     const res = await call("g-erase", "/erasure", { guestId });
 
-    expect(await res.json()).toEqual({ erasedReservations: 2, erasedGuests: 2, erasedWaitlistEntries: 2 });
+    expect(await res.json()).toEqual({ erasedReservations: 2, erasedGuests: 2, erasedWaitlistEntries: 2, blocklistEntriesKept: 0 });
     for (const id of [a.id, b.id]) {
       const row = await reservationRow(id);
       expect(row).toMatchObject({
@@ -378,7 +378,7 @@ describe("guest erasure", () => {
     expect(erased.rows[0].n).toBe(2);
 
     const again = await call("g-erase", "/erasure", { guestId });
-    expect(await again.json()).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0 });
+    expect(await again.json()).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 });
   });
 
   it("falls back to a normalized contact when the guest id is unknown", async () => {
@@ -389,8 +389,8 @@ describe("guest erasure", () => {
     const byPhone = await erase(db, "g-erase-contact", "622222222");
     const byRaw = await erase(db, "g-erase-contact", "ask at the bar");
 
-    expect(byPhone).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0 });
-    expect(byRaw).toEqual({ erasedReservations: 1, erasedGuests: 0, erasedWaitlistEntries: 0 });
+    expect(byPhone).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 });
+    expect(byRaw).toEqual({ erasedReservations: 1, erasedGuests: 0, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 });
     expect((await reservationRow(linked.id)).erased).toBe(true);
     expect((await reservationRow(unlinked.id)).erased).toBe(true);
     expect(await guestsOf("g-erase-contact")).toEqual([]);
@@ -403,11 +403,11 @@ describe("guest erasure", () => {
     const b = await book("g-erase-b", { name: "Hoa", contact: "hoa@example.com" });
 
     const crossId = await erase(db, "g-erase-b", a.guest.guestId as string);
-    expect(crossId).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0 });
+    expect(crossId).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 });
     expect(await guestsOf("g-erase-a")).toHaveLength(1);
 
     const byContact = await erase(db, "g-erase-b", "hoa@example.com");
-    expect(byContact).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0 });
+    expect(byContact).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 });
     expect((await reservationRow(b.id)).erased).toBe(true);
     expect((await reservationRow(a.id)).erased).toBe(false);
     expect((await guestsOf("g-erase-a")).map((g) => g.id)).toEqual([a.guest.guestId]);
@@ -443,7 +443,7 @@ describe("guest erasure", () => {
 
     const res = await erase(db, "g-erase-principal", undefined, "guests-principal", "guests-principal");
 
-    expect(res).toEqual({ erasedReservations: 1, erasedGuests: 2, erasedWaitlistEntries: 0 });
+    expect(res).toEqual({ erasedReservations: 1, erasedGuests: 2, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 });
     expect(await reservationRow(a.id)).toMatchObject({ erased: true, guestId: null, guestName: "" });
     expect(await guestsOf("g-erase-principal")).toEqual([]);
     const audit = await db.execute(
@@ -456,7 +456,7 @@ describe("guest erasure", () => {
     expect(JSON.stringify(audit.rows)).not.toContain("jon@");
 
     const again = await erase(db, "g-erase-principal", undefined, "guests-principal", "guests-principal");
-    expect(again).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0 });
+    expect(again).toEqual({ erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 });
   });
 
   it("erasure by principal keeps a guest who has a visit owned by another principal", async () => {
@@ -480,7 +480,7 @@ describe("guest erasure", () => {
 
     const res = await erase(db, "g-erase-shared", undefined, "guests-principal", "guests-principal");
 
-    expect(res).toEqual({ erasedReservations: 1, erasedGuests: 0, erasedWaitlistEntries: 0 });
+    expect(res).toEqual({ erasedReservations: 1, erasedGuests: 0, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 });
     expect(await reservationRow(mine.id)).toMatchObject({ erased: true, guestId: null });
     expect(await reservationRow(theirs.id)).toMatchObject({ erased: false, guestId: mine.guest.guestId });
     expect((await guestsOf("g-erase-shared")).map((g) => g.email)).toEqual(["kai@example.com"]);

@@ -130,7 +130,9 @@ Acceptance: conformance case C19.
 
 A venue can refuse bookings from a guest who repeatedly does not show up or who abused staff, without keeping a list of names or contacts in clear. An admin, through a staff session and never a key, adds a guest by its record, which covers the guests merged into it, or by a typed contact, with an optional reason code. The engine stores a keyed hash of each normalized contact, the reason code, the admin's account id and the time, and nothing else. An admin lists the entries, looks up a guest or a contact, and removes an entry. Each add and removal writes an id-only row to the membership audit log. A venue holds at most 10,000 entries. Availability and the explanation never consult the list. See ADR-0018.
 
-Acceptance: conformance case C56. No stored entry, audit row or response holds a contact or a hash, and every key is refused.
+A create whose contact is on the list fails with `booking_declined`, only where it would otherwise book, and leaves nothing behind. A walk-in and a seat from the waitlist are not checked. Erasure keeps the entries and reports how many it kept, and retention deletes each entry `retentionDays` after it was added.
+
+Acceptance: conformance cases C56 and C57. No stored entry, audit row or response holds a contact or a hash, and every key is refused.
 
 ## Notices and consent
 
@@ -387,3 +389,4 @@ The conformance cases are the acceptance tests for the contract. The first set:
 - C38: the venue creator hands the creator mark to a member of a venue they administer in one transaction, nobody else can, and an ineligible target is refused.
 - C39 to C55: the public booking channel of ADR-0017. Online booking settings and a rotatable booking key (C39), a credential-free surface where an unknown key looks like any other (C40), a widget page framed only by allowed origins (C41), availability and create that agree and never overbook (C42, C43), isolated public idempotency (C44), bot protection and caps (C45, C46), a hash-only self-service token with one failure answer (C47), the masked guest view, guest modify and guest cancel with its replay rule (C48 to C50), link rotation (C51), public rate limits (C52), links ended by erasure and retention (C53), the blocklist (C54) and minimal guest data (C55).
 - C56: a venue admin session adds, lists, looks up and removes guest blocklist entries stored as keyed hashes, every key is refused, an add is idempotent and capped at 10,000 under concurrency, each change writes an id-only audit row, and no response holds a contact or a hash.
+- C57: a create for a contact on the venue's blocklist fails with `booking_declined` only where it would otherwise book and leaves nothing behind, walk-ins and waitlist seats are not checked, availability and the explanation never read the list, erasure keeps entries and reports `blocklistEntriesKept`, and retention deletes expired entries per venue.
