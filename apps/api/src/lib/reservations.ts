@@ -17,6 +17,7 @@ import { normalizeCommentary } from "./commentary";
 import { consentColumns, type Consent } from "./consent";
 import { normalizeContact, venueCountry } from "./contact";
 import { linkGuest } from "./guests";
+import { claimKey } from "./idempotency";
 import { ratingColumns, type Rating } from "./rating";
 import { reconfirmationColumns, type Reconfirmation } from "./reconfirmation";
 import {
@@ -702,9 +703,7 @@ export async function createReservation(
   const contactKey = input.guestContact != null ? normalizeContact(String(input.guestContact), venueCountry(venue)) : null;
   try {
     const result = await db.transaction(async (tx) => {
-      const existing = (
-        await tx.select().from(idempotencyKeys).where(and(eq(idempotencyKeys.venueId, venueId), eq(idempotencyKeys.key, key))).limit(1)
-      )[0];
+      const existing = await claimKey(tx, venueId, key);
       if (existing) {
         if (existing.kind !== "create") throw new ReservationError("invalid_request");
         return { id: existing.reservationId, version: existing.version };
@@ -847,9 +846,7 @@ export async function modifyReservation(
 ): Promise<WriteResult> {
   try {
     const version = await db.transaction(async (tx) => {
-      const existing = (
-        await tx.select().from(idempotencyKeys).where(and(eq(idempotencyKeys.venueId, venueId), eq(idempotencyKeys.key, key))).limit(1)
-      )[0];
+      const existing = await claimKey(tx, venueId, key);
       if (existing) {
         if (existing.kind !== "modify" || existing.reservationId !== id) {
           throw new ReservationError("invalid_request");
@@ -981,9 +978,7 @@ export async function cancelReservation(
   const hash = await sha256Hex(id);
   try {
     await db.transaction(async (tx) => {
-      const existing = (
-        await tx.select().from(idempotencyKeys).where(and(eq(idempotencyKeys.venueId, venueId), eq(idempotencyKeys.key, key))).limit(1)
-      )[0];
+      const existing = await claimKey(tx, venueId, key);
       if (existing) {
         if (existing.kind !== "cancel" || existing.reservationId !== id) {
           throw new ReservationError("invalid_request");
@@ -1023,9 +1018,7 @@ export async function setStatus(
 ): Promise<WriteResult> {
   try {
     const version = await db.transaction(async (tx) => {
-      const existing = (
-        await tx.select().from(idempotencyKeys).where(and(eq(idempotencyKeys.venueId, venueId), eq(idempotencyKeys.key, key))).limit(1)
-      )[0];
+      const existing = await claimKey(tx, venueId, key);
       if (existing) {
         if (existing.kind !== "status" || existing.reservationId !== id) {
           throw new ReservationError("invalid_request");

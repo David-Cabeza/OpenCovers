@@ -558,12 +558,17 @@ app.post("/v1/venues/:venueId/waitlist", async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
   if (typeof body.partySize !== "number") return error(c, "invalid_request");
-  const result = await addWaitlist(db, venueId, {
-    partySize: body.partySize,
-    zone: typeof body.zone === "string" ? body.zone : undefined,
-    guestName: body.guest?.name,
-    guestContact: body.guest?.contact,
-  });
+  const result = await addWaitlist(
+    db,
+    venueId,
+    {
+      partySize: body.partySize,
+      zone: typeof body.zone === "string" ? body.zone : undefined,
+      guestName: body.guest?.name,
+      guestContact: body.guest?.contact,
+    },
+    c.req.header("Idempotency-Key") || undefined,
+  );
   if (!result.ok) return error(c, result.code);
   const entries = await listWaitlist(db, venueId);
   return c.json({ entries }, 201);
@@ -586,7 +591,7 @@ app.post("/v1/venues/:venueId/waitlist/:id/seat", async (c) => {
 app.post("/v1/venues/:venueId/waitlist/:id/cancel", async (c) => {
   const venueId = c.req.param("venueId");
   const id = c.req.param("id");
-  const result = await cancelWaitlist(db, venueId, id);
+  const result = await cancelWaitlist(db, venueId, id, c.req.header("Idempotency-Key") || undefined);
   if (!result.ok) return error(c, result.code);
   const entries = await listWaitlist(db, venueId);
   return c.json({ entries });

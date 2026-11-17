@@ -1,3 +1,5 @@
+import { createServer as createHttpServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -26,17 +28,36 @@ const CONTRACT_TOOLS = [
   "venue.setConfig",
 ];
 
+const KEYED_WRITES: [string, Record<string, unknown>][] = [
+  ["reservation.create", { venueId: "v", date: "2026-11-12", time: "21:00", partySize: 2 }],
+  ["reservation.walk_in", { venueId: "v", partySize: 2 }],
+  ["reservation.modify", { venueId: "v", id: "r", partySize: 3 }],
+  ["reservation.cancel", { venueId: "v", id: "r" }],
+  ["reservation.status", { venueId: "v", id: "r", status: "seated" }],
+  ["waitlist.add", { venueId: "v", partySize: 2 }],
+  ["waitlist.seat", { venueId: "v", id: "w" }],
+  ["waitlist.cancel", { venueId: "v", id: "w" }],
+];
+
 const pkgDir = path.resolve(import.meta.dirname, "..");
 
 let client: Client;
-let transport: StdioClientTransport;
+let api: Server;
+const sent: { path: string; key: string | undefined }[] = [];
 
 beforeAll(async () => {
-  transport = new StdioClientTransport({
+  api = createHttpServer((req, res) => {
+    const key = req.headers["idempotency-key"];
+    sent.push({ path: req.url ?? "", key: typeof key === "string" ? key : undefined });
+    res.writeHead(200, { "content-type": "application/json" }).end("{}");
+  });
+  await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
+  const { port } = api.address() as AddressInfo;
+  const transport = new StdioClientTransport({
     command: "node_modules/.bin/tsx",
     args: ["src/index.ts"],
     cwd: pkgDir,
-    env: { ...process.env, OPENCOVERS_API_KEY: "test-key" },
+    env: { ...process.env, OPENCOVERS_API_KEY: "test-key", OPENCOVERS_BASE_URL: `http://127.0.0.1:${port}` },
     stderr: "pipe",
   });
   client = new Client({ name: "test", version: "0.0.0" });
@@ -45,6 +66,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await client.close();
+  api.close();
 });
 
 describe("opencovers MCP server", () => {
@@ -80,7 +102,7 @@ describe("opencovers MCP server", () => {
     }
   });
 
-  it("marks only what removes or overwrites as destructive, and waitlist.add as not idempotent", async () => {
+  it("marks only what removes or overwrites as destructive, and every tool idempotent for the same key", async () => {
     const { tools } = await client.listTools();
     const destructive = tools.filter((t) => t.annotations?.destructiveHint).map((t) => t.name).sort();
     expect(destructive).toEqual([
@@ -91,7 +113,21 @@ describe("opencovers MCP server", () => {
       "waitlist.cancel",
     ]);
     const notIdempotent = tools.filter((t) => !t.annotations?.idempotentHint).map((t) => t.name);
-    expect(notIdempotent).toEqual(["waitlist.add"]);
+    expect(notIdempotent).toEqual([]);
+  });
+
+  it("offers an idempotencyKey on every keyed write and tells the caller to resend it on retry", async () => {
+    const { tools } = await client.listTools();
+    const keyed = tools
+      .filter((t) => (t.inputSchema as { properties: Record<string, unknown> }).properties.idempotencyKey)
+      .map((t) => t.name)
+      .sort();
+    expect(keyed).toEqual([...KEYED_WRITES.map(([name]) => name)].sort());
+    for (const name of keyed) {
+      const tool = tools.find((t) => t.name === name);
+      expect(tool?.description, name).toContain("Pass the same idempotencyKey when you retry");
+      expect(tool?.inputSchema.required ?? [], name).not.toContain("idempotencyKey");
+    }
   });
 
   it("accepts the closed consent set on create, walk-in and modify", async () => {
@@ -167,6 +203,35 @@ describe("opencovers MCP server", () => {
       expect(rating).toBeDefined();
       expect(JSON.stringify(rating)).toContain('"minimum":1');
       expect(JSON.stringify(rating)).toContain('"maximum":5');
+    }
+  });
+});
+
+describe("idempotency key on the wire", () => {
+  async function keysSent(name: string, args: Record<string, unknown>) {
+    sent.length = 0;
+    for (let i = 0; i < 2; i++) {
+      const result = await client.callTool({ name, arguments: args });
+      expect(result.isError, name).toBeFalsy();
+    }
+    return sent.map((r) => r.key);
+  }
+
+  it("sends the caller's key unchanged on a retry, for every keyed write", async () => {
+    for (const [name, args] of KEYED_WRITES) {
+      expect(await keysSent(name, { ...args, idempotencyKey: `retry-${name}` }), name).toEqual([
+        `retry-${name}`,
+        `retry-${name}`,
+      ]);
+    }
+  });
+
+  it("sends a fresh key per call when the caller omits it", async () => {
+    for (const [name, args] of KEYED_WRITES) {
+      const [first, second] = await keysSent(name, args);
+      expect(first, name).toMatch(/^[0-9a-f-]{36}$/);
+      expect(second, name).toMatch(/^[0-9a-f-]{36}$/);
+      expect(first, name).not.toBe(second);
     }
   });
 });

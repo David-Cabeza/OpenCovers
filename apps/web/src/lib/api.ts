@@ -500,6 +500,7 @@ export const api = {
   ) =>
     request<{ entries: WaitlistEntry[] }>(`/v1/venues/${venueId}/waitlist`, {
       method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
       body: JSON.stringify(body),
     }),
 
@@ -512,5 +513,6 @@ export const api = {
   cancelWaitlist: (venueId: string, id: string) =>
     request<{ entries: WaitlistEntry[] }>(`/v1/venues/${venueId}/waitlist/${id}/cancel`, {
       method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
     }),
 };

@@ -40,6 +40,14 @@ const commentarySchema = z
     "A short note for staff about this booking, up to 500 characters, such as an occasion. Never put allergies, medical conditions, or diet needs here. Empty string clears it.",
   );
 
+const idempotencyKeySchema = z
+  .string()
+  .optional()
+  .describe("Any unique string for this write. Send the same one again to retry it. Omit it and the server makes a new one.");
+
+const RETRY =
+  " Pass the same idempotencyKey when you retry after a timeout or an error. Without it a retry is a new write and may create a duplicate.";
+
 const idempotencyKey = (key?: string) => key ?? crypto.randomUUID();
 
 export function createServer(): McpServer {
@@ -158,7 +166,7 @@ export function createServer(): McpServer {
     {
       title: "Create reservation",
       description:
-        "Create a reservation and return it. Pass table ids to assign them explicitly, or omit tables to let the engine assign tables automatically for the party size.",
+        "Create a reservation and return it. Pass table ids to assign them explicitly, or omit tables to let the engine assign tables automatically for the party size." + RETRY,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
@@ -179,7 +187,7 @@ export function createServer(): McpServer {
         rating: ratingSchema,
         commentary: commentarySchema,
         reconfirmation: reconfirmationSchema,
-        idempotencyKey: z.string().optional(),
+        idempotencyKey: idempotencyKeySchema,
       }),
     },
     async ({ venueId, date, time, partySize, tables, zone, guestName, guestContact, consent, rating, commentary, reconfirmation, idempotencyKey: key }) => {
@@ -212,7 +220,7 @@ export function createServer(): McpServer {
     {
       title: "Walk-in",
       description:
-        "Seat a guest who arrives without a reservation. Defaults the time to now in the venue timezone.",
+        "Seat a guest who arrives without a reservation. Defaults the time to now in the venue timezone." + RETRY,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
@@ -226,7 +234,7 @@ export function createServer(): McpServer {
         consent: consentSchema,
         rating: ratingSchema,
         commentary: commentarySchema,
-        idempotencyKey: z.string().optional(),
+        idempotencyKey: idempotencyKeySchema,
       }),
     },
     async ({ venueId, partySize, date, time, tables, zone, guestName, guestContact, consent, rating, commentary, idempotencyKey: key }) => {
@@ -257,7 +265,7 @@ export function createServer(): McpServer {
     "reservation.modify",
     {
       title: "Modify reservation",
-      description: "Modify a reservation's party size, tables, contact consent, rating, booking note, and/or reconfirmation.",
+      description: "Modify a reservation's party size, tables, contact consent, rating, booking note, and/or reconfirmation." + RETRY,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
@@ -268,7 +276,7 @@ export function createServer(): McpServer {
         rating: ratingSchema,
         commentary: commentarySchema,
         reconfirmation: reconfirmationSchema,
-        idempotencyKey: z.string().optional(),
+        idempotencyKey: idempotencyKeySchema,
       }),
     },
     async ({ venueId, id, partySize, tables, consent, rating, commentary, reconfirmation, idempotencyKey: key }) => {
@@ -290,12 +298,12 @@ export function createServer(): McpServer {
     "reservation.cancel",
     {
       title: "Cancel reservation",
-      description: "Cancel a reservation. Idempotent for the same key.",
+      description: "Cancel a reservation." + RETRY,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         id: z.string(),
-        idempotencyKey: z.string().optional(),
+        idempotencyKey: idempotencyKeySchema,
       }),
     },
     async ({ venueId, id, idempotencyKey: key }) => {
@@ -317,13 +325,13 @@ export function createServer(): McpServer {
     {
       title: "Set reservation status",
       description:
-        "Advance a reservation status: seat, mark attended, or mark no-show. Seating needs a table: a booking without tables fails with table_required, so assign one with reservation.modify first.",
+        "Advance a reservation status: seat, mark attended, or mark no-show. Seating needs a table: a booking without tables fails with table_required, so assign one with reservation.modify first." + RETRY,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         id: z.string(),
         status: z.enum(["seated", "attended", "no_show"]),
-        idempotencyKey: z.string().optional(),
+        idempotencyKey: idempotencyKeySchema,
       }),
     },
     async ({ venueId, id, status, idempotencyKey: key }) => {
@@ -369,7 +377,7 @@ export function createServer(): McpServer {
     {
       title: "Erase personal data",
       description:
-        "Needs an admin key, a write key gets forbidden. Erase guest data for a venue, by guest id or owner principal. A guest id erases the guest record, every reservation linked to it, and the venue's waitlist entries with the same contact. An owner principal erases the reservations it owns and the guest records left with no other visit. A guest id that is not a record is read as a contact, which is deprecated. Returns counts of erased reservations, guest records, and waitlist entries.",
+        "Needs an admin key, a write key gets forbidden. Erase guest data for a venue, by guest id or owner principal. A guest id erases the guest record, every reservation linked to it, and the venue's waitlist entries with the same contact. An owner principal erases the reservations it owns and the guest records left with no other visit. A guest id that is not a record is read as a contact, which is deprecated. Returns counts of erased reservations, guest records, and waitlist entries. Takes no idempotency key. A retry erases nothing more and reports 0 for what the first call erased.",
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
@@ -416,7 +424,7 @@ export function createServer(): McpServer {
     {
       title: "Set venue config",
       description:
-        "Enable or disable reservations and set the notice address. Enabling requires a notice address.",
+        "Enable or disable reservations and set the notice address. Enabling requires a notice address. Takes no idempotency key. A retry with the same values sets the same configuration.",
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
@@ -519,21 +527,23 @@ export function createServer(): McpServer {
     "waitlist.add",
     {
       title: "Add to waitlist",
-      description: "Add a guest to the waitlist when no table is available.",
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+      description: "Add a guest to the waitlist when no table is available." + RETRY,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         partySize: z.number().int().positive(),
         zone: z.string().optional(),
         guestName: z.string().optional(),
         guestContact: z.string().optional(),
+        idempotencyKey: idempotencyKeySchema,
       }),
     },
-    async ({ venueId, partySize, zone, guestName, guestContact }) => {
+    async ({ venueId, partySize, zone, guestName, guestContact, idempotencyKey: key }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/waitlist`, {
             method: "POST",
+            idempotencyKey: idempotencyKey(key),
             body: { partySize, zone, guest: { name: guestName, contact: guestContact } },
           }),
         );
@@ -547,12 +557,12 @@ export function createServer(): McpServer {
     "waitlist.seat",
     {
       title: "Seat a waitlist entry",
-      description: "Seat a waiting guest, turning the entry into a reservation.",
+      description: "Seat a waiting guest, turning the entry into a reservation." + RETRY,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         id: z.string(),
-        idempotencyKey: z.string().optional(),
+        idempotencyKey: idempotencyKeySchema,
       }),
     },
     async ({ venueId, id, idempotencyKey: key }) => {
@@ -573,18 +583,20 @@ export function createServer(): McpServer {
     "waitlist.cancel",
     {
       title: "Cancel a waitlist entry",
-      description: "Remove a guest from the waitlist.",
+      description: "Remove a guest from the waitlist." + RETRY,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         id: z.string(),
+        idempotencyKey: idempotencyKeySchema,
       }),
     },
-    async ({ venueId, id }) => {
+    async ({ venueId, id, idempotencyKey: key }) => {
       try {
         return ok(
           await request(`/v1/venues/${venueId}/waitlist/${id}/cancel`, {
             method: "POST",
+            idempotencyKey: idempotencyKey(key),
           }),
         );
       } catch (err) {
