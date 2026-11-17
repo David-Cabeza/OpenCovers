@@ -145,10 +145,10 @@ Exit criterion: a host sees who is coming and what they need, and a platform can
 
 Today a guest can only book through a platform or an agent. This phase gives venues their own door.
 
-- An embeddable booking widget with no OpenCovers branding. [L, split it]
-- A self-service link to view, change, or cancel a booking. [M]
+- An embeddable booking widget with no OpenCovers branding. Design proposed in [ADR-0017](docs/adr/0017-booking-widget-and-self-service-link.md), not built: an iframe from a separate widget origin, public routes under `/v1/public/`, and a staged plan. [L, split it]
+- A self-service link to view, change, or cancel a booking. Design proposed in ADR-0017, not built. [M]
 - A public QR page to join the waitlist, and a notice when the table is ready. [M]
-- Theme tokens for the widget and the staff app: colors, radius, type, logo. The staff app already uses CSS variables. [M]
+- Theme tokens for the widget and the staff app: colors, radius, type, logo. The staff app already uses CSS variables. ADR-0017 proposes the widget's token set. [M]
 - Themes as declarative packages, data only with no executable code, so a theme cannot touch guest data. [M]
 - A curated theme registry in the repository, reviewed through pull requests. [M]
 - Localization of the staff app and the widget. [L, split it]
