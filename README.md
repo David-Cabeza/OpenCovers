@@ -181,7 +181,7 @@ It creates the invented venue "La Taberna del Faro" through the HTTP API: two se
 A quick walkthrough of the agenda and the floor plan.
 
 <p align="center">
-  <img src="docs/assets/opencovers-demo.gif" alt="OpenCovers demo" width="720">
+  <img src="docs/assets/opencovers-demo.gif" alt="OpenCovers demo: agenda, availability, double-booking protection, waitlist, floor editor, team and the booking widget (Spanish captions)" width="720">
 </p>
 
 > [Download the full-resolution demo (MP4)](https://raw.githubusercontent.com/David-Cabeza/OpenCovers/main/docs/assets/opencovers-demo.mp4)
