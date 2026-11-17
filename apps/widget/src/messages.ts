@@ -53,6 +53,53 @@ const es = {
   "error.unavailable": "Las reservas en línea no están disponibles ahora mismo.",
   "error.generic": "No hemos podido completar la reserva en línea. Ponte en contacto con el local.",
   "error.genericPhone": "No hemos podido completar la reserva en línea. Llama al local: {phone}.",
+  "manage.title": "Tu reserva",
+  "manage.pageTitle": "Tu reserva en {venue}",
+  "manage.venue": "Local",
+  "manage.when": "Día y hora",
+  "manage.whenValue": "{date} a las {time}",
+  "manage.name": "A nombre de",
+  "manage.contact": "Contacto",
+  "manage.note": "Comentario",
+  "manage.noNote": "Sin comentario",
+  "manage.status": "Estado",
+  "manage.status.booked": "Confirmada",
+  "manage.status.seated": "En la mesa",
+  "manage.status.attended": "Completada",
+  "manage.status.no_show": "No presentada",
+  "manage.status.cancelled": "Cancelada",
+  "manage.changeableUntil": "Puedes cambiarla o cancelarla aquí hasta el {when}.",
+  "manage.closed": "Ya no se puede cambiar ni cancelar en línea.",
+  "manage.callPhone": "Para cualquier cambio, llama al local: {phone}.",
+  "manage.call": "Para cualquier cambio, ponte en contacto con el local.",
+  "manage.moveHint":
+    "En línea no se puede cambiar el día ni la hora. Para otro día u hora, cancela esta reserva y haz una nueva, o ponte en contacto con el local.",
+  "manage.edit": "Cambiar personas o comentario",
+  "manage.editTitle": "Cambiar la reserva",
+  "manage.partyLess": "Una persona menos",
+  "manage.partyMore": "Una persona más",
+  "manage.save": "Guardar cambios",
+  "manage.saving": "Guardando los cambios…",
+  "manage.saved": "Cambios guardados.",
+  "manage.nothingChanged": "No has cambiado nada.",
+  "manage.changed": "La reserva ha cambiado desde que la abriste. Revisa los datos actuales y vuelve a intentarlo.",
+  "manage.cancel": "Cancelar la reserva",
+  "manage.cancelTitle": "¿Cancelar la reserva?",
+  "manage.cancelBody":
+    "No se puede deshacer, y este enlace dejará de funcionar. Si después quieres venir, haz una reserva nueva.",
+  "manage.cancelConfirm": "Sí, cancelar",
+  "manage.cancelKeep": "No, mantenerla",
+  "manage.cancelling": "Cancelando la reserva…",
+  "manage.cancelledTitle": "Reserva cancelada",
+  "manage.cancelledBody":
+    "Hemos cancelado tu reserva del {date} a las {time}. Este enlace ya no sirve. Si quieres venir otro día, haz una reserva nueva.",
+  "manage.invalidTitle": "Este enlace no funciona",
+  "manage.invalidBody":
+    "No podemos abrir una reserva con este enlace. Ábrelo otra vez tal como lo recibiste. Si sigue sin funcionar, ponte en contacto con el local.",
+  "manage.retry": "Reintentar",
+  "manage.error.partySize": "No se puede cambiar en línea a ese número de personas.",
+  "manage.error.noTable": "No queda mesa libre para ese número de personas a esa hora.",
+  "manage.error.generic": "No hemos podido hacer el cambio en línea.",
 };
 
 export type MessageId = keyof typeof es;
@@ -110,14 +157,65 @@ const en: Record<MessageId, string> = {
   "error.unavailable": "Online booking is not available right now.",
   "error.generic": "We could not complete the booking online. Please contact the venue.",
   "error.genericPhone": "We could not complete the booking online. Please call the venue: {phone}.",
+  "manage.title": "Your booking",
+  "manage.pageTitle": "Your booking at {venue}",
+  "manage.venue": "Venue",
+  "manage.when": "Day and time",
+  "manage.whenValue": "{date} at {time}",
+  "manage.name": "Under the name",
+  "manage.contact": "Contact",
+  "manage.note": "Note",
+  "manage.noNote": "No note",
+  "manage.status": "Status",
+  "manage.status.booked": "Confirmed",
+  "manage.status.seated": "Seated",
+  "manage.status.attended": "Completed",
+  "manage.status.no_show": "Missed",
+  "manage.status.cancelled": "Cancelled",
+  "manage.changeableUntil": "You can change or cancel it here until {when}.",
+  "manage.closed": "It can no longer be changed or cancelled online.",
+  "manage.callPhone": "For any change, please call the venue: {phone}.",
+  "manage.call": "For any change, please contact the venue.",
+  "manage.moveHint":
+    "The day and time cannot be changed online. For another day or time, cancel this booking and make a new one, or contact the venue.",
+  "manage.edit": "Change party size or note",
+  "manage.editTitle": "Change your booking",
+  "manage.partyLess": "One guest fewer",
+  "manage.partyMore": "One guest more",
+  "manage.save": "Save changes",
+  "manage.saving": "Saving your changes…",
+  "manage.saved": "Changes saved.",
+  "manage.nothingChanged": "You have not changed anything.",
+  "manage.changed": "The booking changed since you opened it. Check the current details and try again.",
+  "manage.cancel": "Cancel the booking",
+  "manage.cancelTitle": "Cancel the booking?",
+  "manage.cancelBody": "This cannot be undone, and this link will stop working. To come after all, make a new booking.",
+  "manage.cancelConfirm": "Yes, cancel",
+  "manage.cancelKeep": "No, keep it",
+  "manage.cancelling": "Cancelling the booking…",
+  "manage.cancelledTitle": "Booking cancelled",
+  "manage.cancelledBody":
+    "We cancelled your booking on {date} at {time}. This link no longer works. To come another day, make a new booking.",
+  "manage.invalidTitle": "This link does not work",
+  "manage.invalidBody":
+    "We cannot open a booking with this link. Open it again exactly as you received it. If it still does not work, contact the venue.",
+  "manage.retry": "Try again",
+  "manage.error.partySize": "The booking cannot be changed to that party size online.",
+  "manage.error.noTable": "No free table is left for that party size at that time.",
+  "manage.error.generic": "We could not make the change online.",
 };
 
 export const CATALOGS = { es, en } as const;
 export type Locale = keyof typeof CATALOGS;
 
-export function localeOf(lang: string | null | undefined): Locale {
+/** A supported locale named by `lang`, or null. */
+export function supportedLocale(lang: string | null | undefined): Locale | null {
   const base = (lang ?? "").toLowerCase().split("-")[0];
-  return base in CATALOGS ? (base as Locale) : "es";
+  return Object.hasOwn(CATALOGS, base) ? (base as Locale) : null;
+}
+
+export function localeOf(lang: string | null | undefined): Locale {
+  return supportedLocale(lang) ?? "es";
 }
 
 export function translator(locale: Locale) {

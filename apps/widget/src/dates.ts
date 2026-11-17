@@ -25,3 +25,14 @@ export function formatDate(date: string, locale: string): string {
     asUtc(date),
   );
 }
+
+/** An instant, such as `changeableUntil`, on the guest's own clock. */
+export function formatInstant(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}

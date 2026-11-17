@@ -36,3 +36,36 @@ export function explain(failure: Failure): Explanation {
   if (failure.kind === "local") return UNEXPECTED;
   return BY_CODE[failure.code] ?? UNEXPECTED;
 }
+
+/**
+ * What the self-service page does with a failed call. `invalid`: the link does not work, for a reason the page
+ * never tells (C47). `closed`: changes are over, so the page shows the booking read-only. `changed`: the booking
+ * changed since the guest read it, so the page reads it again before the guest decides.
+ */
+export type SelfServiceOutcome =
+  | { kind: "invalid" }
+  | { kind: "closed" }
+  | { kind: "changed" }
+  | { kind: "notice"; notice: Explanation };
+
+const SELF_SERVICE_BY_CODE: Record<string, SelfServiceOutcome> = {
+  self_service_link_invalid: { kind: "invalid" },
+  self_service_closed: { kind: "closed" },
+  reservation_changed: { kind: "changed" },
+  party_size_too_small: { kind: "notice", notice: { message: "manage.error.partySize", phone: true } },
+  party_size_too_large: { kind: "notice", notice: { message: "manage.error.partySize", phone: true } },
+  no_suitable_table: { kind: "notice", notice: { message: "manage.error.noTable", phone: true } },
+  invalid_request: { kind: "notice", notice: { message: "error.invalid" } },
+  rate_limited: { kind: "notice", notice: { message: "error.rateLimited" } },
+};
+
+const SELF_SERVICE_UNEXPECTED: SelfServiceOutcome = {
+  kind: "notice",
+  notice: { message: "manage.error.generic", phone: true },
+};
+
+export function explainSelfService(failure: Failure): SelfServiceOutcome {
+  if (failure.kind === "network") return { kind: "notice", notice: { message: "error.network" } };
+  if (failure.kind === "local") return SELF_SERVICE_UNEXPECTED;
+  return SELF_SERVICE_BY_CODE[failure.code] ?? SELF_SERVICE_UNEXPECTED;
+}

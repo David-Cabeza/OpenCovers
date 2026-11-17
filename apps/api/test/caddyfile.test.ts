@@ -79,4 +79,10 @@ describe("production Caddyfile", () => {
     expect(widget).not.toContain("file_server");
     expect(widget).toMatch(/handle \{\s*respond 404\s*\}/);
   });
+
+  it("proxies the self-service page /r on the widget site only, with the API's headers", () => {
+    expect(handle(widget, "/r")).toMatch(/^handle \/r \{\s*reverse_proxy \{\$API_UPSTREAM:api:3000\}\s*$/);
+    expect(handle(staff, "/r")).toMatch(/^handle \/r \{\s*respond 404\s*$/);
+    expect(staff.indexOf("handle /r {")).toBeLessThan(staff.indexOf("handle {"));
+  });
 });

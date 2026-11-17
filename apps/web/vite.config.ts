@@ -21,6 +21,8 @@ export default defineConfig({
       "/v1": "http://localhost:3000",
       // The booking widget, in local development only (ADR-0017 section 1). Production serves it from WIDGET_ADDRESS.
       "^/w/": "http://localhost:3000",
+      // Its self-service page, `/r` exactly, so no staff route that starts with `r` is caught.
+      "^/r(?:\\?|$)": "http://localhost:3000",
     },
   },
 });
