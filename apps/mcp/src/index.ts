@@ -45,6 +45,38 @@ const idempotencyKeySchema = z
   .optional()
   .describe("Any unique string for this write. Send the same one again to retry it. Omit it and the server makes a new one.");
 
+const guestObject = (fields: "name+contact+consent" | "name+contact" | "consent") => {
+  const shape: Record<string, z.ZodType> = {};
+  if (fields !== "consent") {
+    shape.name = z.string().optional();
+    shape.contact = z.string().optional();
+  }
+  if (fields !== "name+contact") shape.consent = consentSchema;
+  return z
+    .object(shape)
+    .strict()
+    .optional()
+    .describe("Same as the flat guestName, guestContact and consent fields, in the shape the HTTP API uses. Pass one or the other.");
+};
+
+type Guest = { name?: string; contact?: string; consent?: "unknown" | "granted" | "denied" };
+
+function mergeGuest(flat: Guest, nested: Guest | undefined): Guest {
+  const names = { name: "guestName", contact: "guestContact", consent: "consent" } as const;
+  const out: Guest = { ...flat };
+  for (const key of Object.keys(names) as (keyof Guest)[]) {
+    const n = nested?.[key];
+    if (n === undefined) continue;
+    if (flat[key] !== undefined && flat[key] !== n) {
+      throw new Error(`guest.${key} and ${names[key]} disagree. Pass only one of them.`);
+    }
+    (out as Record<string, unknown>)[key] = n;
+  }
+  return out;
+}
+
+const GUEST_NOTE = " Guest fields are guestName, guestContact and consent, or the same as a guest object with name, contact and consent.";
+
 const RETRY =
   " Pass the same idempotencyKey when you retry after a timeout or an error. Without it a retry is a new write and may create a duplicate.";
 
@@ -166,7 +198,7 @@ export function createServer(): McpServer {
     {
       title: "Create reservation",
       description:
-        "Create a reservation and return it. Pass table ids to assign them explicitly, or omit tables to let the engine assign tables automatically for the party size." + RETRY,
+        "Create a reservation and return it. Pass table ids to assign them explicitly, or omit tables to let the engine assign tables automatically for the party size." + GUEST_NOTE + RETRY,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
@@ -183,15 +215,17 @@ export function createServer(): McpServer {
           .describe("Zone to prefer (e.g. Terrace). When set, tables come from this zone."),
         guestName: z.string().optional(),
         guestContact: z.string().optional(),
+        guest: guestObject("name+contact+consent"),
         consent: consentSchema,
         rating: ratingSchema,
         commentary: commentarySchema,
         reconfirmation: reconfirmationSchema,
         idempotencyKey: idempotencyKeySchema,
-      }),
+      }).strict(),
     },
-    async ({ venueId, date, time, partySize, tables, zone, guestName, guestContact, consent, rating, commentary, reconfirmation, idempotencyKey: key }) => {
+    async ({ venueId, date, time, partySize, tables, zone, guestName, guestContact, guest, consent, rating, commentary, reconfirmation, idempotencyKey: key }) => {
       try {
+        const g = mergeGuest({ name: guestName, contact: guestContact, consent }, guest);
         return ok(
           await request(`/v1/venues/${venueId}/reservations`, {
             method: "POST",
@@ -202,7 +236,7 @@ export function createServer(): McpServer {
               partySize,
               tables,
               zone,
-              guest: { name: guestName, contact: guestContact, consent },
+              guest: { name: g.name, contact: g.contact, consent: g.consent },
               rating,
               commentary,
               reconfirmation,
@@ -220,7 +254,7 @@ export function createServer(): McpServer {
     {
       title: "Walk-in",
       description:
-        "Seat a guest who arrives without a reservation. Defaults the time to now in the venue timezone." + RETRY,
+        "Seat a guest who arrives without a reservation. Defaults the time to now in the venue timezone." + GUEST_NOTE + RETRY,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
@@ -231,14 +265,16 @@ export function createServer(): McpServer {
         zone: z.string().optional(),
         guestName: z.string().optional(),
         guestContact: z.string().optional(),
+        guest: guestObject("name+contact+consent"),
         consent: consentSchema,
         rating: ratingSchema,
         commentary: commentarySchema,
         idempotencyKey: idempotencyKeySchema,
-      }),
+      }).strict(),
     },
-    async ({ venueId, partySize, date, time, tables, zone, guestName, guestContact, consent, rating, commentary, idempotencyKey: key }) => {
+    async ({ venueId, partySize, date, time, tables, zone, guestName, guestContact, guest, consent, rating, commentary, idempotencyKey: key }) => {
       try {
+        const g = mergeGuest({ name: guestName, contact: guestContact, consent }, guest);
         return ok(
           await request(`/v1/venues/${venueId}/reservations/walk-in`, {
             method: "POST",
@@ -249,7 +285,7 @@ export function createServer(): McpServer {
               partySize,
               tables,
               zone,
-              guest: { name: guestName, contact: guestContact, consent },
+              guest: { name: g.name, contact: g.contact, consent: g.consent },
               rating,
               commentary,
             },
@@ -265,22 +301,24 @@ export function createServer(): McpServer {
     "reservation.modify",
     {
       title: "Modify reservation",
-      description: "Modify a reservation's party size, tables, contact consent, rating, booking note, and/or reconfirmation." + RETRY,
+      description: "Modify a reservation's party size, tables, contact consent, rating, booking note, and/or reconfirmation. Consent is consent, or guest.consent." + RETRY,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
         id: z.string(),
         partySize: z.number().int().positive().optional(),
         tables: z.array(z.string()).min(1).optional(),
+        guest: guestObject("consent"),
         consent: consentSchema,
         rating: ratingSchema,
         commentary: commentarySchema,
         reconfirmation: reconfirmationSchema,
         idempotencyKey: idempotencyKeySchema,
-      }),
+      }).strict(),
     },
-    async ({ venueId, id, partySize, tables, consent, rating, commentary, reconfirmation, idempotencyKey: key }) => {
+    async ({ venueId, id, partySize, tables, guest, consent: flatConsent, rating, commentary, reconfirmation, idempotencyKey: key }) => {
       try {
+        const { consent } = mergeGuest({ consent: flatConsent }, guest);
         return ok(
           await request(`/v1/venues/${venueId}/reservations/${id}/modify`, {
             method: "POST",
@@ -527,7 +565,7 @@ export function createServer(): McpServer {
     "waitlist.add",
     {
       title: "Add to waitlist",
-      description: "Add a guest to the waitlist when no table is available." + RETRY,
+      description: "Add a guest to the waitlist when no table is available. Guest fields are guestName and guestContact, or the same as a guest object with name and contact." + RETRY,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),
@@ -535,16 +573,18 @@ export function createServer(): McpServer {
         zone: z.string().optional(),
         guestName: z.string().optional(),
         guestContact: z.string().optional(),
+        guest: guestObject("name+contact"),
         idempotencyKey: idempotencyKeySchema,
-      }),
+      }).strict(),
     },
-    async ({ venueId, partySize, zone, guestName, guestContact, idempotencyKey: key }) => {
+    async ({ venueId, partySize, zone, guestName, guestContact, guest, idempotencyKey: key }) => {
       try {
+        const g = mergeGuest({ name: guestName, contact: guestContact }, guest);
         return ok(
           await request(`/v1/venues/${venueId}/waitlist`, {
             method: "POST",
             idempotencyKey: idempotencyKey(key),
-            body: { partySize, zone, guest: { name: guestName, contact: guestContact } },
+            body: { partySize, zone, guest: { name: g.name, contact: g.contact } },
           }),
         );
       } catch (err) {

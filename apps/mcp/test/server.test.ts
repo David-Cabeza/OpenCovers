@@ -44,12 +44,18 @@ const pkgDir = path.resolve(import.meta.dirname, "..");
 let client: Client;
 let api: Server;
 const sent: { path: string; key: string | undefined }[] = [];
+const bodies: Record<string, unknown>[] = [];
 
 beforeAll(async () => {
   api = createHttpServer((req, res) => {
     const key = req.headers["idempotency-key"];
     sent.push({ path: req.url ?? "", key: typeof key === "string" ? key : undefined });
-    res.writeHead(200, { "content-type": "application/json" }).end("{}");
+    let raw = "";
+    req.on("data", (c) => (raw += c));
+    req.on("end", () => {
+      bodies.push(raw ? JSON.parse(raw) : {});
+      res.writeHead(200, { "content-type": "application/json" }).end("{}");
+    });
   });
   await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
   const { port } = api.address() as AddressInfo;
@@ -203,6 +209,80 @@ describe("opencovers MCP server", () => {
       expect(rating).toBeDefined();
       expect(JSON.stringify(rating)).toContain('"minimum":1');
       expect(JSON.stringify(rating)).toContain('"maximum":5');
+    }
+  });
+});
+
+describe("guest fields", () => {
+  const lastGuest = () => (bodies.at(-1) as { guest: Record<string, unknown> }).guest;
+  const BOOKING = { venueId: "v", date: "2026-11-12", time: "21:00", partySize: 2 };
+
+  it("keeps the flat guestName and guestContact working on create, walk-in and waitlist.add", async () => {
+    for (const [name, base] of [
+      ["reservation.create", BOOKING],
+      ["reservation.walk_in", { venueId: "v", partySize: 2 }],
+      ["waitlist.add", { venueId: "v", partySize: 2 }],
+    ] as const) {
+      const res = await client.callTool({ name, arguments: { ...base, guestName: "Ana", guestContact: "ana@example.com" } });
+      expect(res.isError, name).toBeFalsy();
+      expect(lastGuest(), name).toMatchObject({ name: "Ana", contact: "ana@example.com" });
+    }
+  });
+
+  it("maps a guest object to the same booking guest on create, walk-in and waitlist.add", async () => {
+    for (const [name, base] of [
+      ["reservation.create", BOOKING],
+      ["reservation.walk_in", { venueId: "v", partySize: 2 }],
+      ["waitlist.add", { venueId: "v", partySize: 2 }],
+    ] as const) {
+      const res = await client.callTool({ name, arguments: { ...base, guest: { name: "Ana", contact: "ana@example.com" } } });
+      expect(res.isError, name).toBeFalsy();
+      expect(lastGuest(), name).toMatchObject({ name: "Ana", contact: "ana@example.com" });
+    }
+  });
+
+  it("maps guest.consent on create and modify", async () => {
+    await client.callTool({ name: "reservation.create", arguments: { ...BOOKING, guest: { name: "Ana", consent: "granted" } } });
+    expect(lastGuest()).toMatchObject({ name: "Ana", consent: "granted" });
+    await client.callTool({ name: "reservation.modify", arguments: { venueId: "v", id: "r", guest: { consent: "denied" } } });
+    expect(lastGuest()).toEqual({ consent: "denied" });
+  });
+
+  it("fails loudly on an unknown argument and creates nothing", async () => {
+    const before = sent.length;
+    for (const [name, base] of [
+      ["reservation.create", BOOKING],
+      ["reservation.walk_in", { venueId: "v", partySize: 2 }],
+      ["reservation.modify", { venueId: "v", id: "r" }],
+      ["waitlist.add", { venueId: "v", partySize: 2 }],
+    ] as const) {
+      const res = await client.callTool({ name, arguments: { ...base, guestEmail: "ana@example.com" } }).catch((e) => e);
+      const text = JSON.stringify(res);
+      expect(res instanceof Error || (res as { isError?: boolean }).isError, name).toBeTruthy();
+      expect(text, name).toContain("guestEmail");
+    }
+    const res = await client.callTool({ name: "reservation.create", arguments: { ...BOOKING, guest: { name: "Ana", phone: "1" } } }).catch((e) => e);
+    expect(JSON.stringify(res)).toContain("phone");
+    expect(sent.length).toBe(before);
+  });
+
+  it("fails when guest and the flat fields disagree, and accepts them when they agree", async () => {
+    const before = sent.length;
+    const bad = await client.callTool({ name: "reservation.create", arguments: { ...BOOKING, guestName: "Bo", guest: { name: "Ana" } } });
+    expect(bad.isError).toBe(true);
+    expect(JSON.stringify(bad)).toContain("guest.name and guestName disagree");
+    expect(sent.length).toBe(before);
+    const good = await client.callTool({ name: "reservation.create", arguments: { ...BOOKING, guestName: "Ana", guest: { name: "Ana" } } });
+    expect(good.isError).toBeFalsy();
+  });
+
+  it("lists guest as an object next to the flat fields, with idempotencyKey still optional", async () => {
+    const { tools } = await client.listTools();
+    for (const name of ["reservation.create", "reservation.walk_in", "waitlist.add"]) {
+      const schema = tools.find((t) => t.name === name)?.inputSchema as { properties: Record<string, { type?: string }>; required?: string[] };
+      expect(schema.properties.guest.type, name).toBe("object");
+      expect(schema.properties.guestName, name).toBeDefined();
+      expect(schema.required ?? [], name).not.toContain("idempotencyKey");
     }
   });
 });
