@@ -56,6 +56,16 @@ import {
 } from "./lib/public-booking";
 import { challengeConfigFromEnv, createChallengeVerifier, issueChallenge } from "./lib/public-challenge";
 import { findLink, reissueLink, type Link } from "./lib/self-service";
+import {
+  defaultWidgetDist,
+  NOT_FOUND_HTML,
+  readWidgetAsset,
+  servesWidgetOn,
+  widgetAssets,
+  widgetHeaders,
+  widgetHtml,
+  widgetServingFromEnv,
+} from "./lib/widget-page";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/signup";
 import { changeMemberRole, listMembers, removeMember } from "./lib/members";
@@ -92,7 +102,7 @@ import { isCommentary } from "./lib/commentary";
 import { isRating } from "./lib/rating";
 import { isReconfirmation } from "./lib/reconfirmation";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
-import { getOnlineBooking, parseOnlineBookingInput, rotateBookingKey, setOnlineBooking } from "./lib/online-booking";
+import { getOnlineBooking, LOCALES, parseOnlineBookingInput, rotateBookingKey, setOnlineBooking } from "./lib/online-booking";
 import {
   etagMatches,
   etagOf,
@@ -319,6 +329,45 @@ app.post("/v1/public/:bookingKey/reservations", async (c) => {
   const reservation = await guestView(db, target, result.id);
   if (!reservation) return error(c, "reservation_not_found");
   return c.json({ reservation, selfServiceToken: result.selfServiceToken ?? null });
+});
+
+// The widget page (ADR-0017 section 1). The API serves it, not Caddy, because `frame-ancestors` is per venue.
+// Not rate limited. An unknown, rotated or disabled key, and a host that is not the widget's, read alike.
+const widgetServing = widgetServingFromEnv();
+const widgetDist = () => process.env.WIDGET_DIST || defaultWidgetDist();
+const widgetNotFound = (c: any) => c.body(NOT_FOUND_HTML, 404, widgetHeaders([]));
+
+app.get("/w/assets/:file", (c) => {
+  const asset = servesWidgetOn(widgetServing, c.req.url) && readWidgetAsset(widgetDist(), c.req.param("file"));
+  if (!asset) {
+    return c.body("Not found", 404, { "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff" });
+  }
+  return c.body(new Uint8Array(asset.body), 200, {
+    "Content-Type": asset.type,
+    "Cache-Control": "public, max-age=31536000, immutable",
+    "X-Content-Type-Options": "nosniff",
+  });
+});
+
+app.get("/w/:bookingKey", async (c) => {
+  if (!servesWidgetOn(widgetServing, c.req.url)) return widgetNotFound(c);
+  const target = await resolveBookingKey(db, c.req.param("bookingKey"));
+  if (!target) return widgetNotFound(c);
+  const assets = widgetAssets(widgetDist());
+  if (!assets) {
+    console.error(`widget page: no build in ${widgetDist()}. Run pnpm --filter @opencovers/widget build.`);
+    return c.body("The booking widget is not built.", 503, {
+      ...widgetHeaders([]),
+      "Content-Type": "text/plain; charset=utf-8",
+    });
+  }
+  const lang = c.req.query("lang");
+  const html = widgetHtml({
+    lang: lang && (LOCALES as readonly string[]).includes(lang) ? lang : target.settings.locale,
+    title: target.venue.name,
+    assets,
+  });
+  return c.body(html, 200, widgetHeaders(target.settings.allowedOrigins));
 });
 
 app.use("/v1/venues/:venueId/*", async (c, next) => {

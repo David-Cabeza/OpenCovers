@@ -177,11 +177,12 @@ The staff app in action — the agenda, the floor plan, and the floor editor.
 ## Repository layout
 
 ```
-apps/api   the reservation engine and the HTTP API
-apps/web   the staff app
-apps/mcp   the MCP server
-apps/site  the public website
-docs/      the contract, ADRs, and requirements
+apps/api     the reservation engine and the HTTP API
+apps/web     the staff app
+apps/widget  the guest booking widget, served by the API at /w/{bookingKey}
+apps/mcp     the MCP server
+apps/site    the public website
+docs/        the contract, ADRs, and requirements
 ```
 
 ## Design rules
@@ -201,7 +202,7 @@ OpenCovers has no hosting vendor dependency. It needs PostgreSQL and a Node.js p
 
 ## Status
 
-Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — 51 conformance cases pass (C1 to C38, C42, C46 to C49 and C52 to C59), signed webhooks included. 17 cases (C39 to C55) specify the booking widget and self-service link, whose contract is written. The online booking settings (ADR-0017 stage 2), the public booking API for config, availability and create (stage 3) and the guest self-service link to read, change and cancel a booking (stage 4) are built: of those 17, nine pass, seven are partial (C39, C40, C43, C44, C45, C50, C51) and one, the widget page, is not built. A deployment is prepared (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
+Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — 52 conformance cases pass (C1 to C38, C41, C42, C46 to C49 and C52 to C59), signed webhooks included. 17 cases (C39 to C55) specify the booking widget and self-service link, whose contract is written. The online booking settings (ADR-0017 stage 2), the public booking API for config, availability and create (stage 3), the guest self-service link to read, change and cancel a booking (stage 4) and the booking widget with its framed page (stage 5) are built: of those 17, ten pass and seven are partial (C39, C40, C43, C44, C45, C50, C51). A deployment is prepared (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
 
 ## Contributing
 

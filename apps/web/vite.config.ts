@@ -19,6 +19,8 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:3000",
       "/v1": "http://localhost:3000",
+      // The booking widget, in local development only (ADR-0017 section 1). Production serves it from WIDGET_ADDRESS.
+      "^/w/": "http://localhost:3000",
     },
   },
 });

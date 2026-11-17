@@ -15,7 +15,7 @@ pnpm db:migrate          # apply the schema to the dev database
 pnpm dev                 # API :3000 · staff app :5173 · site :5174
 pnpm test                # integration tests against opencovers_test
 pnpm typecheck
-pnpm build               # builds apps/web and apps/site (the API and MCP run from source)
+pnpm build               # builds apps/web, apps/widget and apps/site (the API and MCP run from source)
 ```
 
 Single package: `pnpm --filter @opencovers/api test`, `pnpm --filter @opencovers/web dev`.
@@ -29,11 +29,12 @@ pnpm workspace (`apps/*`, `packages/*`):
 | --- | --- | --- |
 | `apps/api` | The engine and HTTP API (`/v1`, auth under `/api`) | Node, Hono, Drizzle, PostgreSQL, Better Auth |
 | `apps/web` | Staff app (agenda, availability, floor plan, setup) | React, Tailwind, shadcn/ui, TanStack Query |
+| `apps/widget` | Guest booking widget; the API writes its page at `/w/{bookingKey}` and serves the build | React, Tailwind, Vite |
 | `apps/mcp` | MCP server, 18 tools over stdio, wraps the HTTP API | `@modelcontextprotocol/sdk` |
 | `apps/site` | Public website at opencovers.dev | React, Vite, Tailwind, static build |
 | `docs/` | Contract (`docs/contract`), ADRs, requirements, brand kit (`docs/brand`) | Markdown, OpenAPI |
 
-The staff app dev server proxies `/api` and `/v1` to the API on :3000. Production runs through `compose.prod.yaml` (db + api + Caddy serving the web build); see `docs/deploy.md`.
+The staff app dev server proxies `/api`, `/v1` and `/w` to the API on :3000, so the widget opens at `http://localhost:5173/w/{bookingKey}` (development only; production serves it from `WIDGET_ADDRESS`). Production runs through `compose.prod.yaml` (db + api + Caddy serving the web build); see `docs/deploy.md`.
 
 ## Design rules (do not weaken)
 - One transaction decides availability and booking.

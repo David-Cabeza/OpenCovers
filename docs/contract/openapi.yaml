@@ -2159,10 +2159,13 @@ paths:
       summary: The widget page, an HTML shell to embed in an iframe or open top-level
       description: |
         Not JSON. The API serves a small HTML shell that loads the widget's
-        hashed assets from `/assets/`. It needs no credentials, sets no
-        cookie, and is not rate limited. In production it is served only from
-        the widget origin, never from the staff app's origin. In local
-        development the staff app's dev server proxies `/w/*` to the API.
+        hashed assets from `/w/assets/`, which the API also serves, with a
+        long `Cache-Control`. It needs no credentials, sets no cookie, and is
+        not rate limited. In production it is served only from the widget
+        origin, never from the staff app's origin: with `WIDGET_ADDRESS` set
+        the API answers only requests for that host, and without it a
+        production API serves no widget page. In local development the staff
+        app's dev server proxies `/w/*` to the API.
 
         Framing. The answer sends no `X-Frame-Options`. Its
         `Content-Security-Policy` has `frame-ancestors 'self'` followed by
@@ -2178,7 +2181,8 @@ paths:
         JSON-LD.
 
         An unknown key, a rotated key and a venue with online booking off get
-        the same `404` HTML page and headers, with `frame-ancestors 'none'`.
+        the same `404` HTML page and headers, with `frame-ancestors 'none'`,
+        and so does a request for a host other than `WIDGET_ADDRESS`.
         Not exposed through MCP.
       security: []
       parameters:

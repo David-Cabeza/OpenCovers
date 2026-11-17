@@ -20,6 +20,11 @@
 		reverse_proxy {$API_UPSTREAM:api:3000}
 	}
 
+	# The booking widget never shares the staff origin in production (ADR-0017, Q1). It has its own site below.
+	handle /w/* {
+		respond 404
+	}
+
 	handle /v1/* {
 		reverse_proxy {$API_UPSTREAM:api:3000}
 	}
@@ -28,5 +33,34 @@
 		root * /srv
 		try_files {path} /index.html
 		file_server
+	}
+}
+
+# The booking widget's own origin (ADR-0017 section 1). The API writes the page with frame-ancestors per venue,
+# so this block sends no X-Frame-Options and no frame-ancestors of its own on /w/*. The default address names
+# a host that never resolves, so the block serves nothing until WIDGET_ADDRESS is set.
+{$WIDGET_ADDRESS:http://widget.invalid} {
+	encode gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	@https protocol https
+	header @https Strict-Transport-Security "max-age=31536000"
+
+	handle /w/* {
+		reverse_proxy {$API_UPSTREAM:api:3000}
+	}
+
+	handle /v1/public/* {
+		header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		reverse_proxy {$API_UPSTREAM:api:3000}
+	}
+
+	handle {
+		respond 404
 	}
 }

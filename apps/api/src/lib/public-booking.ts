@@ -24,6 +24,7 @@ export interface PublicVenue {
   venue: VenueRow;
   settings: Pick<
     OnlineBooking,
+    | "allowedOrigins"
     | "services"
     | "weekdays"
     | "minPartySize"
