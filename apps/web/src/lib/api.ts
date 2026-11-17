@@ -17,6 +17,34 @@ export interface Member {
   role: Role;
 }
 
+export type AuditAction =
+  | "invited"
+  | "invite_revoked"
+  | "redeemed"
+  | "member_removed"
+  | "role_changed"
+  | "creator_transferred";
+
+export interface AuditEntry {
+  id: string;
+  action: AuditAction;
+  actorUserId: string | null;
+  targetUserId: string | null;
+  invitationId: string | null;
+  role: string | null;
+  occurredAt: string;
+}
+
+export interface AuditPage {
+  entries: AuditEntry[];
+  nextCursor: string | null;
+}
+
+export interface RemovedMember {
+  member: { userId: string; role: Role };
+  revoked: { keys: number; sessions: number; webhooksFlagged: number };
+}
+
 export type InvitationStatus = "pending" | "redeemed" | "revoked" | "expired";
 
 export interface Invitation {
@@ -350,7 +378,7 @@ export const api = {
     request<{ members: Member[] }>(`/v1/venues/${venueId}/members`),
 
   removeMember: (venueId: string, userId: string) =>
-    request<{ member: { userId: string; role: Role } }>(
+    request<RemovedMember>(
       `/v1/venues/${venueId}/members/${encodeURIComponent(userId)}`,
       { method: "DELETE" },
     ),
@@ -368,6 +396,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ userId }),
     }),
+
+  listAudit: (venueId: string, cursor?: string | null) => {
+    const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+    return request<AuditPage>(`/v1/venues/${venueId}/audit${qs}`);
+  },
 
   listInvitations: (venueId: string) =>
     request<{ invitations: Invitation[] }>(`/v1/venues/${venueId}/invitations`),

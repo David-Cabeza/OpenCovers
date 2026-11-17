@@ -30,14 +30,17 @@ import {
 } from "@/components/ui/table";
 import { api, type Member } from "@/lib/api";
 import { errorMessage } from "@/lib/error-message";
+import { AuditLog } from "./audit-log";
 import { InviteDialog } from "./invite-dialog";
 import { MakeCreatorButton, RoleSelect } from "./member-actions";
+import { removalMessage } from "./removal-message";
 
 export function TeamView({ venueId }: { venueId: string }) {
   return (
     <div className="space-y-8">
       <MembersCard venueId={venueId} />
       <InvitationsCard venueId={venueId} />
+      <AuditLog venueId={venueId} />
     </div>
   );
 }
@@ -53,9 +56,10 @@ function MembersCard({ venueId }: { venueId: string }) {
 
   const remove = useMutation({
     mutationFn: (userId: string) => api.removeMember(venueId, userId),
-    onSuccess: () => {
+    onSuccess: (res) => {
       void queryClient.invalidateQueries({ queryKey: ["members", venueId] });
-      toast.success("Member removed");
+      void queryClient.invalidateQueries({ queryKey: ["audit", venueId] });
+      toast.success(removalMessage(res.revoked));
     },
     onError: (err) => toast.error(errorMessage(err, "Could not remove the member.")),
     onSettled: () => setTarget(null),
@@ -117,8 +121,8 @@ function MembersCard({ venueId }: { venueId: string }) {
             <DialogTitle>Remove member</DialogTitle>
             <DialogDescription>
               {target?.email} will lose access to this venue on their next request. Their
-              account and other venues are not affected. API keys they created keep working
-              until you revoke them.
+              account and other venues are not affected. API keys they created in this venue
+              are revoked, and webhooks they created are flagged for review.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
