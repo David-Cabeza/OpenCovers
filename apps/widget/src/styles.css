@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+/* Theme tokens with built-in defaults. Stage 9 of ADR-0017 sets them per venue from validated theme data. */
+:root {
+  --oc-primary: #1f4d3a;
+  --oc-on-primary: #ffffff;
+  --oc-background: #ffffff;
+  --oc-surface: #f5f3ef;
+  --oc-text: #1c1b19;
+  --oc-muted: #5c5852;
+  --oc-border: #cfcac1;
+  --oc-danger: #a1271c;
+  --oc-radius: 8px;
+  --oc-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@theme inline {
+  --color-primary: var(--oc-primary);
+  --color-on-primary: var(--oc-on-primary);
+  --color-background: var(--oc-background);
+  --color-surface: var(--oc-surface);
+  --color-text: var(--oc-text);
+  --color-muted: var(--oc-muted);
+  --color-border: var(--oc-border);
+  --color-danger: var(--oc-danger);
+  --radius-oc: var(--oc-radius);
+}
+
+html {
+  background: var(--oc-background);
+  color: var(--oc-text);
+  font-family: var(--oc-font);
+}
