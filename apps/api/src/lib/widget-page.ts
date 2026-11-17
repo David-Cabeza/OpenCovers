@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
@@ -136,6 +137,44 @@ export function readWidgetAsset(dist: string, name: string): { body: Buffer; typ
   } catch {
     return null;
   }
+}
+
+let embedCached: { file: string; mtimeMs: number; script: EmbedScript } | null = null;
+
+export interface EmbedScript {
+  body: Buffer;
+  etag: string;
+}
+
+/** `embed.js` (stage 10), which Vite copies from the widget's `public` folder to the root of the build. */
+export function widgetEmbedScript(dist: string): EmbedScript | null {
+  const file = path.join(dist, "embed.js");
+  let mtimeMs: number;
+  try {
+    mtimeMs = statSync(file).mtimeMs;
+  } catch {
+    return null;
+  }
+  if (embedCached && embedCached.file === file && embedCached.mtimeMs === mtimeMs) return embedCached.script;
+  const body = readFileSync(file);
+  const script = { body, etag: `"${createHash("sha256").update(body).digest("base64url").slice(0, 22)}"` };
+  embedCached = { file, mtimeMs, script };
+  return script;
+}
+
+/**
+ * A venue's page loads `embed.js` with a plain `<script>` from another origin, which needs no CORS. Its URL has no
+ * version, so the cache is short and revalidates by content hash. `Cross-Origin-Resource-Policy` lets a host page
+ * that requires it (`Cross-Origin-Embedder-Policy: require-corp`) load the script.
+ */
+export function embedScriptHeaders(etag: string): Record<string, string> {
+  return {
+    "Content-Type": "text/javascript; charset=utf-8",
+    "Cache-Control": "public, max-age=300",
+    ETag: etag,
+    "X-Content-Type-Options": "nosniff",
+    "Cross-Origin-Resource-Policy": "cross-origin",
+  };
 }
 
 const escapeHtml = (value: string) =>

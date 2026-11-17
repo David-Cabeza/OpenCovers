@@ -32,6 +32,7 @@ beforeAll(async () => {
   mkdirSync(path.join(dist, "assets"));
   writeFileSync(path.join(dist, ".vite", "manifest.json"), JSON.stringify({ "src/main.tsx": { file: "assets/main-A1.js" } }));
   writeFileSync(path.join(dist, "assets", "main-A1.js"), "");
+  writeFileSync(path.join(dist, "embed.js"), "/* embed */");
   process.env.WIDGET_DIST = dist;
   await migrateDb();
   await db.execute(sql`TRUNCATE TABLE api_keys, services, tables, venue_online_booking, venues RESTART IDENTITY CASCADE`);
@@ -60,6 +61,13 @@ it("serves the widget page and assets on the widget host only; the staff host ge
   expect(await staff.text()).toBe(await unknown.text());
   expect(staff.headers.get("content-security-policy")).toMatch(/frame-ancestors 'none'$/);
   expect((await app.request("http://app.example.com/w/assets/main-A1.js")).status).toBe(404);
+});
+
+it("serves embed.js on the widget host only", async () => {
+  expect((await app.request("http://book.example.com/w/embed.js")).status).toBe(200);
+  const staff = await app.request("http://app.example.com/w/embed.js");
+  expect(staff.status).toBe(404);
+  expect(await staff.text()).toBe("Not found");
 });
 
 it("serves the self-service page /r on the widget host only, and the staff host gets the same 404", async () => {

@@ -60,12 +60,14 @@ import { challengeConfigFromEnv, createChallengeVerifier, issueChallenge } from 
 import { findLink, reissueLink, type Link } from "./lib/self-service";
 import {
   defaultWidgetDist,
+  embedScriptHeaders,
   NOT_FOUND_HTML,
   readWidgetAsset,
   SELF_SERVICE_TITLES,
   selfServiceHeaders,
   servesWidgetOn,
   widgetAssets,
+  widgetEmbedScript,
   widgetHeaders,
   widgetHtml,
   widgetServingFromEnv,
@@ -356,16 +358,27 @@ const widgetNotBuilt = (c: any) => {
   });
 };
 
+const widgetFileNotFound = (c: any) =>
+  c.body("Not found", 404, { "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff" });
+
 app.get("/w/assets/:file", (c) => {
   const asset = servesWidgetOn(widgetServing, c.req.url) && readWidgetAsset(widgetDist(), c.req.param("file"));
-  if (!asset) {
-    return c.body("Not found", 404, { "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff" });
-  }
+  if (!asset) return widgetFileNotFound(c);
   return c.body(new Uint8Array(asset.body), 200, {
     "Content-Type": asset.type,
     "Cache-Control": "public, max-age=31536000, immutable",
     "X-Content-Type-Options": "nosniff",
   });
+});
+
+// The optional resize script (ADR-0017 stage 10). Above `/w/:bookingKey`, which would otherwise take its name.
+app.get("/w/embed.js", (c) => {
+  const script = servesWidgetOn(widgetServing, c.req.url) && widgetEmbedScript(widgetDist());
+  if (!script) return widgetFileNotFound(c);
+  const headers = embedScriptHeaders(script.etag);
+  const tags = c.req.header("if-none-match")?.split(",") ?? [];
+  if (tags.some((tag) => tag.trim().replace(/^W\//, "") === script.etag)) return c.body(null, 304, headers);
+  return c.body(new Uint8Array(script.body), 200, headers);
 });
 
 app.get("/w/:bookingKey", async (c) => {

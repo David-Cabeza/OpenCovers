@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { bookingKeyFrom, publicApi, selfServiceApi, takeToken } from "./api";
+import { reportHeight } from "./height";
 import { ManagePage } from "./Manage";
 import { localeOf, supportedLocale, translator } from "./messages";
 import "./styles.css";
@@ -25,4 +26,5 @@ if (window.location.pathname === "/r") {
 } else {
   const bookingKey = bookingKeyFrom(window.location.pathname) ?? "";
   root.render(<App api={publicApi(bookingKey)} t={translator(locale)} locale={locale} />);
+  reportHeight(window);
 }
