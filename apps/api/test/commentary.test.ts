@@ -58,6 +58,7 @@ beforeAll(async () => {
     })),
   );
   await addKey(db, "commentary-key", "commentary-principal", [VENUE], "write");
+  await addKey(db, "commentary-admin-key", "commentary-admin", [VENUE], "admin");
   await addKey(db, "commentary-read-key", "commentary-reader", [VENUE], "read");
 });
 
@@ -195,7 +196,7 @@ describe("booking note", () => {
       )
     ).json();
 
-    const res = await post("/erasure", { guestId: "eva-note@example.com" });
+    const res = await post("/erasure", { guestId: "eva-note@example.com" }, "commentary-admin-key");
     expect(await res.json()).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0 });
 
     expect((await get(`/reservations/${created.id}`)).commentary).toBe("");
@@ -205,7 +206,7 @@ describe("booking note", () => {
     const created = await (
       await post("/reservations", booking({ guest: { contact: "fer-note@example.com" } }))
     ).json();
-    await post("/erasure", { guestId: "fer-note@example.com" });
+    await post("/erasure", { guestId: "fer-note@example.com" }, "commentary-admin-key");
     const res = await post(`/reservations/${created.id}/modify`, { commentary: "late note" });
     expect(res.status).toBe(400);
   });

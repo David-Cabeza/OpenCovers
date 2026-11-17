@@ -721,6 +721,11 @@ paths:
       operationId: reservation.erasure
       summary: Erase personal data by guest id or by principal
       description: |
+        Admin only. Any other role fails with `forbidden`, and nothing is
+        erased. Erasure is irreversible, so a leaked `write` key cannot
+        destroy guest data. Retention runs inside the engine and is not
+        affected.
+
         Erasure returns counts. For each erased reservation the event feed
         emits an `erased` event carrying a tombstone hash. Erasure also resets
         the reservation's consent to `unknown`, its rating to null, its

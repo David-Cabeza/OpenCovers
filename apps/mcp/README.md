@@ -66,7 +66,7 @@ Or from a clone of the repository:
 
 ## Tools
 
-See [docs/contract/mcp.md](../../docs/contract/mcp.md) for the full catalog: availability, agenda, list, search, get, create, modify, cancel, status, events, erasure, and venue config.
+See [docs/contract/mcp.md](../../docs/contract/mcp.md) for the full catalog: availability, agenda, list, search, get, create, modify, cancel, status, events, erasure (admin key only), and venue config.
 
 ## Publishing
 

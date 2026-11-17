@@ -58,6 +58,7 @@ beforeAll(async () => {
     })),
   );
   await addKey(db, "reconfirmation-key", "reconfirmation-principal", [VENUE], "write");
+  await addKey(db, "reconfirmation-admin-key", "reconfirmation-admin", [VENUE], "admin");
   await addKey(db, "reconfirmation-read-key", "reconfirmation-reader", [VENUE], "read");
 });
 
@@ -194,7 +195,7 @@ describe("per-reservation reconfirmation", () => {
       )
     ).json();
 
-    const res = await post("/erasure", { guestId: "eva-reconf@example.com" });
+    const res = await post("/erasure", { guestId: "eva-reconf@example.com" }, "reconfirmation-admin-key");
     expect(await res.json()).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0 });
 
     const after = await get(`/reservations/${created.id}`);
@@ -206,7 +207,7 @@ describe("per-reservation reconfirmation", () => {
     const created = await (
       await post("/reservations", booking({ guest: { contact: "fer-reconf@example.com" } }))
     ).json();
-    await post("/erasure", { guestId: "fer-reconf@example.com" });
+    await post("/erasure", { guestId: "fer-reconf@example.com" }, "reconfirmation-admin-key");
     const res = await post(`/reservations/${created.id}/modify`, { reconfirmation: "confirmed" });
     expect(res.status).toBe(400);
     expect((await res.json()).code).toBe("invalid_request");

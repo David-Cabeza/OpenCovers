@@ -57,6 +57,7 @@ beforeAll(async () => {
     })),
   );
   await addKey(db, "rating-key", "rating-principal", [VENUE], "write");
+  await addKey(db, "rating-admin-key", "rating-admin", [VENUE], "admin");
   await addKey(db, "rating-read-key", "rating-reader", [VENUE], "read");
 });
 
@@ -174,7 +175,7 @@ describe("per-reservation guest rating", () => {
       await post("/reservations", booking({ guest: { name: "Eva", contact: "eva@example.com" }, rating: 5 }))
     ).json();
 
-    const res = await post("/erasure", { guestId: "eva@example.com" });
+    const res = await post("/erasure", { guestId: "eva@example.com" }, "rating-admin-key");
     expect(await res.json()).toEqual({ erasedReservations: 1, erasedGuests: 1, erasedWaitlistEntries: 0 });
 
     const after = await get(`/reservations/${created.id}`);
@@ -186,7 +187,7 @@ describe("per-reservation guest rating", () => {
     const created = await (
       await post("/reservations", booking({ guest: { contact: "fer@example.com" } }))
     ).json();
-    await post("/erasure", { guestId: "fer@example.com" });
+    await post("/erasure", { guestId: "fer@example.com" }, "rating-admin-key");
     const res = await post(`/reservations/${created.id}/modify`, { rating: 5 });
     expect(res.status).toBe(400);
   });
