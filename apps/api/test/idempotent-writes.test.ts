@@ -187,6 +187,19 @@ describe("concurrent duplicates with one key", () => {
     expect(await countOf(reservations, venueId)).toBe(1);
   });
 
+  it("waitlist seat with different keys: one reservation, the loser gets invalid_transition", async () => {
+    const venueId = await seedVenue();
+    const id = await waitingEntry(venueId);
+    const results = await Promise.all(
+      ["seat-a", "seat-b", "seat-c"].map(async (key) => snapshot(await post(venueId, `/waitlist/${id}/seat`, key))),
+    );
+    expect(results.filter((r) => r.status === 200)).toHaveLength(1);
+    const losers = results.filter((r) => r.status !== 200);
+    expect(losers.map((r) => r.body.code)).toEqual(["invalid_transition", "invalid_transition"]);
+    expect(await countOf(reservations, venueId)).toBe(1);
+    expect(await entryStatus(id)).toBe("seated");
+  });
+
   it("waitlist cancel and reservation cancel: every caller succeeds, one change", async () => {
     const venueId = await seedVenue();
     const entry = await waitingEntry(venueId);

@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { idempotencyKeys, waitlist } from "../db/schema";
 import * as schema from "../db/schema";
-import { claimKey, findKey } from "./idempotency";
+import { claimKey } from "./idempotency";
 import { walkIn, type WriteErrorCode } from "./reservations";
 
 export type Db = NodePgDatabase<typeof schema>;
@@ -101,46 +101,49 @@ export async function seatWaitlist(
   entryId: string,
   key: string,
 ): Promise<SeatResult> {
-  const row = (
-    await db
-      .select()
-      .from(waitlist)
-      .where(and(eq(waitlist.venueId, venueId), eq(waitlist.id, entryId)))
-      .limit(1)
-  )[0];
-  if (!row) return { ok: false, code: "waitlist_entry_not_found" };
-  const stored = await findKey(db, venueId, key);
-  if (stored) {
-    if (stored.kind === "create" && row.reservationId === stored.reservationId) {
-      return { ok: true, reservationId: stored.reservationId };
+  return db.transaction(async (tx): Promise<SeatResult> => {
+    // Key lock first, then the entry row, the order cancelWaitlist takes them in.
+    const stored = await claimKey(tx, venueId, key);
+    const row = (
+      await tx
+        .select()
+        .from(waitlist)
+        .where(and(eq(waitlist.venueId, venueId), eq(waitlist.id, entryId)))
+        .for("update")
+    )[0];
+    if (!row) return { ok: false, code: "waitlist_entry_not_found" };
+    if (stored) {
+      if (stored.kind === "create" && row.reservationId === stored.reservationId) {
+        return { ok: true, reservationId: stored.reservationId };
+      }
+      const seatedElsewhere = await tx
+        .select({ id: waitlist.id })
+        .from(waitlist)
+        .where(and(eq(waitlist.venueId, venueId), eq(waitlist.reservationId, stored.reservationId)))
+        .limit(1);
+      if (stored.kind !== "create" || seatedElsewhere.length > 0) return { ok: false, code: "invalid_request" };
     }
-    const seatedElsewhere = await db
-      .select({ id: waitlist.id })
-      .from(waitlist)
-      .where(and(eq(waitlist.venueId, venueId), eq(waitlist.reservationId, stored.reservationId)))
-      .limit(1);
-    if (stored.kind !== "create" || seatedElsewhere.length > 0) return { ok: false, code: "invalid_request" };
-  }
-  if (row.status !== "waiting") return { ok: false, code: "invalid_transition" };
+    if (row.status !== "waiting") return { ok: false, code: "invalid_transition" };
 
-  const result = await walkIn(
-    db,
-    venueId,
-    {
-      partySize: row.partySize,
-      zone: row.zone || undefined,
-      guestName: row.guestName || undefined,
-      guestContact: row.guestContact || undefined,
-    },
-    key,
-  );
-  if (!result.ok) return result;
+    const result = await walkIn(
+      tx,
+      venueId,
+      {
+        partySize: row.partySize,
+        zone: row.zone || undefined,
+        guestName: row.guestName || undefined,
+        guestContact: row.guestContact || undefined,
+      },
+      key,
+    );
+    if (!result.ok) return result;
 
-  await db
-    .update(waitlist)
-    .set({ status: "seated", reservationId: result.id })
-    .where(and(eq(waitlist.venueId, venueId), eq(waitlist.id, entryId)));
-  return { ok: true, reservationId: result.id };
+    await tx
+      .update(waitlist)
+      .set({ status: "seated", reservationId: result.id })
+      .where(and(eq(waitlist.venueId, venueId), eq(waitlist.id, entryId)));
+    return { ok: true, reservationId: result.id };
+  });
 }
 
 export async function cancelWaitlist(
