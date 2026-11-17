@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm";
+import type { BlocklistReason } from "../lib/blocklist";
 import type { Consent } from "../lib/consent";
+import type { ContactKey } from "../lib/contact";
 import type { Rating } from "../lib/rating";
 import type { Reconfirmation } from "../lib/reconfirmation";
 import type { DateRange } from "../lib/booking-policy";
@@ -505,6 +507,33 @@ export const membershipAudit = pgTable(
       "membership_audit_action",
       sql`${t.action} IN ('invited', 'invite_revoked', 'redeemed', 'member_removed', 'role_changed', 'creator_transferred')`,
     ),
+  ],
+);
+
+export const guestBlocklist = pgTable(
+  "guest_blocklist",
+  {
+    id: text("id").primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<ContactKey["kind"]>().notNull(),
+    keyId: text("key_id").notNull(),
+    hash: text("hash").notNull(),
+    reason: text("reason").$type<BlocklistReason>(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_guest_blocklist_venue_key_hash").on(t.venueId, t.keyId, t.hash),
+    index("idx_guest_blocklist_venue_created").on(t.venueId, t.createdAt),
+    check("guest_blocklist_kind", sql`${t.kind} IN ('email', 'phone')`),
+    check(
+      "guest_blocklist_reason",
+      sql`${t.reason} IS NULL OR ${t.reason} IN ('no_show', 'late_cancellation', 'conduct', 'other')`,
+    ),
+    check("guest_blocklist_key_id", sql`${t.keyId} ~ '^[0-9a-f]{16}$'`),
+    check("guest_blocklist_hash", sql`${t.hash} ~ '^[0-9a-f]{64}$'`),
   ],
 );
 

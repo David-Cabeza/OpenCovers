@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import app from "./app";
 import { db } from "./db/client";
+import { blocklistKeys } from "./lib/blocklist";
 import { runRetention } from "./lib/retention";
 import { describeRateLimit, rateLimitConfigFromEnv } from "./lib/rate-limit";
 import { signupMode } from "./lib/signup";
@@ -12,6 +13,7 @@ const port = Number(process.env.PORT ?? 3000);
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`opencovers api listening on port ${info.port} (sign-up: ${signup}, trust proxy: ${rateLimit.trustProxy})`);
   console.log(describeRateLimit(rateLimit));
+  console.log(`blocklist key: ${blocklistKeys.current.id}${blocklistKeys.previous ? `, previous: ${blocklistKeys.previous.id}` : ""}`);
 });
 
 const RETENTION_INTERVAL_MS = 60 * 60 * 1000;

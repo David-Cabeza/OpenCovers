@@ -25,6 +25,8 @@ services:
     environment:
       DATABASE_URL: postgres://opencovers:${POSTGRES_PASSWORD}@db:5432/opencovers
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env.prod. Generate one with openssl rand -base64 32}
+      BLOCKLIST_KEY: ${BLOCKLIST_KEY:?Set BLOCKLIST_KEY in .env.prod. Generate one with openssl rand -base64 32}
+      BLOCKLIST_KEY_PREVIOUS: ${BLOCKLIST_KEY_PREVIOUS:-}
       BETTER_AUTH_URL: ${PUBLIC_URL:-http://localhost}
       TRUSTED_ORIGINS: ${PUBLIC_URL:-http://localhost}
       SIGNUP: ${SIGNUP:-first-user}
