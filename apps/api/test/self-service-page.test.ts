@@ -75,7 +75,7 @@ describe("GET /r, the self-service page (ADR-0017 stage 6)", () => {
     const cookie = signUp.headers.get("set-cookie")!.split(";")[0];
     for (const [query, init] of [
       ["?token=abc.def", {}],
-      ["?lang=fr", {}],
+      ["?lang=xx", {}],
       ['?lang="><script>', {}],
       ["", { headers: { cookie } }],
       ["", { headers: { "X-Self-Service-Token": "0f8fad5b-d9cb-469f-a165-70867728950e.x" } }],

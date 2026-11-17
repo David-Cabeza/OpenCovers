@@ -142,7 +142,9 @@ describe("GET /w/{bookingKey} (C41)", () => {
     const lang = async (key: string, query = "") => /<html lang="([^"]*)">/.exec(await (await page(`${key}${query}`)).text())?.[1];
     expect(await lang(es.key)).toBe("es");
     expect(await lang(es.key, "?lang=en")).toBe("en");
-    expect(await lang(es.key, "?lang=fr")).toBe("es");
+    expect(await lang(es.key, "?lang=fr")).toBe("fr");
+    expect(await lang(es.key, "?lang=xx")).toBe("es");
+    expect(await lang(en.key, "?lang=xx")).toBe("en");
     expect(await lang(es.key, '?lang="><script>')).toBe("es");
     expect(await lang(en.key)).toBe("en");
     expect(await lang(en.key, "?lang=es")).toBe("es");

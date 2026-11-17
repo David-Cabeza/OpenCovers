@@ -3,7 +3,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { bookingKeyFrom, selfServiceUrl } from "../src/api";
 import { explain } from "../src/errors";
-import { CATALOGS, localeOf, translator } from "../src/messages";
+import { formatDate } from "../src/dates";
+import { CATALOGS, localeOf, supportedLocale, translator } from "../src/messages";
 import { contactLooksValid } from "../src/validate";
 
 // Every public error code of docs/contract/errors.md a widget call can get.
@@ -64,8 +65,31 @@ describe("message catalog", () => {
   it("picks the locale from <html lang> and fills slots", () => {
     expect(localeOf("en")).toBe("en");
     expect(localeOf("en-GB")).toBe("en");
-    expect(localeOf("fr")).toBe("es");
+    expect(localeOf("fr")).toBe("fr");
+    expect(localeOf("PT-br")).toBe("pt");
     expect(translator("en")("times.none", { n: 4 })).toBe("No free times left that day for 4 guests. Try another day.");
+  });
+});
+
+describe("locale fallback", () => {
+  it("falls back from an unknown lang to the venue locale, then to es", () => {
+    // main.tsx reads <html lang>, which the API set from a supported `?lang=`, else the venue's locale.
+    const choose = (lang: string | null, venue: string | null) =>
+      supportedLocale(lang) ?? supportedLocale(venue) ?? "es";
+    expect(choose("de", "fr")).toBe("de");
+    expect(choose("xx", "fr")).toBe("fr");
+    expect(choose("xx", "yy")).toBe("es");
+    expect(choose(null, null)).toBe("es");
+    expect(localeOf("xx")).toBe("es");
+    expect(localeOf("")).toBe("es");
+    expect(localeOf(undefined)).toBe("es");
+    expect(localeOf("constructor")).toBe("es");
+  });
+
+  it("formats dates with Intl in the locale's own language", () => {
+    for (const locale of Object.keys(CATALOGS)) expect(formatDate("2026-12-25", locale)).toMatch(/25/);
+    expect(formatDate("2026-12-25", "de")).toMatch(/Freitag/);
+    expect(formatDate("2026-12-25", "fr")).toMatch(/vendredi/);
   });
 });
 

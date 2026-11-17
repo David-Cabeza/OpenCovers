@@ -4,7 +4,7 @@ import { services, venueOnlineBooking, venues } from "../db/schema";
 import type { Db, DbTx } from "./venue";
 import { isFrameAncestor } from "./widget-page";
 
-export const LOCALES = ["es", "en"] as const;
+export const LOCALES = ["es", "en", "ca", "fr", "de", "it", "pt"] as const;
 export const FONTS = ["system", "serif", "rounded"] as const;
 export const COLOR_KEYS = ["primary", "onPrimary", "background", "surface", "text", "muted", "border"] as const;
 export const MAX_ORIGINS = 10;

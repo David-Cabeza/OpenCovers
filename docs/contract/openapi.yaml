@@ -2276,7 +2276,7 @@ paths:
         - name: lang
           in: query
           required: false
-          description: A supported widget locale. It wins over the venue's `locale`. Any other value is ignored.
+          description: A supported widget locale (`es`, `en`, `ca`, `fr`, `de`, `it`, `pt`). It wins over the venue's `locale`. Any other value is ignored.
           schema: { type: string, example: en }
       responses:
         "200":
@@ -2334,7 +2334,7 @@ paths:
         - name: lang
           in: query
           required: false
-          description: A supported widget locale for the page. Without it the page uses the venue's `locale` from the guest view. Any other value is ignored.
+          description: A supported widget locale for the page (`es`, `en`, `ca`, `fr`, `de`, `it`, `pt`). Without it the page uses the venue's `locale` from the guest view. Any other value is ignored.
           schema: { type: string, example: en }
       responses:
         "200":
@@ -3434,9 +3434,9 @@ components:
     WidgetLocale:
       type: string
       example: es
-      x-extensible-enum: [es, en]
+      x-extensible-enum: [es, en, ca, fr, de, it, pt]
       description: |
-        A widget locale. `es` and `en` in the first release. More may be
+        A widget locale: `es`, `en`, `ca`, `fr`, `de`, `it` or `pt`. More may be
         added, so clients must accept any value on read. A write of a locale
         the engine does not support fails with `invalid_request`.
 

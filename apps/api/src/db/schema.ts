@@ -583,7 +583,7 @@ export const venueOnlineBooking = pgTable(
       sql`${t.maxOpenBookingsPerContact} IS NULL OR ${t.maxOpenBookingsPerContact} BETWEEN 1 AND 20`,
     ),
     check("venue_online_booking_mode", sql`${t.confirmationMode} = 'auto'`),
-    check("venue_online_booking_locale", sql`${t.locale} IN ('es', 'en')`),
+    check("venue_online_booking_locale", sql`${t.locale} IN ('es', 'en', 'ca', 'fr', 'de', 'it', 'pt')`),
     check(
       "venue_online_booking_weekdays",
       sql`${t.weekdays} IS NULL OR (cardinality(${t.weekdays}) BETWEEN 1 AND 7 AND ${t.weekdays} <@ ARRAY[1,2,3,4,5,6,7]::smallint[])`,

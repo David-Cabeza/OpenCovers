@@ -1,0 +1,2 @@
+ALTER TABLE "venue_online_booking" DROP CONSTRAINT "venue_online_booking_locale";--> statement-breakpoint
+ALTER TABLE "venue_online_booking" ADD CONSTRAINT "venue_online_booking_locale" CHECK ("venue_online_booking"."locale" IN ('es', 'en', 'ca', 'fr', 'de', 'it', 'pt'));
