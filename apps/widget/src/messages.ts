@@ -100,6 +100,13 @@ const es = {
   "manage.error.partySize": "No se puede cambiar en línea a ese número de personas.",
   "manage.error.noTable": "No queda mesa libre para ese número de personas a esa hora.",
   "manage.error.generic": "No hemos podido hacer el cambio en línea.",
+  "lost.open": "¿Has perdido el enlace de tu reserva?",
+  "lost.body": "Escribe el email con el que reservaste. Te enviaremos un enlace nuevo, y el anterior dejará de funcionar.",
+  "lost.email": "Email",
+  "lost.send": "Enviar enlace",
+  "lost.sending": "Enviando…",
+  "lost.sent": "Si hay una reserva con ese email, te hemos enviado un enlace nuevo. Puede tardar unos minutos.",
+  "validate.email": "Escribe un email válido.",
 };
 
 export type MessageId = keyof typeof es;
@@ -203,6 +210,13 @@ const en: Record<MessageId, string> = {
   "manage.error.partySize": "The booking cannot be changed to that party size online.",
   "manage.error.noTable": "No free table is left for that party size at that time.",
   "manage.error.generic": "We could not make the change online.",
+  "lost.open": "Lost the link to your booking?",
+  "lost.body": "Enter the email you booked with. We will send you a new link, and the old one will stop working.",
+  "lost.email": "Email",
+  "lost.send": "Send link",
+  "lost.sending": "Sending…",
+  "lost.sent": "If there is a booking with that email, we have sent you a new link. It may take a few minutes.",
+  "validate.email": "Enter a valid email.",
 };
 
 export const CATALOGS = { es, en } as const;

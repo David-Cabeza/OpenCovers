@@ -89,7 +89,7 @@ function venueView({ venue, settings }: PublicVenue) {
   return { name: venue.name, locale: settings.locale, theme: settings.theme, phone: venue.publicPhone };
 }
 
-export async function publicConfig(db: Db, target: PublicVenue, challenge: FormChallenge) {
+export async function publicConfig(db: Db, target: PublicVenue, challenge: FormChallenge, linkResend: boolean) {
   const { venue, settings } = target;
   const online = applyChannel(
     venue,
@@ -108,6 +108,7 @@ export async function publicConfig(db: Db, target: PublicVenue, challenge: FormC
     confirmationMode: settings.confirmationMode,
     challenge,
     captcha: null,
+    linkResend,
   };
 }
 

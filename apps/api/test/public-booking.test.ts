@@ -149,6 +149,7 @@ describe("C40 public surface and venue isolation", () => {
       confirmationMode: "auto",
       challenge: { nonce: expect.any(String), issuedAt: expect.any(String), difficulty: 4, signature: expect.any(String) },
       captcha: null,
+      linkResend: false,
     });
     const b = await (await getPublic(v.key)).json();
     expect(b.challenge.nonce).not.toBe(a.challenge.nonce);

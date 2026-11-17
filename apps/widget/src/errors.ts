@@ -1,4 +1,4 @@
-import type { Failure } from "./api";
+import type { Failure, Result } from "./api";
 import type { MessageId } from "./messages";
 
 // What the guest reads for each public error code (docs/contract/errors.md), and where the form sends them
@@ -35,6 +35,17 @@ export function explain(failure: Failure): Explanation {
   if (failure.kind === "network") return { message: "error.network" };
   if (failure.kind === "local") return UNEXPECTED;
   return BY_CODE[failure.code] ?? UNEXPECTED;
+}
+
+/**
+ * What the guest reads after asking for a lost link. Every answer but a failed connection and a rate limit reads
+ * the same, so the page never tells whether the address holds a booking, whatever the engine answered.
+ */
+export function explainResend(result: Result<unknown>): MessageId {
+  if (result.ok) return "lost.sent";
+  if (result.failure.kind === "network") return "error.network";
+  if (result.failure.kind === "error" && result.failure.code === "rate_limited") return "error.rateLimited";
+  return "lost.sent";
 }
 
 /**

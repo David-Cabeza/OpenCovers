@@ -41,7 +41,7 @@ beforeAll(async () => {
   await db.execute(
     sql`TRUNCATE TABLE events, tombstones, idempotency_keys, table_allocations, reservations, guests, grants, api_keys, services, tables, venue_online_booking, venues RESTART IDENTITY CASCADE`,
   );
-  for (const id of ["rl-a", "rl-b", "rl-c"]) {
+  for (const id of ["rl-a", "rl-b", "rl-c", "rl-d"]) {
     await db.insert(venues).values({ id, name: id, timezone: "Europe/Madrid" });
     await db.insert(services).values({ venueId: id, name: "dinner", openStart: "20:00", openEnd: "23:00" });
     await db.insert(tables).values([1, 2, 3, 4].map((i) => ({ id: `${id}-t${i}`, venueId: id, name: `T${i}`, seats: 4 })));
@@ -127,6 +127,28 @@ describe("C52 public_venue counts only creates that reach the booking", () => {
     expect((await create("rl-c", "203.0.113.45")).status).toBe(200);
     expect((await create("rl-c", "203.0.113.46")).status).toBe(429);
     expect(await booked("rl-c")).toBe(2);
+  });
+});
+
+describe("C52 the lost-link resend spends public_booking", () => {
+  const resend = (ip: string, email: string) =>
+    app.request(`/v1/public/${keys["rl-d"]}/self-service/resend`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": ip },
+      body: JSON.stringify({ email }),
+    });
+
+  it("charges a resend to the address's budget, shared with creates, and refuses alike whatever the address", async () => {
+    const ip = "203.0.113.60";
+    expect((await resend(ip, "a@example.com")).status).toBe(202);
+    const refused = await resend(ip, "b@example.com");
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("cache-control")).toBe("no-store");
+    const again = await resend(ip, "a@example.com");
+    expect(again.status).toBe(429);
+    expect(await again.text()).toBe(await refused.text());
+    expect((await create("rl-d", ip)).status).toBe(429);
+    expect((await resend("203.0.113.61", "a@example.com")).status).toBe(202);
   });
 });
 

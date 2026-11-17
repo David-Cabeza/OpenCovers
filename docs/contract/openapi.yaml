@@ -1998,12 +1998,15 @@ paths:
         whether or not a booking matches, and does its work after the
         answer. When `notificationsEnabled` is on and the normalized email
         matches future `booked` bookings of the venue, it rotates each one's
-        link and sends the new links in `self_service_link` emails to the
-        address stored on the booking. Otherwise it does nothing. A body
-        without a string `email` fails with `invalid_request`. An unknown or
-        disabled key gives `venue_not_found`. Limited by `public_booking`
-        and `public_venue`, and per contact inside the work it does. Not
-        exposed through MCP.
+        link and sends the new links in a `self_service_link` email to the
+        address stored on the booking. Otherwise it does nothing. At most
+        one email per address and venue every 15 minutes, a reservation in
+        at most 3 of them, and at most 5 bookings in one, the earliest
+        first; a booking left out keeps its link (C51). A body without one
+        email address fails with `invalid_request`. An unknown or disabled
+        key gives `venue_not_found`. Limited by `public_booking` and
+        `public_venue`. The config's `linkResend` says whether the resend
+        can send. Not exposed through MCP.
       security: []
       parameters:
         - $ref: "#/components/parameters/bookingKey"
@@ -3727,6 +3730,7 @@ components:
         - confirmationMode
         - challenge
         - captcha
+        - linkResend
       properties:
         venue: { $ref: "#/components/schemas/PublicVenue" }
         minPartySize:
@@ -3759,6 +3763,12 @@ components:
           properties:
             provider: { type: string, enum: [turnstile, hcaptcha] }
             siteKey: { type: string }
+        linkResend:
+          type: boolean
+          description: |
+            Whether a lost-link resend can send an email: `notificationsEnabled`
+            on, a way to send, and a widget origin to link to. The widget offers
+            the resend only when true. It says nothing about any guest (C51).
 
     PublicAvailability:
       type: object
