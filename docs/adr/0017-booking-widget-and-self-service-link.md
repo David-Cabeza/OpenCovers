@@ -282,7 +282,7 @@ A new resource, `GET` and `PUT /v1/venues/{venueId}/online-booking`, with the us
 | `maxOpenBookingsPerContact` | null or 1 to 20. | `2` |
 | `confirmationMode` | `auto` only (Q2). The contract names `approval` as reserved, and a write of it fails with `invalid_request` until stage 14, so adding it later does not rename the field. | `auto` |
 | `askConsent` | boolean | `false` |
-| `locale` | a supported widget locale, `es` or `en` at first. | `es` |
+| `locale` | a supported widget locale: `es`, `en`, `ca`, `fr`, `de`, `it` or `pt` (stage 15). | `es` |
 | `theme` | see below | built-in defaults |
 
 ### Theme tokens as data
@@ -348,7 +348,7 @@ Each stage is one pull request, sized S or M, and each starts from the contract.
 | 12 | Lost-link resend route and form. Built ahead of stage 8 with placeholder email text (see the stage 12 amendment). | S | 8 | Email on, Q8. |
 | 13 | Optional CAPTCHA (`PUBLIC_CAPTCHA`). | S | 3, 5 | none |
 | 14 | Pending approval mode: a `pending` status that holds tables, and `confirmationMode: approval`. | M | 3, 7 | Deferred by Q2. Needs a new decision before it starts. |
-| 15 | Widget localization beyond `es` and `en`. | S each | 5 | none |
+| 15 | Widget localization beyond `es` and `en`. Done for `ca`, `fr`, `de`, `it` and `pt` (see the stage 15 amendment). | S each | 5 | Native review of the five catalogs. |
 
 Stages 2 to 4 are the API. Stages 5 and 6 make the exit criterion reachable with auto-confirm and no email. Stages 8 and 11 need legal, and nothing before them does, because the widget collects no consent and sends no email until they land.
 
@@ -479,3 +479,14 @@ David Cabeza asked for stage 12 before stage 8, whose gate, the legal review of 
 - **The widget origin.** Links are built server side on `WIDGET_ADDRESS`. Outside production without it, they use `BETTER_AUTH_URL` (default `http://localhost:3000`), because the API then serves `/r` on any host. A production API without `WIDGET_ADDRESS` serves no widget, so the resend sends nothing. The request's `Host` is never used, because the sender chooses it. The link is `<origin>/r?lang=<venue locale>#<token>`: the request carries only the address, so the locale is the venue's.
 - **`linkResend` in the config.** With email off the route can never send, and a form that says "we sent a link" would mislead the guest. The config answer says `linkResend: true` only with email on, a way to send it (an API key and a from address), and a widget origin. It reveals nothing about any guest. The widget offers the form only when it is true.
 - **The widget form.** A "Lost the link to your booking?" button under the booking form on `/w/{bookingKey}` opens one email field. `/r` has no booking key, so it cannot offer the form. There is no challenge or proof of work, because the contract does not ask for one on this route. Every answer reads "If there is a booking with that email, we have sent you a new link", except a failed connection and `429`, which get the widget's usual messages.
+
+## Amendment 2026-11-17: widget locales beyond `es` and `en` (stage 15)
+
+Stage 15 adds five widget locales: `ca` (Catalan), `fr`, `de`, `it` and `pt`. The set is a proposal; any other locale is one more catalog and one more entry in each list below.
+
+- **One list, four places.** The supported locales are `es`, `en`, `ca`, `fr`, `de`, `it`, `pt`. They are `LOCALES` in `apps/api/src/lib/online-booking.ts` (validation of the venue's `locale`, and of `lang` on `/w`), `SELF_SERVICE_TITLES` in `apps/api/src/lib/widget-page.ts` (`lang` on `/r`), `CATALOGS` in `apps/widget/src/messages.ts`, and `LOCALES` in the staff app, which shows each language by its own name. A test fails when the API list, the `/r` titles and the widget catalogs differ.
+- **Same ids and slots.** Every catalog has exactly the keys of `es`, typed as `Record<MessageId, string>`, and a test checks that every `{slot}` matches. Dates go through `Intl.DateTimeFormat` with the locale, so `de`, `fr` and the rest get their own weekday and month names.
+- **Fallback order.** An unsupported `lang` is ignored, then the venue's `locale` applies, and the widget falls back to `es` when `<html lang>` is not a supported locale. Matching is exact on `/w` and `/r` (lower case), and the widget reads the base subtag of `<html lang>` (`pt-BR` reads as `pt`).
+- **Migration `0038`.** The `venue_online_booking_locale` check constraint listed `es` and `en`, so it is dropped and added again with the new list. No data changes.
+- **Machine-assisted text.** The `ca`, `fr`, `de`, `it` and `pt` catalogs were written with machine assistance and have not had a native-speaker review. A native review of each is open before a venue relies on them. The guest-facing tone is informal `tu` in `ca`, `it` and `de` (`du`), and formal in `fr` and `pt`, which a reviewer may change.
+- **Not changed.** The email templates stay as they are (stages 8 and 11 and their legal gate), so an email is not localized by this stage. `formatInstant` still formats `changeableUntil` on the guest's own clock, because the guest view carries no venue time zone; moving it to the venue's zone needs a contract change and stays open.

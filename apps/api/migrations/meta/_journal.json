@@ -267,6 +267,13 @@
       "when": 1794934662256,
       "tag": "0037_guest_last_visit_not_future",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794954362122,
+      "tag": "0038_widget_locales",
+      "breakpoints": true
     }
   ]
 }

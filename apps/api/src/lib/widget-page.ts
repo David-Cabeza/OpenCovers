@@ -100,7 +100,15 @@ export function selfServiceHeaders(): Record<string, string> {
   return { ...widgetHeaders([]), "X-Frame-Options": "DENY" };
 }
 
-export const SELF_SERVICE_TITLES: Record<string, string> = { es: "Tu reserva", en: "Your booking" };
+export const SELF_SERVICE_TITLES: Record<string, string> = {
+  es: "Tu reserva",
+  en: "Your booking",
+  ca: "La teva reserva",
+  fr: "Votre réservation",
+  de: "Deine Reservierung",
+  it: "La tua prenotazione",
+  pt: "A sua reserva",
+};
 
 export interface WidgetAssets {
   scripts: string[];

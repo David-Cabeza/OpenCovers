@@ -32,6 +32,7 @@ import {
   FONTS,
   FONT_STACKS,
   LOCALES,
+  LOCALE_NAMES,
   defaultThemeForm,
   embedSnippet,
   isLogoUrl,
@@ -356,7 +357,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                 >
                   {LOCALES.map((l) => (
                     <option key={l} value={l}>
-                      {l === "es" ? "Español" : "English"}
+                      {LOCALE_NAMES[l]}
                     </option>
                   ))}
                 </select>

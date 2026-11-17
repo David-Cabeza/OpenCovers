@@ -24,7 +24,16 @@ export type OnlineBookingUpdate = Partial<
   Omit<OnlineBooking, "bookingKey" | "confirmationMode" | "askConsent" | "theme">
 > & { theme?: Theme | null };
 
-export const LOCALES = ["es", "en"] as const;
+export const LOCALES = ["es", "en", "ca", "fr", "de", "it", "pt"] as const;
+export const LOCALE_NAMES: Record<(typeof LOCALES)[number], string> = {
+  es: "Español",
+  en: "English",
+  ca: "Català",
+  fr: "Français",
+  de: "Deutsch",
+  it: "Italiano",
+  pt: "Português",
+};
 
 export const COLOR_KEYS = ["primary", "onPrimary", "background", "surface", "text", "muted", "border"] as const;
 export type ColorKey = (typeof COLOR_KEYS)[number];
