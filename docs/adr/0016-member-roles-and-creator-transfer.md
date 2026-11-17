@@ -1,6 +1,6 @@
 # ADR-0016: Member role change and venue creator transfer
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-17
 - Deciders: David Cabeza
 
