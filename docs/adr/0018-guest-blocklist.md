@@ -17,7 +17,7 @@ Facts this design rests on, read in the code on `main` at `13e7f49`:
 - **Modify cannot change the contact.** It changes party size, tables, consent, rating, note and reconfirmation (ADR-0013).
 - **Availability and the explanation are anonymous.** `explainSlot` takes date, time, party size and zone, and no contact. ADR-0013 rejected adding a contact to availability because it would let a caller probe whether a contact has bookings.
 - **Errors.** `apps/api/src/lib/errors.ts` is a typed registry. Every code has a status and `retryable`. `forbidden` (403) means the caller lacks the role. `approval_required` exists and no route emits it.
-- **Erasure.** `erase` in `apps/api/src/lib/venue.ts` deletes the guest rows it targets, with their merged family, blanks their reservations with tombstones, deletes matching waitlist rows, and returns counts. It is admin only ([ADR-0017, erasure](0017-erasure-admin-only.md)).
+- **Erasure.** `erase` in `apps/api/src/lib/venue.ts` deletes the guest rows it targets, with their merged family, blanks their reservations with tombstones, deletes matching waitlist rows, and returns counts. It is admin only ([ADR-0019, erasure](0019-erasure-admin-only.md)).
 - **Retention.** `runRetention` in `apps/api/src/lib/retention.ts` uses `venues.retention_days` (default 400) to clear guests, unlinked reservations, waitlist rows, events and `membership_audit` rows. I found no route that sets `retention_days`.
 - **Audit.** `membership_audit` (ADR-0010) holds ids, a role and an action from a check-constrained set, and `GET /audit` reads it behind `adminOnly`.
 - **Secrets.** `BETTER_AUTH_SECRET` falls back to a public development value, and `compose.prod.yaml` refuses to start without it. `docs/hardening.md` says dumps hold guest data.
@@ -27,7 +27,7 @@ Facts this design rests on, read in the code on `main` at `13e7f49`:
 
 - **No clear value, and no cheap way back to one.** A database leak must not turn into a list of the venue's refused guests.
 - **The refusal says no more than it must.** A refused caller learns that this booking is declined. It learns nothing about other entries, the reason, the date or who added it.
-- **Reuse what exists.** The same normalization, the same check point and error vocabulary as ADR-0013, the same audit log as ADR-0010, and the same admin boundary as ADR-0009 and the erasure ADR-0017.
+- **Reuse what exists.** The same normalization, the same check point and error vocabulary as ADR-0013, the same audit log as ADR-0010, and the same admin boundary as ADR-0009 and the erasure ADR-0019.
 - **A person decides.** Adding someone to the list is a judgment about a human, made by a named staff member, and it can be undone.
 - **Fail visible.** A wrong lockout, a lost key or an erasure that keeps an entry must show up where an admin looks.
 

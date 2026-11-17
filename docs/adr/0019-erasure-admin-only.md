@@ -1,4 +1,4 @@
-# ADR-0017: Guest erasure needs the admin role
+# ADR-0019: Guest erasure needs the admin role
 
 - Status: Accepted
 - Date: 2026-11-17
