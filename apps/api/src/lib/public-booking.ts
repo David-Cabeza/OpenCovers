@@ -2,9 +2,10 @@ import { and, eq } from "drizzle-orm";
 import { reservations, services, venueOnlineBooking, venues } from "../db/schema";
 import { isCommentary } from "./commentary";
 import { normalizeContact, venueCountry } from "./contact";
-import type { OnlineBooking, Theme } from "./online-booking";
+import { getOnlineBooking, type OnlineBooking, type Theme } from "./online-booking";
 import { isSolution, parseChallenge, type FormChallenge } from "./public-challenge";
 import { applyChannel, type OnlineRules } from "./reservations";
+import { linkExpiry } from "./self-service";
 import { formatTime } from "./time";
 import type { Db } from "./venue";
 
@@ -14,8 +15,8 @@ const BOOKING_KEY = /^pk_[A-Za-z0-9_-]{22}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
-const LINK_LIFE_MS = 48 * 3_600_000;
 const REFUSED_FIELDS = ["tables", "zone", "rating", "reconfirmation"] as const;
+const MODIFY_REFUSED_FIELDS = ["date", "time", ...REFUSED_FIELDS] as const;
 
 type VenueRow = typeof venues.$inferSelect;
 
@@ -63,6 +64,13 @@ export async function resolveBookingKey(db: Db, bookingKey: string): Promise<Pub
   )[0];
   if (!row) return null;
   return { venue: row.venue, settings: { ...row.settings, theme: row.settings.theme as Theme } };
+}
+
+/** The venue a self-service link names, with its online settings whether online booking is on or off. */
+export async function publicVenueOf(db: Db, venueId: string): Promise<PublicVenue | null> {
+  const venue = (await db.select().from(venues).where(eq(venues.id, venueId)).limit(1))[0];
+  const settings = await getOnlineBooking(db, venueId);
+  return venue && settings ? { venue, settings } : null;
 }
 
 export function rulesOf(settings: PublicVenue["settings"]): OnlineRules {
@@ -149,6 +157,35 @@ export function parsePublicCreate(body: unknown, target: PublicVenue): PublicCre
   };
 }
 
+export interface SelfServiceModify {
+  version: number;
+  partySize?: number;
+  commentary?: string;
+  consent?: "unknown" | "granted";
+}
+
+/** Parses a guest modify body. Returns null for anything the contract answers with `invalid_request`, `denied` included. */
+export function parseSelfServiceModify(body: unknown): SelfServiceModify | null {
+  if (!isObject(body)) return null;
+  if (MODIFY_REFUSED_FIELDS.some((field) => body[field] !== undefined)) return null;
+  const { version, partySize, commentary, guest } = body;
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 1) return null;
+  if (partySize === undefined && commentary === undefined && guest === undefined) return null;
+  if (partySize !== undefined && (typeof partySize !== "number" || !Number.isInteger(partySize) || partySize < 1)) {
+    return null;
+  }
+  if (commentary !== undefined && !isCommentary(commentary)) return null;
+  if (guest !== undefined && (!isObject(guest) || Object.keys(guest).some((k) => k !== "consent"))) return null;
+  const consent = isObject(guest) ? guest.consent : undefined;
+  if (consent !== undefined && consent !== "unknown" && consent !== "granted") return null;
+  return {
+    version,
+    partySize: partySize as number | undefined,
+    commentary: commentary as string | undefined,
+    consent,
+  };
+}
+
 export function maskContact(contact: string): string {
   const at = contact.lastIndexOf("@");
   if (at > 0) return `${contact[0]}***${contact.slice(at)}`;
@@ -177,6 +214,6 @@ export async function guestView(db: Db, target: PublicVenue, reservationId: stri
     commentary: row.commentary,
     consent: row.consent,
     changeableUntil: new Date(row.startsAt.getTime() - target.settings.selfServiceCutoffMinutes * 60_000).toISOString(),
-    linkExpiresAt: new Date(row.endsAt.getTime() + LINK_LIFE_MS).toISOString(),
+    linkExpiresAt: linkExpiry(row.endsAt).toISOString(),
   };
 }

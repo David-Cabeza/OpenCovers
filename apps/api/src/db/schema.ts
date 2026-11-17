@@ -593,4 +593,30 @@ export const venueOnlineBooking = pgTable(
   ],
 );
 
+// ADR-0017: one capability link per reservation. Only the SHA-256 of the secret is stored.
+export const selfServiceLinks = pgTable(
+  "self_service_links",
+  {
+    id: text("id").primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    reservationId: text("reservation_id")
+      .notNull()
+      .references(() => reservations.id, { onDelete: "cascade" }),
+    secretHash: text("secret_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    // The public key of the guest cancel that revoked the link, so a repeat of that cancel can replay.
+    cancelKey: text("cancel_key"),
+  },
+  (t) => [
+    uniqueIndex("uq_self_service_links_live").on(t.reservationId).where(sql`${t.revokedAt} IS NULL`),
+    index("idx_self_service_links_expires").on(t.expiresAt),
+    check("self_service_links_hash", sql`${t.secretHash} ~ '^[0-9a-f]{64}$'`),
+    check("self_service_links_cancel_revoked", sql`${t.cancelKey} IS NULL OR ${t.revokedAt} IS NOT NULL`),
+  ],
+);
+
 export const betterAuthSchema = { user, session, account, verification };

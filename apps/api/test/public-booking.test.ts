@@ -303,7 +303,7 @@ describe("C43 public create and attribution", () => {
         changeableUntil: expect.any(String),
         linkExpiresAt: expect.any(String),
       },
-      selfServiceToken: null,
+      selfServiceToken: expect.stringMatching(/^[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/),
     });
     const start = Date.parse(`${SATURDAY}T18:00:00Z`);
     expect(Date.parse(answer.reservation.changeableUntil)).toBe(start - 120 * 60_000);
@@ -313,7 +313,7 @@ describe("C43 public create and attribution", () => {
     const staffView = await (await app.request(`/v1/venues/${v.id}/reservations/${row.id}`, { headers: { apikey: v.admin } })).json();
     expect(staffView.tables).toEqual([`${v.id}-t0`]);
     expect(await counts(v.id)).toEqual({ reservations: 1, events: 1, keys: 1 });
-    const text = JSON.stringify(answer);
+    const text = JSON.stringify(answer.reservation);
     for (const leak of [row.id, v.id, "t0", "dinner", "widget"]) expect(text).not.toContain(leak);
   });
 

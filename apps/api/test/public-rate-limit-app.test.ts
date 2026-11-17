@@ -2,7 +2,7 @@ import { count, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
-import { reservations, services, tables, venues } from "../src/db/schema";
+import { reservations, selfServiceLinks, services, tables, venues } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
 import { challengeConfigFromEnv, issueChallenge, solve } from "../src/lib/public-challenge";
 
@@ -10,6 +10,7 @@ process.env.RATE_LIMIT = "on";
 process.env.TRUST_PROXY = "true";
 process.env.RATE_LIMIT_PUBLIC_BOOKING = "1/1h";
 process.env.RATE_LIMIT_PUBLIC_VENUE = "2/1h";
+process.env.RATE_LIMIT_PUBLIC_SELF_SERVICE = "3/15m";
 process.env.PUBLIC_CHALLENGE_SECRET = "rate-limit-test-secret-for-the-public-challenge";
 process.env.PUBLIC_POW_DIFFICULTY = "0";
 
@@ -22,6 +23,7 @@ afterAll(() => {
     "TRUST_PROXY",
     "RATE_LIMIT_PUBLIC_BOOKING",
     "RATE_LIMIT_PUBLIC_VENUE",
+    "RATE_LIMIT_PUBLIC_SELF_SERVICE",
     "PUBLIC_CHALLENGE_SECRET",
     "PUBLIC_POW_DIFFICULTY",
   ]) {
@@ -98,5 +100,53 @@ describe("C52 public limits in the app", () => {
       body: JSON.stringify({ date: "2030-06-01", time: "21:00", partySize: 2 }),
     });
     expect(staff.status).toBe(200);
+  });
+});
+
+describe("C52 self_service limit in the app", () => {
+  async function staffLink(ip: string): Promise<{ id: string; token: string }> {
+    const headers = { apikey: "rl-b-admin", "content-type": "application/json", "x-forwarded-for": ip };
+    const made = await app.request("/v1/venues/rl-b/reservations", {
+      method: "POST",
+      headers: { ...headers, "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({ date: "2030-06-01", time: "22:00", partySize: 2, guest: { name: "Eva", contact: `${ip}@example.com` } }),
+    });
+    const { id } = await made.json();
+    const issued = await app.request(`/v1/venues/rl-b/reservations/${id}/self-service-link`, {
+      method: "POST",
+      headers: { ...headers, "Idempotency-Key": crypto.randomUUID() },
+    });
+    return { id, token: (await issued.json()).selfServiceToken };
+  }
+
+  const guest = (path: string, ip: string, token: string, method = "GET", payload?: unknown) =>
+    app.request(`/v1/public/self-service${path}`, {
+      method,
+      headers: {
+        "x-forwarded-for": ip,
+        "X-Self-Service-Token": token,
+        "Idempotency-Key": crypto.randomUUID(),
+        "content-type": "application/json",
+      },
+      body: payload === undefined ? undefined : JSON.stringify(payload),
+    });
+
+  it("shares one budget per address across read, modify and cancel, and a refused cancel does nothing", async () => {
+    const { id, token } = await staffLink("203.0.113.20");
+    const ip = "203.0.113.21";
+    expect((await guest("", ip, token)).status).toBe(200);
+    expect((await guest("/modify", ip, token, "POST", { version: 1, commentary: "x" })).status).toBe(200);
+    expect((await guest("", ip, "bad")).status).toBe(404);
+    const refused = await guest("/cancel", ip, token, "POST");
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("cache-control")).toBe("no-store");
+    const other = await guest("/cancel", ip, "bad", "POST");
+    expect(other.status).toBe(429);
+    expect(await other.text()).toBe(await refused.text());
+    const [r] = await db.select().from(reservations).where(eq(reservations.id, id));
+    expect(r.status).toBe("booked");
+    const [link] = await db.select().from(selfServiceLinks).where(eq(selfServiceLinks.reservationId, id));
+    expect(link.revokedAt).toBeNull();
+    expect((await guest("/cancel", "203.0.113.22", token, "POST")).status).toBe(200);
   });
 });
