@@ -20,7 +20,6 @@ import { normalizeContact, venueCountry } from "./contact";
 import { forgetMergeState, movedAtMerge } from "./guests";
 import { ratingColumns } from "./rating";
 import { reconfirmationColumns } from "./reconfirmation";
-import { normalizeTimeZone } from "./time";
 import { sha256Hex } from "./reservations";
 import { deleteLinks } from "./self-service";
 import type { TurnTime } from "./turn-times";
@@ -66,7 +65,7 @@ export async function createVenue(
     await tx.insert(venues).values({
       id,
       name: input.name,
-      timezone: normalizeTimeZone(input.timezone ?? "UTC"),
+      timezone: input.timezone ?? "UTC",
       enabled: false,
     });
     await tx.insert(venueMemberships).values({

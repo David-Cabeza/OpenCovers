@@ -142,7 +142,7 @@ import {
   webhookPolicyFromEnv,
 } from "./lib/webhooks";
 import { ERRORS, errorBody, type ErrorCode } from "./lib/errors";
-import { isCalendarDate } from "./lib/time";
+import { isCalendarDate, isValidTimeZone } from "./lib/time";
 import {
   addWaitlist,
   cancelWaitlist,
@@ -472,10 +472,9 @@ app.post("/v1/venues", async (c) => {
   if ("id" in body || typeof body.name !== "string" || body.name.trim() === "") {
     return error(c, "invalid_request");
   }
-  const { id } = await createVenue(db, user.id, {
-    name: body.name,
-    timezone: typeof body.timezone === "string" ? body.timezone : undefined,
-  });
+  const timezone = body.timezone ?? undefined;
+  if (timezone !== undefined && !isValidTimeZone(timezone)) return error(c, "invalid_request");
+  const { id } = await createVenue(db, user.id, { name: body.name, timezone });
   return c.json({ venue: { id, name: body.name } }, 201);
 });
 

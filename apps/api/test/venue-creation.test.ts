@@ -3,9 +3,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import app from "../src/app";
 import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
-import { user, venues } from "../src/db/schema";
+import { user, venueMemberships, venues } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
 import { auth } from "../src/lib/auth";
+import { formatTime, isValidTimeZone, localDateTime, toTimestamp } from "../src/lib/time";
 import { addMembership, type Role } from "../src/lib/memberships";
 import { createVenue } from "../src/lib/venue";
 
@@ -138,12 +139,58 @@ describe("POST /v1/venues input", () => {
     expect(await venueCount()).toBe(0);
   });
 
-  it("takes an invalid time zone as UTC, not as a server error", async () => {
+  it("refuses a time zone that is not a zone, and writes nothing", async () => {
     const a = await signUp();
-    const res = await call(a, "POST", "/v1/venues", { name: "Z", timezone: "Not/AZone" });
+    const res = await call(a, "POST", "/v1/venues", { name: "Z", timezone: "Europe/Madird" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("invalid_request");
+    expect(await venueCount()).toBe(0);
+    expect(await db.select().from(venueMemberships)).toHaveLength(0);
+  });
+
+  it.each([42, true, {}, [], ["UTC"], "", " ", " Europe/Madrid", "+25:00"].map((v) => [v]))(
+    "refuses the time zone %j",
+    async (timezone) => {
+      const a = await signUp();
+      const res = await call(a, "POST", "/v1/venues", { name: "Z", timezone });
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe("invalid_request");
+      expect(await venueCount()).toBe(0);
+    },
+  );
+
+  it.each(["Europe/Madrid", "UTC", "utc", "europe/madrid", "Etc/GMT+1", "+01:00"])(
+    "creates a venue with the time zone %j, stored as given",
+    async (timezone) => {
+      const a = await signUp();
+      const res = await call(a, "POST", "/v1/venues", { name: "Z", timezone });
+      expect(res.status).toBe(201);
+      const [row] = await db.select().from(venues);
+      expect(row!.timezone).toBe(timezone);
+    },
+  );
+
+  it.each([{}, { timezone: null }])("defaults to UTC for %j", async (extra) => {
+    const a = await signUp();
+    const res = await call(a, "POST", "/v1/venues", { name: "Z", ...extra });
     expect(res.status).toBe(201);
     const [row] = await db.select().from(venues);
     expect(row!.timezone).toBe("UTC");
+  });
+});
+
+describe("a stored zone the validator accepts works in the date helpers", () => {
+  it.each(["Europe/Madrid", "utc", "Etc/GMT+1", "+01:00"])("%s", (zone) => {
+    expect(isValidTimeZone(zone)).toBe(true);
+    const instant = toTimestamp("2026-01-15", "20:00", zone);
+    expect(formatTime(instant, zone)).toBe("20:00");
+    expect(localDateTime(instant, zone)).toEqual({ date: "2026-01-15", time: "20:00" });
+  });
+
+  it("puts a wall-clock time at the zone's offset", () => {
+    expect(toTimestamp("2026-01-15", "20:00", "+01:00").toISOString()).toBe("2026-01-15T19:00:00.000Z");
+    expect(toTimestamp("2026-01-15", "20:00", "Europe/Madrid").toISOString()).toBe("2026-01-15T19:00:00.000Z");
+    expect(toTimestamp("2026-01-15", "20:00", "utc").toISOString()).toBe("2026-01-15T20:00:00.000Z");
   });
 });
 
