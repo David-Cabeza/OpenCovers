@@ -1,3 +1,5 @@
+import { isCalendarDate } from "./time";
+
 export interface DateRange {
   from: string;
   to: string;
@@ -13,15 +15,6 @@ export function isMaxAdvanceDays(value: unknown): value is number {
 
 export function isMaxActivePerGuest(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= MAX_ACTIVE_PER_GUEST_MAX;
-}
-
-function isCalendarDate(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
-    !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
-    new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value
-  );
 }
 
 function nextDay(date: string): string {

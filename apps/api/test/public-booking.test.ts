@@ -21,10 +21,12 @@ import {
   solves,
   type FormChallenge,
 } from "../src/lib/public-challenge";
-import { addDays, localDateTime } from "../src/lib/time";
+import { addDays, localDateTime, toTimestamp } from "../src/lib/time";
+import { saturdayAhead } from "./dates";
 
-const SATURDAY = "2030-06-01";
-const SUNDAY = "2030-06-02";
+const SATURDAY = saturdayAhead();
+const SUNDAY = addDays(SATURDAY, 1);
+const NEXT_SATURDAY = addDays(SATURDAY, 7);
 const config = challengeConfigFromEnv();
 
 beforeAll(async () => {
@@ -305,7 +307,7 @@ describe("C43 public create and attribution", () => {
       },
       selfServiceToken: expect.stringMatching(/^[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/),
     });
-    const start = Date.parse(`${SATURDAY}T18:00:00Z`);
+    const start = toTimestamp(SATURDAY, "20:00", "Europe/Madrid").getTime();
     expect(Date.parse(answer.reservation.changeableUntil)).toBe(start - 120 * 60_000);
     expect(Date.parse(answer.reservation.linkExpiresAt)).toBe(start + 120 * 60_000 + 48 * 3_600_000);
     const [row] = await db.select().from(reservations).where(eq(reservations.venueId, v.id));
@@ -351,7 +353,7 @@ describe("C43 public create and attribution", () => {
   it("applies the online services, weekdays, party limits, lead time and horizon on top of the venue's", async () => {
     const tomorrow = addDays(localDateTime(new Date(), "Europe/Madrid").date, 1);
     const v = await makeVenue({
-      venue: { blockedDates: [{ from: "2030-06-08", to: "2030-06-08" }] },
+      venue: { blockedDates: [{ from: NEXT_SATURDAY, to: NEXT_SATURDAY }] },
       settings: { weekdays: [6], minPartySize: 2, maxPartySize: 4 },
     });
     const cases: [Record<string, unknown>, number, string][] = [
@@ -359,7 +361,7 @@ describe("C43 public create and attribution", () => {
       [{ time: "13:00" }, 400, "outside_hours"],
       [{ partySize: 1 }, 400, "party_size_too_small"],
       [{ partySize: 5 }, 400, "party_size_too_large"],
-      [{ date: "2030-06-08" }, 400, "date_blocked"],
+      [{ date: NEXT_SATURDAY }, 400, "date_blocked"],
     ];
     for (const [override, status, code] of cases) {
       const res = await create(v.key, body(v.key, override));
@@ -371,7 +373,7 @@ describe("C43 public create and attribution", () => {
     const near = await makeVenue({ settings: { maxAdvanceDays: 30 } });
     const res = await create(near.key, body(near.key));
     expect((await res.json()).code).toBe("beyond_booking_horizon");
-    for (const [venue, date] of [[v, "2030-06-08"], [early, tomorrow], [near, SATURDAY]] as const) {
+    for (const [venue, date] of [[v, NEXT_SATURDAY], [early, tomorrow], [near, SATURDAY]] as const) {
       expect((await (await availability(venue.key, date, 2)).json()).times).toEqual([]);
     }
     expect((await (await availability(early.key, SATURDAY, 2)).json()).times).toContain("20:00");

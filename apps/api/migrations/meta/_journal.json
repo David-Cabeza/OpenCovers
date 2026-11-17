@@ -260,6 +260,13 @@
       "when": 1794924094657,
       "tag": "0036_self_service_links",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794934662256,
+      "tag": "0037_guest_last_visit_not_future",
+      "breakpoints": true
     }
   ]
 }

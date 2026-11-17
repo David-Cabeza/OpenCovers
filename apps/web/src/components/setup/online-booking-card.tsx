@@ -272,7 +272,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ob-advance">Booking horizon (days)</Label>
-                <Input id="ob-advance" placeholder="Same as the venue" {...num("maxAdvanceDays")} />
+                <Input id="ob-advance" placeholder="Same as the venue, or 365" {...num("maxAdvanceDays")} />
                 {error("maxAdvanceDays")}
               </div>
               <div className="space-y-2">

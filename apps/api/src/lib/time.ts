@@ -7,6 +7,19 @@ export function normalizeTimeZone(timezone: string): string {
   }
 }
 
+// The dates the engine takes. Outside them a booking's end, its link expiry or a time-zone shift leaves the
+// years `Date#toISOString` and PostgreSQL round-trip as plain dates, and the request would fail with a 500.
+export const FIRST_DATE = "1900-01-01";
+export const LAST_DATE = "9998-12-31";
+
+/** A real `YYYY-MM-DD` calendar date from `FIRST_DATE` to `LAST_DATE`. */
+export function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  if (value < FIRST_DATE || value > LAST_DATE) return false;
+  const ms = Date.parse(`${value}T00:00:00Z`);
+  return !Number.isNaN(ms) && new Date(ms).toISOString().startsWith(value);
+}
+
 export function toTimestamp(date: string, time: string, timezone = "UTC"): Date {
   const tz = normalizeTimeZone(timezone);
   const asUTC = Date.parse(`${date}T${time}:00Z`);

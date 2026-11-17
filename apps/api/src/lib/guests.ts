@@ -49,6 +49,11 @@ function isCleared(g: Guest): boolean {
   return g.email === null && g.phone === null && g.name === "";
 }
 
+/**
+ * Links a booking's contact to its guest record. `lastVisitAt` never moves past now: a booking that has not
+ * happened yet counts from the moment it was made, so a future booking, cancelled or not, cannot push the
+ * guest's retention out. Retention keeps a guest with a live booking through that booking (`expireGuests`).
+ */
 export async function linkGuest(
   tx: DbTx,
   venueId: string,
@@ -65,7 +70,7 @@ export async function linkGuest(
       venueId,
       [key.kind]: key.value,
       name,
-      lastVisitAt: visitAt,
+      lastVisitAt: sql`least(${visitAt.toISOString()}::timestamptz, now())`,
     })
     .onConflictDoUpdate({
       target: [guests.venueId, column],
@@ -90,7 +95,7 @@ export async function linkGuest(
   }
   await tx
     .update(guests)
-    .set({ lastVisitAt: sql`greatest(${guests.lastVisitAt}, ${visitAt.toISOString()}::timestamptz)` })
+    .set({ lastVisitAt: sql`greatest(${guests.lastVisitAt}, least(${visitAt.toISOString()}::timestamptz, now()))` })
     .where(and(eq(guests.venueId, venueId), eq(guests.id, rootId)));
   return { id: rootId, created: false };
 }
@@ -348,7 +353,7 @@ export async function movedAtMerge(tx: DbTx, venueId: string, absorbed: Guest[])
 
 async function latestVisit(tx: DbTx, venueId: string, guestId: string): Promise<Date | null> {
   const [row] = await tx
-    .select({ at: sql<string | null>`max(${reservations.startsAt})` })
+    .select({ at: sql<string | null>`least(max(${reservations.startsAt}), now())` })
     .from(reservations)
     .where(and(eq(reservations.venueId, venueId), eq(reservations.guestId, guestId)));
   return row?.at ? new Date(row.at) : null;

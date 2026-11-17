@@ -63,7 +63,8 @@ export function toForm(s: OnlineBooking): OnlineBookingForm {
   };
 }
 
-const ORIGIN = /^https:\/\/[^/?#@*\s:]+(:[0-9]{1,5})?$/;
+// The API check (`normalizeOrigin`), apart from the URL parse that also refuses `:443` and ports over 65535.
+const ORIGIN = /^https:\/\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?$/;
 
 function int(text: string, min: number, max: number, nullable: boolean): number | null | undefined {
   const t = text.trim();
@@ -123,7 +124,7 @@ export function parseForm(
   if (origins.length > 10) errors.allowedOrigins = "At most 10 addresses.";
   else if (origins.some((o) => !ORIGIN.test(o)))
     errors.allowedOrigins =
-      "Each address is https://host or https://host:port, with no path and no wildcard.";
+      "Each address is https://host or https://host:port, with no path or wildcard, and a host of letters, digits, hyphens and dots.";
   else if (!sameSet(origins, stored.allowedOrigins)) update.allowedOrigins = origins;
 
   if (form.weekdays.length === 0) errors.weekdays = "Pick at least one day.";

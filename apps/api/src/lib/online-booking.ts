@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { services, venueOnlineBooking, venues } from "../db/schema";
 import type { Db, DbTx } from "./venue";
+import { isFrameAncestor } from "./widget-page";
 
 export const LOCALES = ["es", "en"] as const;
 export const FONTS = ["system", "serif", "rounded"] as const;
@@ -99,15 +100,13 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 const intIn = (v: unknown, min: number, max: number): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
 
-const ORIGIN = /^https:\/\/[^/?#@*\s:]+(:[0-9]{1,5})?$/;
-
+/** The origin in lower case when the value is exactly an `https` origin, as `new URL(v).origin` writes it. */
 export function normalizeOrigin(v: unknown): string | null {
-  if (typeof v !== "string" || !ORIGIN.test(v)) return null;
+  if (typeof v !== "string") return null;
+  const origin = v.toLowerCase();
+  if (!isFrameAncestor(origin)) return null;
   try {
-    const u = new URL(v);
-    if (u.protocol !== "https:" || u.hostname === "") return null;
-    if (u.port !== "" && Number(u.port) > 65535) return null;
-    return v.toLowerCase();
+    return new URL(origin).origin === origin ? origin : null;
   } catch {
     return null;
   }

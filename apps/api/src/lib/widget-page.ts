@@ -56,8 +56,16 @@ const POLICY =
   "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' https: data:; " +
   "style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'; object-src 'none'";
 
+const LABEL = "[a-z0-9](?:[a-z0-9-]*[a-z0-9])?";
+const FRAME_ANCESTOR = new RegExp(`^https://${LABEL}(?:\\.${LABEL})*(?::[0-9]{1,5})?$`);
+
+/** An `https` origin in lower case, with only the characters a CSP host source allows. */
+export const isFrameAncestor = (value: string) => FRAME_ANCESTOR.test(value);
+
+/** Entries that are not a plain origin, such as a value stored before the stricter check, are left out. */
 export function widgetCsp(allowedOrigins: readonly string[]): string {
-  const ancestors = allowedOrigins.length === 0 ? "'none'" : ["'self'", ...allowedOrigins].join(" ");
+  const origins = allowedOrigins.filter(isFrameAncestor);
+  const ancestors = origins.length === 0 ? "'none'" : ["'self'", ...origins].join(" ");
   return `${POLICY}; frame-ancestors ${ancestors}`;
 }
 

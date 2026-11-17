@@ -60,6 +60,7 @@ async function expireGuests(db: Db, venueId: string, cutoff: Date, limit: number
                   eq(reservations.venueId, venueId),
                   eq(reservations.guestId, guests.id),
                   eq(reservations.erased, false),
+                  ne(reservations.status, "cancelled"),
                   gte(reservations.endsAt, cutoff),
                 ),
               ),

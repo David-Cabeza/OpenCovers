@@ -125,7 +125,7 @@ describe("guest retention", () => {
     await seedVenue("ret-future");
     const old = await book("ret-future", "2024-01-10", "Iker", "iker@example.com");
     const future = await book("ret-future", "2027-03-01", "Iker", "iker@example.com");
-    expect((await guestOf(old)).lastVisitAt).toEqual((await reservationRow(future)).startsAt);
+    expect((await guestOf(old)).lastVisitAt.getTime()).toBeLessThan((await reservationRow(future)).startsAt.getTime());
 
     await runRetention(db, NOW);
 

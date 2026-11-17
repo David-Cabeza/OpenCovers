@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, gt, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { reservations, sentEmails, venues } from "../db/schema";
 import * as schema from "../db/schema";
@@ -7,12 +7,26 @@ import { formatTime } from "./time";
 
 export type Db = NodePgDatabase<typeof schema>;
 
+/**
+ * The limit on confirmations a guest's own modify sends (ADR-0017, amendment of 2026-11-17). Anyone holding a
+ * link can change the party, so without it a link would send mail to the booking's contact on demand. Each
+ * reservation gets at most `perReservation` of them, at least `intervalMinutes` apart. A modify past the limit
+ * still succeeds and answers the same, so the guest cannot tell. A staff change's confirmation counts toward the
+ * limit, so a guest gets no more mail in all, but a staff send is never held back by it.
+ */
+export const GUEST_MODIFY_EMAILS = { intervalMinutes: 15, perReservation: 3 } as const;
+
+export interface NotifyOptions {
+  guestModify?: boolean;
+}
+
 export async function notifyReservation(
   db: Db,
   venueId: string,
   reservationId: string,
   version: number,
   kind: EmailKind,
+  { guestModify = false }: NotifyOptions = {},
 ): Promise<void> {
   try {
     const venue = (
@@ -49,6 +63,7 @@ export async function notifyReservation(
         .limit(1)
     )[0];
     if (already) return;
+    if (guestModify && !(await claimGuestModify(db, venueId, reservationId, version))) return;
 
     const { subject, text } = buildEmail(kind, {
       date: reservation.date,
@@ -71,4 +86,32 @@ export async function notifyReservation(
   } catch (err) {
     console.error(`notification ${kind} failed`, err);
   }
+}
+
+/** Records the guest-modify confirmation before it is sent, so concurrent modifies cannot both pass the limit. */
+async function claimGuestModify(db: Db, venueId: string, reservationId: string, version: number): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`guest-modify-email:${venueId}:${reservationId}`}, 0))`);
+    const [prior] = await tx
+      .select({
+        sent: count(),
+        recent: sql<boolean>`coalesce(max(${sentEmails.createdAt}) > now() - make_interval(mins => ${GUEST_MODIFY_EMAILS.intervalMinutes}), false)`,
+      })
+      .from(sentEmails)
+      .where(
+        and(
+          eq(sentEmails.venueId, venueId),
+          eq(sentEmails.reservationId, reservationId),
+          eq(sentEmails.kind, "confirmation"),
+          gt(sentEmails.version, 1),
+        ),
+      );
+    if (prior.sent >= GUEST_MODIFY_EMAILS.perReservation || prior.recent) return false;
+    const claimed = await tx
+      .insert(sentEmails)
+      .values({ id: crypto.randomUUID(), venueId, reservationId, kind: "confirmation", version })
+      .onConflictDoNothing()
+      .returning({ id: sentEmails.id });
+    return claimed.length === 1;
+  });
 }
