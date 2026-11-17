@@ -18,7 +18,8 @@ import {
   encodeAuditCursor,
   listMembershipAudit,
 } from "./lib/membership-audit";
-import { auth } from "./lib/auth";
+import { auth, trustedOrigins } from "./lib/auth";
+import { staffOriginGuard } from "./lib/staff-origin";
 import {
   addToBlocklist,
   BLOCKLIST_DEFAULT_LIMIT,
@@ -171,6 +172,7 @@ app.use("*", createRateLimiter(rateLimitConfigFromEnv()).middleware);
 const bodyTooLarge = (c: any) => error(c, "invalid_request");
 app.use("/v1/public/*", bodyLimit({ maxSize: 16 * 1024, onError: bodyTooLarge }));
 app.use("*", bodyLimit({ maxSize: 256 * 1024, onError: bodyTooLarge }));
+app.use("/v1/*", staffOriginGuard(trustedOrigins));
 
 app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
 
