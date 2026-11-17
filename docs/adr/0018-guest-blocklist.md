@@ -172,7 +172,7 @@ This changes one acceptance criterion of issue #66, "shown as unavailable in the
 
 No MCP tool adds, lists, looks up or removes entries, on stdio or remote. Agents are only refused by the list. A remote token never reaches these routes, because ADR-0014's dispatcher allowlist does not contain them, and ADR-0014 changes `staffSessionOnly` to refuse the OAuth identity. A stdio server with an `admin` key is refused by `staffSessionOnly`. `reservation.create` in `docs/contract/mcp.md` gains `booking_declined` among its errors.
 
-[ADR-0017, booking widget](0017-booking-widget-and-self-service-link.md) proposes a public create route. If it is built, it must call `createReservation`, so the same check applies there with no extra code, and its per-address and per-venue limits bound probing.
+[ADR-0017, booking widget](0017-booking-widget-and-self-service-link.md), accepted, decides a public create route. If it is built, it must call `createReservation`, so the same check applies there with no extra code, and its per-address and per-venue limits bound probing.
 
 ### Venue isolation
 

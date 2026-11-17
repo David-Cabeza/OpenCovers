@@ -1,27 +1,27 @@
 # ADR-0017: Guest booking widget and self-service link
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-17
 - Deciders: David Cabeza
 
-Nothing in this record is built. It decides the design so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow it, in that order. The maintainer accepts, changes or rejects each decision, and answers the open questions at the end before the stage that needs them.
+Nothing in this record is built. It decides the design so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow it, in that order. The maintainer accepted decisions 1 to 14 and answered Q1 to Q4 on 2026-11-17. The other open questions are answered before the stage that needs them.
 
 ## Decisions at a glance
 
-| # | Question | Recommendation | Main alternative rejected |
+| # | Question | Decision | Main alternative rejected |
 | --- | --- | --- | --- |
-| 1 | How the widget reaches the venue's page | An iframe that loads a widget page from a separate widget origin. A copy-paste `<iframe>` snippet, plus an optional resize script later. | A script that renders into the host page (shadow DOM or a web component). |
+| 1 | How the widget reaches the venue's page | An iframe that loads a widget page from a separate widget origin (`WIDGET_ADDRESS`), required in production. Local development alone may serve it from the staff app's origin on a separate path (Q1). A copy-paste `<iframe>` snippet, plus an optional resize script later. | A script that renders into the host page (shadow DOM or a web component). |
 | 2 | Framing policy | The staff app keeps `X-Frame-Options: DENY` and `frame-ancestors 'none'`. The widget page sends `frame-ancestors` built per venue from its allowed origins, and no `X-Frame-Options`. | One static policy for every venue in the Caddyfile. |
 | 3 | JSON-LD | Stays where ADR-0012 put it, in the host page HTML. The widget never emits JSON-LD and is `noindex`. | JSON-LD inside the widget page. |
 | 4 | Public API routes | A separate prefix, `/v1/public/...`, outside the venue auth middleware. Guests can read the widget config, read availability, create a booking, and read, modify or cancel their own booking with a self-service token. | Public routes under `/v1/venues/{venueId}/` registered above the middleware. |
 | 5 | Which venue a guest addresses | A per-venue public booking key. It is not a secret and not a credential. It names the venue, gates online booking, and can be rotated. | The venue UUID in the URL with no key. |
-| 6 | Self-service link | A capability token `<linkId>.<secret>` for one reservation. The database stores only the SHA-256 hash, as for invitations (ADR-0006). The token travels in the URL fragment. It expires 48 hours after the booking ends. | A signed, stateless token such as a JWT. |
+| 6 | Self-service link | A capability token `<linkId>.<secret>` for one reservation. The database stores only the SHA-256 hash, as for invitations (ADR-0006, Q4). The token travels in the URL fragment. It expires 48 hours after the booking ends. It rotates on a create replay, a staff reissue and a lost-link resend, and a guest cancel revokes it with no replacement (Q3). | A signed, stateless token such as a JWT, or an HMAC-derived token. |
 | 7 | Rate limits | Extend ADR-0007 with three rules for `/v1/public`: reads per address, booking creates per address, and token use per address. Add a per-venue ceiling on public creates. | No limit on public reads, as ADR-0012 chose for the JSON-LD route. |
 | 8 | Bot protection | A honeypot field and a signed form challenge with a minimum fill time and a small proof of work, on by default. Turnstile or hCaptcha only as an operator opt-in. | A mandatory third-party CAPTCHA. |
 | 9 | Slot hoarding | A cap on open future online bookings per contact (default 2), the existing ADR-0013 per-day cap, online lead time and horizon. The public channel never uses the overbooking ceiling. | Email verification before a booking counts. |
 | 10 | Guest data collected | Name, one contact, party size, date and time, an optional note, and consent only when the venue turns the question on. No allergy or diet field until the legal review. | A structured allergy field. |
 | 11 | Per-venue settings | A new admin resource `online-booking`, separate from `config` and from the public profile. Themes are validated data only. | More fields on `PUT /config`. |
-| 12 | Confirmation mode | Auto-confirm only in the first release. Pending approval waits for a status vocabulary decision. | A `pending` status in the first release. |
+| 12 | Confirmation mode | Auto-confirm only in the first release (Q2). Every online booking is `booked` at once when there is room. `confirmationMode` accepts only `auto`, and `approval` stays reserved. A `pending` status that holds tables is deferred to stage 14. | A `pending` status in the first release, or an approval flag on `booked`. |
 | 13 | Attribution | `bookedVia: "widget"`, `ownerPrincipal: "widget"`, `basis: "service"`, set by the route. | Per-key principals. |
 | 14 | Events, webhooks, email | The same `created`, `modified` and `cancelled` events. The confirmation email carries the self-service link and stays gated by `notificationsEnabled`. | A new event type per channel. |
 
@@ -83,7 +83,16 @@ The same page opened top-level is the hosted booking page. A venue without a sit
 
 ### Origins and framing
 
-The widget gets its own origin, for example `book.example.com`, as a second site block in the Caddyfile with its own address variable (`WIDGET_ADDRESS`). It must not share the staff app's origin. A shared origin would put the staff session cookie in reach of any bug in the widget, and would force path exceptions into the staff app's headers.
+The widget gets its own origin, for example `book.example.com`, as a second site block in the Caddyfile with its own address variable (`WIDGET_ADDRESS`). In production it must not share the staff app's origin, and a production instance that serves the widget requires `WIDGET_ADDRESS` (Q1). A shared origin would put the staff session cookie in reach of any bug in the widget, and would force path exceptions into the staff app's headers.
+
+#### Local development
+
+Local development alone may serve the widget from the staff app's origin on a separate path, so a contributor needs no second domain or certificate (Q1, option B).
+
+- The staff app's dev server on `:5173` proxies `/w/*` to the API, beside the `/api` and `/v1` proxies it already has. `/v1/public/*` already reaches the API through the `/v1` proxy. The widget opens at `http://localhost:5173/w/{bookingKey}`.
+- There is no second Caddy site block and no `WIDGET_ADDRESS` in development. Caddy is not in the development loop.
+- The browser holds the staff session cookie for that origin and attaches it to same-origin requests. In development the widget is kept away from it by code, not by the browser. The widget calls only `/v1/public/*`, and every call sets `credentials: "omit"`, so the cookie is not sent. No route under `/v1/public/` reads a cookie or a session, so a cookie that arrives anyway changes nothing. A test pins that a public request with a staff cookie gets the same answer as one without. The widget sets no cookies of its own.
+- The exception never ships. `compose.prod.yaml` and the production Caddyfile serve the widget only from the `WIDGET_ADDRESS` site block, and the staff site block never proxies `/w/*`.
 
 | Response | `X-Frame-Options` | CSP `frame-ancestors` | Set by |
 | --- | --- | --- | --- |
@@ -127,7 +136,7 @@ Decision. Option B. The key is `pk_` followed by 16 random bytes in base64url. I
 | `POST /v1/public/{bookingKey}/reservations` | Create a booking. | Needs `Idempotency-Key`. Returns the guest view and the self-service token once. |
 | `GET /v1/public/self-service` | Read the booking the token names. | Token in the `X-Self-Service-Token` header. |
 | `POST /v1/public/self-service/modify` | Change party size, note or consent. | Needs `Idempotency-Key`. |
-| `POST /v1/public/self-service/cancel` | Cancel. | Needs `Idempotency-Key`. |
+| `POST /v1/public/self-service/cancel` | Cancel. | Needs `Idempotency-Key`. Revokes the link in the same transaction and issues no new one (Q3). |
 
 The self-service routes carry no venue id and no reservation id. The token names both. A guest cannot address a reservation other than the one the token was minted for.
 
@@ -145,7 +154,7 @@ The self-service routes carry no venue id and no reservation id. The token names
 
 Party size, the note and consent. Party size runs the same table search as a staff modify, and the online party limits apply. A guest cannot change the date or time, because `modifyReservation` cannot. To move a booking a guest cancels and books again, and the widget says so. A real move needs a modify that re-runs the time rules, which ADR-0013 names as a future change. That is open question Q5.
 
-A guest can modify or cancel only while the booking is `booked` and the start is more than `selfServiceCutoffMinutes` away (default 120). Later, the write fails with a new `409 self_service_closed`, and the widget shows the venue's phone from the public profile when one is set. Reading stays possible until the token expires.
+A guest can modify or cancel only while the booking is `booked` and the start is more than `selfServiceCutoffMinutes` away (default 120). Later, the write fails with a new `409 self_service_closed`, and the widget shows the venue's phone from the public profile when one is set. Reading stays possible until the token expires or is revoked. A guest cancel revokes it (Q3).
 
 ### The self-service token
 
@@ -158,18 +167,20 @@ A guest can modify or cancel only while the booking is `booked` and the start is
 | Delivery | Returned once in the create response and passed in memory to the confirmation email. Never stored in clear and never logged. The staff reissue call below is the only staff route that returns one. |
 | URL | `https://book.example.com/r#<token>`. The token is in the fragment, which browsers do not send to the server, write to proxy logs or put in a `Referer`. The page reads it and sends it in the `X-Self-Service-Token` header. |
 | Expiry | 48 hours after the booking's end time. A Phase 13 rating link may extend this later. |
-| Revocation | On erasure, on retention expiry of the reservation, and on rotation. Rows are deleted 30 days after expiry, as invitations are (ADR-0006). |
-| Rotation | On an idempotent replay of the create, on a staff "reissue link" call, and on a guest "send me a new link" request. Each rotation revokes the old link and mints a new one in one transaction. Not on every guest modify (see below and Q3). |
+| Revocation | On erasure, on retention expiry of the reservation, on rotation, and on a guest cancel. A guest cancel revokes the link in the cancel transaction and mints no new one (Q3). Rows are deleted 30 days after expiry, as invitations are (ADR-0006). |
+| Rotation | On an idempotent replay of the create, on a staff "reissue link" call, and on a guest "send me a new link" request. Each rotation revokes the old link and mints a new one in one transaction. Not on a guest modify (Q3). |
 | Failure | Unknown id, wrong secret, expired, revoked, erased, and any venue: all return the same `404 self_service_link_invalid`. |
 | Caching | Every self-service response sends `Cache-Control: no-store`. |
 
 Why rotation on replay. The idempotency record stores the reservation id and version, not the response, and the token must not be stored in clear. A replay therefore cannot return the original token. It rotates instead, returns the new token, and sends one new link email when email is on. The email that carried the first token then holds a dead link, which is the cost of storing only a hash.
 
-Why not rotate on every guest change. Rotation on modify kills the link in the guest's email each time the guest changes the party size, and it does not stop an attacker who already holds the token, because the attacker acts before the guest. It costs the guest and protects little. The maintainer may still want it. See Q3.
+Why not rotate on every guest change. Rotation on modify kills the link in the guest's email each time the guest changes the party size, and it does not stop an attacker who already holds the token, because the attacker acts before the guest. It costs the guest and protects little. The maintainer chose no rotation on modify (Q3).
+
+Why revoke on a guest cancel. A cancelled booking needs no link. A guest who wants to come after all books again, which creates a new reservation with its own link. Revoking at the cancel leaves nothing live for a forwarded or leaked link to read. The cancel response is the last answer the link gives. It carries the cancelled guest view and no token. A staff cancel does not revoke the link, so the guest can still read that the venue cancelled.
 
 ### Staff reissue
 
-`POST /v1/venues/{venueId}/reservations/{reservationId}/self-service-link`, with a `write` or `admin` role and an `Idempotency-Key`, rotates the link of a `booked` reservation. It returns the new token once, so staff can read the link to a guest on the phone, and emails it when email is on. It is the only staff route that ever sees a token. It refuses a reservation that is not `booked` with `invalid_transition`.
+`POST /v1/venues/{venueId}/reservations/{reservationId}/self-service-link`, with a `write` or `admin` role and an `Idempotency-Key`, rotates the link of a `booked` reservation. It returns the new token once, so staff can read the link to a guest on the phone, and emails it when email is on. It is the only staff route that ever sees a token. It refuses a reservation that is not `booked` with `invalid_transition`, so a cancelled booking never gets a new link.
 
 ### A lost link
 
@@ -267,7 +278,7 @@ A new resource, `GET` and `PUT /v1/venues/{venueId}/online-booking`, with the us
 | `maxAdvanceDays` | null or 0 to 1000. Stricter of this and the venue's. | `null` |
 | `selfServiceCutoffMinutes` | 0 to 10080. | `120` |
 | `maxOpenBookingsPerContact` | null or 1 to 20. | `2` |
-| `confirmationMode` | `auto`. `approval` is reserved for the stage in Q2. | `auto` |
+| `confirmationMode` | `auto` only (Q2). The contract names `approval` as reserved, and a write of it fails with `invalid_request` until stage 14, so adding it later does not rename the field. | `auto` |
 | `askConsent` | boolean | `false` |
 | `locale` | a supported widget locale, `es` or `en` at first. | `es` |
 | `theme` | see below | built-in defaults |
@@ -310,7 +321,7 @@ Events do not say who made a change, so a consumer cannot tell a guest cancel fr
 - A public create sends `confirmation` to the guest and `notice` to the venue, through `notifyReservation`, only when `notificationsEnabled` is on. The confirmation gains the self-service link when the contact is an email.
 - `notifyReservation` reads the reservation from the database, which holds no token. The create route passes the plaintext token to it in memory for that one send. A later confirmation for a new version, after a staff or guest modify, carries no link, because the engine cannot rebuild the token. The email says to use the link from the first message.
 - A rotation sends one email of a new kind, `self_service_link`, once per link id.
-- A guest cancel sends `cancellation` to the guest and a `notice` to the venue.
+- A guest cancel sends `cancellation` to the guest and a `notice` to the venue. The cancellation carries no link, because the cancel revoked it and mints none (Q3).
 - With `notificationsEnabled` off, the widget's confirmation screen is the only place the guest sees the link. The screen says to save it.
 - The email text waits for the same legal review as every other email (REQ-N2).
 
@@ -320,12 +331,12 @@ Each stage is one pull request, sized S or M, and each starts from the contract.
 
 | Stage | Flag | Size | Depends on | Gate |
 | --- | --- | --- | --- | --- |
-| 0 | This ADR, accepted. | S | none | Maintainer accepts or amends decisions 1 to 14 and answers Q1 to Q4. |
+| 0 | This ADR, accepted. Done: accepted 2026-11-17, with Q1 to Q4 answered. | S | none | none |
 | 1 | Contract and conformance only: `/v1/public/*` routes, the `online-booking` resource, new error codes (`reservation_changed`, `self_service_closed`, `self_service_link_invalid`, `online_booking_limit`, `online_booking_incomplete`), conformance cases for each rule in sections 2 to 6 marked pending in `conformance-status.md`, and the public-channel requirements in `docs/requirements.md`. | M | 0 | none |
 | 2 | API: the `online-booking` resource, booking key and rotation, migration for `venue_online_booking`. No public route yet. | M | 1 | none |
 | 3 | API: public config, availability and create. Channel input on `createReservation` with overbooking off, online limits in the reason functions, open-bookings cap, attribution, honeypot and form challenge, the four rate-limit rules. | M | 2 | Q7 (proof-of-work difficulty measured). |
-| 4 | API: self-service links. Table, mint in the create transaction, read, modify with version check, cancel, cutoff, rotation on replay, the staff reissue route, revocation on erasure and retention. | M | 3 | none |
-| 5 | Widget app (`apps/widget`): booking flow, the `/w/{bookingKey}` HTML shell served by the API with per-venue `frame-ancestors`, the widget site block in the Caddyfile and `compose.prod.yaml`, `docs/deploy.md`. | M | 3 | none |
+| 4 | API: self-service links. Table, mint in the create transaction, read, modify with version check, cancel with revocation of the link, cutoff, rotation on replay, the staff reissue route, revocation on erasure and retention. | M | 3 | none |
+| 5 | Widget app (`apps/widget`): booking flow, the `/w/{bookingKey}` HTML shell served by the API with per-venue `frame-ancestors`, the widget site block in the Caddyfile and `compose.prod.yaml`, the `/w/*` proxy in the staff app's dev server for local development only, `docs/deploy.md`. | M | 3 | none |
 | 6 | Widget: self-service page at `/r`, reading the token from the fragment. | S | 4, 5 | none |
 | 7 | Staff app: an Online booking card in Setup with the settings, allowed origins, the snippet to copy, and key rotation. | M | 2, 5 | none |
 | 8 | Email: self-service link in the confirmation, `self_service_link` kind, guest-cancel notice. | S | 4 | Legal review of email text and of the link in email (REQ-N2). |
@@ -334,7 +345,7 @@ Each stage is one pull request, sized S or M, and each starts from the contract.
 | 11 | Consent question in the widget (`askConsent`). | S | 5 | Legal review of the consent text and basis (REQ-N4). |
 | 12 | Lost-link resend route and form. | S | 8 | Email on, Q8. |
 | 13 | Optional CAPTCHA (`PUBLIC_CAPTCHA`). | S | 3, 5 | none |
-| 14 | Pending approval mode. | M | 3, 7 | Q2. |
+| 14 | Pending approval mode: a `pending` status that holds tables, and `confirmationMode: approval`. | M | 3, 7 | Deferred by Q2. Needs a new decision before it starts. |
 | 15 | Widget localization beyond `es` and `en`. | S each | 5 | none |
 
 Stages 2 to 4 are the API. Stages 5 and 6 make the exit criterion reachable with auto-confirm and no email. Stages 8 and 11 need legal, and nothing before them does, because the widget collects no consent and sends no email until they land.
@@ -343,32 +354,37 @@ Stages 2 to 4 are the API. Stages 5 and 6 make the exit criterion reachable with
 
 **Easier.** A venue takes bookings on its own site with a pasted snippet, and the guest's data stays out of the host page's reach. Every public route is under one prefix, so the guest surface can be audited by reading one block of `app.ts`. The booking rules are the same functions staff bookings use, so staff and guest bookings cannot drift.
 
-**Harder.** A second origin, a second Caddy site block and a second front-end build to deploy. The widget page is served by the API, not as a static file, so it is one more HTML response the API must get right. A new table for links and one for settings. The limiter gains its first rule keyed by venue, and its first limit on `GET`. Every new write path must remember the channel input, or it could reach the overbooking path from the public channel. A test must pin that.
+**Harder.** A second origin, a second Caddy site block and a second front-end build to deploy in production. Local development runs on one origin, so there the widget is kept from the staff cookie by code, not by the browser. The widget page is served by the API, not as a static file, so it is one more HTML response the API must get right. A new table for links and one for settings. The limiter gains its first rule keyed by venue, and its first limit on `GET`. Every new write path must remember the channel input, or it could reach the overbooking path from the public channel. A test must pin that.
 
-**Accepted.** Proof of work and rate limits stop casual abuse, not a funded attacker. Contacts are not verified, so per-contact caps are weak against a hoarder who types new contacts. The per-venue limit can be spent by an attacker to stop online bookings for an hour. A replayed create or a staff reissue leaves a dead link in an earlier email. A guest cannot move a booking, only cancel and book again. The iframe has a fixed height until `embed.js` ships.
+**Accepted.** Proof of work and rate limits stop casual abuse, not a funded attacker. Contacts are not verified, so per-contact caps are weak against a hoarder who types new contacts. The per-venue limit can be spent by an attacker to stop online bookings for an hour. A replayed create, a staff reissue or a lost-link resend leaves a dead link in an earlier email. A guest cancel ends the link for good. A venue cannot require approval of online bookings in the first release. A guest cannot move a booking, only cancel and book again. The iframe has a fixed height until `embed.js` ships.
 
 ## Alternatives considered
 
 - **Script injection with shadow DOM, or a web component.** Rejected for the first release. The host page's scripts could read the guest's contact as typed. It could return later as an option for venues that accept that, rendering the same widget.
-- **Serve the widget from the staff origin under a path.** Rejected. It puts the staff session cookie on the widget's origin and needs path exceptions in the staff app's framing headers.
+- **Serve the widget from the staff origin under a path.** Rejected for production (Q1). Allowed in local development only, under the rules in section 1. In production it would put the staff session cookie on the widget's origin and would need path exceptions in the staff app's framing headers.
 - **A static Caddy CSP for the widget, `frame-ancestors *`.** Rejected. It lets any site frame any venue's widget, which invites clickjacking and look-alike pages. Per-venue origins cost one dynamic header.
 - **Public routes under `/v1/venues/{venueId}/` above the middleware.** Rejected. It depends on registration order, the risk ADR-0012 already noted for one route.
 - **A JWT or other signed, stateless self-service token.** Rejected. It cannot be revoked without a deny list, which is a table anyway, and it would put the reservation id in a readable payload.
-- **An HMAC-derived token (secret = HMAC of the link id under a server key).** It would let the engine rebuild a link for any email and for an idempotent replay, so no email would hold a dead link. Rejected for the first release because a database leak plus the server key yields every live link, while a hash-only table yields none. This is the main trade-off a maintainer may weigh differently (Q4).
+- **An HMAC-derived token (secret = HMAC of the link id under a server key).** It would let the engine rebuild a link for any email and for an idempotent replay, so no email would hold a dead link. Rejected (Q4). Whoever holds the server key could rebuild every link, and a database leak plus that key yields every live link, while a hash-only table yields none. A re-send therefore always issues a new token.
 - **A mandatory CAPTCHA.** Rejected. It makes every instance depend on a vendor that sees every guest.
 - **Email verification before a booking counts.** Deferred. It needs email on, which waits for legal review, and it adds a pending state to every booking (Q8).
-- **A `pending` status in the first release.** Deferred. It changes REQ-B6, every status transition, the agenda, the event feed and the tables a pending booking holds (Q2).
+- **A `pending` status in the first release.** Deferred to stage 14 (Q2). It changes REQ-B6, every status transition, the agenda, the event feed and the tables a pending booking holds.
+- **An approval flag on `booked`.** Rejected (Q2). The booking would hold its table and look unapproved, but nothing would stop staff from seating it. It gives the appearance of control without the control.
 - **Online settings on `PUT /config`.** Rejected, for the reason ADR-0012 gives for the public profile.
 - **A structured allergy field in the widget.** Rejected until the legal review of health data.
 
 ## Open questions for the maintainer
 
-Answer Q1 to Q4 before stage 1. The others have a gate in the stage table.
+David Cabeza answered Q1 to Q4 on 2026-11-17. The others have a gate in the stage table.
 
 - **Q1. Widget origin.** Is a separate origin (`WIDGET_ADDRESS`, a second domain or subdomain and certificate) acceptable for a self-hoster, or should the first release allow the same domain on a separate path with its own headers, accepting the cookie exposure? This record recommends the separate origin.
+  Answered 2026-11-17: option A. A separate origin (`WIDGET_ADDRESS`) is required in production. Local development alone may use the staff app's origin on a separate path (option B), under the rules in section 1. The exception never ships in `compose.prod.yaml`.
 - **Q2. Pending approval.** Should a venue be able to require staff approval of online bookings? If yes: a new `pending` status that holds tables (so the exclusion constraint still guards them) and expires after a set time if nobody acts, or a flag on `booked`? Either changes REQ-B6 and the contract. `approval_required` already exists in the error vocabulary.
+  Answered 2026-11-17: no approval mode in the first release. Every online booking is `booked` at once when there is room. `confirmationMode` accepts only `auto`, and `approval` stays reserved. The `pending` status that holds tables is deferred to stage 14. The flag on `booked` is rejected.
 - **Q3. Rotation on change.** This record rotates the link on replay, reissue and resend, not on every guest modify. Do you want rotation on every change made through the link, accepting that each one kills the emailed link and sends a new email?
+  Answered 2026-11-17: no rotation on a guest modify. The link rotates on a create replay, a staff reissue and a lost-link resend, as proposed. A guest cancel also revokes the link and issues no new one. Rebooking creates a new reservation with its own link.
 - **Q4. Token storage.** Hash only, as ADR-0006 (recommended), or HMAC-derived so links can be re-sent and a replay returns the same link?
+  Answered 2026-11-17: hash only, SHA-256 with a constant-time compare, as ADR-0006. HMAC-derived tokens are rejected, because a master key could rebuild every link. A re-send always issues a new token.
 - **Q5. Moving a booking.** Is "cancel and book again" enough for Phase 11, or should a modify that changes date and time, re-running the time rules, come before the self-service link ships?
 - **Q6. Per-venue public limit.** Should `public_venue` be a per-venue setting, so a large venue can raise it, or stay an instance variable?
 - **Q7. Proof-of-work difficulty.** Measure the default on a low-end phone before stage 3. Should proof of work be on by default at all, given that it slows older devices?
