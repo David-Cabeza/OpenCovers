@@ -54,7 +54,7 @@ A venue admin invites staff, changes their roles, and removes members from the s
 
 ### 🤖 An MCP server
 
-The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly. It is published on npm as [`@opencovers/mcp`](https://www.npmjs.com/package/@opencovers/mcp) and listed in the official MCP registry as `io.github.David-Cabeza/opencovers`. Run it with `npx -y @opencovers/mcp`. Every reservation and waitlist write tool takes an idempotency key, so an agent that retries after a timeout does not book twice. Each error tells the agent whether a retry can succeed.
+The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly. It is published on npm as [`@opencovers/mcp`](https://www.npmjs.com/package/@opencovers/mcp) and listed in the official MCP registry as `io.github.David-Cabeza/opencovers`. Run it with `npx -y @opencovers/mcp`. Every reservation and waitlist write tool except `reservation.erasure` takes an idempotency key, so an agent that retries after a timeout does not book twice. A repeated erasure erases nothing more. Each error tells the agent whether a retry can succeed.
 
 ### 🧭 The room, covered
 
