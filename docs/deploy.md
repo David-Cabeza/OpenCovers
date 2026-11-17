@@ -108,7 +108,7 @@ Any other account gets `403` with the code `venue_creation_closed`, an invited `
 
 ## Rate limiting
 
-The API limits sign-in, sign-up, invitation redemption and venue creation per client address. It keeps the counters in memory. A refused call returns `429` with the code `rate_limited` and a `Retry-After` header. [ADR-0007](adr/0007-rate-limiting.md) has the design and the measured behavior of Better Auth's own limiter.
+The API limits sign-in, sign-up, invitation redemption and venue creation per client address, and the guest booking routes under `/v1/public` by address and by booking key. It keeps the counters in memory. A refused call returns `429` with the code `rate_limited` and a `Retry-After` header. [ADR-0007](adr/0007-rate-limiting.md) has the design and the measured behavior of Better Auth's own limiter.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -118,6 +118,12 @@ The API limits sign-in, sign-up, invitation redemption and venue creation per cl
 | `RATE_LIMIT_SIGNUP` | `5/1h` | Sign-up. |
 | `RATE_LIMIT_INVITATION` | `10/15m` | `POST /v1/invitations/redeem` and a sign-up that carries `X-Invitation-Token`. |
 | `RATE_LIMIT_VENUE_CREATION` | `10/1h` | `POST /v1/venues`. Every call counts, including one refused with `401`, `403` or `400`. |
+| `RATE_LIMIT_PUBLIC_READ` | `300/15m` | Every `GET` under `/v1/public`: the widget config and public availability. |
+| `RATE_LIMIT_PUBLIC_BOOKING` | `10/1h` | Public creates and link resends, per client address. |
+| `RATE_LIMIT_PUBLIC_VENUE` | `100/1h` | The same routes, per booking key, all addresses together. Whoever spends it stops online booking in that venue until the window ends. Staff bookings are untouched. |
+| `RATE_LIMIT_PUBLIC_SELF_SERVICE` | `60/15m` | Every `/v1/public/self-service` request, per client address. |
+
+`compose.prod.yaml` does not pass the four `RATE_LIMIT_PUBLIC_*` variables to the API yet, so their defaults apply there until the widget stage of ADR-0017 adds them with its site block.
 
 A budget is `max/window`, with a window in `s`, `m` or `h`. An unknown value stops the API at startup and names the variable. An empty value means the default.
 
@@ -168,4 +174,6 @@ The API reads these variables regardless of host:
 | `SIGNUP` | no | `open` (default), `first-user` or `closed`. See Sign-up control. |
 | `RATE_LIMIT` | no | `on` or `off`. Default `on` in `compose.prod.yaml`. See Rate limiting. |
 | `TRUST_PROXY` | no | `false` (default) or `true`. See Rate limiting. |
-| `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION`, `RATE_LIMIT_VENUE_CREATION` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |
+| `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION`, `RATE_LIMIT_VENUE_CREATION`, `RATE_LIMIT_PUBLIC_READ`, `RATE_LIMIT_PUBLIC_BOOKING`, `RATE_LIMIT_PUBLIC_VENUE`, `RATE_LIMIT_PUBLIC_SELF_SERVICE` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |
+| `PUBLIC_POW_DIFFICULTY` | no | Proof-of-work bits for a public booking, 0 to 32. Default `12`. `0` turns the proof of work off and keeps the signed challenge. See ADR-0017. |
+| `PUBLIC_CHALLENGE_SECRET` | no | Signs the public form challenge, at least 32 characters. Default: a random key per process, which is enough for one API process. Set it when several serve the widget. |
