@@ -1,10 +1,11 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { selfServiceUrl, type Created, type Failure, type PublicApi, type PublicConfig } from "./api";
 import { addDays, formatDate, isoWeekday, todayLocal } from "./dates";
 import { explain, type Explanation } from "./errors";
 import type { Translate } from "./messages";
 import { solveInBackground } from "./pow";
 import { createSubmitter, createTicketSource } from "./submit";
+import { Field, inputClass, primaryButton, secondaryButton, Section } from "./ui";
 import { checkDetails, type DetailErrors } from "./validate";
 
 type Phase =
@@ -60,34 +61,6 @@ export function App({ api, t, locale }: { api: PublicApi; t: Translate; locale: 
     </main>
   );
 }
-
-/**
- * A step with its heading. `focus` moves focus to the heading when the step appears after a guest action. The
- * first step never takes focus, because focus inside an iframe scrolls the host page to it.
- */
-function Section({ title, focus = false, children }: { title: string; focus?: boolean; children: ReactNode }) {
-  const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    if (focus) heading.current?.focus();
-  }, [focus, title]);
-  return (
-    <section className="space-y-4">
-      <h1 ref={heading} tabIndex={-1} className="text-xl font-semibold outline-none">
-        {title}
-      </h1>
-      {children}
-    </section>
-  );
-}
-
-const inputClass =
-  "block w-full rounded-oc border border-border bg-background px-3 py-2 text-base text-text " +
-  "focus:outline-2 focus:outline-offset-1 focus:outline-primary aria-invalid:border-danger";
-const buttonClass =
-  "inline-flex min-h-11 items-center justify-center rounded-oc px-4 py-2 font-medium " +
-  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60";
-const primaryButton = `${buttonClass} w-full bg-primary text-on-primary`;
-const secondaryButton = `${buttonClass} border border-border bg-surface text-text`;
 
 function BookingForm(props: {
   api: PublicApi;
@@ -384,27 +357,6 @@ function BookingForm(props: {
   );
 }
 
-function Field(props: { id: string; label: string; hint?: string; error?: string; children: ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <label htmlFor={props.id} className="block font-medium">
-        {props.label}
-      </label>
-      {props.hint && (
-        <p id={`${props.id}-hint`} className="text-sm text-muted">
-          {props.hint}
-        </p>
-      )}
-      {props.children}
-      {props.error && (
-        <p id={`${props.id}-error`} className="text-sm text-danger">
-          {props.error}
-        </p>
-      )}
-    </div>
-  );
-}
-
 function TimeList(props: {
   times: Times;
   t: Translate;
@@ -451,7 +403,7 @@ function Confirmation({ t, locale, created }: { t: Translate; locale: string; cr
   const { reservation, selfServiceToken } = created;
   const [copied, setCopied] = useState(false);
   const ids = useId();
-  const link = selfServiceToken ? selfServiceUrl(window.location.origin, selfServiceToken) : null;
+  const link = selfServiceToken ? selfServiceUrl(window.location.origin, selfServiceToken, locale) : null;
   const party = reservation.partySize === 1 ? t("field.partyOptionOne") : t("field.partyOption", { n: reservation.partySize });
   return (
     <Section title={t("done.title")} focus>

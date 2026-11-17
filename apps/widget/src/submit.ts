@@ -94,3 +94,20 @@ export function createTicketSource(deps: {
 
   return { offer, take };
 }
+
+/**
+ * One guest action on the self-service link (modify or cancel) as one `Idempotency-Key`. The same payload sent
+ * again after an answer that may change on repeat reuses the key, so a change or a cancel that did reach the
+ * engine replays instead of applying twice. A cancel replay answers although the cancel revoked the token (C50).
+ */
+export function createKeyedAction<P, T>(deps: { send(key: string, payload: P): Promise<Result<T>>; newKey(): string }) {
+  let attempt: { key: string; fingerprint: string } | null = null;
+
+  return async function run(payload: P): Promise<Result<T>> {
+    const fingerprint = JSON.stringify(payload ?? null);
+    if (!attempt || attempt.fingerprint !== fingerprint) attempt = { key: deps.newKey(), fingerprint };
+    const result = await deps.send(attempt.key, payload);
+    if (result.ok || !mayRetry(result.failure)) attempt = null;
+    return result;
+  };
+}

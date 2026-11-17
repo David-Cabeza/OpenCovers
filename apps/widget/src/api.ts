@@ -24,15 +24,24 @@ export interface PublicConfig {
   challenge: FormChallenge;
 }
 
+/** The guest view (`PublicReservation`), the answer of the create and of every self-service route. */
 export interface PublicReservation {
   venue: PublicVenue;
   date: string;
   time: string;
   partySize: number;
   status: string;
+  version: number;
   guest: { name: string; contact: string };
   commentary: string;
+  consent: string;
+  changeableUntil: string;
+  linkExpiresAt: string;
 }
+
+/** Whether the guest may still change or cancel: `booked`, and before `changeableUntil`. */
+export const isChangeable = (view: PublicReservation, now: number = Date.now()) =>
+  view.status === "booked" && now < Date.parse(view.changeableUntil);
 
 export interface Created {
   reservation: PublicReservation;
@@ -123,5 +132,64 @@ export function bookingKeyFrom(pathname: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-/** The self-service page of stage 6. The token rides in the fragment, which is never sent to a server. */
-export const selfServiceUrl = (origin: string, token: string) => `${origin}/r#${token}`;
+/**
+ * The self-service page on the widget origin. The token rides in the fragment, which the browser never sends to a
+ * server, writes to a log or puts in a `Referer`. Only the locale goes in the query.
+ */
+export function selfServiceUrl(origin: string, token: string, lang?: string): string {
+  const url = new URL("/r", origin);
+  if (lang) url.searchParams.set("lang", lang);
+  url.hash = token;
+  return url.href;
+}
+
+/** A self-service token as the contract writes it: `<linkId>.<secret>`. */
+export type SelfServiceToken = string & { readonly __brand: "SelfServiceToken" };
+
+const TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[A-Za-z0-9_-]{43}$/;
+
+export function parseToken(hash: string): SelfServiceToken | null {
+  const value = hash.startsWith("#") ? hash.slice(1) : hash;
+  return TOKEN.test(value) ? (value as SelfServiceToken) : null;
+}
+
+/**
+ * Reads the token from the fragment once and removes the fragment from the address bar and the history entry, so
+ * it is not left on screen, in a bookmark or in a screenshot. The token then lives only in memory: the widget
+ * keeps nothing in browser storage (ADR-0017 section 1).
+ */
+export function takeToken(
+  location: { hash: string; pathname: string; search: string },
+  history: { replaceState(data: unknown, unused: string, url: string): void },
+): SelfServiceToken | null {
+  const token = parseToken(location.hash);
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  return token;
+}
+
+export interface GuestChanges {
+  partySize?: number;
+  commentary?: string;
+}
+
+/** The self-service routes. The token goes only in `X-Self-Service-Token`, never in a path or a query. */
+export function selfServiceApi(token: SelfServiceToken, fetcher: Fetch = (input, init) => fetch(input, init)) {
+  const base = "/v1/public/self-service";
+  const auth = { "X-Self-Service-Token": token };
+  return {
+    read: () => call<PublicReservation>(fetcher, base, { headers: auth }),
+    modify: (idempotencyKey: string, version: number, changes: GuestChanges) =>
+      call<PublicReservation>(fetcher, `${base}/modify`, {
+        method: "POST",
+        headers: { ...auth, "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({ version, ...changes }),
+      }),
+    cancel: (idempotencyKey: string) =>
+      call<PublicReservation>(fetcher, `${base}/cancel`, {
+        method: "POST",
+        headers: { ...auth, "Idempotency-Key": idempotencyKey },
+      }),
+  };
+}
+
+export type SelfServiceApi = ReturnType<typeof selfServiceApi>;
