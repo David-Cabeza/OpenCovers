@@ -80,6 +80,12 @@ describe("production Caddyfile", () => {
     expect(widget).toMatch(/handle \{\s*respond 404\s*\}/);
   });
 
+  it("caps request bodies in both site blocks above the API's own limits", () => {
+    const maxSize = (block: string) => /^\trequest_body \{\s*max_size (\S+)\s*\}/m.exec(block)?.[1];
+    expect(maxSize(staff)).toBe("1MiB");
+    expect(maxSize(widget)).toBe("64KiB");
+  });
+
   it("proxies the self-service page /r on the widget site only, with the API's headers", () => {
     expect(handle(widget, "/r")).toMatch(/^handle \/r \{\s*reverse_proxy \{\$API_UPSTREAM:api:3000\}\s*$/);
     expect(handle(staff, "/r")).toMatch(/^handle \/r \{\s*respond 404\s*$/);

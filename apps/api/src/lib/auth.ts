@@ -17,6 +17,15 @@ function invitationToken(
   return value ? value : null;
 }
 
+/** The browser origins that may sign in and send cookie-authenticated writes (lib/staff-origin.ts). */
+export const trustedOrigins = [
+  process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+  ...(process.env.TRUSTED_ORIGINS?.split(",").filter(Boolean) ?? [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ]),
+];
+
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-me",
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
@@ -65,11 +74,5 @@ export const auth = betterAuth({
       },
     },
   },
-  trustedOrigins: [
-    process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-    ...(process.env.TRUSTED_ORIGINS?.split(",").filter(Boolean) ?? [
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-    ]),
-  ],
+  trustedOrigins,
 });

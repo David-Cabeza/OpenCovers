@@ -60,7 +60,9 @@ const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
 
 export const INVITATION_HEADER = "x-invitation-token";
 const DEFAULT_MAX_KEYS = 10_000;
-const SWEEP_EVERY_MS = 1_000;
+// A rule whose charge is returned when the route answers one of these statuses: the request never reached a
+// booking, so a malformed body or an unknown key costs the address budget and not the venue's.
+const REFUNDED_ON: Partial<Record<RuleName, ReadonlySet<number>>> = { public_venue: new Set([400, 404]) };
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 type Env = Record<string, string | undefined>;
@@ -167,7 +169,8 @@ function clientKey(address: string): string {
     const [high, low] = [groups[6] ?? 0, groups[7] ?? 0];
     return `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`;
   }
-  return `${groups.slice(0, 4).map((group) => group.toString(16)).join(":")}::/64`;
+  // A /48, not a /64: one site commonly holds a /48, which is 65,536 /64s, enough to fill a rule's table.
+  return `${groups.slice(0, 3).map((group) => group.toString(16)).join(":")}::/48`;
 }
 
 function socketAddress(c: Context): string | undefined {
@@ -183,13 +186,22 @@ interface Counter {
   expiresAt: number;
 }
 
+/** Counters of one rule by subject. A rule has one window, so insertion order is expiry order. */
+type Table = Map<string, Counter>;
+
+interface Charge {
+  name: RuleName;
+  table: Table;
+  subject: string;
+  counter: Counter;
+}
+
 export function createRateLimiter(config: RateLimitConfig, options: RateLimitOptions = {}) {
   const now = options.now ?? Date.now;
   const maxKeys = options.maxKeys ?? DEFAULT_MAX_KEYS;
   const warn = options.warn ?? ((message: string) => console.warn(message));
-  const counters = new Map<string, Counter>();
+  const tables = Object.fromEntries(RULE_NAMES.map((name) => [name, new Map()])) as Record<RuleName, Table>;
   const warned = new Set<string>();
-  let lastSweep = -Infinity;
 
   function warnOnce(message: string) {
     if (warned.has(message)) return;
@@ -213,43 +225,51 @@ export function createRateLimiter(config: RateLimitConfig, options: RateLimitOpt
     return clientKey(socketAddress(c) ?? "unknown");
   }
 
-  function sweep(at: number) {
-    if (at - lastSweep < SWEEP_EVERY_MS) return;
-    lastSweep = at;
-    for (const [key, counter] of counters) {
-      if (at >= counter.expiresAt) counters.delete(key);
+  function dropExpired(table: Table, at: number) {
+    for (const [subject, counter] of table) {
+      if (at < counter.expiresAt) return;
+      table.delete(subject);
     }
   }
 
-  function start(key: string, rule: Rule, at: number) {
-    counters.delete(key);
-    if (counters.size >= maxKeys) {
-      sweep(at);
-      while (counters.size >= maxKeys) {
-        const oldest = counters.keys().next().value;
-        if (oldest === undefined) break;
-        counters.delete(oldest);
-      }
-    }
-    counters.set(key, { count: 1, expiresAt: at + rule.windowMs });
-  }
-
-  function consume(names: RuleName[], subjectOf: (name: RuleName) => string, at: number): number {
+  // A full table refuses new subjects until its oldest window ends. Dropping a live counter instead would let a
+  // flood of new addresses reset a spent budget.
+  function consume(names: RuleName[], subjectOf: (name: RuleName) => string, at: number) {
     const live = names.map((name) => {
-      const key = `${name}|${subjectOf(name)}`;
-      const counter = counters.get(key);
-      return { key, rule: config.rules[name], counter: counter && at < counter.expiresAt ? counter : undefined };
+      const table = tables[name];
+      dropExpired(table, at);
+      const subject = subjectOf(name);
+      const counter = table.get(subject);
+      return { name, table, subject, counter: counter && at < counter.expiresAt ? counter : undefined };
     });
     let waitMs = 0;
-    for (const { rule, counter } of live) {
-      if (counter && counter.count >= rule.max) waitMs = Math.max(waitMs, counter.expiresAt - at);
+    for (const { name, table, counter } of live) {
+      if (counter) {
+        if (counter.count >= config.rules[name].max) waitMs = Math.max(waitMs, counter.expiresAt - at);
+      } else if (table.size >= maxKeys) {
+        warnOnce(`Rate limit rule ${name} tracks ${maxKeys} clients, its most. New clients are refused until a window ends.`);
+        const oldest = table.values().next().value as Counter;
+        waitMs = Math.max(waitMs, oldest.expiresAt - at);
+      }
     }
-    if (waitMs > 0) return Math.max(1, Math.ceil(waitMs / 1000));
-    for (const { key, rule, counter } of live) {
-      if (counter) counter.count += 1;
-      else start(key, rule, at);
-    }
-    return 0;
+    if (waitMs > 0) return { retryAfter: Math.max(1, Math.ceil(waitMs / 1000)), charges: [] };
+    const charges: Charge[] = live.map(({ name, table, subject, counter }) => {
+      if (counter) {
+        counter.count += 1;
+        return { name, table, subject, counter };
+      }
+      const fresh = { count: 1, expiresAt: at + config.rules[name].windowMs };
+      table.delete(subject);
+      table.set(subject, fresh);
+      return { name, table, subject, counter: fresh };
+    });
+    return { retryAfter: 0, charges };
+  }
+
+  function refund({ table, subject, counter }: Charge) {
+    if (table.get(subject) !== counter) return;
+    counter.count -= 1;
+    if (counter.count === 0) table.delete(subject);
   }
 
   const middleware: MiddlewareHandler = async (c, next) => {
@@ -258,8 +278,14 @@ export function createRateLimiter(config: RateLimitConfig, options: RateLimitOpt
     if (names.length === 0) return next();
     const client = clientOf(c);
     const subjectOf = (name: RuleName) => (name === "public_venue" ? `venue:${bookingKeyOf(c.req.path)}` : client);
-    const retryAfter = consume(names, subjectOf, now());
-    if (retryAfter === 0) return next();
+    const { retryAfter, charges } = consume(names, subjectOf, now());
+    if (retryAfter === 0) {
+      await next();
+      for (const charge of charges) {
+        if (REFUNDED_ON[charge.name]?.has(c.res.status)) refund(charge);
+      }
+      return;
+    }
     return c.json(
       { ...errorBody("rate_limited"), message: "Too many requests. Try again later." },
       ERRORS.rate_limited.status,
@@ -267,5 +293,5 @@ export function createRateLimiter(config: RateLimitConfig, options: RateLimitOpt
     );
   };
 
-  return { middleware, size: () => counters.size };
+  return { middleware, size: () => RULE_NAMES.reduce((sum, name) => sum + tables[name].size, 0) };
 }

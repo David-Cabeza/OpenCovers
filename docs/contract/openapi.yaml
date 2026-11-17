@@ -20,6 +20,12 @@ info:
     docs/adr/0017-booking-widget-and-self-service-link.md: `public_read`,
     `public_booking`, `public_venue` and `self_service`.
 
+    A request body over 16 KB under `/public/`, or over 256 KB elsewhere,
+    fails with `invalid_request`. A write made with a staff session
+    cookie, not a key, fails with `forbidden` when its `Origin` is not a
+    trusted origin of the instance, and with `invalid_request` when its
+    body is not `application/json`.
+
     Paths are relative to `/v1`, except `/w/{bookingKey}` and `/r`, which
     are served at the root of the widget origin.
 

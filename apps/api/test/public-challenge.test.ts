@@ -3,6 +3,7 @@ import {
   challengeConfigFromEnv,
   createChallengeVerifier,
   DEFAULT_DIFFICULTY,
+  describeChallenge,
   issueChallenge,
   leadingZeroBits,
   solve,
@@ -13,6 +14,26 @@ const SECRET = "a-test-secret-that-is-long-enough-to-use";
 const KEY = "pk_AAAAAAAAAAAAAAAAAAAAAA";
 
 describe("challenge settings", () => {
+  it("states the effective settings at startup and warns about weak ones in production", () => {
+    const report = (env: Record<string, string>) => describeChallenge(challengeConfigFromEnv(env), env);
+
+    const quiet = report({ NODE_ENV: "production", PUBLIC_CHALLENGE_SECRET: SECRET });
+    expect(quiet.line).toMatch(/difficulty 12/);
+    expect(quiet.line).toMatch(/PUBLIC_CHALLENGE_SECRET/);
+    expect(quiet.line).not.toContain(SECRET);
+    expect(quiet.warnings).toEqual([]);
+
+    const off = report({ NODE_ENV: "production", PUBLIC_POW_DIFFICULTY: "0", PUBLIC_CHALLENGE_SECRET: SECRET });
+    expect(off.line).toMatch(/difficulty 0/);
+    expect(off.warnings).toEqual([expect.stringMatching(/PUBLIC_POW_DIFFICULTY=0.*proof of work is off/i)]);
+
+    const unsigned = report({ NODE_ENV: "production" });
+    expect(unsigned.line).toMatch(/per-process key/);
+    expect(unsigned.warnings).toEqual([expect.stringMatching(/PUBLIC_CHALLENGE_SECRET is not set/)]);
+
+    expect(report({ PUBLIC_POW_DIFFICULTY: "0" }).warnings).toEqual([]);
+  });
+
   it("defaults to a low difficulty and lets 0 turn the proof of work off", () => {
     expect(challengeConfigFromEnv({}).difficulty).toBe(DEFAULT_DIFFICULTY);
     expect(DEFAULT_DIFFICULTY).toBe(12);

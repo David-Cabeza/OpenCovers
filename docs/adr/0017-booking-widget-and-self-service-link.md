@@ -203,6 +203,8 @@ The limiter keeps its shape: fixed windows, in memory, `429 rate_limited` with `
 
 `public_venue` caps what a distributed attacker can book in one venue in an hour. It is also a lever for denial of service: whoever spends it stops every online booking in that venue until the window ends. Staff bookings are untouched. The default is high enough for a busy venue and low enough to bound a flood. Q6 asks whether it should be a per-venue setting.
 
+Note 2026-11-17 (ADR-0007, amendment of that date): a create that answers `400` or `404` gives its `public_venue` charge back, so a malformed body or an unknown key spends only the sender's `public_booking` budget. IPv6 addresses are keyed by `/48`. A body over 16 KB under `/v1/public/` fails with `invalid_request`.
+
 A per-contact limit cannot live in the limiter, because the limiter does not read the body. It lives in the create transaction as the open-bookings cap below.
 
 ### Bot protection

@@ -14,7 +14,7 @@ function build(env: Env = {}, options: RateLimitOptions = {}) {
   const limiter = createRateLimiter(rateLimitConfigFromEnv({ RATE_LIMIT: "on", ...env }), options);
   const app = new Hono();
   app.use("*", limiter.middleware);
-  app.all("*", (c) => c.json({ ok: true }));
+  app.all("*", (c) => c.json({ ok: true }, Number(c.req.header("x-test-status") ?? 200) as 200));
   return { app, limiter };
 }
 
@@ -250,34 +250,67 @@ describe("keys", () => {
     expect(warn.mock.calls[0][0]).toMatch(/TRUST_PROXY/);
   });
 
-  it("groups an IPv6 client by its /64 and reads an IPv4-mapped address as IPv4", async () => {
+  it("groups an IPv6 client by its /48 and reads an IPv4-mapped address as IPv4", async () => {
     const { app } = build({ ...TRUST, RATE_LIMIT_AUTH: "2/1m" });
     const out = await statuses(4, (i) =>
-      call(app, "POST", SIGN_IN, { ip: `2001:db8:1:2:${i}::${i + 1}` }),
+      call(app, "POST", SIGN_IN, { ip: `2001:db8:1:${i}:${i}::${i + 1}` }),
     );
     expect(out).toEqual([200, 200, 429, 429]);
-    expect((await call(app, "POST", SIGN_IN, { ip: "2001:db8:1:3::1" })).status).toBe(200);
+    expect((await call(app, "POST", SIGN_IN, { ip: "2001:db8:2::1" })).status).toBe(200);
 
     const { app: mapped } = build({ ...TRUST, RATE_LIMIT_AUTH: "1/1m" });
     await call(mapped, "POST", SIGN_IN, { ip: "203.0.113.7" });
     expect((await call(mapped, "POST", SIGN_IN, { ip: "::ffff:203.0.113.7" })).status).toBe(429);
   });
 
-  it("bounds its memory, dropping the oldest keys first", async () => {
+  it("bounds its memory to the most clients each rule tracks", async () => {
     const { app, limiter } = build({ ...TRUST }, { maxKeys: 10 });
     for (let i = 0; i < 50; i += 1) {
       await call(app, "POST", SIGN_IN, { ip: `203.0.113.${i}` });
+      await call(app, "GET", "/v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA", { ip: `203.0.113.${i}` });
     }
-    expect(limiter.size()).toBeLessThanOrEqual(10);
+    expect(limiter.size()).toBe(20);
   });
 
-  it("drops expired keys before it drops live ones", async () => {
+  it("drops expired clients to make room for new ones", async () => {
     let now = 0;
     const { app, limiter } = build({ ...TRUST, RATE_LIMIT_AUTH: "5/10s" }, { maxKeys: 10, now: () => now });
     for (let i = 0; i < 10; i += 1) await call(app, "POST", SIGN_IN, { ip: `203.0.113.${i}` });
     now = 11_000;
-    for (let i = 100; i < 105; i += 1) await call(app, "POST", SIGN_IN, { ip: `203.0.113.${i}` });
+    const out = await statuses(5, (i) => call(app, "POST", SIGN_IN, { ip: `203.0.113.${100 + i}` }));
+    expect(out).toEqual([200, 200, 200, 200, 200]);
     expect(limiter.size()).toBe(5);
+  });
+
+  it("refuses a new client while a rule tracks its most clients, and says when one window ends", async () => {
+    let now = 0;
+    const warn = vi.fn();
+    const { app } = build({ ...TRUST, RATE_LIMIT_AUTH: "5/1m" }, { maxKeys: 3, now: () => now, warn });
+    for (let i = 0; i < 3; i += 1) {
+      now = i * 1_000;
+      expect((await call(app, "POST", SIGN_IN, { ip: `203.0.113.${i}` })).status).toBe(200);
+    }
+    now = 5_000;
+    const refused = await call(app, "POST", SIGN_IN, { ip: "203.0.113.50" });
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("retry-after")).toBe("55");
+    expect((await refused.json()).code).toBe("rate_limited");
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/auth/));
+    expect((await call(app, "POST", SIGN_IN, { ip: "203.0.113.1" })).status).toBe(200);
+    now = 60_000;
+    expect((await call(app, "POST", SIGN_IN, { ip: "203.0.113.50" })).status).toBe(200);
+  });
+
+  it("keeps a spent sign-in budget however many new addresses arrive", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_AUTH: "2/1m" }, { maxKeys: 10 });
+    await call(app, "POST", SIGN_IN, { ip: "198.51.100.1" });
+    await call(app, "POST", SIGN_IN, { ip: "198.51.100.1" });
+    expect((await call(app, "POST", SIGN_IN, { ip: "198.51.100.1" })).status).toBe(429);
+    for (let i = 0; i < 11; i += 1) {
+      await call(app, "POST", SIGN_IN, { ip: `203.0.113.${i}` });
+      await call(app, "GET", "/v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA", { ip: `203.0.113.${i}` });
+    }
+    expect((await call(app, "POST", SIGN_IN, { ip: "198.51.100.1" })).status).toBe(429);
   });
 });
 
@@ -457,6 +490,31 @@ describe("public routes (C52)", () => {
     expect((await call(app, "POST", `/v1/public/${KEY_B}/reservations`, { ip: "203.0.113.90" })).status).toBe(200);
     expect((await call(app, "GET", `/v1/public/${KEY_A}`, { ip: "203.0.113.91" })).status).toBe(200);
     expect((await call(app, "POST", "/v1/venues/v1/reservations", { ip: "203.0.113.92" })).status).toBe(200);
+  });
+
+  it("keeps a spent venue budget however many new addresses read the public routes", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_PUBLIC_VENUE: "3/1h" }, { maxKeys: 10 });
+    expect(await statuses(3, (i) => call(app, "POST", CREATE_A, { ip: `198.51.100.${i}` }))).toEqual([200, 200, 200]);
+    for (let i = 0; i < 11; i += 1) {
+      await call(app, "GET", `/v1/public/${KEY_B}`, { ip: `203.0.113.${i}` });
+      await call(app, "GET", `/v1/public/${KEY_B}`, { ip: `2001:db8:${i}:1::1` });
+    }
+    expect((await call(app, "POST", CREATE_A, { ip: "198.51.100.200" })).status).toBe(429);
+  });
+
+  it("charges the venue budget only for a create that reaches the booking, and the address budget for every one", async () => {
+    const { app, limiter } = build(
+      { ...TRUST, RATE_LIMIT_PUBLIC_VENUE: "2/1h", RATE_LIMIT_PUBLIC_BOOKING: "2/1h" },
+    );
+    const junk = { headers: { "x-test-status": "400" } };
+    const unknown = { headers: { "x-test-status": "404" } };
+    for (let i = 0; i < 5; i += 1) {
+      expect((await call(app, "POST", CREATE_A, { ip: `198.51.100.${i}`, ...junk })).status).toBe(400);
+      expect((await call(app, "POST", `/v1/public/pk_x${i}/reservations`, { ip: `198.51.100.${i}`, ...unknown })).status).toBe(404);
+    }
+    expect((await call(app, "POST", CREATE_A, { ip: "198.51.100.1" })).status).toBe(429);
+    expect(limiter.size()).toBe(5);
+    expect(await statuses(3, (i) => call(app, "POST", CREATE_A, { ip: `203.0.113.${i}` }))).toEqual([200, 200, 429]);
   });
 
   it("counts a request that matches two rules on both, and charges neither when one is spent", async () => {

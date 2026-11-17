@@ -1,6 +1,11 @@
 {$SITE_ADDRESS:http://localhost} {
 	encode gzip
 
+	# Above the API's own limits (256 KB, and 16 KB under /v1/public), which answer with the JSON error.
+	request_body {
+		max_size 1MiB
+	}
+
 	header {
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
@@ -45,6 +50,10 @@
 # a host that never resolves, so the block serves nothing until WIDGET_ADDRESS is set.
 {$WIDGET_ADDRESS:http://widget.invalid} {
 	encode gzip
+
+	request_body {
+		max_size 64KiB
+	}
 
 	header {
 		X-Content-Type-Options "nosniff"

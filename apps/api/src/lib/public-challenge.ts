@@ -47,6 +47,21 @@ export function challengeConfigFromEnv(env: Env = process.env): ChallengeConfig 
   };
 }
 
+/** The startup log line for the challenge settings, and the warnings a production instance should see. */
+export function describeChallenge(config: ChallengeConfig, env: Env = process.env): { line: string; warnings: string[] } {
+  const keyed = Boolean(env.PUBLIC_CHALLENGE_SECRET);
+  const line = `public challenge: difficulty ${config.difficulty}, signed with ${keyed ? "PUBLIC_CHALLENGE_SECRET" : "a per-process key"}`;
+  if (env.NODE_ENV !== "production") return { line, warnings: [] };
+  const warnings: string[] = [];
+  if (config.difficulty === 0) {
+    warnings.push("PUBLIC_POW_DIFFICULTY=0: the proof of work is off for public bookings. Only the signed challenge and the minimum fill time remain.");
+  }
+  if (!keyed) {
+    warnings.push("PUBLIC_CHALLENGE_SECRET is not set: a restart voids open challenges, and several API processes reject each other's.");
+  }
+  return { line, warnings };
+}
+
 function sign(secret: Buffer, bookingKey: string, nonce: string, issuedAt: string, difficulty: number): string {
   return createHmac("sha256", secret)
     .update(`v1\n${bookingKey}\n${nonce}\n${issuedAt}\n${difficulty}`)

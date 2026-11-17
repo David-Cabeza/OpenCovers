@@ -1,4 +1,5 @@
 import { Hono, type MiddlewareHandler } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client";
 import {
   addKey,
@@ -17,7 +18,8 @@ import {
   encodeAuditCursor,
   listMembershipAudit,
 } from "./lib/membership-audit";
-import { auth } from "./lib/auth";
+import { auth, trustedOrigins } from "./lib/auth";
+import { staffOriginGuard } from "./lib/staff-origin";
 import {
   addToBlocklist,
   BLOCKLIST_DEFAULT_LIMIT,
@@ -164,6 +166,13 @@ app.use("/v1/public/*", async (c, next) => {
 });
 
 app.use("*", createRateLimiter(rateLimitConfigFromEnv()).middleware);
+
+// Below the limiter, so an oversized body still spends the caller's budget. The widget's largest body is about
+// 2 KB and the staff app's (a config with 366 blocked date ranges) about 20 KB.
+const bodyTooLarge = (c: any) => error(c, "invalid_request");
+app.use("/v1/public/*", bodyLimit({ maxSize: 16 * 1024, onError: bodyTooLarge }));
+app.use("*", bodyLimit({ maxSize: 256 * 1024, onError: bodyTooLarge }));
+app.use("/v1/*", staffOriginGuard(trustedOrigins));
 
 app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
 

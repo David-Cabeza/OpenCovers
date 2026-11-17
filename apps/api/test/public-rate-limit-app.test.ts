@@ -38,7 +38,7 @@ beforeAll(async () => {
   await db.execute(
     sql`TRUNCATE TABLE events, tombstones, idempotency_keys, table_allocations, reservations, guests, grants, api_keys, services, tables, venue_online_booking, venues RESTART IDENTITY CASCADE`,
   );
-  for (const id of ["rl-a", "rl-b"]) {
+  for (const id of ["rl-a", "rl-b", "rl-c"]) {
     await db.insert(venues).values({ id, name: id, timezone: "Europe/Madrid" });
     await db.insert(services).values({ venueId: id, name: "dinner", openStart: "20:00", openEnd: "23:00" });
     await db.insert(tables).values([1, 2, 3, 4].map((i) => ({ id: `${id}-t${i}`, venueId: id, name: `T${i}`, seats: 4 })));
@@ -100,6 +100,30 @@ describe("C52 public limits in the app", () => {
       body: JSON.stringify({ date: "2030-06-01", time: "21:00", partySize: 2 }),
     });
     expect(staff.status).toBe(200);
+  });
+});
+
+describe("C52 public_venue counts only creates that reach the booking", () => {
+  it("does not let malformed bodies or unknown keys spend a venue's budget", async () => {
+    const path = `/v1/public/${keys["rl-c"]}/reservations`;
+    for (const [i, body] of ["{}", "not json", JSON.stringify({ date: "2030-06-01" })].entries()) {
+      const res = await app.request(path, {
+        method: "POST",
+        headers: { "content-type": "application/json", "Idempotency-Key": crypto.randomUUID(), "x-forwarded-for": `203.0.113.${40 + i}` },
+        body,
+      });
+      expect(res.status).toBe(400);
+    }
+    const unknown = await app.request("/v1/public/pk_ZZZZZZZZZZZZZZZZZZZZZZ/reservations", {
+      method: "POST",
+      headers: { "content-type": "application/json", "Idempotency-Key": crypto.randomUUID(), "x-forwarded-for": "203.0.113.43" },
+      body: "{}",
+    });
+    expect(unknown.status).toBe(404);
+    expect((await create("rl-c", "203.0.113.44")).status).toBe(200);
+    expect((await create("rl-c", "203.0.113.45")).status).toBe(200);
+    expect((await create("rl-c", "203.0.113.46")).status).toBe(429);
+    expect(await booked("rl-c")).toBe(2);
   });
 });
 
