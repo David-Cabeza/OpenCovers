@@ -1,6 +1,6 @@
 # ADR-0017: Guest erasure needs the admin role
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-17
 - Deciders: David Cabeza
 
