@@ -8,7 +8,9 @@ export type MembershipAuditEntry =
   | { action: "redeemed"; targetUserId: string; invitationId: string; role: Role }
   | { action: "member_removed"; actorUserId: string; targetUserId: string; role: Role }
   | { action: "role_changed"; actorUserId: string; targetUserId: string; role: Role }
-  | { action: "creator_transferred"; actorUserId: string; targetUserId: string };
+  | { action: "creator_transferred"; actorUserId: string; targetUserId: string }
+  | { action: "guest_blocked"; actorUserId: string; blocklistEntryId: string }
+  | { action: "guest_unblocked"; actorUserId: string; blocklistEntryId: string };
 
 export async function recordMembershipAudit(
   tx: Pick<Db, "insert">,
@@ -22,6 +24,7 @@ export async function recordMembershipAudit(
     targetUserId: "targetUserId" in entry ? entry.targetUserId : null,
     invitationId: "invitationId" in entry ? entry.invitationId : null,
     role: "role" in entry ? entry.role : null,
+    blocklistEntryId: "blocklistEntryId" in entry ? entry.blocklistEntryId : null,
   });
 }
 
@@ -37,6 +40,7 @@ export interface MembershipAuditView {
   targetUserId: string | null;
   invitationId: string | null;
   role: string | null;
+  blocklistEntryId: string | null;
   occurredAt: string;
 }
 
@@ -79,6 +83,7 @@ export async function listMembershipAudit(
       targetUserId: r.targetUserId,
       invitationId: r.invitationId,
       role: r.role,
+      blocklistEntryId: r.blocklistEntryId,
       occurredAt: r.occurredAt.toISOString(),
     })),
     next: rows.length > opts.limit ? page[page.length - 1].id : null,

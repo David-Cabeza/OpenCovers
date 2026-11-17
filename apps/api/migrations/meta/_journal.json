@@ -239,6 +239,13 @@
       "when": 1794908830033,
       "tag": "0033_guest_blocklist",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794909815598,
+      "tag": "0034_blocklist_audit",
+      "breakpoints": true
     }
   ]
 }

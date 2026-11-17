@@ -23,7 +23,9 @@ export type AuditAction =
   | "redeemed"
   | "member_removed"
   | "role_changed"
-  | "creator_transferred";
+  | "creator_transferred"
+  | "guest_blocked"
+  | "guest_unblocked";
 
 export interface AuditEntry {
   id: string;
@@ -32,6 +34,7 @@ export interface AuditEntry {
   targetUserId: string | null;
   invitationId: string | null;
   role: string | null;
+  blocklistEntryId: string | null;
   occurredAt: string;
 }
 

@@ -1279,8 +1279,10 @@ paths:
         `write` session or key fails with `forbidden`, and a caller outside
         the venue fails with `venue_not_found`. Entries are newest first. The
         log records invitations created, revoked, and redeemed, and member
-        removals (ADR-0010), role changes, and creator transfers (ADR-0016). It holds ids and a role only, never an email, a
-        name, an invitation token, or a key. Pass `nextCursor` back as
+        removals (ADR-0010), role changes, and creator transfers (ADR-0016),
+        and guest blocklist entries added and removed (ADR-0018). It holds ids
+        and a role only, never an email, a name, an invitation token, a key,
+        a contact, a blocklist hash, or a blocklist reason. Pass `nextCursor` back as
         `cursor` for the next page. It is null on the last page. A cursor from
         another venue or a malformed one, and a bad `limit`, fail with
         `invalid_request`. Not exposed through MCP. See ADR-0011.
@@ -1309,6 +1311,185 @@ paths:
                   nextCursor:
                     type: string
                     nullable: true
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/blocklist:
+    get:
+      operationId: blocklist.list
+      summary: List the venue's guest blocklist
+      description: |
+        Admin only, and only through a staff session. A `read` or `write`
+        session, and a key of any role, an `admin` key included, fail with
+        `forbidden`. Entries are newest first. An entry shows its kind,
+        reason, creator, creation and expiry times, and whether a configured
+        key can match it. It never shows the contact or its hash, so the list
+        does not say whom an entry refuses. Use `blocklist.lookup` for that.
+        Pass `nextCursor` back as `cursor` for the next page. It is null on
+        the last page. A cursor from another venue or a malformed one, a bad
+        `limit`, and any other query parameter fail with `invalid_request`.
+        Not exposed through MCP. See ADR-0018.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: One page of blocklist entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries, nextCursor]
+                properties:
+                  entries:
+                    type: array
+                    items: { $ref: "#/components/schemas/BlocklistEntry" }
+                  nextCursor:
+                    type: string
+                    nullable: true
+        default:
+          $ref: "#/components/responses/Error"
+
+    post:
+      operationId: blocklist.add
+      summary: Refuse bookings for a guest's contacts
+      description: |
+        Admin only, and only through a staff session. A `read` or `write`
+        session, and a key of any role, an `admin` key included, fail with
+        `forbidden`.
+
+        With `guestId`, adds one entry for each email and phone of that guest
+        and of every guest merged into it, so staff never type a contact
+        again. A guest of another venue, a guest merged into another, and a
+        guest cleared by retention fail with `guest_not_found`. The response
+        then carries `bookedReservations`, the number of that guest's
+        reservations still `booked`, computed and not stored. An add never
+        cancels or changes a booking.
+
+        With `contact`, the engine normalizes it with the venue's default
+        country, as a booking does, stores only a keyed hash, and drops the
+        clear value. A contact that does not normalize fails with
+        `invalid_request`. A contact travels only in the body. The route
+        refuses any query parameter with `invalid_request`.
+
+        An entry that already exists, under the current or the previous key,
+        is returned with `created: false`, keeps its reason, and writes no
+        audit row, so the call needs no `Idempotency-Key`. Each entry created
+        writes one `guest_blocked` row to the audit log. A venue holds at most
+        10,000 entries. An add that would pass it fails with
+        `blocklist_limit_reached` and adds nothing. The response never holds a
+        contact or a hash. Not exposed through MCP. See ADR-0018.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/BlocklistSubject"
+                - type: object
+                  properties:
+                    reason: { $ref: "#/components/schemas/BlocklistReason" }
+      responses:
+        "200":
+          description: One entry per normalized contact, created or already there
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: "#/components/schemas/BlocklistEntry"
+                        - type: object
+                          required: [created]
+                          properties:
+                            created:
+                              type: boolean
+                              description: False when the entry already existed.
+                  bookedReservations:
+                    type: integer
+                    minimum: 0
+                    description: |
+                      Present on an add by `guestId` only. The guest's
+                      reservations, its merged guests' included, whose status
+                      is `booked`.
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/blocklist/lookup:
+    post:
+      operationId: blocklist.lookup
+      summary: Find the blocklist entries for a guest or a contact
+      description: |
+        Admin only, and only through a staff session, with the same refusals
+        as `blocklist.add`. Takes `guestId`, covering the guests merged into
+        it, or `contact`, normalized as on add, in the body, never in the
+        query string. Returns the matching entries of this venue under any
+        configured key, newest first, or an empty list. Use it to fix a wrong
+        lockout or to answer a guest who asks what the venue holds about
+        them. It writes nothing. Not exposed through MCP. See ADR-0018.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BlocklistSubject" }
+      responses:
+        "200":
+          description: The matching entries, possibly none
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    items: { $ref: "#/components/schemas/BlocklistEntry" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/blocklist/{entryId}:
+    delete:
+      operationId: blocklist.remove
+      summary: Remove one blocklist entry
+      description: |
+        Admin only, and only through a staff session, with the same refusals
+        as `blocklist.add`. Deletes the entry and returns it. An unknown id
+        and an entry of another venue fail with `blocklist_entry_not_found`,
+        the same answer, so a second delete fails with it too and the call
+        needs no `Idempotency-Key`. Writes one `guest_unblocked` row to the
+        audit log. The entry's audit rows stay and hold only its random id.
+        Not exposed through MCP. See ADR-0018.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The entry that was removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entry]
+                properties:
+                  entry: { $ref: "#/components/schemas/BlocklistEntry" }
         default:
           $ref: "#/components/responses/Error"
 
@@ -1924,6 +2105,8 @@ components:
         moves reservations, runs the waitlist, manages webhooks, and erases.
         Venue configuration, services, tables, floor items, API keys, and
         guest merges need `admin`. Any other role fails with `forbidden`.
+        Members, invitations, and the guest blocklist need an `admin` staff
+        session, and refuse every key with `forbidden`.
 
   parameters:
     venueId:
@@ -2560,13 +2743,22 @@ components:
 
     MembershipAuditEntry:
       type: object
-      required: [id, action, actorUserId, targetUserId, invitationId, role, occurredAt]
+      required: [id, action, actorUserId, targetUserId, invitationId, role, blocklistEntryId, occurredAt]
       properties:
         id: { type: string }
         action:
           type: string
           enum:
-            [invited, invite_revoked, redeemed, member_removed, role_changed, creator_transferred]
+            [
+              invited,
+              invite_revoked,
+              redeemed,
+              member_removed,
+              role_changed,
+              creator_transferred,
+              guest_blocked,
+              guest_unblocked,
+            ]
         actorUserId: { type: string, nullable: true }
         targetUserId:
           type: string
@@ -2579,7 +2771,57 @@ components:
           type: string
           nullable: true
           description: The new role for `role_changed`. Null for `creator_transferred`.
+        blocklistEntryId:
+          type: string
+          nullable: true
+          description: |
+            The entry added or removed, for `guest_blocked` and
+            `guest_unblocked`. Null for every other action.
         occurredAt: { type: string, format: date-time }
+
+    BlocklistReason:
+      type: string
+      nullable: true
+      enum: [no_show, late_cancellation, conduct, other, null]
+      description: A code, never free text. Null or absent means no reason.
+
+    BlocklistSubject:
+      type: object
+      description: Exactly one of `guestId` or `contact`.
+      properties:
+        guestId:
+          type: string
+          minLength: 1
+          description: A guest record id. Covers the guests merged into it.
+        contact:
+          type: string
+          minLength: 1
+          description: An email or a phone, normalized as a booking contact is.
+
+    BlocklistEntry:
+      type: object
+      required: [id, kind, reason, createdBy, createdAt, expiresAt, active]
+      description: Never holds the contact or its hash.
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [email, phone] }
+        reason: { $ref: "#/components/schemas/BlocklistReason" }
+        createdBy:
+          type: string
+          description: The account id of the admin who added it.
+        createdAt: { type: string, format: date-time }
+        expiresAt:
+          type: string
+          format: date-time
+          description: |
+            `createdAt` plus the venue's `retentionDays`. Retention deletes
+            the entry after it.
+        active:
+          type: boolean
+          description: |
+            False when the entry was made under a key that is no longer
+            configured, so it matches no booking. An admin removes it and
+            adds the contact again.
 
     Invitation:
       type: object
@@ -3375,6 +3617,7 @@ components:
         - beyond_booking_horizon
         - date_blocked
         - guest_booking_limit
+        - booking_declined
         - email_required
         - confirmation_required
         - approval_required
@@ -3391,6 +3634,8 @@ components:
         - webhook_not_found
         - webhook_url_rejected
         - webhook_limit_reached
+        - blocklist_entry_not_found
+        - blocklist_limit_reached
         - invalid_invitation
         - invitation_not_found
         - invitation_redeemed

@@ -19,6 +19,20 @@ import {
 } from "./lib/membership-audit";
 import { auth } from "./lib/auth";
 import {
+  addToBlocklist,
+  BLOCKLIST_DEFAULT_LIMIT,
+  BLOCKLIST_MAX_LIMIT,
+  blocklistKeys,
+  decodeBlocklistCursor,
+  encodeBlocklistCursor,
+  lookupBlocklist,
+  pageBlocklist,
+  parseBlocklistReason,
+  parseBlocklistSubject,
+  removeFromBlocklist,
+  type BlocklistCursor,
+} from "./lib/blocklist";
+import {
   createInvitation,
   isExpiryHours,
   isInvitationEmail,
@@ -324,6 +338,75 @@ app.get("/v1/venues/:venueId/audit", adminOnly, async (c) => {
     entries: page.entries,
     nextCursor: page.next === null ? null : encodeAuditCursor(venueId, page.next),
   });
+});
+
+// ADR-0018. A contact travels only in a request body, so these routes refuse
+// any query parameter they do not define.
+const queryOnly =
+  (...allowed: string[]): MiddlewareHandler<AppEnv> =>
+  async (c, next) => {
+    if (Object.keys(c.req.queries()).some((name) => !allowed.includes(name))) {
+      return error(c, "invalid_request");
+    }
+    await next();
+  };
+
+const BLOCKLIST = "/v1/venues/:venueId/blocklist";
+
+app.get(BLOCKLIST, adminOnly, staffSessionOnly, queryOnly("limit", "cursor"), async (c) => {
+  const venueId = c.req.param("venueId");
+  const limitRaw = c.req.query("limit") ?? String(BLOCKLIST_DEFAULT_LIMIT);
+  const limit = Number(limitRaw);
+  if (!/^\d+$/.test(limitRaw) || limit < 1 || limit > BLOCKLIST_MAX_LIMIT) {
+    return error(c, "invalid_request");
+  }
+  const cursor = c.req.query("cursor");
+  let after: BlocklistCursor | undefined;
+  if (cursor) {
+    const decoded = decodeBlocklistCursor(venueId, cursor);
+    if (!decoded) return error(c, "invalid_request");
+    after = decoded;
+  }
+  const page = await pageBlocklist(db, blocklistKeys, venueId, { limit, after });
+  if (!page.ok) return error(c, page.code);
+  return c.json({
+    entries: page.entries,
+    nextCursor: page.next ? encodeBlocklistCursor(venueId, page.next) : null,
+  });
+});
+
+app.post(BLOCKLIST, adminOnly, staffSessionOnly, queryOnly(), async (c) => {
+  const user = await sessionUser(c);
+  if (!user) return error(c, "unauthorized");
+  const body = await c.req.json().catch(() => null);
+  const subject = parseBlocklistSubject(body);
+  const reason = parseBlocklistReason(body?.reason);
+  if (!subject || reason === undefined) return error(c, "invalid_request");
+  const result = await addToBlocklist(db, blocklistKeys, c.req.param("venueId"), user.id, subject, reason);
+  if (!result.ok) return error(c, result.code);
+  return c.json({ entries: result.entries, bookedReservations: result.bookedReservations });
+});
+
+app.post(`${BLOCKLIST}/lookup`, adminOnly, staffSessionOnly, queryOnly(), async (c) => {
+  const subject = parseBlocklistSubject(await c.req.json().catch(() => null));
+  if (!subject) return error(c, "invalid_request");
+  const result = await lookupBlocklist(db, blocklistKeys, c.req.param("venueId"), subject);
+  if (!result.ok) return error(c, result.code);
+  return c.json({ entries: result.entries });
+});
+
+app.delete(`${BLOCKLIST}/:entryId`, adminOnly, staffSessionOnly, queryOnly(), async (c) => {
+  const user = await sessionUser(c);
+  if (!user) return error(c, "unauthorized");
+  const result = await removeFromBlocklist(
+    db,
+    blocklistKeys,
+    c.req.param("venueId"),
+    user.id,
+    c.req.param("entryId"),
+  );
+  if (!result.ok) return error(c, result.code);
+  return c.json({ entry: result.entry });
 });
 
 app.post("/v1/invitations/redeem", async (c) => {

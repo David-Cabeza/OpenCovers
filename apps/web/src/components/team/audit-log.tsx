@@ -27,6 +27,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   member_removed: "Member removed",
   role_changed: "Role changed",
   creator_transferred: "Venue creator transferred",
+  guest_blocked: "Guest blocked",
+  guest_unblocked: "Guest unblocked",
 };
 
 function shortId(id: string): string {
@@ -43,6 +45,10 @@ function Person({ id, members }: { id: string | null; members: Map<string, Membe
       <span className="text-xs text-muted-foreground">former member</span>
     </span>
   );
+}
+
+function Reference({ id }: { id: string | null }) {
+  return id ? <code className="text-xs">{shortId(id)}</code> : null;
 }
 
 export function AuditLog({ venueId }: { venueId: string }) {
@@ -64,8 +70,8 @@ export function AuditLog({ venueId }: { venueId: string }) {
       <CardHeader>
         <CardTitle>Audit log</CardTitle>
         <CardDescription>
-          Who invited, who joined, who was removed, role changes and creator transfers, newest first. The log keeps ids only, so
-          people who have left show as a shortened id.
+          Who invited, who joined, who was removed, role changes, creator transfers and blocklist changes, newest first. The log
+          keeps ids only, so people who have left show as a shortened id.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -88,7 +94,7 @@ export function AuditLog({ venueId }: { venueId: string }) {
                 <TableHead>By</TableHead>
                 <TableHead>Person</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Invitation</TableHead>
+                <TableHead>Reference</TableHead>
                 <TableHead>When</TableHead>
               </TableRow>
             </TableHeader>
@@ -108,9 +114,7 @@ export function AuditLog({ venueId }: { venueId: string }) {
                     {e.role ? <Badge variant="secondary">{e.role}</Badge> : null}
                   </TableCell>
                   <TableCell>
-                    {e.invitationId ? (
-                      <code className="text-xs">{shortId(e.invitationId)}</code>
-                    ) : null}
+                    <Reference id={e.invitationId ?? e.blocklistEntryId} />
                   </TableCell>
                   <TableCell>{new Date(e.occurredAt).toLocaleString()}</TableCell>
                 </TableRow>

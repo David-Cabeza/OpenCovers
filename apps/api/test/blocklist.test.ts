@@ -192,13 +192,13 @@ describe("guest_blocklist table", () => {
 
     expect(await findBlocklistEntries(db, B, [digestA])).toEqual([]);
     expect(await findBlocklistEntries(db, B, [blocklistHash(key, B, EMAIL)])).toEqual([]);
-    expect(await listBlocklistEntries(db, B, 50)).toEqual([]);
+    expect((await listBlocklistEntries(db, B, { limit: 50 })).entries).toEqual([]);
     expect(await deleteBlocklistEntry(db, B, entry.id)).toBeNull();
-    expect(await listBlocklistEntries(db, A, 50)).toEqual([entry]);
+    expect((await listBlocklistEntries(db, A, { limit: 50 })).entries).toEqual([entry]);
 
     expect(await deleteBlocklistEntry(db, A, entry.id)).toEqual(entry);
     expect(await deleteBlocklistEntry(db, A, entry.id)).toBeNull();
-    expect(await listBlocklistEntries(db, A, 50)).toEqual([]);
+    expect((await listBlocklistEntries(db, A, { limit: 50 })).entries).toEqual([]);
   });
 
   it("lists newest first, up to the limit", async () => {
@@ -215,7 +215,7 @@ describe("guest_blocklist table", () => {
         .where(eq(guestBlocklist.id, entry.id));
       ids.push(entry.id);
     }
-    expect((await listBlocklistEntries(db, A, 2)).map((e) => e.id)).toEqual([ids[2], ids[1]]);
+    expect((await listBlocklistEntries(db, A, { limit: 2 })).entries.map((e) => e.id)).toEqual([ids[2], ids[1]]);
   });
 
   it("goes with its venue", async () => {
