@@ -211,6 +211,7 @@ OpenCovers uses flags — scoped tasks with acceptance criteria, dependencies, a
 
 - [GOVERNANCE.md](GOVERNANCE.md) explains how decisions are made.
 - [SECURITY.md](SECURITY.md) explains how to report a vulnerability.
+- [docs/collaboration-security.md](docs/collaboration-security.md) sets the rules for contributions, dependencies, and AI agents.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) applies to every project space.
 
 ## License

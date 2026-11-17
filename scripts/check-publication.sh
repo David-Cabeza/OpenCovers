@@ -41,6 +41,18 @@ if git grep -n -E "LicenseRef-Proprietary|BEGIN (RSA|OPENSSH|EC) PRIVATE" -- \
   exit 1
 fi
 
+remote_install='npx\s+(-y|--yes)\s+(?!@opencovers/)\S|\b(curl|wget)\b[^|\n]*\|\s*(sudo\s+)?(ba|z)?sh\b'
+set +e
+git grep -n -I -P "$remote_install" -- . ':!pnpm-lock.yaml' ':!docs/collaboration-security.md'
+status=$?
+set -e
+if [ "$status" -eq 0 ]; then
+  printf 'remote install pattern found; see docs/collaboration-security.md, section 3\n' >&2
+  exit 1
+elif [ "$status" -ne 1 ]; then
+  printf 'note: git grep -P unavailable, skipping the remote install check\n' >&2
+fi
+
 if ! git check-ignore -q .opencode/; then
   printf '.opencode/ is not ignored\n' >&2
   exit 1
