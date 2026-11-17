@@ -3,7 +3,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { isIP } from "node:net";
 import { ERRORS, errorBody } from "./errors";
 
-export const RULE_NAMES = ["auth", "signup", "invitation"] as const;
+export const RULE_NAMES = ["auth", "signup", "invitation", "venue_creation"] as const;
 export type RuleName = (typeof RULE_NAMES)[number];
 
 export interface Rule {
@@ -17,6 +17,7 @@ export const DEFAULT_RULES: Rules = {
   auth: { max: 30, windowMs: 15 * 60_000 },
   signup: { max: 5, windowMs: 60 * 60_000 },
   invitation: { max: 10, windowMs: 15 * 60_000 },
+  venue_creation: { max: 10, windowMs: 60 * 60_000 },
 };
 
 export interface RateLimitConfig {
@@ -35,6 +36,7 @@ const RULE_ENV: Record<RuleName, string> = {
   auth: "RATE_LIMIT_AUTH",
   signup: "RATE_LIMIT_SIGNUP",
   invitation: "RATE_LIMIT_INVITATION",
+  venue_creation: "RATE_LIMIT_VENUE_CREATION",
 };
 
 const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
@@ -101,6 +103,7 @@ export function rulesFor(method: string, rawPath: string, hasInvitationToken: bo
   if (SAFE_METHODS.has(method.toUpperCase())) return [];
   const path = normalizePath(rawPath);
   if (path === "/v1/invitations/redeem") return ["invitation"];
+  if (path === "/v1/venues" && method.toUpperCase() === "POST") return ["venue_creation"];
   if (path === "/api/auth" || path.startsWith("/api/auth/")) {
     if (path.startsWith("/api/auth/sign-up")) {
       return hasInvitationToken ? ["signup", "invitation"] : ["signup"];

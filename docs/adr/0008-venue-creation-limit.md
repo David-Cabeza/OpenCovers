@@ -70,7 +70,7 @@ No migration and no data step.
 
 ### What this does not cover
 
-- Venue creation is not rate limited. [ADR-0007](0007-rate-limiting.md) covers credential paths only, and `POST /v1/venues` is not one. The owner can create venues without a bound.
+- Venue creation had no rate limit when this ADR was written. [ADR-0007](0007-rate-limiting.md) now limits `POST /v1/venues` per client address (amendment of 2026-11-17), so the owner can no longer create venues without a bound from one address.
 - Under `open` nothing is limited, as before.
 - An owner who invites a person as `admin` still gives that person full control of the invited venue, including keys and further invitations. The limit is on creating venues, not on administering the one they hold.
 - The mark is one row. There is no way to hand ownership to another account except SQL. A transfer flow is a separate decision, now [ADR-0016](0016-member-roles-and-creator-transfer.md).

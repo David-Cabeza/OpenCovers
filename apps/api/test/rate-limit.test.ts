@@ -82,6 +82,7 @@ describe("rateLimitConfigFromEnv", () => {
       auth: { max: 30, windowMs: 15 * 60_000 },
       signup: { max: 5, windowMs: 60 * 60_000 },
       invitation: { max: 10, windowMs: 15 * 60_000 },
+      venue_creation: { max: 10, windowMs: 60 * 60_000 },
     });
   });
 
@@ -379,7 +380,6 @@ describe("what is limited", () => {
       ["GET", REDEEM],
       ["GET", "/v1/venues"],
       ["GET", "/v1/venues/v1/availability?date=2026-01-01&partySize=2"],
-      ["POST", "/v1/venues"],
       ["POST", "/v1/venues/v1/reservations"],
       ["DELETE", "/v1/venues/v1/webhooks/w1"],
     ];
@@ -387,6 +387,35 @@ describe("what is limited", () => {
       const out = await statuses(40, () => call(app, method, path, { ip: "203.0.113.1" }));
       expect(new Set(out), `${method} ${path}`).not.toContain(429);
     }
+  });
+
+  it("limits venue creation on its own budget, however the path is written", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_VENUE_CREATION: "2/1m", RATE_LIMIT_AUTH: "1/1m" });
+    expect(await statuses(3, () => call(app, "POST", "/v1/venues", { ip: "203.0.113.50" }))).toEqual([200, 200, 429]);
+    expect((await call(app, "POST", "/v1//venues/", { ip: "203.0.113.50" })).status).toBe(429);
+    expect((await call(app, "POST", SIGN_IN, { ip: "203.0.113.50" })).status).toBe(200);
+    expect((await call(app, "POST", "/v1/venues", { ip: "203.0.113.51" })).status).toBe(200);
+    const res = await call(app, "POST", "/v1/venues", { ip: "203.0.113.50" });
+    expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect((await res.json()).code).toBe("rate_limited");
+  });
+
+  it("does not limit reads of venues or other venue routes", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_VENUE_CREATION: "1/1m" });
+    for (const [method, path] of [
+      ["GET", "/v1/venues"],
+      ["POST", "/v1/venues/v1/reservations"],
+      ["POST", "/v1/venues/v1/invitations"],
+    ] as const) {
+      const out = await statuses(5, () => call(app, method, path, { ip: "203.0.113.60" }));
+      expect(new Set(out), `${method} ${path}`).toEqual(new Set([200]));
+    }
+  });
+
+  it("reads RATE_LIMIT_VENUE_CREATION and rejects a bad value", () => {
+    const config = rateLimitConfigFromEnv({ RATE_LIMIT_VENUE_CREATION: "3/2h" });
+    expect(config.rules.venue_creation).toEqual({ max: 3, windowMs: 2 * 3_600_000 });
+    expect(() => rateLimitConfigFromEnv({ RATE_LIMIT_VENUE_CREATION: "0/1h" })).toThrow(/RATE_LIMIT_VENUE_CREATION/);
   });
 
   it("does nothing when switched off", async () => {
