@@ -163,7 +163,7 @@ describe("C22 role boundaries", () => {
     expect(((await accepted.json()) as { noticeAddress: string }).noticeAddress).toBe("new-owner@example.com");
   });
 
-  it("keeps reservation, waitlist, and erasure operations open to a write key", async () => {
+  it("keeps reservation and waitlist operations open to a write key", async () => {
     const venueId = "authz-write";
     await seedVenue(venueId);
     const key = `write-${venueId}`;
@@ -208,8 +208,51 @@ describe("C22 role boundaries", () => {
     const { entries: waiting } = (await second.json()) as { entries: { id: string }[] };
     const dropped = await call(venueId, "POST", `/waitlist/${waiting[0].id}/cancel`, key);
     expect(dropped.status).toBe(200);
+  });
 
-    const erased = await call(venueId, "POST", "/erasure", key, { guestId: reservation.guest.guestId });
+  it("lets only an admin erase guest data and leaves it intact for write and read", async () => {
+    const venueId = "authz-erasure";
+    await seedVenue(venueId);
+    const created = await call(venueId, "POST", "/reservations", `write-${venueId}`, {
+      date: DATE,
+      time: "21:00",
+      partySize: 2,
+      guest: { name: "Ana", contact: "ana@example.com" },
+    });
+    const reservation = (await created.json()) as { id: string; guest: { guestId: string } };
+    const body = { guestId: reservation.guest.guestId };
+    const snapshot = async () => (await call(venueId, "GET", `/reservations/${reservation.id}`, `admin-${venueId}`)).json();
+    const before = await snapshot();
+
+    for (const key of [`write-${venueId}`, `read-${venueId}`]) {
+      const res = await call(venueId, "POST", "/erasure", key, body);
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as { code: string }).code).toBe("forbidden");
+    }
+    const floorStaff = await signUpWithRole(venueId, "write");
+    const refused = await call(venueId, "POST", "/erasure", floorStaff, body);
+    expect(refused.status).toBe(403);
+    expect(((await refused.json()) as { code: string }).code).toBe("forbidden");
+    expect(await snapshot()).toEqual(before);
+
+    const erased = await call(venueId, "POST", "/erasure", `admin-${venueId}`, body);
+    expect(erased.status).toBe(200);
+    expect(await erased.json()).toMatchObject({ erasedReservations: 1, erasedGuests: 1 });
+    expect(await snapshot()).not.toEqual(before);
+  });
+
+  it("lets an admin session erase guest data", async () => {
+    const venueId = "authz-erasure-session";
+    await seedVenue(venueId);
+    const owner = await signUpWithRole(venueId, "admin");
+    const created = await call(venueId, "POST", "/reservations", owner, {
+      date: DATE,
+      time: "21:00",
+      partySize: 2,
+      guest: { name: "Bea", contact: "bea@example.com" },
+    });
+    const reservation = (await created.json()) as { guest: { guestId: string } };
+    const erased = await call(venueId, "POST", "/erasure", owner, { guestId: reservation.guest.guestId });
     expect(erased.status).toBe(200);
     expect(await erased.json()).toMatchObject({ erasedGuests: 1 });
   });

@@ -178,7 +178,7 @@ The text of any reconfirmation message and the legal basis for sending it are pe
 
 ### REQ-E1 Erasure by id or principal
 
-Erasure runs by guest id or by principal, per venue. It deletes or nulls the personal fields and returns counts.
+Erasure runs by guest id or by principal, per venue. It deletes or nulls the personal fields and returns counts. Only an `admin` can call it.
 
 Acceptance: erasure returns the counts and the hashes the tombstones need, and no personal value remains for that guest.
 
@@ -230,7 +230,7 @@ Acceptance: a call through MCP and a call through HTTP produce the same result f
 
 ### REQ-C3 Role boundaries
 
-Keys and staff sessions carry a per-venue role, `read`, `write`, or `admin`. A `write` role works the reservations: create, walk-in, modify, cancel, status, the waitlist, webhooks, and erasure. Only an `admin` changes how the venue is set up: its configuration, services, tables, floor items, API keys, and guest merges. A platform or agent that may book cannot redirect the venue's emails or reshape its floor.
+Keys and staff sessions carry a per-venue role, `read`, `write`, or `admin`. A `write` role works the reservations: create, walk-in, modify, cancel, status, and the waitlist and webhooks. Only an `admin` changes how the venue is set up: its configuration, services, tables, floor items, API keys, and guest merges, and only an `admin` erases guest data, because erasure cannot be undone. A platform or agent that may book cannot redirect the venue's emails or reshape its floor.
 
 Acceptance: conformance case C22. A `read` or `write` key or session that tries an admin operation fails with `forbidden` and changes nothing.
 

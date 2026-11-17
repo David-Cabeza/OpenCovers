@@ -1035,7 +1035,7 @@ app.delete("/v1/venues/:venueId/webhooks/:webhookId", async (c) => {
   return c.json({ webhooks });
 });
 
-app.post("/v1/venues/:venueId/erasure", async (c) => {
+app.post("/v1/venues/:venueId/erasure", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
   const result = await erase(db, venueId, body.guestId, body.principal, c.get("principal") as string);

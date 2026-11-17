@@ -15,7 +15,7 @@ The MCP server implements this catalog. It wraps the HTTP API and is scoped per 
 | `reservation.cancel` | POST /venues/{venueId}/reservations/{id}/cancel | write | required |
 | `reservation.status` | POST /venues/{venueId}/reservations/{id}/status | write | required |
 | `reservation.events` | GET /venues/{venueId}/events | read | none |
-| `reservation.erasure` | POST /venues/{venueId}/erasure | write | required |
+| `reservation.erasure` | POST /venues/{venueId}/erasure | admin | required |
 | `waitlist.list` | GET /venues/{venueId}/waitlist | read | none |
 | `waitlist.add` | POST /venues/{venueId}/waitlist | write | none |
 | `waitlist.seat` | POST /venues/{venueId}/waitlist/{id}/seat | write | required |
@@ -42,7 +42,7 @@ Every tool sets `readOnlyHint`, `destructiveHint` and `idempotentHint` explicitl
 
 A tool error reads `API error <status>: <code>` followed by ` (retryable)` or ` (not retryable)`, taken from the `retryable` field of the HTTP error. See [errors.md](errors.md).
 
-Reservation writes carry an idempotency key and return the reservation. Erasure returns the counts of erased reservations, guest records, and waitlist entries. Reads never mutate.
+Reservation writes carry an idempotency key and return the reservation. Erasure needs an `admin` key, and a key without it gets `forbidden`. It returns the counts of erased reservations, guest records, and waitlist entries. Reads never mutate.
 
 Reads return `guest.guestId` when the reservation is linked to a guest record of the venue. `reservation.erasure` takes that id as `guestId`. A `guestId` that is not a guest record is read as a contact. That fallback is deprecated and kept for one version. `erasedGuests` counts guest records deleted, so a contact that matches no record reports 0. Erasure by `principal` also deletes the guest records whose every visit that principal owned, and keeps a guest who still has a visit owned by another principal.
 

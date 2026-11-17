@@ -92,7 +92,7 @@ A venue sets `turnTimes` in its config, rows of `upTo` and `minutes` with `upTo`
 
 ## C22. Role boundaries
 
-Every venue route accepts a key or a staff session with a role for that venue, `read`, `write`, or `admin`. A `read` role cannot write anything. A `write` role creates, walks in, modifies, cancels, and moves reservations, including consent and rating, adds, seats, and cancels waitlist entries, manages webhooks, and erases. Changing the venue config, creating, updating, or deleting a service, a table, a floor item, or its layout, minting, listing, or revoking API keys, and merging or unmerging guests need `admin`. A `read` or `write` key or session that tries one fails with `forbidden`, and the config, services, tables, floor items, and keys read back unchanged. A session follows the same rule by its venue role.
+Every venue route accepts a key or a staff session with a role for that venue, `read`, `write`, or `admin`. A `read` role cannot write anything. A `write` role creates, walks in, modifies, cancels, and moves reservations, including consent and rating, adds, seats, and cancels waitlist entries, and manages webhooks. Changing the venue config, creating, updating, or deleting a service, a table, a floor item, or its layout, minting, listing, or revoking API keys, merging or unmerging guests, and erasing guest data need `admin`. A `read` or `write` key or session that tries one fails with `forbidden`, and the config, services, tables, floor items, and keys read back unchanged. A refused erasure leaves the guest data unchanged. A session follows the same rule by its venue role.
 
 ## C23. Booking note
 
