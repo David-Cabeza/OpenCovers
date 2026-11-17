@@ -31,10 +31,11 @@ Put secrets in `.env.prod` and nothing else. `.env.prod` is git-ignored and excl
 | Variable | What it protects | Rule |
 | --- | --- | --- |
 | `BETTER_AUTH_SECRET` | Staff sessions | Generate with `openssl rand -base64 32`. Compose refuses to start without it. |
+| `BLOCKLIST_KEY` | The guest blocklist | Generate with `openssl rand -base64 32`, a different value from `BETTER_AUTH_SECRET`. Compose refuses to start without it. Never store it with a database dump. A dump restored under another key leaves the list inactive. During a rotation, set the old value as `BLOCKLIST_KEY_PREVIOUS`. See [ADR-0018](adr/0018-guest-blocklist.md). |
 | `POSTGRES_PASSWORD` | The database | Letters and digits only, because it goes inside the database URL. Compose refuses to start without it. Use a long random value. |
 | `RESEND_API_KEY` | Outgoing email | Optional. Create a key limited to sending. |
 
-If you run the API without Docker, `BETTER_AUTH_SECRET` falls back to a fixed development value that is public in the source. Anyone can forge sessions if it is left in place. Always set it.
+If you run the API without Docker, `BETTER_AUTH_SECRET` and `BLOCKLIST_KEY` fall back to fixed development values that are public in the source. Anyone can forge sessions, or test contacts against a dump of the blocklist, if they are left in place. Always set both.
 
 Webhook signing secrets are generated per endpoint by the API. They are returned once, when the endpoint is created.
 

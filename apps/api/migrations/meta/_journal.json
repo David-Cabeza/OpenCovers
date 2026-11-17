@@ -232,6 +232,13 @@
       "when": 1794870107124,
       "tag": "0032_salty_cloak",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794908830033,
+      "tag": "0033_guest_blocklist",
+      "breakpoints": true
     }
   ]
 }
