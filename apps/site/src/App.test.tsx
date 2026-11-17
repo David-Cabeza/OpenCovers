@@ -25,6 +25,33 @@ describe("public site", () => {
     );
   });
 
+  it("points every README anchor at a heading the README has", () => {
+    const { container } = render(<App />);
+    const readme = readFileSync(resolve(process.cwd(), "../../README.md"), "utf8");
+    const slugs = [...readme.matchAll(/^#{1,6} (.+)$/gm)].map((m) =>
+      m[1].toLowerCase().replace(/[^\p{L}\p{N} -]/gu, "").replace(/ /g, "-"),
+    );
+    const anchors = [...container.querySelectorAll("a")]
+      .map((a) => a.getAttribute("href") ?? "")
+      .filter((href) => href.startsWith("https://github.com/David-Cabeza/OpenCovers#"));
+    expect(anchors.length).toBeGreaterThan(0);
+    for (const href of anchors) {
+      expect(slugs, href).toContain(href.split("#")[1]);
+    }
+  });
+
+  it("links only to site pages that exist", () => {
+    const { container } = render(<App />);
+    const paths = [...container.querySelectorAll("a, img, source")]
+      .map((el) => el.getAttribute("href") ?? el.getAttribute("src") ?? "")
+      .filter((p) => p.startsWith("/"));
+    expect(paths).toEqual(expect.arrayContaining(["/privacidad.html", "/en/"]));
+    for (const p of paths) {
+      const file = p.endsWith("/") ? `${p}index.html` : p;
+      expect(existsSync(resolve(process.cwd(), "public", file.slice(1))), p).toBe(true);
+    }
+  });
+
   it("renders the roadmap, the FAQ and the closing call to action", () => {
     const { container } = render(<App />);
 

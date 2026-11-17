@@ -96,9 +96,9 @@ const modules = [
 ];
 
 const challenges = [
-  { title: "Ficha de cliente", tag: "motor", body: "Un cliente por local, emparejado por email o teléfono, con fusión manual y auditoría. El diseño ya está decidido." },
-  { title: "Disponibilidad que se explica", tag: "motor", body: "Un endpoint que dice por qué un hueco está cerrado." },
-  { title: "Widget de reservas", tag: "producto", body: "Una página de reservas para la web del local, sin marca de OpenCovers." },
+  { title: "Ficha de cliente en sala", tag: "producto", body: "Una pantalla con la ficha y el historial de visitas. El motor ya guarda un cliente por local." },
+  { title: "Por qué está cerrado, en sala", tag: "producto", body: "Mostrar en la app de sala la explicación que la API ya da de un hueco cerrado." },
+  { title: "Altura del widget", tag: "producto", body: "Un script embed.js que crea el iframe del widget de reservas y ajusta su altura." },
   { title: "Temas declarativos", tag: "producto", body: "Paquetes solo de datos para cambiar colores, tipos y logo." },
   { title: "Primer adaptador de TPV", tag: "integración", body: "Leer la reserva de una mesa, enviar la cuenta y liberar la mesa." },
   { title: "Pagos con Stripe y Redsys", tag: "motor", body: "Depósitos y garantías con la cuenta de pago de cada local." },
@@ -108,12 +108,12 @@ const faqs = [
   {
     t: "Alcance",
     q: "¿Es un CRM o un TPV?",
-    a: "No. OpenCovers es el motor de reservas: disponibilidad, reservas, mesas y eventos. No sustituye a tu TPV ni a tu CRM. Más adelante tendrá ficha de cliente y conexión con tu propia cuenta de pago, siempre abiertas a combinarse con lo que ya usas.",
+    a: "No. OpenCovers es el motor de reservas: disponibilidad, reservas, mesas y eventos. No sustituye a tu TPV ni a tu CRM. Guarda una ficha mínima de cliente por local y más adelante se conectará con tu propia cuenta de pago, siempre abierto a combinarse con lo que ya usas.",
   },
   {
     t: "Estado",
     q: "¿En qué estado está?",
-    a: "Pre-alfa. Funciona y se prueba en local, con tests y casos de conformidad en verde. Todavía no hay un servicio gestionado en producción.",
+    a: "Pre-alfa. Funciona y se prueba en local, con tests y casos de conformidad en verde. El widget de reservas para la web del local está en curso. Todavía no hay un servicio gestionado en producción.",
   },
   {
     t: "Hosting",
@@ -307,7 +307,7 @@ function Hero() {
           Motor de reservas open source para restaurantes, con API y servidor MCP.
         </p>
         <div className="acts rv" style={d(180)}>
-          <a className="btn accent" href={`${REPO}#development`}>Empieza ahora</a>
+          <a className="btn accent" href={`${REPO}#quick-start`}>Empieza ahora</a>
           <a className="btn ghost" href={REPO}>Ver en GitHub</a>
         </div>
         <p className="status rv" style={d(260)}>Pre-alfa · Apache-2.0 · 18 herramientas MCP</p>
@@ -677,7 +677,7 @@ function Cta() {
           <h3>Arranca en local</h3>
           <pre><code>{commands}</code></pre>
           <div className="acts">
-            <a className="btn accent" href={`${REPO}#development`}>Ir al repositorio</a>
+            <a className="btn accent" href={`${REPO}#quick-start`}>Ir al repositorio</a>
             <button className="btn alt" type="button" onClick={copy}>{copied ? "Copiado" : "Copiar comandos"}</button>
           </div>
           <small>API en :3000, web en :5173. Crea una cuenta y monta tu primer local.</small>
@@ -708,6 +708,8 @@ function Footer() {
         </ul>
         <ul>
           <li><a href={`${REPO}/blob/main/LICENSE`}>Apache-2.0</a></li>
+          <li><a href="/privacidad.html">Privacidad</a></li>
+          <li><a href="/en/" hrefLang="en" lang="en">English</a></li>
         </ul>
         <p className="who">Motor de reservas open source para restaurantes. Pre-alfa.</p>
       </div>

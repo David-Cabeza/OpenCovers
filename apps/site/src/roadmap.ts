@@ -5,22 +5,22 @@ export const phases: Phase[] = [
   {
     n: 10,
     title: "Clientes y disponibilidad",
-    summary: "El cliente pasa a ser una ficha propia y la disponibilidad aprende a explicarse.",
+    summary: "El cliente pasa a ser una ficha propia y la disponibilidad aprende a explicarse. La base ya está hecha: un cliente por local, tiempo de mesa según el grupo y un endpoint que explica por qué un hueco está cerrado.",
     items: [
-      "Decidido: un cliente pertenece a un local, se empareja por email o teléfono y se fusiona a mano con auditoría.",
-      "Ficha de cliente con notas e historial de visitas. Las alergias como campo propio esperan a la revisión legal.",
-      "Tiempo de mesa según el tamaño del grupo.",
-      "Un endpoint que explica por qué un hueco está cerrado.",
+      "Ficha de cliente en la app de sala, con notas e historial de visitas.",
+      "Alergias y dieta como campo propio, cuando pase la revisión legal.",
+      "Etiquetas manuales y por reglas, con aviso en la reserva.",
+      "Ver en la app de sala por qué un hueco está cerrado.",
     ],
     exit: "Sala ve quién viene y qué necesita, y una plataforma puede preguntar por qué un hueco está cerrado.",
   },
   {
     n: 11,
     title: "Puertas para el cliente",
-    summary: "Cada local tendrá su propia puerta de entrada, sin pasar por una plataforma.",
+    summary: "Cada local tendrá su propia puerta de entrada, sin pasar por una plataforma. El widget y el enlace de autogestión ya funcionan en local.",
     items: [
-      "Un widget de reservas para incrustar, sin marca de OpenCovers.",
-      "Un enlace para ver, cambiar o cancelar la reserva.",
+      "En curso: un widget de reservas para incrustar, sin marca de OpenCovers.",
+      "En curso: un enlace para ver, cambiar o cancelar la reserva. Falta enviarlo en el email de confirmación.",
       "Una página con QR para apuntarse a la lista de espera.",
       "Temas declarativos, solo datos y sin código ejecutable.",
     ],
@@ -98,17 +98,17 @@ export const notPlanned: string[] = [
 ];
 
 export const today: Today[] = [
-  { area: "Reservas y disponibilidad", now: "Crear, modificar, cancelar y sentar, sin dobles reservas.", target: "Reglas por capas, por canal y con explicación.", phase: "10" },
+  { area: "Reservas y disponibilidad", now: "Crear, modificar, cancelar y sentar, sin dobles reservas, y saber por qué un hueco está cerrado.", target: "Reglas por capas y por canal.", phase: "10" },
   { area: "Mesas y sala", now: "Zonas, combinaciones, asignación automática y editor visual.", target: "Planos por servicio y estado en vivo.", phase: "10" },
-  { area: "Clientes", now: "Nombre, contacto y consentimiento en la reserva.", target: "Ficha con historial, notas, alergias y etiquetas.", phase: "10" },
+  { area: "Clientes", now: "Una ficha por local, emparejada por email o teléfono, con fusión y lista de bloqueados por API. Aún sin pantalla en la app de sala.", target: "Ficha con historial, notas, alergias y etiquetas.", phase: "10" },
   { area: "Lista de espera", now: "Existe en la app de sala.", target: "Página con QR y aviso de mesa lista.", phase: "11" },
-  { area: "Cara al cliente", now: "Ninguna. Solo API y MCP.", target: "Widget, enlace de autogestión y temas.", phase: "11" },
-  { area: "No-shows y pagos", now: "Solo cambios de estado.", target: "Depósitos, garantías y reembolsos.", phase: "12" },
+  { area: "Cara al cliente", now: "En curso: widget de reservas, rutas públicas y enlace para ver, cambiar o cancelar. Aún sin enlace en el email ni temas.", target: "Widget, enlace de autogestión y temas.", phase: "11" },
+  { area: "No-shows y pagos", now: "Cambios de estado y estado de reconfirmación.", target: "Depósitos, garantías y reembolsos.", phase: "12" },
   { area: "Mensajes", now: "Confirmación por email, desactivada por defecto.", target: "Email, SMS y WhatsApp con automatizaciones.", phase: "13" },
   { area: "Opiniones", now: "Ninguna.", target: "Encuesta tras la visita con consentimiento.", phase: "13" },
   { area: "Integraciones", now: "API, webhooks firmados, feed de eventos y MCP.", target: "Contrato de TPV, adaptadores y kit de conformidad.", phase: "14" },
   { area: "Informes", now: "Una vista de ritmo.", target: "Cubiertos, no-shows, origen y exportaciones.", phase: "15" },
   { area: "Varios locales", now: "Locales aislados.", target: "Grupos, clientes compartidos por opt-in y roles.", phase: "15" },
   { area: "Eventos y ecosistema", now: "Ninguno.", target: "Consultas, menús prepagados y registro de plugins.", phase: "16" },
-  { area: "Privacidad", now: "Borrado con recuento, retención y consentimiento.", target: "Exportación de datos y guía de refuerzo.", phase: "7, 10, 13" },
+  { area: "Privacidad", now: "Borrado por un admin con recuento, retención, consentimiento y guía de refuerzo.", target: "Exportación de datos y ajustes de retención.", phase: "7, 10, 13" },
 ];
