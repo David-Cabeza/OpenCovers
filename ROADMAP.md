@@ -2,7 +2,7 @@
 
 OpenCovers is pre-alpha. The engine, the staff app, and the MCP server run locally and pass their tests. Nothing is deployed except the public site. This roadmap has two jobs. It records where the project stands, and it lays out the road to the product depth that mature restaurant reservation platforms offer, so contributors can choose a place to work.
 
-Phases are a sequence, not a promise of dates. There is no Phase 1 or Phase 9. Numbering started at the contract in Phase 2, and the first-venue phase was dropped, so its route is a decision below. Phase 0 is a track that runs alongside the others, listed last under Now because it gates making the repository public. Each phase has an exit criterion. Flags are the unit of work. Read [CONTRIBUTING.md](CONTRIBUTING.md) to claim one. Sizes (S, M, L) on the items below are first estimates. A maintainer refines them when the flag is opened, and splits any L.
+Phases are a sequence, not a promise of dates. There is no Phase 1 or Phase 9. Numbering started at the contract in Phase 2, and the first-venue phase was dropped, so its route is a decision below. Phase 0 is a track that runs alongside the others, listed last under Now. It covers the publication of the repository, which is now public. Each phase has an exit criterion. Flags are the unit of work. Read [CONTRIBUTING.md](CONTRIBUTING.md) to claim one. Sizes (S, M, L) on the items below are first estimates. A maintainer refines them when the flag is opened, and splits any L.
 
 How we built this map. We studied what mature platforms publish about their products and wrote our own plan in our own words. The "Not planned" section says what we leave out and why.
 
@@ -12,9 +12,9 @@ How we built this map. We studied what mature platforms publish about their prod
 | --- | --- | --- | --- |
 | Booking and availability | Create, modify, cancel, seat. A database rule blocks double booking. Services, hours, pacing. Turn time by party size, party limits per service, an overbooking ceiling per venue, and an endpoint that explains why a slot is closed. | Layered availability rules, per-channel inventory, a slot grid with per-day overrides. | 10 |
 | Tables and floor | Zones, combinations, automatic assignment, a visual floor editor. | Saved layouts per service, live table status, sections. | 10 |
-| Guests | A guest record per venue, matched by normalized email or phone, with list, read, and admin merge and unmerge through the API. A contact consent, a rating, and a booking note per reservation. No guest screen in the staff app yet. | Notes, allergies, tags, and segments on the profile, and a staff app view. | 10 |
+| Guests | A guest record per venue, matched by normalized email or phone, with list, read, and admin merge and unmerge through the API. An admin blocklist on hashed contacts refuses new bookings (ADR-0018). A contact consent, a rating, and a booking note per reservation. No guest screen in the staff app yet. | Notes, allergies, tags, and segments on the profile, and a staff app view. | 10 |
 | Waitlist and walk-ins | Both exist in the staff app. | A QR join page, a notice when the table is ready. | 11 |
-| Guest-facing surfaces | None. The API and the MCP server are the only entry points. | An embeddable booking widget, a self-service change link, themes. | 11 |
+| Guest-facing surfaces | A booking widget framed on the venue's site, public booking routes, and a self-service link to view, change, or cancel a booking, in progress (ADR-0017 stages 2 to 7). No confirmation email carries the link yet, and the theme is not rendered. | An embeddable booking widget, a self-service change link, themes. | 11 |
 | No-shows and payments | Status transitions and a reconfirmation status on each reservation. | Deposits, card guarantees, no-show fees, refund windows, automatic reconfirmation messages. | 12 |
 | Messaging | Email confirmations through Resend, off by default. | Pluggable email, SMS, and WhatsApp, automations on the event feed, STOP handling. | 13 |
 | Reviews | None. | A post-visit survey gated by consent, routing to a review link. | 13 |
@@ -22,7 +22,7 @@ How we built this map. We studied what mature platforms publish about their prod
 | Reporting | A pacing view. | Covers, no-show rate, source mix, lead time, exports. | 15 |
 | Multiple venues | Venues are isolated. Venue configuration and structure need an admin key. | Groups, shared guests by opt-in, group roles and dashboards. | 15 |
 | Events and ecosystem | None. | Inquiries, prepaid menus, ticketing, a plugin and theme registry. | 16 |
-| Privacy | Erasure with counts and tombstones, retention for guest records and reservations, per-reservation consent. | Data export, retention settings, a hardening guide. | 7, 10, 13 |
+| Privacy | Erasure by an admin with counts and tombstones, retention for guest records and reservations, per-reservation consent, and a hardening guide for self-hosters. | Data export and retention settings. | 7, 10, 13 |
 
 ## Done
 
@@ -56,12 +56,18 @@ Availability, agenda, list, pacing, and an event feed with a cursor and a retent
 - Guest records per venue, matched by normalized email or phone, with an hourly retention job, list and read endpoints, and admin merge and unmerge with an audit trail ([ADR-0003](docs/adr/0003-guest-identity.md), conformance C17 to C19).
 - An endpoint that explains why a slot is unavailable, from the same rules that decide booking (C20).
 - Turn time by party size, and a minimum and maximum party size per service (C21).
-- Role boundaries. A `read` key cannot write, and configuration, services, tables, floor items, keys, and guest merge need `admin` (C22).
+- Role boundaries. A `read` key cannot write, and configuration, services, tables, floor items, keys, guest merge, and erasure need `admin` (C22, ADR-0019).
 - A booking note, `commentary`, on create, walk-in, and modify, up to 500 characters (C23).
 - An explicit overbooking ceiling per venue, default 0, enforced under a per-venue lock (C24).
 - A reconfirmation status on a reservation (C25).
 - Optional booking policy per venue: how far ahead a booking may name, a cap on one guest's active bookings per day, and blocked dates (C35, [ADR-0013](docs/adr/0013-booking-policy.md)).
 - A pre-shift view in the staff app for a service and date.
+- Services that run on chosen weekdays (C36).
+- Staff invitations, member removal that revokes the member's keys for the venue, role changes, a venue creator transfer, and a membership audit log on the Team screen (C27, C30 to C32, C37, C38).
+- Rate limits on sign-in, sign-up, invitation redemption, and venue creation (C28). On first-user and closed instances, only the owner creates venues (C29).
+- A guest blocklist on keyed hashes of contacts, managed by an admin through the API. A blocked contact cannot book (C56, C57, ADR-0018).
+- An idempotency key on every reservation and waitlist write, and a waitlist entry that is seated once under concurrent requests (C58, C59).
+- An error retry hint for agents (C34), and the MCP server published on npm as `@opencovers/mcp`.
 - Vitest and Testing Library in the staff app and the public site.
 - Signed webhooks over the event feed, with ordered, at-least-once delivery and protection against server-side request forgery. See [docs/contract/webhooks.md](docs/contract/webhooks.md).
 - A one-command deployment with Docker Compose and no hosting vendor. See [docs/deploy.md](docs/deploy.md).
@@ -95,13 +101,14 @@ Exit criterion: the staff app signs in and books a table against an API running 
 
 ### Phase 0: Publication readiness
 
-Status: in progress.
+Status: the repository is public. Two checks remain.
 
 - Done: Apache-2.0 license, README, contribution guide, code of conduct, security policy, governance, and the flag and pull request templates.
-- Pending: confirm the repository history holds no private reference material with `scripts/check-publication.sh`.
-- Pending: private vulnerability reporting enabled and a monitored private contact for the code of conduct.
+- Done: private vulnerability reporting through GitHub, as [SECURITY.md](SECURITY.md) describes.
+- Pending: confirm the repository history holds no private reference material. `scripts/check-publication.sh` checks the files in the working tree, not the history.
+- Pending: a monitored private contact for the code of conduct.
 
-Exit criterion: the repository can be made public without confidential or proprietary material, and every reporting channel is live.
+Exit criterion: the public repository holds no confidential or proprietary material, and every reporting channel is live.
 
 ## The road to maturity
 
@@ -134,19 +141,19 @@ Availability
 - Done: a reservation cannot be seated without a table (C26, no migration).
 
 Staff and floor
-- Done: a pre-shift view in the staff app for a service and date. Its note column is not wired to `commentary` yet, and allergies wait for the legal review. [S]
+- Done: a pre-shift view in the staff app for a service and date. It shows the booking note and the reconfirmation status. Allergies wait for the legal review. [S]
 - Saved floor layouts per service and live table status timers. [M]
 - Done: role boundaries for `read`, `write`, and `admin` (C22).
 - Pending: granular permissions beyond the three roles. [M]
 
-Exit criterion: a host sees who is coming and what they need, and a platform can ask why a slot is closed and get an answer. The second half is met through the API. The first half is partly met. The pre-shift view exists, and it waits on the note column and on the guest profile.
+Exit criterion: a host sees who is coming and what they need, and a platform can ask why a slot is closed and get an answer. The second half is met through the API. The first half is partly met. The pre-shift view shows the booking note, and it waits on the guest profile.
 
 ### Phase 11: Guest-facing surfaces
 
-Today a guest can only book through a platform or an agent. This phase gives venues their own door.
+This phase gives venues their own door, so a guest can book without a platform or an agent. The widget and the self-service link are partly built and tested locally (ADR-0017 stages 2 to 7).
 
-- An embeddable booking widget with no OpenCovers branding. Design accepted in [ADR-0017](docs/adr/0017-booking-widget-and-self-service-link.md): an iframe from a separate widget origin (required in production), public routes under `/v1/public/`, and a staged plan. The contract is written (stage 1: `openapi.yaml`, the five new error codes, cases C39 to C55, REQ-P1 to REQ-P8). Stage 2 is built, the admin settings and the booking key with its rotation (C39, partial). Nothing else is. [L, split it]
-- A self-service link to view, change, or cancel a booking. Design accepted in ADR-0017, and its contract is written in the same cases. Nothing is built. The link is stored as a hash and ends when the guest cancels. [M]
+- An embeddable booking widget with no OpenCovers branding. Design accepted in [ADR-0017](docs/adr/0017-booking-widget-and-self-service-link.md): an iframe from a separate widget origin (required in production), public routes under `/v1/public/`, and a staged plan. The contract is written (stage 1: `openapi.yaml`, the five new error codes, cases C39 to C55, REQ-P1 to REQ-P8). Built: the admin settings and the booking key with its rotation (stage 2), the public config, availability and create (stage 3), the widget app and its framed page at `/w/{bookingKey}` (stage 5), and the Online booking card in Setup (stage 7). Pending: the email stage, the theme, `embed.js`, the consent question, the resend route, and the optional CAPTCHA (stages 8 to 13). See [conformance status](docs/contract/conformance-status.md) for C39 to C55. [L, split it]
+- A self-service link to view, change, or cancel a booking. Design accepted in ADR-0017, and its contract is written in the same cases. Built: the link and its routes (stage 4) and the page at `/r` (stage 6). The link is stored as a hash and ends when the guest cancels. Pending: the link in the confirmation email, which waits for the legal review (stage 8). [M]
 - A public QR page to join the waitlist, and a notice when the table is ready. [M]
 - Theme tokens for the widget and the staff app: colors, radius, type, logo. The staff app already uses CSS variables. ADR-0017 defines the widget's token set, not built. [M]
 - Themes as declarative packages, data only with no executable code, so a theme cannot touch guest data. [M]
