@@ -90,7 +90,7 @@ pnpm does not run dependency build scripts unless the package is listed. The lis
 
 ### Dependency review in CI
 
-`.github/workflows/dependency-review.yml` runs on every pull request. It fails when a change introduces a dependency with a known vulnerability of high or critical severity, or a license outside the allow list. The allow list holds the licenses already in the tree. GPL-family and AGPL licenses are left out on purpose: a copyleft dependency in the engine or the MCP package would change the terms under which self-hosters can ship OpenCovers. An exception for one package goes in the workflow's `allow-dependencies-licenses` with a reason in the PR.
+`.github/workflows/dependency-review.yml` runs on every pull request once the maintainer has enabled the dependency graph and set the `DEPENDENCY_REVIEW` variable (section 6). It fails when a change introduces a dependency with a known vulnerability of high or critical severity, or a license outside the allow list. The allow list holds the licenses already in the tree. GPL-family and AGPL licenses are left out on purpose: a copyleft dependency in the engine or the MCP package would change the terms under which self-hosters can ship OpenCovers. An exception for one package goes in the workflow's `allow-dependencies-licenses` with a reason in the PR.
 
 ### No code from the network at runtime
 
@@ -161,7 +161,7 @@ A change to any of these paths needs the extra review listed next to it. Agents 
 - [ ] **Actions, fork pull request workflows** (Settings, Actions, General): require approval for all outside collaborators, not only first-time contributors.
 - [ ] **Actions, allowed actions**: allow actions created by GitHub and by verified creators, or a pinned list. Today any action is allowed.
 - [ ] **Actions, workflow permissions**: keep the default at read repository contents. Keep "Allow GitHub Actions to create and approve pull requests" off.
-- [ ] **Dependency graph**: enabled. `dependency-review.yml` needs it.
+- [ ] **Dependency graph**: enable it (Settings, Advanced Security). Today it is off. Then add the repository variable `DEPENDENCY_REVIEW` with the value `enabled` (Settings, Secrets and variables, Actions, Variables). Until both are done, `dependency-review.yml` is skipped, because without the graph the action fails on every pull request.
 - [ ] **Dependabot alerts**: enable. Today they are off.
 - [ ] **Dependabot security updates**: enable. Today they are off.
 - [ ] **Private vulnerability reporting**: enable, then update [SECURITY.md](../SECURITY.md), which still describes the repository as private.
