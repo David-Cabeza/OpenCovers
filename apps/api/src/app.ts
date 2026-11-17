@@ -316,8 +316,8 @@ app.get("/v1/public/:bookingKey/availability", async (c) => {
   const rawParty = c.req.query("partySize") ?? "";
   if (!isPublicDate(date) || !/^[1-9]\d{0,5}$/.test(rawParty)) return error(c, "invalid_request");
   const partySize = Number(rawParty);
-  const times = await publicTimes(db, target.venue.id, date, partySize, rulesOf(target.settings));
-  return c.json({ date, partySize, times });
+  const { times, reason } = await publicTimes(db, target.venue.id, date, partySize, rulesOf(target.settings));
+  return c.json({ date, partySize, times, reason });
 });
 
 app.post("/v1/public/:bookingKey/reservations", async (c) => {

@@ -37,6 +37,17 @@ export function Logo({ theme, venue }: { theme: unknown; venue: string }) {
   return <img src={src} alt={venue} referrerPolicy="no-referrer" decoding="async" className="mb-4 h-12 w-auto max-w-full object-contain" />;
 }
 
+/** The venue's logo, its name and its public phone, when it has one, above the step. */
+export function VenueHeader({ venue }: { venue: { name: string; phone: string | null; theme?: unknown } }) {
+  return (
+    <header className="mb-4">
+      <Logo theme={venue.theme} venue={venue.name} />
+      <p className="font-medium [overflow-wrap:anywhere]">{venue.name}</p>
+      {venue.phone && <p className="text-sm text-muted [overflow-wrap:anywhere]">{venue.phone}</p>}
+    </header>
+  );
+}
+
 export function Field(props: { id: string; label: string; hint?: string; error?: string; children: ReactNode }) {
   return (
     <div className="space-y-1">

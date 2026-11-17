@@ -44,7 +44,7 @@ The guest-facing routes under `/v1/public/` and the `online-booking` settings. S
 - `no_suitable_table`: no table combination fits the party, and the venue's overbooking ceiling leaves no room for it. A modify that would leave a booking without tables beyond that ceiling fails with it too. Not retryable.
 - `table_required`: the reservation holds no table, so it cannot be seated. Staff assign a table with a modify first. A modify that would leave a seated reservation without tables fails with it too. Not retryable.
 - `outside_hours`: the time is outside the venue's hours or on a weekday the service does not open, off the slot grid, or after the last seating. Not retryable.
-- `lead_time_violation`: the booking is too close to the requested time. Not retryable.
+- `lead_time_violation`: the booking is too close to the requested time. On the public channel it also covers a start earlier than now, whatever the lead time, so a past date or an earlier time today fails with it (C62). Staff create is unaffected, and a walk-in is never held to it. Not retryable.
 - `beyond_booking_horizon`: the date is further ahead than the venue's `maxAdvanceDays`. Not retryable.
 - `date_blocked`: the venue takes no bookings on that date. Not retryable.
 - `guest_booking_limit`: the guest already holds the venue's `maxActivePerGuestPerDay` active bookings on that date. Create only, because availability does not know the guest. Not retryable.

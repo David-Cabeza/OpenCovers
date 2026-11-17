@@ -34,6 +34,8 @@ export interface PublicReservation {
   date: string;
   time: string;
   partySize: number;
+  /** The online party maximum, where the change screen stops. */
+  maxPartySize: number;
   status: string;
   version: number;
   guest: { name: string; contact: string };
@@ -106,7 +108,7 @@ export function publicApi(bookingKey: string, fetcher: Fetch = (input, init) => 
   return {
     config: () => call<PublicConfig>(fetcher, base),
     availability: (date: string, partySize: number) =>
-      call<{ times: string[] }>(
+      call<{ times: string[]; reason?: "past_date" | "beyond_horizon" | null }>(
         fetcher,
         `${base}/availability?${new URLSearchParams({ date, partySize: String(partySize) })}`,
       ),

@@ -205,6 +205,7 @@ export async function guestView(db: Db, target: PublicVenue, reservationId: stri
     date: row.date,
     time: formatTime(row.startsAt, target.venue.timezone),
     partySize: row.partySize,
+    maxPartySize: target.settings.maxPartySize,
     status: row.status,
     version: row.version,
     guest: { name: row.guestName, contact: maskContact(row.guestContact.trim().toLowerCase()) },

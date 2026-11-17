@@ -70,6 +70,9 @@ export interface OnlineRules {
   maxOpenBookingsPerContact: number | null;
 }
 
+/** A venue as a channel sees it. `refusePast` is set for the public channel: it never takes a start earlier than now. */
+export type ChannelVenue = VenueRow & { refusePast?: boolean };
+
 export type Channel = { kind: "staff" } | { kind: "public"; rules: OnlineRules };
 
 const STAFF: Channel = { kind: "staff" };
@@ -327,13 +330,14 @@ export function applyChannel(
   venue: VenueRow,
   serviceRows: ServiceRow[],
   channel: Channel,
-): { venue: VenueRow; serviceRows: ServiceRow[] } {
+): { venue: ChannelVenue; serviceRows: ServiceRow[] } {
   if (channel.kind === "staff") return { venue, serviceRows };
   const { rules } = channel;
   return {
     venue: {
       ...venue,
       overbookingCeiling: 0,
+      refusePast: true,
       leadTimeMinutes: Math.max(venue.leadTimeMinutes, rules.leadTimeMinutes),
       maxAdvanceDays: stricterHorizon(venue.maxAdvanceDays, rules.maxAdvanceDays) ?? PUBLIC_DEFAULT_MAX_ADVANCE_DAYS,
     },
@@ -389,7 +393,7 @@ function servesDate(service: ServiceRow, date: string): boolean {
 }
 
 function timeReasons(
-  venue: VenueRow,
+  venue: ChannelVenue,
   serviceRows: ServiceRow[],
   request: SlotRequest,
   startsAt: Date,
@@ -465,7 +469,7 @@ function timeReasons(
     }
   }
   const leadMs = venue.leadTimeMinutes * 60000;
-  if (!request.walkIn && venue.leadTimeMinutes > 0 && startsAt.getTime() - now < leadMs) {
+  if (!request.walkIn && (venue.leadTimeMinutes > 0 || venue.refusePast) && startsAt.getTime() - now < leadMs) {
     const earliest = new Date(Math.ceil((now + leadMs) / 60000) * 60000);
     reasons.push({
       code: "lead_time_violation",
@@ -581,7 +585,7 @@ async function tableReasons(
 
 async function evaluateSlot(
   db: Db,
-  venue: VenueRow,
+  venue: ChannelVenue,
   serviceRows: ServiceRow[],
   request: SlotRequest,
 ): Promise<Reason[]> {
@@ -1473,7 +1477,7 @@ interface GridSlot {
 
 async function gridAvailability(
   db: Db,
-  venue: VenueRow,
+  venue: ChannelVenue,
   serviceRows: ServiceRow[],
   date: string,
   partySize: number,
@@ -1513,16 +1517,21 @@ export async function getAvailability(db: Db, venueId: string, date: string, par
   return result;
 }
 
-/** The local times a public create would accept now for this date and party, ascending, each once. */
+export type PublicEmptyReason = "past_date" | "beyond_horizon";
+
+/**
+ * The local times a public create would accept now for this date and party, ascending, each once. When there are
+ * none, `reason` says so for a date already gone or past the horizon; any other empty answer has `reason: null`.
+ */
 export async function publicTimes(
   db: Db,
   venueId: string,
   date: string,
   partySize: number,
   rules: OnlineRules,
-): Promise<string[]> {
+): Promise<{ times: string[]; reason: PublicEmptyReason | null }> {
   const stored = await venueOf(db, venueId);
-  if (!stored) return [];
+  if (!stored) return { times: [], reason: null };
   const { venue, serviceRows } = applyChannel(
     stored,
     await db.select().from(services).where(eq(services.venueId, venueId)),
@@ -1533,7 +1542,14 @@ export async function publicTimes(
     .flat()
     .filter((s) => s.available && s.date === date)
     .map((s) => s.time);
-  return [...new Set(times)].sort();
+  const sorted = [...new Set(times)].sort();
+  if (sorted.length > 0) return { times: sorted, reason: null };
+  const today = localDateTime(new Date(), venue.timezone).date;
+  if (date < today) return { times: sorted, reason: "past_date" };
+  if (venue.maxAdvanceDays !== null && date > addDays(today, venue.maxAdvanceDays)) {
+    return { times: sorted, reason: "beyond_horizon" };
+  }
+  return { times: sorted, reason: null };
 }
 
 export async function explainSlot(

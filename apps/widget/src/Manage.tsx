@@ -5,7 +5,7 @@ import { explainSelfService, type Explanation } from "./errors";
 import { localeOf, translator, type Locale, type MessageId, type Translate } from "./messages";
 import { createKeyedAction } from "./submit";
 import { applyTheme } from "./theme";
-import { dangerButton, Field, inputClass, Logo, primaryButton, secondaryButton, Section } from "./ui";
+import { dangerButton, Field, inputClass, primaryButton, secondaryButton, Section, VenueHeader } from "./ui";
 
 // The self-service page at /r (ADR-0017 section 2, stage 6). The token was read from the fragment before this
 // renders and reaches this file only inside `api`.
@@ -21,7 +21,6 @@ type Mode = "view" | "edit" | "cancel";
 
 type Notice = Explanation & { ok?: boolean };
 
-const MAX_PARTY = 100;
 
 export function ManagePage(props: {
   api: SelfServiceApi | null;
@@ -67,7 +66,7 @@ export function ManagePage(props: {
 
   return (
     <main className="mx-auto w-full max-w-md p-4 text-text">
-      {"view" in page && <Logo theme={page.view.venue.theme} venue={page.view.venue.name} />}
+      {"view" in page && <VenueHeader venue={page.view.venue} />}
       {page.kind === "loading" && <p role="status">{t("loading")}</p>}
       {page.kind === "invalid" && (
         <Section title={t("manage.invalidTitle")} focus>
@@ -134,6 +133,7 @@ function OpenBooking(props: {
   };
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState(false);
+  const maxParty = Math.max(view.maxPartySize, view.partySize);
   const [party, setParty] = useState(view.partySize);
   const [note, setNote] = useState(view.commentary);
 
@@ -239,11 +239,11 @@ function OpenBooking(props: {
                 type="number"
                 inputMode="numeric"
                 min={1}
-                max={MAX_PARTY}
+                max={maxParty}
                 value={party}
                 onChange={(e) => {
                   const n = Number.parseInt(e.target.value, 10);
-                  if (Number.isInteger(n)) setParty(Math.min(MAX_PARTY, Math.max(1, n)));
+                  if (Number.isInteger(n)) setParty(Math.min(maxParty, Math.max(1, n)));
                 }}
                 className={`${inputClass} w-20 text-center`}
               />
@@ -252,8 +252,8 @@ function OpenBooking(props: {
                 className={secondaryButton}
                 aria-label={t("manage.partyMore")}
                 aria-controls={`${ids}-party`}
-                disabled={busy || party >= MAX_PARTY}
-                onClick={() => setParty((n) => Math.min(MAX_PARTY, n + 1))}
+                disabled={busy || party >= maxParty}
+                onClick={() => setParty((n) => Math.min(maxParty, n + 1))}
               >
                 +
               </button>
@@ -347,9 +347,9 @@ function OpenBooking(props: {
       {noticeView}
       <dl className="divide-y divide-border rounded-oc border border-border bg-surface">
         {rows.map(([label, value]) => (
-          <div key={label} className="grid grid-cols-[8rem_1fr] gap-2 p-3">
+          <div key={label} className="grid grid-cols-[8rem_minmax(0,1fr)] gap-2 p-3">
             <dt className="text-muted">{t(label)}</dt>
-            <dd className="break-words">{value}</dd>
+            <dd className="min-w-0 [overflow-wrap:anywhere]">{value}</dd>
           </div>
         ))}
       </dl>
