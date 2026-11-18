@@ -33,4 +33,17 @@ describe("table shapes", () => {
     expect(el.style.width).toBe(el.style.height);
     expect(el.className).toContain("rounded-full");
   });
+
+  it("draws a long table that stretches with its seats up to a limit", () => {
+    const { unmount } = renderWithApp(<FloorCanvas tables={[table("long", 4)]} mode="view" />);
+    const short = face();
+    const shortW = parseFloat(short.style.width);
+    expect(shortW).toBeGreaterThan(parseFloat(short.style.height) * 2);
+    expect(short.className).toContain("rounded-lg");
+    unmount();
+    renderWithApp(<FloorCanvas tables={[table("long", 30)]} mode="view" />);
+    const longW = parseFloat(face().style.width);
+    expect(longW).toBeGreaterThan(shortW);
+    expect(longW).toBeLessThanOrEqual(220);
+  });
 });

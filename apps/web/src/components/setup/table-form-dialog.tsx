@@ -144,6 +144,7 @@ export function TableFormDialog({
                 <option value="oval">Oval</option>
                 <option value="square">Square</option>
                 <option value="rectangle">Rectangle</option>
+                <option value="long">Long</option>
               </select>
             </div>
           </div>
