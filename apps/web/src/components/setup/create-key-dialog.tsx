@@ -90,7 +90,7 @@ export function CreateKeyDialog({
               <code className="flex-1 break-all rounded-md bg-muted px-3 py-2 text-sm">
                 {generated}
               </code>
-              <Button variant="outline" size="icon" onClick={copy}>
+              <Button variant="outline" size="icon" aria-label="Copy key" onClick={copy}>
                 {copied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
               </Button>
             </div>

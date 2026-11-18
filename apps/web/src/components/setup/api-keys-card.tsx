@@ -83,6 +83,7 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label="Revoke key"
                         onClick={() => revoke.mutate(k.hash)}
                       >
                         <Trash2Icon className="size-4" />

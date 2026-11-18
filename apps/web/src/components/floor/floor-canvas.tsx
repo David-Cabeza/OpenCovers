@@ -259,7 +259,7 @@ export function FloorCanvas({
                     ×
                   </button>
                   <div
-                    aria-label="Resize"
+                    title="Resize"
                     onPointerDown={(e) => startResize(e, item)}
                     onPointerMove={onResizeMove}
                     onPointerUp={onResizeUp}

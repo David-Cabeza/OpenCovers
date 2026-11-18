@@ -42,7 +42,7 @@ export function Topbar({ email, onMenu }: { email?: string; onMenu?: () => void 
           </Button>
           {venues.length > 0 && (
             <Select value={venueId ?? ""} onValueChange={setVenue}>
-              <SelectTrigger className="w-full min-w-0 sm:w-[220px]">
+              <SelectTrigger className="w-full min-w-0 sm:w-[220px]" aria-label="Venue">
                 <SelectValue placeholder="Venue" />
               </SelectTrigger>
               <SelectContent>
@@ -60,7 +60,7 @@ export function Topbar({ email, onMenu }: { email?: string; onMenu?: () => void 
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full">
+              <Button variant="ghost" size="icon" className="rounded-full" aria-label={`Account menu ${initials}`}>
                 {initials}
               </Button>
             </DropdownMenuTrigger>
