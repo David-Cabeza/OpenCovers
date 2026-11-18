@@ -204,7 +204,7 @@ describe("OnlineBookingCard", () => {
     const frame = screen.getByLabelText("Embed code with a fixed height");
     expect(script).toHaveValue(`<script src="${o}/w/embed.js" data-key="pk_abc123" async></script>`);
     expect(frame).toHaveValue(
-      `<iframe src="${o}/w/pk_abc123" title="Book a table" width="100%" height="640" style="border:0"></iframe>`,
+      `<iframe src="${o}/w/pk_abc123" title="Book a table" width="100%" height="640" style="border:0" loading="lazy"></iframe>`,
     );
 
     const host = screen.getByLabelText("Address of the booking page");
@@ -214,7 +214,7 @@ describe("OnlineBookingCard", () => {
       '<script src="https://reservas.example.com/w/embed.js" data-key="pk_abc123" async></script>',
     );
     expect(frame).toHaveValue(
-      '<iframe src="https://reservas.example.com/w/pk_abc123" title="Book a table" width="100%" height="640" style="border:0"></iframe>',
+      '<iframe src="https://reservas.example.com/w/pk_abc123" title="Book a table" width="100%" height="640" style="border:0" loading="lazy"></iframe>',
     );
 
     const writeText = vi.spyOn(navigator.clipboard, "writeText");
