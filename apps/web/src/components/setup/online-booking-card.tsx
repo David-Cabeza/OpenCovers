@@ -4,6 +4,7 @@ import { CopyIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "cn";
 import { Pill } from "@/components/pill";
+import { Group } from "./form-parts";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -99,26 +100,6 @@ function ThemePreview({ theme }: { theme: ThemeForm }) {
         Book
       </div>
     </div>
-  );
-}
-
-function Group({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-3">
-      <div>
-        <h3 className="font-display text-lg">{title}</h3>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
-      </div>
-      {children}
-    </section>
   );
 }
 

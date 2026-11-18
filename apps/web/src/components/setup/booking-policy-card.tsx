@@ -109,7 +109,7 @@ export function BookingPolicyCard({ venueId, role }: { venueId: string; role?: R
           <Skeleton className="h-24 w-full" />
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="max-advance-days">Advance days</Label>
                 <Input

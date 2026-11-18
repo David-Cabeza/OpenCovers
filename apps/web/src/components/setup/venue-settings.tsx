@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Group, SaveBar, StatusPanel } from "./form-parts";
 import {
   Card,
   CardContent,
@@ -13,7 +14,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { useVenueConfig } from "@/hooks/use-venue-config";
 import { api, type Role } from "@/lib/api";
 
@@ -101,50 +101,43 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
           <Skeleton className="h-24 w-full" />
         ) : (
           <>
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="enabled">Accepting reservations</Label>
-                <p className="text-sm text-muted-foreground">
-                  Turn this on to let platforms and agents book.
-                </p>
-              </div>
-              <Switch
+            <Group title="Reservations" description="Whether platforms and agents may book this venue.">
+              <StatusPanel
                 id="enabled"
+                label="Accepting reservations"
+                description="Turn this on to let platforms and agents book."
+                live={data?.enabled ?? false}
                 checked={enabled}
                 onCheckedChange={setEnabled}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notice-address">Notice address</Label>
-              <Input
-                id="notice-address"
-                type="email"
-                placeholder="owner@example.com"
-                value={noticeAddress}
-                onChange={(e) => setNoticeAddress(e.target.value)}
-              />
-              <p className="text-sm text-muted-foreground">
-                Required before enabling. Used for legal and STOP notices.
-              </p>
-            </div>
-
-            <div className="space-y-4 border-t pt-6">
-              <div className="flex items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="notifications">Email confirmations</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Send confirmations, cancellations, and booking notices by email.
-                  </p>
-                </div>
-                <Switch
-                  id="notifications"
-                  checked={notificationsEnabled}
-                  onCheckedChange={setNotificationsEnabled}
+              <div className="space-y-2">
+                <Label htmlFor="notice-address">Notice address</Label>
+                <Input
+                  id="notice-address"
+                  type="email"
+                  placeholder="owner@example.com"
+                  value={noticeAddress}
+                  onChange={(e) => setNoticeAddress(e.target.value)}
                 />
+                <p className="text-sm text-muted-foreground">
+                  Required before enabling. Used for legal and STOP notices.
+                </p>
               </div>
+            </Group>
 
-              <div className="grid grid-cols-2 gap-4">
+            <Group title="Email" description="Messages sent to guests, from your own Resend account.">
+              <StatusPanel
+                id="notifications"
+                label="Email confirmations"
+                description="Send confirmations, cancellations, and booking notices by email."
+                live={data?.notificationsEnabled ?? false}
+                checked={notificationsEnabled}
+                onCheckedChange={setNotificationsEnabled}
+                onLabel="On"
+              />
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="from-email">From address</Label>
                   <Input
@@ -170,16 +163,10 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
                   </p>
                 </div>
               </div>
-            </div>
+            </Group>
 
-            <div className="space-y-4 border-t pt-6">
-              <div>
-                <h4 className="font-medium">Booking rules</h4>
-                <p className="text-sm text-muted-foreground">
-                  How the engine accepts bookings. Times are in minutes.
-                </p>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
+            <Group title="Booking rules" description="How the engine accepts bookings. Times are in minutes.">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="slot-interval">Slot interval</Label>
                   <Input
@@ -211,15 +198,9 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
                   />
                 </div>
               </div>
-            </div>
+            </Group>
 
-            <div className="space-y-4 border-t pt-6">
-              <div>
-                <h4 className="font-medium">Overbooking</h4>
-                <p className="text-sm text-muted-foreground">
-                  Take a few covers beyond what your tables seat, with a hard limit.
-                </p>
-              </div>
+            <Group title="Overbooking" description="Take a few covers beyond what your tables seat, with a hard limit.">
               <div className="space-y-2">
                 <Label htmlFor="overbooking-ceiling">Overbooking ceiling</Label>
                 <Input
@@ -239,11 +220,13 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
                   they can be seated. Only an admin can change this.
                 </p>
               </div>
-            </div>
+            </Group>
 
-            <Button onClick={() => save.mutate()} disabled={save.isPending}>
-              {save.isPending ? "Saving…" : "Save settings"}
-            </Button>
+            <SaveBar>
+              <Button onClick={() => save.mutate()} disabled={save.isPending}>
+                {save.isPending ? "Saving…" : "Save settings"}
+              </Button>
+            </SaveBar>
           </>
         )}
       </CardContent>

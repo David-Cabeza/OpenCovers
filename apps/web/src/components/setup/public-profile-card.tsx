@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CopyIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Group, SaveBar, StatusPanel } from "./form-parts";
 import {
   Card,
   CardContent,
@@ -13,7 +14,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { usePublicProfile } from "@/hooks/use-public-profile";
 import { api } from "@/lib/api";
 import { errorMessage, isApiError } from "@/lib/error-message";
@@ -144,19 +144,15 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
           <Skeleton className="h-24 w-full" />
         ) : (
           <>
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="pp-enabled">Publish the public profile</Label>
-                <p className="text-sm text-muted-foreground">
-                  Needs street, city or town and country. The venue name becomes public too.
-                </p>
-              </div>
-              <Switch
-                id="pp-enabled"
-                checked={form.publicProfileEnabled}
-                onCheckedChange={(v) => setForm({ ...form, publicProfileEnabled: v })}
-              />
-            </div>
+            <StatusPanel
+              id="pp-enabled"
+              label="Publish the public profile"
+              description="Needs street, city or town and country. The venue name becomes public too."
+              live={data?.publicProfileEnabled ?? false}
+              checked={form.publicProfileEnabled}
+              onCheckedChange={(v) => setForm({ ...form, publicProfileEnabled: v })}
+              onLabel="Published"
+            />
 
             {incomplete && (
               <div
@@ -167,116 +163,129 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 space-y-2">
-                <Label htmlFor="pp-street">Street</Label>
-                <Input id="pp-street" placeholder="Calle Mayor 1" {...text("street")} />
-                {error("street")}
+            <Group title="Address" description="Where the venue is.">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="pp-street">Street</Label>
+                  <Input id="pp-street" placeholder="Calle Mayor 1" {...text("street")} />
+                  {error("street")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pp-locality">City or town</Label>
+                  <Input id="pp-locality" placeholder="Madrid" {...text("locality")} />
+                  {error("locality")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pp-postal">Postal code</Label>
+                  <Input id="pp-postal" placeholder="28013" {...text("postalCode")} />
+                  {error("postalCode")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pp-region">Region</Label>
+                  <Input id="pp-region" placeholder="Madrid" {...text("region")} />
+                  {error("region")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pp-country">Country</Label>
+                  <Input id="pp-country" placeholder="ES" maxLength={2} {...text("country")} />
+                  {error("country")}
+                  <p className="text-sm text-muted-foreground">
+                    2-letter ISO code in capitals, for example ES.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="pp-locality">City or town</Label>
-                <Input id="pp-locality" placeholder="Madrid" {...text("locality")} />
-                {error("locality")}
+            </Group>
+
+            <Group title="Contact and details" description="How guests reach you and what you serve.">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="pp-phone">Phone</Label>
+                  <Input id="pp-phone" type="tel" placeholder="+34 910 000 000" {...text("phone")} />
+                  {error("phone")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pp-cuisine">Cuisine</Label>
+                  <Input id="pp-cuisine" placeholder="Spanish" {...text("cuisine")} />
+                  {error("cuisine")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pp-website">Website</Label>
+                  <Input
+                    id="pp-website"
+                    type="url"
+                    placeholder="https://example.com/"
+                    {...text("websiteUrl")}
+                  />
+                  {error("websiteUrl")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pp-booking">Booking link</Label>
+                  <Input
+                    id="pp-booking"
+                    type="url"
+                    placeholder="https://example.com/reservas"
+                    {...text("bookingUrl")}
+                  />
+                  {error("bookingUrl")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pp-price">Price range</Label>
+                  <select
+                    id="pp-price"
+                    value={form.priceRange}
+                    onChange={(e) => setForm({ ...form, priceRange: e.target.value })}
+                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                  >
+                    <option value="">Not shown</option>
+                    {PRICE_RANGES.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="pp-postal">Postal code</Label>
-                <Input id="pp-postal" placeholder="28013" {...text("postalCode")} />
-                {error("postalCode")}
+            </Group>
+
+            <Group title="Location" description="Optional. Give both coordinates or neither.">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="pp-lat">Latitude</Label>
+                  <Input
+                    id="pp-lat"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="40.4168"
+                    {...text("latitude")}
+                  />
+                  {error("latitude")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pp-lon">Longitude</Label>
+                  <Input
+                    id="pp-lon"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="-3.7038"
+                    {...text("longitude")}
+                  />
+                  {error("longitude")}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="pp-region">Region</Label>
-                <Input id="pp-region" placeholder="Madrid" {...text("region")} />
-                {error("region")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pp-country">Country</Label>
-                <Input id="pp-country" placeholder="ES" maxLength={2} {...text("country")} />
-                {error("country")}
-                <p className="text-sm text-muted-foreground">
-                  2-letter ISO code in capitals, for example ES.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pp-phone">Phone</Label>
-                <Input id="pp-phone" type="tel" placeholder="+34 910 000 000" {...text("phone")} />
-                {error("phone")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pp-cuisine">Cuisine</Label>
-                <Input id="pp-cuisine" placeholder="Spanish" {...text("cuisine")} />
-                {error("cuisine")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pp-website">Website</Label>
-                <Input
-                  id="pp-website"
-                  type="url"
-                  placeholder="https://example.com/"
-                  {...text("websiteUrl")}
-                />
-                {error("websiteUrl")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pp-booking">Booking link</Label>
-                <Input
-                  id="pp-booking"
-                  type="url"
-                  placeholder="https://example.com/reservas"
-                  {...text("bookingUrl")}
-                />
-                {error("bookingUrl")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pp-price">Price range</Label>
-                <select
-                  id="pp-price"
-                  value={form.priceRange}
-                  onChange={(e) => setForm({ ...form, priceRange: e.target.value })}
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
-                >
-                  <option value="">Not shown</option>
-                  {PRICE_RANGES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div />
-              <div className="space-y-2">
-                <Label htmlFor="pp-lat">Latitude</Label>
-                <Input
-                  id="pp-lat"
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="40.4168"
-                  {...text("latitude")}
-                />
-                {error("latitude")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pp-lon">Longitude</Label>
-                <Input
-                  id="pp-lon"
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="-3.7038"
-                  {...text("longitude")}
-                />
-                {error("longitude")}
-              </div>
-            </div>
+            </Group>
             <p className="text-sm text-muted-foreground">
               Empty a field and save to clear it. Coordinates are optional, but give both or
               neither.
             </p>
 
-            <Button onClick={submit} disabled={save.isPending}>
-              {save.isPending ? "Saving…" : "Save public profile"}
-            </Button>
+            <SaveBar>
+              <Button onClick={submit} disabled={save.isPending}>
+                {save.isPending ? "Saving…" : "Save public profile"}
+              </Button>
+            </SaveBar>
 
             <div className="space-y-3 border-t pt-6">
-              <h3 className="text-sm font-medium">Preview</h3>
+              <h3 className="font-display text-lg">Preview</h3>
               <div className="space-y-2">
                 <Label htmlFor="pp-url">Public JSON-LD address</Label>
                 <div className="flex gap-2">
