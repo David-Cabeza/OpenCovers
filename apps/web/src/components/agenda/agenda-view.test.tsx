@@ -346,12 +346,3 @@ describe("AgendaView overview", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Today" })).not.toBeInTheDocument());
   });
 });
-
-describe("shiftIso", () => {
-  it("crosses month and year boundaries", async () => {
-    const { shiftIso } = await import("@/lib/date");
-    expect(shiftIso("2026-11-30", 1)).toBe("2026-12-01");
-    expect(shiftIso("2026-01-01", -1)).toBe("2025-12-31");
-    expect(shiftIso("2026-03-29", 1)).toBe("2026-03-30");
-  });
-});

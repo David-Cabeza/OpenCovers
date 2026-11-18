@@ -2,8 +2,6 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarPlusIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   MoreHorizontalIcon,
   UsersIcon,
 } from "lucide-react";
@@ -11,7 +9,9 @@ import { cn } from "cn";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { DayNav } from "@/components/day-nav";
 import { PageHeader } from "@/components/layout/page-header";
+import { Stat } from "@/components/stat";
 import { StatusBadge } from "./status-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AssignTablesDialog } from "@/components/reservation/assign-tables-dialog";
 import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
@@ -29,7 +28,7 @@ import { EmptyState } from "@/components/empty-state";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useTables } from "@/hooks/use-tables";
 import { api, type Reservation } from "@/lib/api";
-import { longDate, shiftIso, todayIso } from "@/lib/date";
+import { longDate, todayIso } from "@/lib/date";
 import { errorMessage, isApiError } from "@/lib/error-message";
 import { guestInitials } from "@/lib/format";
 
@@ -63,24 +62,6 @@ function groupByService(reservations: Reservation[]) {
     else groups.push({ service: r.service, items: [r] });
   }
   return groups;
-}
-
-function Stat({ label, value, alert = false }: { label: string; value: number; alert?: boolean }) {
-  return (
-    <div
-      className={cn(
-        "rounded-xl border bg-card p-4",
-        alert && "border-transparent bg-danger-soft text-destructive",
-      )}
-    >
-      <div
-        className={cn("text-sm text-muted-foreground", alert && "text-destructive")}
-      >
-        {label}
-      </div>
-      <div className="mt-1 font-display text-4xl tabular-nums">{value}</div>
-    </div>
-  );
 }
 
 export function AgendaView({ venueId }: { venueId: string }) {
@@ -128,7 +109,6 @@ export function AgendaView({ venueId }: { venueId: string }) {
     (r) => ["booked", "seated"].includes(r.status) && (r.tables ?? []).length === 0,
   ).length;
   const groups = groupByService(reservations);
-  const today = todayIso();
 
   return (
     <div className="space-y-6">
@@ -137,36 +117,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
         description={<span className="first-letter:uppercase">{longDate(date)}</span>}
         actions={
           <>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Previous day"
-                onClick={() => setDate(shiftIso(date, -1))}
-              >
-                <ChevronLeftIcon />
-              </Button>
-              <Input
-                type="date"
-                value={date}
-                onChange={(e) => e.target.value && setDate(e.target.value)}
-                aria-label="Date"
-                className="w-fit"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Next day"
-                onClick={() => setDate(shiftIso(date, 1))}
-              >
-                <ChevronRightIcon />
-              </Button>
-            </div>
-            {date !== today && (
-              <Button variant="ghost" onClick={() => setDate(today)}>
-                Today
-              </Button>
-            )}
+            <DayNav date={date} onChange={setDate} />
             <Button onClick={() => setWalkInOpen(true)}>Walk-in</Button>
           </>
         }
@@ -193,7 +144,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
             <Stat label="Reservations" value={active.length} />
             <Stat label="Covers" value={active.reduce((n, r) => n + r.partySize, 0)} />
             <Stat label="Now seated" value={active.filter((r) => r.status === "seated").length} />
-            <Stat label="Needs table" value={needTable} alert={needTable > 0} />
+            <Stat label="Needs table" value={needTable} tone={needTable > 0 ? "danger" : "default"} />
           </div>
 
           {groups.map((group) => (

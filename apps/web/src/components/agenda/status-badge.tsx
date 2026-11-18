@@ -1,11 +1,12 @@
-import { cn } from "cn";
+import type { PillTone } from "@/components/pill";
+import { Pill } from "@/components/pill";
 
-const STATUS: Record<string, { label: string; tone: string; dot: string }> = {
-  booked: { label: "Booked", tone: "bg-info-soft text-info", dot: "bg-info" },
-  seated: { label: "Seated", tone: "bg-success-soft text-success", dot: "bg-success" },
-  attended: { label: "Attended", tone: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
-  no_show: { label: "No-show", tone: "bg-warning-soft text-warning", dot: "bg-warning" },
-  cancelled: { label: "Cancelled", tone: "bg-danger-soft text-destructive", dot: "bg-destructive" },
+const STATUS: Record<string, { label: string; tone: PillTone }> = {
+  booked: { label: "Booked", tone: "info" },
+  seated: { label: "Seated", tone: "success" },
+  attended: { label: "Attended", tone: "muted" },
+  no_show: { label: "No-show", tone: "warning" },
+  cancelled: { label: "Cancelled", tone: "danger" },
 };
 
 export function statusLabel(status: string): string {
@@ -16,15 +17,8 @@ export function statusLabel(status: string): string {
 export function StatusBadge({ status, className }: { status: string; className?: string }) {
   const s = STATUS[status] ?? STATUS.attended;
   return (
-    <span
-      className={cn(
-        "inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap",
-        s.tone,
-        className,
-      )}
-    >
-      <span aria-hidden="true" className={cn("size-1.5 rounded-full", s.dot)} />
+    <Pill tone={s.tone} dot className={className}>
       {statusLabel(status)}
-    </span>
+    </Pill>
   );
 }
