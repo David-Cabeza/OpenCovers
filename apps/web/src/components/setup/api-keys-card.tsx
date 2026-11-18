@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { Pill, type PillTone } from "@/components/pill";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,17 +13,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useVenueKeys } from "@/hooks/use-venue-keys";
-import { api } from "@/lib/api";
+import { api, type Role } from "@/lib/api";
 import { CreateKeyDialog } from "./create-key-dialog";
+
+const ROLE_TONE: Record<Role, PillTone> = { admin: "warning", write: "info", read: "muted" };
 
 export function ApiKeysCard({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
@@ -61,39 +55,32 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
             <KeyRoundIcon className="size-4" /> No keys yet.
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Principal</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="w-16" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {keys.map((k) => (
-                <TableRow key={k.hash}>
-                  <TableCell className="font-medium">{k.principal}</TableCell>
-                  <TableCell>
-                    <Badge variant={k.role === "write" ? "default" : "secondary"}>
-                      {k.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Revoke key"
-                        onClick={() => revoke.mutate(k.hash)}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <ul className="-my-2 divide-y">
+            {keys.map((k) => (
+              <li key={k.hash} className="flex items-center justify-between gap-3 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground"
+                  >
+                    <KeyRoundIcon className="size-4" />
+                  </span>
+                  <span className="truncate font-medium">{k.principal}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Pill tone={ROLE_TONE[k.role] ?? "muted"}>{k.role}</Pill>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Revoke key for ${k.principal}`}
+                    onClick={() => revoke.mutate(k.hash)}
+                  >
+                    <Trash2Icon className="size-4" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </CardContent>
       <CreateKeyDialog venueId={venueId} open={open} onOpenChange={setOpen} />

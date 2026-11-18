@@ -4,7 +4,7 @@ import { CopyIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "cn";
 import { Pill } from "@/components/pill";
-import { Group } from "./form-parts";
+import { Group, SaveBar } from "./form-parts";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -539,12 +539,6 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
               )}
             </fieldset>
 
-            <div className="sticky bottom-0 z-[5] -mx-6 -mb-6 flex items-center gap-3 border-t bg-card/95 px-6 py-3 backdrop-blur">
-              <Button onClick={submit} disabled={save.isPending}>
-                {save.isPending ? "Saving…" : "Save online booking"}
-              </Button>
-              <span className="text-sm text-muted-foreground">Changes apply to new bookings.</span>
-            </div>
 
             <div className="space-y-4 border-t pt-6">
               <h3 className="font-display text-lg">Booking page and embed code</h3>
@@ -662,6 +656,12 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                 </div>
               )}
             </div>
+
+            <SaveBar hint="Changes apply to new bookings.">
+              <Button onClick={submit} disabled={save.isPending}>
+                {save.isPending ? "Saving…" : "Save online booking"}
+              </Button>
+            </SaveBar>
           </>
         )}
       </CardContent>
