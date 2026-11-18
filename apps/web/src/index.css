@@ -4,6 +4,8 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* Tells the browser which palette to use for what it draws itself: scrollbars, date and time pickers, form controls. */
+  color-scheme: light;
   --radius: 0.75rem;
   --background: oklch(0.975 0.003 100);
   --foreground: oklch(0.21 0.01 60);
@@ -52,6 +54,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.17 0.01 60);
   --foreground: oklch(0.96 0.005 95);
   --card: oklch(0.21 0.01 60);
