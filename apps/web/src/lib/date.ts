@@ -46,3 +46,13 @@ export function longDate(iso: string): string {
     month: "long",
   }).format(parseIso(iso));
 }
+
+/** Time elapsed since `iso`, short: "<1m", "12m", "1h 5m", "2d". */
+export function elapsed(iso: string, now: number = Date.now()): string {
+  const minutes = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000));
+  if (minutes < 1) return "<1m";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return minutes % 60 === 0 ? `${hours}h` : `${hours}h ${minutes % 60}m`;
+  return `${Math.floor(hours / 24)}d`;
+}
