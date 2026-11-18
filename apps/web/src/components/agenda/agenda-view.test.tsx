@@ -119,6 +119,7 @@ describe("AgendaView actions", () => {
     await openRowMenu(user);
 
     await user.click(await screen.findByRole("menuitem", { name: "Cancel" }));
+    await user.click(await screen.findByRole("button", { name: "Cancel reservation" }));
 
     await waitFor(() => expect(api.writes()).toHaveLength(1));
     expect(api.writes()[0].path).toBe("/v1/venues/v1/reservations/r1/cancel");
@@ -151,8 +152,25 @@ describe("AgendaView actions", () => {
     await openRowMenu(user);
 
     await user.click(await screen.findByRole("menuitem", { name: "Cancel" }));
+    await user.click(await screen.findByRole("button", { name: "Cancel reservation" }));
 
     expect(await screen.findByText("This reservation is already cancelled.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("asks before cancelling and writes nothing when the guest is kept", async () => {
+    const { api, user } = setup(reservation());
+    await openRowMenu(user);
+
+    await user.click(await screen.findByRole("menuitem", { name: "Cancel" }));
+    expect(await screen.findByRole("heading", { name: "Cancel this reservation?" })).toBeInTheDocument();
+    expect(api.writes()).toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: "Keep reservation" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(api.writes()).toHaveLength(0);
+    expect(screen.getByText("Booked")).toBeInTheDocument();
   });
 
   it("offers no status actions for a finished reservation", async () => {
