@@ -39,6 +39,25 @@ function setup(extra: Parameters<typeof mockApi>[0] = {}) {
 describe("TeamView", () => {
   afterEach(resetApiMocks);
 
+  it("summarises people, admins and pending invites", async () => {
+    setup();
+    const people = (await screen.findByText("People")).parentElement as HTMLElement;
+    expect(within(people).getByText("2")).toBeInTheDocument();
+    const admins = screen.getByText("Admins").parentElement as HTMLElement;
+    expect(within(admins).getByText("1")).toBeInTheDocument();
+    const invites = screen.getByText("Pending invites").parentElement as HTMLElement;
+    expect(within(invites).getByText("1")).toBeInTheDocument();
+  });
+
+  it("shows each member's initial and each invitation's status", async () => {
+    setup();
+    expect(await screen.findByText("A")).toBeInTheDocument();
+    expect(screen.getByText("B")).toBeInTheDocument();
+    const row = screen.getByText("new@example.com").closest("li") as HTMLElement;
+    expect(within(row).getByText("pending")).toBeInTheDocument();
+    expect(within(row).getByText("read")).toBeInTheDocument();
+  });
+
   it("lists members with their role", async () => {
     setup();
     expect(await screen.findByLabelText("Role of bo@example.com")).toHaveValue("write");

@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { Pill, type PillTone } from "@/components/pill";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,17 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   creator_transferred: "Venue creator transferred",
   guest_blocked: "Guest blocked",
   guest_unblocked: "Guest unblocked",
+};
+
+const ACTION_TONE: Record<AuditAction, PillTone> = {
+  invited: "info",
+  invite_revoked: "muted",
+  redeemed: "success",
+  member_removed: "danger",
+  role_changed: "warning",
+  creator_transferred: "warning",
+  guest_blocked: "danger",
+  guest_unblocked: "success",
 };
 
 function shortId(id: string): string {
@@ -101,8 +113,10 @@ export function AuditLog({ venueId }: { venueId: string }) {
             <TableBody>
               {entries.map((e) => (
                 <TableRow key={e.id}>
-                  <TableCell className="font-medium">
-                    {ACTION_LABELS[e.action] ?? e.action}
+                  <TableCell>
+                    <Pill tone={ACTION_TONE[e.action] ?? "muted"} dot>
+                      {ACTION_LABELS[e.action] ?? e.action}
+                    </Pill>
                   </TableCell>
                   <TableCell>
                     <Person id={e.actorUserId} members={members} />
