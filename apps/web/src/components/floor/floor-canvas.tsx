@@ -43,6 +43,7 @@ const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 function tableSize(shape: string | undefined, seats: number): { w: number; h: number } {
   if (shape === "rectangle") return { w: 64, h: 46 };
   if (shape === "square") return { w: 52, h: 52 };
+  if (shape === "oval") return { w: Math.min(56 + seats * 4, 96), h: 44 };
   const d = Math.min(46 + seats * 3, 60);
   return { w: d, h: d };
 }
@@ -64,6 +65,14 @@ function chairPositions(
       } else {
         pts.push({ x: span / 2 - ((i - perSide + 0.5) / perSide) * span, y: size.h / 2 + CHAIR_GAP });
       }
+    }
+  } else if (shape === "oval") {
+    // Chairs go round the outline, a little off the ellipse so they sit beside the table edge.
+    const rx = size.w / 2 + CHAIR_GAP;
+    const ry = size.h / 2 + CHAIR_GAP;
+    for (let i = 0; i < seats; i++) {
+      const a = (i / seats) * 2 * Math.PI - Math.PI / 2;
+      pts.push({ x: Math.cos(a) * rx, y: Math.sin(a) * ry });
     }
   } else if (shape === "square") {
     // Spread the chairs over the four sides (top, bottom, right, left first), centered on each side.
@@ -368,7 +377,7 @@ export function FloorCanvas({
                   className={cn(
                     "absolute flex flex-col items-center justify-center border-2 text-center transition-colors group-focus-visible:ring-[3px] group-focus-visible:ring-ring/50",
                     skin.tableShadow,
-                    shape === "round" ? "rounded-full" : "rounded-lg",
+                    shape === "round" ? "rounded-full" : shape === "oval" ? "rounded-[50%]" : "rounded-lg",
                     t.occupied
                       ? "border-success bg-success-soft text-success"
                       : shape === "round"
