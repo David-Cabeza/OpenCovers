@@ -121,6 +121,87 @@ function EntranceShape() {
   );
 }
 
+function SofaShape() {
+  return (
+    <svg viewBox="0 0 120 48" className="size-full" preserveAspectRatio="none">
+      <rect x="1" y="1" width="118" height="46" rx="6" className="fill-muted stroke-muted-foreground/40" {...STROKE} />
+      <rect x="1" y="1" width="118" height="12" rx="6" className="fill-muted-foreground/25" />
+      {[0, 1, 2].map((i) => (
+        <rect key={i} x={7 + i * 36} y="15" width="34" height="28" rx="5" className="fill-tabletop stroke-muted-foreground/30" {...STROKE} />
+      ))}
+      <rect x="1" y="1" width="8" height="46" rx="4" className="fill-muted-foreground/20" />
+      <rect x="111" y="1" width="8" height="46" rx="4" className="fill-muted-foreground/20" />
+    </svg>
+  );
+}
+
+function ColumnShape() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-full" preserveAspectRatio="xMidYMid meet">
+      <circle cx="12" cy="13" r="10" className="fill-black/10" />
+      <circle cx="12" cy="12" r="10" className="fill-muted stroke-muted-foreground/60" {...STROKE} />
+      <circle cx="12" cy="12" r="6" className="fill-tabletop/60 stroke-muted-foreground/30" {...STROKE} />
+    </svg>
+  );
+}
+
+function StairsShape() {
+  return (
+    <svg viewBox="0 0 72 96" className="size-full" preserveAspectRatio="none">
+      <rect x="1" y="1" width="70" height="94" rx="2" className="fill-tabletop stroke-muted-foreground/50" {...STROKE} />
+      {Array.from({ length: 9 }, (_, i) => (
+        <line key={i} x1="1" x2="71" y1={11 + i * 9.5} y2={11 + i * 9.5} className="stroke-muted-foreground/40" vectorEffect="non-scaling-stroke" strokeWidth="1" />
+      ))}
+      <path d="M36 86 L36 12 M28 22 L36 12 L44 22" fill="none" className="stroke-primary" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+function RugShape() {
+  return (
+    <svg viewBox="0 0 120 80" className="size-full" preserveAspectRatio="none">
+      <rect x="1" y="1" width="118" height="78" rx="4" className="fill-primary/10 stroke-primary/40" {...STROKE} />
+      <rect x="8" y="8" width="104" height="64" rx="2" className="fill-none stroke-primary/40" strokeDasharray="4 3" {...STROKE} />
+      <rect x="18" y="18" width="84" height="44" rx="2" className="fill-primary/10 stroke-primary/20" {...STROKE} />
+    </svg>
+  );
+}
+
+function LargePlantShape() {
+  const angles = Array.from({ length: 12 }, (_, i) => i * 30);
+  return (
+    <svg viewBox="0 0 64 64" className="size-full" preserveAspectRatio="xMidYMid meet">
+      <circle cx="32" cy="34" r="27" className="fill-black/10" />
+      {angles.map((a, i) => (
+        <path
+          key={a}
+          d="M32 32 C22 22 24 8 32 2 C40 8 42 22 32 32 Z"
+          transform={`rotate(${a + (i % 2 ? 15 : 0)} 32 32)`}
+          className={i % 2 ? "fill-primary" : "fill-primary/70"}
+        />
+      ))}
+      {angles.map((a) => (
+        <path key={`v${a}`} d="M32 30 L32 9" transform={`rotate(${a} 32 32)`} className="stroke-tabletop/40" strokeWidth="0.8" strokeLinecap="round" fill="none" />
+      ))}
+      <circle cx="32" cy="32" r="3.5" className="fill-primary" />
+    </svg>
+  );
+}
+
+function UmbrellaShape() {
+  const spokes = Array.from({ length: 8 }, (_, i) => i * 45 + 22.5);
+  return (
+    <svg viewBox="0 0 96 96" className="size-full" preserveAspectRatio="xMidYMid meet">
+      <polygon points="48,6 77,18 90,48 77,78 48,90 19,78 6,48 19,18" transform="translate(2 3)" className="fill-black/10" />
+      <polygon points="48,6 77,18 90,48 77,78 48,90 19,78 6,48 19,18" className="fill-tabletop stroke-muted-foreground/40" {...STROKE} />
+      {spokes.map((a) => (
+        <line key={a} x1="48" y1="48" x2="48" y2="8" transform={`rotate(${a} 48 48)`} className="stroke-muted-foreground/30" vectorEffect="non-scaling-stroke" strokeWidth="1" />
+      ))}
+      <circle cx="48" cy="48" r="5" className="fill-muted stroke-muted-foreground/50" {...STROKE} />
+    </svg>
+  );
+}
+
 function GenericShape() {
   return (
     <svg viewBox="0 0 40 40" className="size-full" preserveAspectRatio="none">
@@ -147,6 +228,18 @@ export function FloorItemShape({ type }: { type: string }) {
       return <WindowShape />;
     case "entrance":
       return <EntranceShape />;
+    case "sofa":
+      return <SofaShape />;
+    case "column":
+      return <ColumnShape />;
+    case "stairs":
+      return <StairsShape />;
+    case "rug":
+      return <RugShape />;
+    case "large-plant":
+      return <LargePlantShape />;
+    case "umbrella":
+      return <UmbrellaShape />;
     default:
       return <GenericShape />;
   }
