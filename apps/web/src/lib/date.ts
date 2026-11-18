@@ -25,3 +25,24 @@ export function timeAgo(iso: string): string {
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
 }
+
+function parseIso(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** `iso` moved by `days` calendar days (DST-safe: works on the local date, not on milliseconds). */
+export function shiftIso(iso: string, days: number): string {
+  const date = parseIso(iso);
+  date.setDate(date.getDate() + days);
+  return toIsoDate(date);
+}
+
+/** "Wednesday, 18 November" for the viewer's locale. */
+export function longDate(iso: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(parseIso(iso));
+}

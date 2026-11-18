@@ -42,7 +42,7 @@ function setup(initial: Reservation, extra: Parameters<typeof mockApi>[0] = {}) 
 }
 
 async function openRowMenu(user: ReturnType<typeof userEvent.setup>, guest = "Jane Doe") {
-  const row = (await screen.findByText(guest)).closest("tr") as HTMLElement;
+  const row = (await screen.findByText(guest)).closest("[data-slot=reservation-row]") as HTMLElement;
   await user.click(within(row).getByRole("button"));
 }
 
@@ -298,5 +298,60 @@ describe("AgendaView table assignment", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Seat" }));
 
     expect(await screen.findByText("This reservation cannot change to that status right now.")).toBeInTheDocument();
+  });
+});
+
+describe("AgendaView overview", () => {
+  afterEach(resetApiMocks);
+
+  const reservations = [
+    reservation({ id: "a", time: "13:00", service: "lunch", partySize: 2, tables: ["t1"], guest: { name: "Ana", consent: "unknown" } }),
+    reservation({ id: "b", time: "20:30", service: "dinner", partySize: 4, guest: { name: "Beto", consent: "unknown" } }),
+    reservation({ id: "c", time: "21:00", service: "dinner", partySize: 3, status: "cancelled", guest: { name: "Cris", consent: "unknown" } }),
+  ];
+
+  function setupDay() {
+    const api = mockApi({
+      [AGENDA]: () => ({ body: { reservations } }),
+      [TABLES_ROUTE]: () => ({ body: { tables: TABLES } }),
+    });
+    renderWithApp(<AgendaView venueId="v1" />);
+    return { api, user: userEvent.setup() };
+  }
+
+  it("summarizes the day without counting cancelled bookings", async () => {
+    setupDay();
+    await screen.findByText("Ana");
+    const stat = (label: string) => screen.getByText(label).nextElementSibling;
+    expect(stat("Reservations")).toHaveTextContent("2");
+    expect(stat("Covers")).toHaveTextContent("6");
+    expect(stat("Needs table")).toHaveTextContent("1");
+  });
+
+  it("groups the bookings by service", async () => {
+    setupDay();
+    await screen.findByText("Ana");
+    expect(screen.getByRole("heading", { name: "lunch" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "dinner" })).toBeInTheDocument();
+  });
+
+  it("moves between days and offers a way back to today", async () => {
+    const { api, user } = setupDay();
+    await screen.findByText("Ana");
+    expect(screen.queryByRole("button", { name: "Today" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next day" }));
+    expect(await screen.findByRole("button", { name: "Today" })).toBeInTheDocument();
+    await waitFor(() => expect(api.calls("GET", "/v1/venues/v1/agenda").length).toBeGreaterThan(1));
+    await user.click(screen.getByRole("button", { name: "Today" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Today" })).not.toBeInTheDocument());
+  });
+});
+
+describe("shiftIso", () => {
+  it("crosses month and year boundaries", async () => {
+    const { shiftIso } = await import("@/lib/date");
+    expect(shiftIso("2026-11-30", 1)).toBe("2026-12-01");
+    expect(shiftIso("2026-01-01", -1)).toBe("2025-12-31");
+    expect(shiftIso("2026-03-29", 1)).toBe("2026-03-30");
   });
 });

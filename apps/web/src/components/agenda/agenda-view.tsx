@@ -1,9 +1,18 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalendarPlusIcon, MoreHorizontalIcon } from "lucide-react";
+import {
+  CalendarPlusIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  MoreHorizontalIcon,
+  UsersIcon,
+} from "lucide-react";
+import { cn } from "cn";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/layout/page-header";
+import { StatusBadge } from "./status-badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,14 +22,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { AssignTablesDialog } from "@/components/reservation/assign-tables-dialog";
 import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
@@ -28,25 +29,9 @@ import { EmptyState } from "@/components/empty-state";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useTables } from "@/hooks/use-tables";
 import { api, type Reservation } from "@/lib/api";
-import { todayIso } from "@/lib/date";
+import { longDate, shiftIso, todayIso } from "@/lib/date";
 import { errorMessage, isApiError } from "@/lib/error-message";
 import { guestInitials } from "@/lib/format";
-
-const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  booked: "default",
-  seated: "secondary",
-  attended: "outline",
-  no_show: "destructive",
-  cancelled: "destructive",
-};
-
-const statusLabel: Record<string, string> = {
-  booked: "Booked",
-  seated: "Seated",
-  attended: "Attended",
-  no_show: "No-show",
-  cancelled: "Cancelled",
-};
 
 type RowAction =
   | { kind: "status"; label: string; status: string }
@@ -68,6 +53,34 @@ function rowActions(status: string): RowAction[] {
     default:
       return [];
   }
+}
+
+function groupByService(reservations: Reservation[]) {
+  const groups: { service: string; items: Reservation[] }[] = [];
+  for (const r of reservations) {
+    const group = groups.find((g) => g.service === r.service);
+    if (group) group.items.push(r);
+    else groups.push({ service: r.service, items: [r] });
+  }
+  return groups;
+}
+
+function Stat({ label, value, alert = false }: { label: string; value: number; alert?: boolean }) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border bg-card p-4",
+        alert && "border-transparent bg-danger-soft text-destructive",
+      )}
+    >
+      <div
+        className={cn("text-sm text-muted-foreground", alert && "text-destructive")}
+      >
+        {label}
+      </div>
+      <div className="mt-1 font-display text-4xl tabular-nums">{value}</div>
+    </div>
+  );
 }
 
 export function AgendaView({ venueId }: { venueId: string }) {
@@ -110,30 +123,64 @@ export function AgendaView({ venueId }: { venueId: string }) {
     },
   });
 
+  const active = reservations.filter((r) => ["booked", "seated", "attended"].includes(r.status));
+  const needTable = active.filter(
+    (r) => ["booked", "seated"].includes(r.status) && (r.tables ?? []).length === 0,
+  ).length;
+  const groups = groupByService(reservations);
+  const today = todayIso();
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="font-display text-2xl">Agenda</h2>
-          <p className="text-sm text-muted-foreground">
-            Reservations for the selected day.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setWalkInOpen(true)}>
-            Walk-in
-          </Button>
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-fit"
-          />
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Agenda"
+        description={<span className="first-letter:uppercase">{longDate(date)}</span>}
+        actions={
+          <>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Previous day"
+                onClick={() => setDate(shiftIso(date, -1))}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => e.target.value && setDate(e.target.value)}
+                aria-label="Date"
+                className="w-fit"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Next day"
+                onClick={() => setDate(shiftIso(date, 1))}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
+            {date !== today && (
+              <Button variant="ghost" onClick={() => setDate(today)}>
+                Today
+              </Button>
+            )}
+            <Button onClick={() => setWalkInOpen(true)}>Walk-in</Button>
+          </>
+        }
+      />
 
       {isPending ? (
-        <Skeleton className="h-64 w-full" />
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((n) => (
+              <Skeleton key={n} className="h-24" />
+            ))}
+          </div>
+          <Skeleton className="h-64 w-full" />
+        </div>
       ) : reservations.length === 0 ? (
         <EmptyState
           icon={CalendarPlusIcon}
@@ -141,33 +188,39 @@ export function AgendaView({ venueId }: { venueId: string }) {
           description="Nothing booked for this day yet."
         />
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Guest</TableHead>
-                <TableHead>Party</TableHead>
-                <TableHead>Tables</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {reservations.map((r) => (
-                <ReservationRow
-                  key={r.id}
-                  reservation={r}
-                  tableNames={tableNames}
-                  onAssign={() => setAssigning(r)}
-                  onCancel={() => cancel.mutate(r.id)}
-                  onStatus={(status) => setStatus.mutate({ id: r.id, status })}
-                  onEdit={() => setEditing(r)}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Stat label="Reservations" value={active.length} />
+            <Stat label="Covers" value={active.reduce((n, r) => n + r.partySize, 0)} />
+            <Stat label="Now seated" value={active.filter((r) => r.status === "seated").length} />
+            <Stat label="Needs table" value={needTable} alert={needTable > 0} />
+          </div>
+
+          {groups.map((group) => (
+            <section key={group.service} className="space-y-2">
+              <div className="flex items-baseline justify-between gap-3 px-1">
+                <h3 className="font-display text-lg first-letter:uppercase">{group.service || "Service"}</h3>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {group.items.length} {group.items.length === 1 ? "booking" : "bookings"} ·{" "}
+                  {group.items.reduce((n, r) => n + r.partySize, 0)} covers
+                </span>
+              </div>
+              <ul className="divide-y overflow-hidden rounded-xl border bg-card">
+                {group.items.map((r) => (
+                  <ReservationRow
+                    key={r.id}
+                    reservation={r}
+                    tableNames={tableNames}
+                    onAssign={() => setAssigning(r)}
+                    onCancel={() => cancel.mutate(r.id)}
+                    onStatus={(status) => setStatus.mutate({ id: r.id, status })}
+                    onEdit={() => setEditing(r)}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </>
       )}
 
       <WalkInDialog venueId={venueId} open={walkInOpen} onOpenChange={setWalkInOpen} />
@@ -209,48 +262,33 @@ function ReservationRow({
   const canAssign = ["booked", "seated"].includes(reservation.status);
   const tableIds = reservation.tables ?? [];
 
+  const finished = reservation.status === "cancelled" || reservation.status === "no_show";
+
   return (
-    <TableRow>
-      <TableCell className="font-medium tabular-nums">{reservation.time}</TableCell>
-      <TableCell>
-        <div className="flex items-center gap-3">
-          <Avatar className="size-8">
-            <AvatarFallback className="text-xs">
-              {guestInitials(reservation.guest.name)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <div className="truncate font-medium">
-              {reservation.guest.name || "—"}
-            </div>
-            {reservation.guest.contact && (
-              <div className="truncate text-xs text-muted-foreground">
-                {reservation.guest.contact}
-              </div>
-            )}
-          </div>
+    <li
+      data-slot="reservation-row"
+      className={cn(
+        "grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-muted/40 md:grid-cols-[4rem_minmax(0,1fr)_4.5rem_9rem_8rem_2.25rem] md:gap-x-4",
+        finished && "opacity-60",
+      )}
+    >
+      <div className="font-display text-xl tabular-nums">{reservation.time}</div>
+      <div className="flex min-w-0 items-center gap-3">
+        <Avatar className="size-9">
+          <AvatarFallback className="text-xs">{guestInitials(reservation.guest.name)}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0">
+          <div className="truncate font-medium">{reservation.guest.name || "—"}</div>
+          {reservation.guest.contact && (
+            <div className="truncate text-xs text-muted-foreground">{reservation.guest.contact}</div>
+          )}
         </div>
-      </TableCell>
-      <TableCell>{reservation.partySize}</TableCell>
-      <TableCell>
-        {tableIds.length > 0 ? (
-          tableIds.map((id) => tableNames.get(id) ?? id).join(", ")
-        ) : canAssign ? (
-          <Badge variant="destructive">Unassigned</Badge>
-        ) : (
-          "-"
-        )}
-      </TableCell>
-      <TableCell>
-        <Badge variant={statusVariant[reservation.status] ?? "outline"}>
-          {statusLabel[reservation.status] ?? reservation.status}
-        </Badge>
-      </TableCell>
-      <TableCell>
-        {(actions.length > 0 || canEdit || canAssign) && (
+      </div>
+      {(actions.length > 0 || canEdit || canAssign) && (
+        <div className="md:order-last">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" aria-label="Reservation actions">
                 <MoreHorizontalIcon className="size-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -259,9 +297,7 @@ function ReservationRow({
                 <DropdownMenuItem
                   key={action.label}
                   onSelect={() =>
-                    action.kind === "cancel"
-                      ? onCancel()
-                      : onStatus(action.status)
+                    action.kind === "cancel" ? onCancel() : onStatus(action.status)
                   }
                 >
                   {action.label}
@@ -277,8 +313,27 @@ function ReservationRow({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
-      </TableCell>
-    </TableRow>
+        </div>
+      )}
+      <div className="col-span-3 col-start-1 flex flex-wrap items-center gap-x-3 gap-y-2 pl-[calc(3.5rem+0.75rem)] md:contents">
+        <span className="inline-flex items-center gap-1.5 text-sm tabular-nums text-muted-foreground">
+          <UsersIcon className="size-4" aria-hidden="true" />
+          <span className="sr-only">Party of </span>
+          {reservation.partySize}
+        </span>
+        <span className="text-sm">
+          {tableIds.length > 0 ? (
+            tableIds.map((id) => tableNames.get(id) ?? id).join(", ")
+          ) : canAssign ? (
+            <Badge variant="outline" className="border-transparent bg-danger-soft text-destructive">
+              Unassigned
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </span>
+        <StatusBadge status={reservation.status} />
+      </div>
+    </li>
   );
 }
