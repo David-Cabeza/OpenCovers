@@ -54,12 +54,14 @@ export function FloorView({ venueId }: { venueId: string }) {
         <div className="flex flex-wrap items-center gap-2">
           <Input
             type="date"
+            aria-label="Date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             className="w-fit"
           />
           <Input
             type="time"
+            aria-label="Time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
             className="w-fit"

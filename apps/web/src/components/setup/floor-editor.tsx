@@ -82,7 +82,7 @@ export function FloorEditor({ venueId }: { venueId: string }) {
             if (cfg) addItem.mutate({ type, label: cfg.label, width: cfg.width, height: cfg.height });
           }}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[180px]" aria-label="Add element">
             <SelectValue placeholder="Add element" />
           </SelectTrigger>
           <SelectContent>
