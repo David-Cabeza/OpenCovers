@@ -199,16 +199,19 @@ export function FloorCanvas({
   );
 
   return (
-    <div className="overflow-auto rounded-xl border bg-card">
+    <div className="overflow-auto rounded-xl border bg-floor">
       <div
         ref={canvasRef}
         data-testid="floor-canvas"
-        className="relative h-[480px] w-full"
+        className="relative h-[480px] w-full bg-floor"
         style={{
           minWidth: extentX + 24,
           minHeight: extentY + 24,
-          backgroundImage: "radial-gradient(circle, var(--border) 1.25px, transparent 1.25px)",
-          backgroundSize: "24px 24px",
+          backgroundImage:
+            mode === "edit"
+              ? "radial-gradient(circle, var(--floor-line) 1.5px, transparent 1.5px)"
+              : "linear-gradient(var(--floor-line) 1px, transparent 1px), linear-gradient(90deg, var(--floor-line) 1px, transparent 1px)",
+          backgroundSize: mode === "edit" ? "24px 24px" : "96px 96px",
         }}
         onDragOver={(e) => e.preventDefault()}
       >
@@ -328,22 +331,32 @@ export function FloorCanvas({
                 {chairPositions(shape, t.seats, size).map((c, i) => (
                   <div
                     key={i}
-                    className={cn(
-                      "absolute size-2.5 rounded-full transition-colors",
-                      t.occupied ? "bg-success/50" : "bg-muted-foreground/30",
-                    )}
-                    style={{ left: NODE / 2 + c.x - 5, top: NODE / 2 + c.y - 5 }}
-                  />
+                    className="absolute h-[15px] w-[17px] rounded-[5px] border border-wood-edge bg-wood shadow-sm"
+                    style={{
+                      left: NODE / 2 + c.x - 8.5,
+                      top: NODE / 2 + c.y - 7.5,
+                      transform: `rotate(${(Math.atan2(c.y, c.x) * 180) / Math.PI + 90}deg)`,
+                    }}
+                  >
+                    <div
+                      className={cn(
+                        "absolute inset-x-[2px] top-[3px] bottom-[1px] rounded-[4px] transition-colors",
+                        t.occupied ? "bg-success-soft" : "bg-tabletop",
+                      )}
+                    />
+                  </div>
                 ))}
                 <div
                   className={cn(
                     "absolute flex flex-col items-center justify-center border-2 text-center transition-colors group-focus-visible:ring-[3px] group-focus-visible:ring-ring/50",
+                    "shadow-[0_2px_6px_rgb(0_0_0/0.18)]",
                     shape === "round" ? "rounded-full" : "rounded-lg",
                     t.occupied
                       ? "border-success bg-success-soft text-success"
-                      : mode === "view"
-                        ? "border-border bg-card group-hover:border-primary group-hover:bg-accent"
-                        : "border-border bg-card",
+                      : shape === "round"
+                        ? "border-border bg-tabletop text-[oklch(0.25_0.02_70)]"
+                        : "border-wood-edge bg-wood text-[oklch(0.25_0.02_70)]",
+                    !t.occupied && mode === "view" && "group-hover:border-primary group-hover:ring-2 group-hover:ring-primary/40",
                   )}
                   style={{
                     left: NODE / 2 - size.w / 2,
@@ -367,7 +380,7 @@ export function FloorCanvas({
                         </span>
                       </>
                     ) : (
-                      <span className="text-[10px] text-muted-foreground">{t.seats}</span>
+                      <span className="text-[10px] opacity-70">{t.seats}</span>
                     )}
                   </div>
                 </div>
