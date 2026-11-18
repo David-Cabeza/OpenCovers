@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CalendarDaysIcon } from "lucide-react";
+import { BrandMark } from "@/components/brand/brand-mark";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,10 +22,8 @@ function Shell({
     <div className="flex min-h-dvh items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <CalendarDaysIcon className="size-6" />
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">OpenCovers</h1>
+          <BrandMark className="size-14 text-primary" />
+          <h1 className="font-display text-3xl">OpenCovers</h1>
         </div>
         <Card>
           <CardHeader>

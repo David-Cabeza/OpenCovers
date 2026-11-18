@@ -22,7 +22,7 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Availability</h2>
+          <h2 className="font-display text-2xl">Availability</h2>
           <p className="text-sm text-muted-foreground">
             Free tables for the selected day and party size.
           </p>

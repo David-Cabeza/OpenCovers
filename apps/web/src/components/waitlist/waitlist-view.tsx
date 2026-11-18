@@ -56,7 +56,7 @@ export function WaitlistView({ venueId }: { venueId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Waitlist</h2>
+          <h2 className="font-display text-2xl">Waitlist</h2>
           <p className="text-sm text-muted-foreground">
             Guests waiting for a table.
           </p>

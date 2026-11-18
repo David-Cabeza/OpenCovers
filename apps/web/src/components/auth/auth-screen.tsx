@@ -1,4 +1,4 @@
-import { CalendarDaysIcon } from "lucide-react";
+import { BrandMark } from "@/components/brand/brand-mark";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SignInForm } from "./sign-in-form";
@@ -9,11 +9,9 @@ export function AuthScreen() {
     <div className="flex min-h-dvh items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <CalendarDaysIcon className="size-6" />
-          </div>
+          <BrandMark className="size-14 text-primary" />
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">OpenCovers</h1>
+            <h1 className="font-display text-3xl">OpenCovers</h1>
             <p className="text-sm text-muted-foreground">
               Reservations for restaurants
             </p>

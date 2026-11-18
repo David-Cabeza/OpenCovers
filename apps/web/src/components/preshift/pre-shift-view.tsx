@@ -64,7 +64,7 @@ export function PreShiftView({ venueId }: { venueId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Pre-shift</h2>
+          <h2 className="font-display text-2xl">Pre-shift</h2>
           <p className="text-sm text-muted-foreground">
             Who is coming and what they need, before service.
           </p>
