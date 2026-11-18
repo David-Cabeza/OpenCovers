@@ -193,6 +193,24 @@ export interface AvailabilitySlot {
 
 export type Availability = Record<string, AvailabilitySlot[]>;
 
+export interface ExplainReason {
+  code: string;
+  /** Human-readable server text; it may change, so show it as is. */
+  message: string;
+  details: Record<string, unknown>;
+}
+
+export interface ExplainResponse {
+  date: string;
+  time: string;
+  partySize: number;
+  zone?: string;
+  available: boolean;
+  reasons: ExplainReason[];
+  /** Up to 3 free times on the same date, nearest first. */
+  nearest: string[];
+}
+
 export interface CreateReservationBody {
   date: string;
   time: string;
@@ -456,6 +474,11 @@ export const api = {
   availability: (venueId: string, date: string, partySize: number) =>
     request<{ availability: Availability }>(
       `/v1/venues/${venueId}/availability?date=${date}&partySize=${partySize}`,
+    ),
+
+  explainAvailability: (venueId: string, date: string, time: string, partySize: number) =>
+    request<ExplainResponse>(
+      `/v1/venues/${venueId}/availability/explain?date=${date}&time=${time}&partySize=${partySize}`,
     ),
 
   createReservation: (venueId: string, body: CreateReservationBody) =>
