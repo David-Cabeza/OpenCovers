@@ -264,7 +264,7 @@ export function FloorCanvas({
                     aria-label="Rotate"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => rotate(item.id, rotation, "item")}
-                    className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-accent"
+                    className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm hover:bg-accent"
                   >
                     <RotateCwIcon className="size-3" />
                   </button>
@@ -273,7 +273,7 @@ export function FloorCanvas({
                     aria-label="Delete"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => onDeleteItem?.(item.id)}
-                    className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-destructive hover:text-white"
+                    className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm hover:bg-destructive hover:text-white"
                   >
                     ×
                   </button>
@@ -283,7 +283,7 @@ export function FloorCanvas({
                     onPointerMove={onResizeMove}
                     onPointerUp={onResizeUp}
                     onPointerCancel={onResizeUp}
-                    className="absolute -bottom-1 -right-1 size-3 cursor-nwse-resize rounded-sm border bg-background"
+                    className="absolute -bottom-1 -right-1 size-3 cursor-nwse-resize rounded-sm border border-foreground/40 bg-card"
                   />
                 </>
               )}
@@ -421,7 +421,7 @@ export function FloorCanvas({
                   aria-label="Rotate"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => rotate(t.id, rotation, "table")}
-                  className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-accent"
+                  className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm hover:bg-accent"
                 >
                   <RotateCwIcon className="size-3" />
                 </button>
