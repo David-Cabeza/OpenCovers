@@ -136,7 +136,7 @@ Availability
 - Done: an explicit overbooking ceiling, default 0 (C24, migration 0023).
 - Per-channel allocation, so a platform sees its own share of the slots. [M]
 - A slot grid with per-day overrides. [M]
-- Done: an endpoint that explains why a slot is unavailable (C20). A staff app view of the explanation is pending. [S]
+- Done: an endpoint that explains why a slot is unavailable (C20), and a popover on the Availability screen that shows the reasons and the nearest free times. [S]
 - Done: reconfirmation status on a reservation (C25, migration 0024).
 - Done: a reservation cannot be seated without a table (C26, no migration).
 

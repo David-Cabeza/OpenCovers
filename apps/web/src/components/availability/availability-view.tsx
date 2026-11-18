@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { CalendarXIcon, MinusIcon, PlusIcon } from "lucide-react";
-import { cn } from "cn";
 import { DayNav } from "@/components/day-nav";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAvailability } from "@/hooks/use-availability";
 import { longDate, todayIso } from "@/lib/date";
 import type { AvailabilitySlot } from "@/lib/api";
+import { SlotExplanation } from "@/components/availability/slot-explanation";
 import { NewReservationDialog } from "@/components/reservation/new-reservation-dialog";
 
 export function AvailabilityView({ venueId }: { venueId: string }) {
@@ -79,6 +79,9 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
             <ServiceSlots
               key={service}
               service={service}
+              venueId={venueId}
+              date={date}
+              partySize={partySize}
               slots={slots}
               onSelect={(time) => setSlot({ time })}
             />
@@ -100,10 +103,16 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
 
 function ServiceSlots({
   service,
+  venueId,
+  date,
+  partySize,
   slots,
   onSelect,
 }: {
   service: string;
+  venueId: string;
+  date: string;
+  partySize: number;
   slots: AvailabilitySlot[];
   onSelect: (time: string) => void;
 }) {
@@ -117,23 +126,28 @@ function ServiceSlots({
         </span>
       </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2 rounded-xl border bg-card p-4">
-        {slots.map((slot) => (
-          <Button
-            key={slot.time}
-            type="button"
-            variant="outline"
-            disabled={!slot.available}
-            onClick={() => onSelect(slot.time)}
-            className={cn(
-              "h-10 tabular-nums",
-              slot.available
-                ? "border-primary/30 text-primary hover:border-primary hover:bg-accent"
-                : "border-transparent bg-muted/60 text-muted-foreground line-through",
-            )}
-          >
-            {slot.time}
-          </Button>
-        ))}
+        {slots.map((slot) =>
+          slot.available ? (
+            <Button
+              key={slot.time}
+              type="button"
+              variant="outline"
+              onClick={() => onSelect(slot.time)}
+              className="h-10 border-primary/30 tabular-nums text-primary hover:border-primary hover:bg-accent"
+            >
+              {slot.time}
+            </Button>
+          ) : (
+            <SlotExplanation
+              key={slot.time}
+              venueId={venueId}
+              date={date}
+              time={slot.time}
+              partySize={partySize}
+              onPickNearest={onSelect}
+            />
+          ),
+        )}
       </div>
     </section>
   );
