@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CopyIcon } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "cn";
+import { Pill } from "@/components/pill";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -97,6 +99,57 @@ function ThemePreview({ theme }: { theme: ThemeForm }) {
         Book
       </div>
     </div>
+  );
+}
+
+function Group({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="font-display text-lg">{title}</h3>
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** A checkbox drawn as a pill. The real input stays in the page, so labels and the keyboard work as before. */
+function Chip({
+  checked,
+  onChange,
+  children,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="cursor-pointer">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
+      <span
+        className={cn(
+          "inline-flex items-center rounded-full border px-3.5 py-1.5 text-sm font-medium first-letter:uppercase transition-colors",
+          "hover:bg-muted peer-checked:border-primary peer-checked:bg-accent peer-checked:text-accent-foreground",
+          "peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50",
+        )}
+      >
+        {children}
+      </span>
+    </label>
   );
 }
 
@@ -266,9 +319,19 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
           <Skeleton className="h-24 w-full" />
         ) : (
           <>
-            <div className="flex items-center justify-between gap-4">
+            <div
+              className={cn(
+                "flex items-center justify-between gap-4 rounded-xl border p-4 transition-colors",
+                form.enabled && "border-transparent bg-success-soft",
+              )}
+            >
               <div className="space-y-1">
-                <Label htmlFor="ob-enabled">Accept online bookings</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label htmlFor="ob-enabled">Accept online bookings</Label>
+                  <Pill tone={data.enabled ? "success" : "muted"} dot>
+                    {data.enabled ? "Live" : "Off"}
+                  </Pill>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Needs the venue name and at least one service bookable online. While it is off,
                   the booking address answers as if it did not exist. Bookings already made keep
@@ -296,112 +359,116 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
               </div>
             )}
 
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Services bookable online</legend>
-              {serviceNames.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No services yet.</p>
-              ) : (
-                <div className="flex flex-wrap gap-4">
-                  {serviceNames.map((name) => (
-                    <label key={name} className="flex items-center gap-2 text-sm capitalize">
-                      <input
-                        type="checkbox"
+            <Group title="What guests can book" description="Services and days open to online bookings.">
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">Services bookable online</legend>
+                {serviceNames.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No services yet.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {serviceNames.map((name) => (
+                      <Chip
+                        key={name}
                         checked={form.services === null || form.services.includes(name)}
-                        onChange={(e) => toggleService(name, e.target.checked)}
-                      />
-                      {name}
-                    </label>
+                        onChange={(on) => toggleService(name, on)}
+                      >
+                        {name}
+                      </Chip>
+                    ))}
+                  </div>
+                )}
+                {error("services")}
+              </fieldset>
+
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">Days bookable online</legend>
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAYS.map((d) => (
+                    <Chip
+                      key={d.value}
+                      checked={form.weekdays.includes(d.value)}
+                      onChange={(on) => toggleDay(d.value, on)}
+                    >
+                      {d.short}
+                    </Chip>
                   ))}
                 </div>
-              )}
-              {error("services")}
-            </fieldset>
+                {error("weekdays")}
+              </fieldset>
+            </Group>
 
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Days bookable online</legend>
-              <div className="flex flex-wrap gap-4">
-                {WEEKDAYS.map((d) => (
-                  <label key={d.value} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.weekdays.includes(d.value)}
-                      onChange={(e) => toggleDay(d.value, e.target.checked)}
-                    />
-                    {d.short}
-                  </label>
-                ))}
+            <Group title="Party size and timing" description="Limits for the bookings guests make by themselves.">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ob-min">Smallest party</Label>
+                  <Input id="ob-min" {...num("minPartySize")} />
+                  {error("minPartySize")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ob-max">Largest party</Label>
+                  <Input id="ob-max" {...num("maxPartySize")} />
+                  {error("maxPartySize")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ob-lead">Lead time (minutes)</Label>
+                  <Input id="ob-lead" {...num("leadTimeMinutes")} />
+                  {error("leadTimeMinutes")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ob-advance">Booking horizon (days)</Label>
+                  <Input id="ob-advance" placeholder="Same as the venue, or 365" {...num("maxAdvanceDays")} />
+                  {error("maxAdvanceDays")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ob-cutoff">Guest can change until (minutes before)</Label>
+                  <Input id="ob-cutoff" {...num("selfServiceCutoffMinutes")} />
+                  {error("selfServiceCutoffMinutes")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ob-open">Open online bookings per contact</Label>
+                  <Input id="ob-open" placeholder="No limit" {...num("maxOpenBookingsPerContact")} />
+                  {error("maxOpenBookingsPerContact")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ob-locale">Language</Label>
+                  <select
+                    id="ob-locale"
+                    value={form.locale}
+                    onChange={(e) => setForm({ ...form, locale: e.target.value })}
+                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                  >
+                    {LOCALES.map((l) => (
+                      <option key={l} value={l}>
+                        {LOCALE_NAMES[l]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              {error("weekdays")}
-            </fieldset>
+            </Group>
 
-            <div className="grid grid-cols-2 gap-4">
+            <Group title="Embedding" description="Where the booking page may appear.">
               <div className="space-y-2">
-                <Label htmlFor="ob-min">Smallest party</Label>
-                <Input id="ob-min" {...num("minPartySize")} />
-                {error("minPartySize")}
+                <Label htmlFor="ob-origins">Websites that may embed the page</Label>
+                <Textarea
+                  id="ob-origins"
+                  rows={3}
+                  placeholder="https://example.com"
+                  value={form.allowedOrigins}
+                  aria-invalid={errors.allowedOrigins ? true : undefined}
+                  aria-describedby={errors.allowedOrigins ? "ob-allowedOrigins-error" : undefined}
+                  onChange={(e) => setForm({ ...form, allowedOrigins: e.target.value })}
+                />
+                {error("allowedOrigins")}
+                <p className="text-sm text-muted-foreground">
+                  One address per line, up to 10, as https://host. Empty means the page works only
+                  on its own address.
+                </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="ob-max">Largest party</Label>
-                <Input id="ob-max" {...num("maxPartySize")} />
-                {error("maxPartySize")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ob-lead">Lead time (minutes)</Label>
-                <Input id="ob-lead" {...num("leadTimeMinutes")} />
-                {error("leadTimeMinutes")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ob-advance">Booking horizon (days)</Label>
-                <Input id="ob-advance" placeholder="Same as the venue, or 365" {...num("maxAdvanceDays")} />
-                {error("maxAdvanceDays")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ob-cutoff">Guest can change until (minutes before)</Label>
-                <Input id="ob-cutoff" {...num("selfServiceCutoffMinutes")} />
-                {error("selfServiceCutoffMinutes")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ob-open">Open online bookings per contact</Label>
-                <Input id="ob-open" placeholder="No limit" {...num("maxOpenBookingsPerContact")} />
-                {error("maxOpenBookingsPerContact")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ob-locale">Language</Label>
-                <select
-                  id="ob-locale"
-                  value={form.locale}
-                  onChange={(e) => setForm({ ...form, locale: e.target.value })}
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
-                >
-                  {LOCALES.map((l) => (
-                    <option key={l} value={l}>
-                      {LOCALE_NAMES[l]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ob-origins">Websites that may embed the page</Label>
-              <Textarea
-                id="ob-origins"
-                rows={3}
-                placeholder="https://example.com"
-                value={form.allowedOrigins}
-                aria-invalid={errors.allowedOrigins ? true : undefined}
-                aria-describedby={errors.allowedOrigins ? "ob-allowedOrigins-error" : undefined}
-                onChange={(e) => setForm({ ...form, allowedOrigins: e.target.value })}
-              />
-              {error("allowedOrigins")}
-              <p className="text-sm text-muted-foreground">
-                One address per line, up to 10, as https://host. Empty means the page works only
-                on its own address.
-              </p>
-            </div>
+            </Group>
 
             <fieldset className="space-y-4">
-              <legend className="text-sm font-medium">Look of the booking page</legend>
+              <legend className="font-display text-lg">Look of the booking page</legend>
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
@@ -475,7 +542,9 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     Reset look to defaults
                   </Button>
                 </div>
-                <ThemePreview theme={form.theme} />
+                <div className="sm:sticky sm:top-36 sm:self-start">
+                  <ThemePreview theme={form.theme} />
+                </div>
               </div>
               {lowContrast !== null && (
                 <div
@@ -489,12 +558,15 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
               )}
             </fieldset>
 
-            <Button onClick={submit} disabled={save.isPending}>
-              {save.isPending ? "Saving…" : "Save online booking"}
-            </Button>
+            <div className="sticky bottom-0 z-[5] -mx-6 -mb-6 flex items-center gap-3 border-t bg-card/95 px-6 py-3 backdrop-blur">
+              <Button onClick={submit} disabled={save.isPending}>
+                {save.isPending ? "Saving…" : "Save online booking"}
+              </Button>
+              <span className="text-sm text-muted-foreground">Changes apply to new bookings.</span>
+            </div>
 
             <div className="space-y-4 border-t pt-6">
-              <h3 className="text-sm font-medium">Booking page and embed code</h3>
+              <h3 className="font-display text-lg">Booking page and embed code</h3>
               {key ? (
                 <div className="space-y-2">
                   <Label htmlFor="ob-key">Public booking key</Label>
