@@ -63,6 +63,23 @@ it("serves the widget page and assets on the widget host only; the staff host ge
   expect((await app.request("http://app.example.com/w/assets/main-A1.js")).status).toBe(404);
 });
 
+it("answers /favicon.ico with an empty 204 on the widget host only; the staff host keeps its 404", async () => {
+  const widget = await app.request("http://book.example.com/favicon.ico");
+  expect(widget.status).toBe(204);
+  expect(await widget.text()).toBe("");
+  expect(widget.headers.get("x-content-type-options")).toBe("nosniff");
+
+  const staff = await app.request("http://app.example.com/favicon.ico");
+  const other = await app.request("http://app.example.com/nothing-here");
+  expect(staff.status).toBe(404);
+  expect(Object.fromEntries(staff.headers)).toEqual(Object.fromEntries(other.headers));
+  expect(await staff.text()).toBe(await other.text());
+
+  expect((await app.request("http://book.example.com/favicon.ico", { method: "POST" })).status).toBe(404);
+  const page = await app.request(`http://book.example.com/w/${bookingKey}`);
+  expect(page.headers.get("content-security-policy")).toMatch(/frame-ancestors 'self' https:\/\/casa\.example$/);
+});
+
 it("serves embed.js on the widget host only", async () => {
   expect((await app.request("http://book.example.com/w/embed.js")).status).toBe(200);
   const staff = await app.request("http://app.example.com/w/embed.js");

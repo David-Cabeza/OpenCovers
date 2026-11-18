@@ -376,6 +376,13 @@ const widgetNotBuilt = (c: any) => {
 const widgetFileNotFound = (c: any) =>
   c.body("Not found", 404, { "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff" });
 
+// Browsers ask for /favicon.ico on every page. The widget host answers 204 (no icon, no console error) with no
+// body, so the page's CSP and the uniform 404 of every other route are untouched. Anywhere else it is a 404.
+app.get("/favicon.ico", (c, next) => {
+  if (!servesWidgetOn(widgetServing, c.req.url)) return next();
+  return c.body(null, 204, { "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" });
+});
+
 app.get("/w/assets/:file", (c) => {
   const asset = servesWidgetOn(widgetServing, c.req.url) && readWidgetAsset(widgetDist(), c.req.param("file"));
   if (!asset) return widgetFileNotFound(c);

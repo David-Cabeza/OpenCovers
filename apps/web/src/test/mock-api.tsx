@@ -67,10 +67,13 @@ export function renderWithApp(ui: ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
-    <QueryClientProvider client={client}>
-      {ui}
-      <Toaster />
-    </QueryClientProvider>,
+  return Object.assign(
+    render(
+      <QueryClientProvider client={client}>
+        {ui}
+        <Toaster />
+      </QueryClientProvider>,
+    ),
+    { queryClient: client },
   );
 }

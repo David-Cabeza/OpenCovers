@@ -73,6 +73,11 @@
 		reverse_proxy {$API_UPSTREAM:api:3000}
 	}
 
+	# Browsers ask for it on every page. The API answers 204 on this host.
+	handle /favicon.ico {
+		reverse_proxy {$API_UPSTREAM:api:3000}
+	}
+
 	handle /v1/public/* {
 		header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
 		reverse_proxy {$API_UPSTREAM:api:3000}
