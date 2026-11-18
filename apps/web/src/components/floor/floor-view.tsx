@@ -25,6 +25,10 @@ export function FloorView({ venueId }: { venueId: string }) {
   const tables = data?.tables ?? [];
   const items = itemsData?.items ?? [];
 
+  const occupied = tables.filter((t) => t.occupied).length;
+  const free = tables.length - occupied;
+  const seatedCovers = tables.reduce((n, t) => n + (t.occupied ? (t.partySize ?? 0) : 0), 0);
+
   const move = useMutation({
     mutationFn: ({ reservationId, targetTableId }: { reservationId: string; targetTableId: string }) =>
       api.modifyReservation(venueId, reservationId, { tables: [targetTableId] }),
@@ -39,14 +43,14 @@ export function FloorView({ venueId }: { venueId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="font-display text-2xl">Floor plan</h2>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <h2 className="font-display text-3xl">Floor plan</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             Drag a reservation to a free table, or click a free table to seat a walk-in.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             type="date"
             value={date}
@@ -70,6 +74,14 @@ export function FloorView({ venueId }: { venueId: string }) {
           </Button>
         </div>
       </div>
+
+      {tables.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+          <Legend tone="free" label="Free" value={free} />
+          <Legend tone="occupied" label="Occupied" value={occupied} />
+          <span className="text-muted-foreground tabular-nums">{seatedCovers} guests at tables</span>
+        </div>
+      )}
 
       {isPending ? (
         <Skeleton className="h-[480px] w-full" />
@@ -102,5 +114,22 @@ export function FloorView({ venueId }: { venueId: string }) {
         tableName={seatTable?.name}
       />
     </div>
+  );
+}
+
+function Legend({ tone, label, value }: { tone: "free" | "occupied"; label: string; value: number }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span
+        aria-hidden="true"
+        className={
+          tone === "occupied"
+            ? "size-3 rounded-full border-2 border-success bg-success-soft"
+            : "size-3 rounded-full border-2 border-border bg-card"
+        }
+      />
+      <span className="font-medium">{label}</span>
+      <span className="text-muted-foreground tabular-nums">{value}</span>
+    </span>
   );
 }

@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { RotateCwIcon } from "lucide-react";
 import { cn } from "cn";
 import { FloorItemShape } from "./floor-item-shape";
-import { WoodFloor } from "./wood-floor";
 
 export interface CanvasTable {
   id: string;
@@ -35,25 +34,47 @@ const SNAP = 8;
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 
 function tableSize(shape: string | undefined, seats: number): { w: number; h: number } {
-  if (shape === "rectangle") return { w: 56, h: 40 };
-  if (shape === "square") return { w: 44, h: 44 };
-  const d = Math.min(36 + seats * 4, 56);
+  if (shape === "rectangle") return { w: 64, h: 46 };
+  if (shape === "square") return { w: 52, h: 52 };
+  const d = Math.min(46 + seats * 3, 60);
   return { w: d, h: d };
 }
 
-function chairPositions(shape: string | undefined, seats: number): { x: number; y: number }[] {
+const CHAIR_GAP = 8;
+
+function chairPositions(
+  shape: string | undefined,
+  seats: number,
+  size: { w: number; h: number },
+): { x: number; y: number }[] {
   const pts: { x: number; y: number }[] = [];
   if (shape === "rectangle") {
     const perSide = Math.ceil(seats / 2);
+    const span = size.w - 14;
     for (let i = 0; i < seats; i++) {
       if (i < perSide) {
-        pts.push({ x: -22 + ((i + 0.5) / perSide) * 44, y: -26 });
+        pts.push({ x: -span / 2 + ((i + 0.5) / perSide) * span, y: -(size.h / 2 + CHAIR_GAP) });
       } else {
-        pts.push({ x: 22 - ((i - perSide + 0.5) / perSide) * 44, y: 26 });
+        pts.push({ x: span / 2 - ((i - perSide + 0.5) / perSide) * span, y: size.h / 2 + CHAIR_GAP });
+      }
+    }
+  } else if (shape === "square") {
+    // Spread the chairs over the four sides (top, bottom, right, left first), centered on each side.
+    const half = size.w / 2 + CHAIR_GAP;
+    const span = size.w - 12;
+    const order = [0, 2, 1, 3];
+    for (const side of order) {
+      const count = Math.floor(seats / 4) + (order.indexOf(side) < seats % 4 ? 1 : 0);
+      for (let k = 0; k < count; k++) {
+        const along = -span / 2 + ((k + 0.5) / count) * span;
+        if (side === 0) pts.push({ x: along, y: -half });
+        else if (side === 1) pts.push({ x: half, y: along });
+        else if (side === 2) pts.push({ x: -along, y: half });
+        else pts.push({ x: -half, y: -along });
       }
     }
   } else {
-    const radius = shape === "square" ? 28 : Math.min(24 + seats * 2, 34);
+    const radius = size.w / 2 + CHAIR_GAP;
     for (let i = 0; i < seats; i++) {
       const a = (i / seats) * 2 * Math.PI - Math.PI / 2;
       pts.push({ x: Math.cos(a) * radius, y: Math.sin(a) * radius });
@@ -165,165 +186,207 @@ export function FloorCanvas({
     else onItemUpdate?.(itemId, { rotation: next });
   }
 
+  // The plan uses absolute pixel positions, so on a narrow screen the stage scrolls instead of clipping.
+  const extentX = Math.max(
+    ...tables.map((t) => posOf("table", t.id, t.posX, t.posY).x + NODE),
+    ...items.map((i) => posOf("item", i.id, i.posX, i.posY).x + sizeOf(i.id, i.width, i.height).w),
+    0,
+  );
+  const extentY = Math.max(
+    ...tables.map((t) => posOf("table", t.id, t.posX, t.posY).y + NODE),
+    ...items.map((i) => posOf("item", i.id, i.posX, i.posY).y + sizeOf(i.id, i.width, i.height).h),
+    0,
+  );
+
   return (
-    <div
-      ref={canvasRef}
-      data-testid="floor-canvas"
-      className="relative h-[480px] w-full overflow-hidden rounded-lg border bg-[#eedcc0]"
-      onDragOver={(e) => e.preventDefault()}
-    >
-      <WoodFloor />
-      {items.map((item) => {
-        const pos = posOf("item", item.id, item.posX, item.posY);
-        const size = sizeOf(item.id, item.width, item.height);
-        const rotation = item.rotation ?? 0;
-        return (
-          <div
-            key={item.id}
-            style={{ left: pos.x, top: pos.y, width: size.w, height: size.h }}
-            className={cn("absolute select-none", mode === "edit" && "cursor-move touch-none")}
-            onPointerDown={(e) => startDrag(e, "item", item.id, item.posX, item.posY)}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-          >
-            <div className="absolute inset-0" style={{ transform: `rotate(${rotation}deg)` }}>
-              <FloorItemShape type={item.type} />
+    <div className="overflow-auto rounded-xl border bg-card">
+      <div
+        ref={canvasRef}
+        data-testid="floor-canvas"
+        className="relative h-[480px] w-full"
+        style={{
+          minWidth: extentX + 24,
+          minHeight: extentY + 24,
+          backgroundImage: "radial-gradient(circle, var(--border) 1.25px, transparent 1.25px)",
+          backgroundSize: "24px 24px",
+        }}
+        onDragOver={(e) => e.preventDefault()}
+      >
+        {items.map((item) => {
+          const pos = posOf("item", item.id, item.posX, item.posY);
+          const size = sizeOf(item.id, item.width, item.height);
+          const rotation = item.rotation ?? 0;
+          return (
+            <div
+              key={item.id}
+              style={{ left: pos.x, top: pos.y, width: size.w, height: size.h }}
+              className={cn("absolute select-none", mode === "edit" && "cursor-move touch-none")}
+              onPointerDown={(e) => startDrag(e, "item", item.id, item.posX, item.posY)}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+            >
+              <div className="absolute inset-0" style={{ transform: `rotate(${rotation}deg)` }}>
+                <FloorItemShape type={item.type} />
+              </div>
+              {mode === "edit" && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Rotate"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => rotate(item.id, rotation, "item")}
+                    className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-accent"
+                  >
+                    <RotateCwIcon className="size-3" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Delete"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => onDeleteItem?.(item.id)}
+                    className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-destructive hover:text-white"
+                  >
+                    ×
+                  </button>
+                  <div
+                    aria-label="Resize"
+                    onPointerDown={(e) => startResize(e, item)}
+                    onPointerMove={onResizeMove}
+                    onPointerUp={onResizeUp}
+                    onPointerCancel={onResizeUp}
+                    className="absolute -bottom-1 -right-1 size-3 cursor-nwse-resize rounded-sm border bg-background"
+                  />
+                </>
+              )}
             </div>
-            {mode === "edit" && (
-              <>
+          );
+        })}
+
+        {tables.map((t) => {
+          const pos = posOf("table", t.id, t.posX, t.posY);
+          const shape = t.shape ?? "round";
+          const size = tableSize(shape, t.seats);
+          const rotation = t.rotation ?? 0;
+          const movableInView = mode === "view" && t.occupied;
+          const seatable = mode === "view" && !t.occupied;
+          return (
+            <div
+              key={t.id}
+              style={{ left: pos.x, top: pos.y, width: NODE, height: NODE }}
+              className={cn(
+                "group absolute select-none",
+                mode === "edit" ? "cursor-move touch-none" : movableInView ? "cursor-grab" : "cursor-pointer",
+              )}
+              role={seatable ? "button" : undefined}
+              tabIndex={seatable ? 0 : undefined}
+              aria-label={
+                seatable
+                  ? `Seat a walk-in at ${t.name}`
+                  : mode === "view"
+                    ? `${t.name}: ${t.guestName || "reserved"}, ${t.partySize ?? "?"} guests`
+                    : undefined
+              }
+              onKeyDown={
+                seatable
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSeat?.(t.id);
+                      }
+                    }
+                  : undefined
+              }
+              draggable={movableInView}
+              onDragStart={
+                movableInView
+                  ? (e) => {
+                      e.dataTransfer.setData("text/plain", t.reservationId ?? t.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }
+                  : undefined
+              }
+              onPointerDown={(e) => startDrag(e, "table", t.id, t.posX, t.posY)}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+              onDragOver={(e) => {
+                if (mode === "view" && !t.occupied) e.preventDefault();
+              }}
+              onDrop={(e) => {
+                if (mode === "view" && !t.occupied) {
+                  e.preventDefault();
+                  const reservationId = e.dataTransfer.getData("text/plain");
+                  if (reservationId) onMove?.(reservationId, t.id);
+                }
+              }}
+              onClick={() => {
+                if (mode === "view" && !t.occupied) onSeat?.(t.id);
+              }}
+            >
+              <div className="absolute inset-0" style={{ transform: `rotate(${rotation}deg)` }}>
+                {chairPositions(shape, t.seats, size).map((c, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "absolute size-2.5 rounded-full transition-colors",
+                      t.occupied ? "bg-success/50" : "bg-muted-foreground/30",
+                    )}
+                    style={{ left: NODE / 2 + c.x - 5, top: NODE / 2 + c.y - 5 }}
+                  />
+                ))}
+                <div
+                  className={cn(
+                    "absolute flex flex-col items-center justify-center border-2 text-center transition-colors group-focus-visible:ring-[3px] group-focus-visible:ring-ring/50",
+                    shape === "round" ? "rounded-full" : "rounded-lg",
+                    t.occupied
+                      ? "border-success bg-success-soft text-success"
+                      : mode === "view"
+                        ? "border-border bg-card group-hover:border-primary group-hover:bg-accent"
+                        : "border-border bg-card",
+                  )}
+                  style={{
+                    left: NODE / 2 - size.w / 2,
+                    top: NODE / 2 - size.h / 2,
+                    width: size.w,
+                    height: size.h,
+                  }}
+                >
+                  <div
+                    className="flex flex-col items-center justify-center"
+                    style={{ transform: `rotate(${-rotation}deg)` }}
+                  >
+                    <span className="px-1 text-[11px] font-semibold leading-tight">{t.name}</span>
+                    {t.occupied ? (
+                      <>
+                        <span className="max-w-[48px] truncate text-[10px] font-medium leading-tight">
+                          {t.guestName || "—"}
+                        </span>
+                        <span className="text-[10px] leading-tight opacity-80">
+                          {t.partySize ?? "?"} pax
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground">{t.seats}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {mode === "edit" && (
                 <button
                   type="button"
                   aria-label="Rotate"
                   onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => rotate(item.id, rotation, "item")}
+                  onClick={() => rotate(t.id, rotation, "table")}
                   className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-accent"
                 >
                   <RotateCwIcon className="size-3" />
                 </button>
-                <button
-                  type="button"
-                  aria-label="Delete"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => onDeleteItem?.(item.id)}
-                  className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-destructive hover:text-white"
-                >
-                  ×
-                </button>
-                <div
-                  aria-label="Resize"
-                  onPointerDown={(e) => startResize(e, item)}
-                  onPointerMove={onResizeMove}
-                  onPointerUp={onResizeUp}
-                  onPointerCancel={onResizeUp}
-                  className="absolute -bottom-1 -right-1 size-3 cursor-nwse-resize rounded-sm border bg-background"
-                />
-              </>
-            )}
-          </div>
-        );
-      })}
-
-      {tables.map((t) => {
-        const pos = posOf("table", t.id, t.posX, t.posY);
-        const shape = t.shape ?? "round";
-        const size = tableSize(shape, t.seats);
-        const rotation = t.rotation ?? 0;
-        const movableInView = mode === "view" && t.occupied;
-        return (
-          <div
-            key={t.id}
-            style={{ left: pos.x, top: pos.y, width: NODE, height: NODE }}
-            className={cn(
-              "absolute select-none",
-              mode === "edit" ? "cursor-move touch-none" : movableInView ? "cursor-grab" : undefined,
-            )}
-            draggable={movableInView}
-            onDragStart={
-              movableInView
-                ? (e) => {
-                    e.dataTransfer.setData("text/plain", t.reservationId ?? t.id);
-                    e.dataTransfer.effectAllowed = "move";
-                  }
-                : undefined
-            }
-            onPointerDown={(e) => startDrag(e, "table", t.id, t.posX, t.posY)}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-            onDragOver={(e) => {
-              if (mode === "view" && !t.occupied) e.preventDefault();
-            }}
-            onDrop={(e) => {
-              if (mode === "view" && !t.occupied) {
-                e.preventDefault();
-                const reservationId = e.dataTransfer.getData("text/plain");
-                if (reservationId) onMove?.(reservationId, t.id);
-              }
-            }}
-            onClick={() => {
-              if (mode === "view" && !t.occupied) onSeat?.(t.id);
-            }}
-          >
-            <div className="absolute inset-0" style={{ transform: `rotate(${rotation}deg)` }}>
-              {chairPositions(shape, t.seats).map((c, i) => (
-                <div
-                  key={i}
-                  className="absolute size-2 rounded-full bg-muted-foreground/40"
-                  style={{ left: NODE / 2 + c.x - 4, top: NODE / 2 + c.y - 4 }}
-                />
-              ))}
-              <div
-                className={cn(
-                  "absolute flex flex-col items-center justify-center border-2 text-center shadow-sm transition-colors",
-                  shape === "round" ? "rounded-full" : "rounded-lg",
-                  t.occupied
-                    ? "border-primary bg-primary/15"
-                    : mode === "view"
-                      ? "border-border bg-background hover:border-primary"
-                      : "border-border bg-background",
-                )}
-                style={{
-                  left: NODE / 2 - size.w / 2,
-                  top: NODE / 2 - size.h / 2,
-                  width: size.w,
-                  height: size.h,
-                }}
-              >
-                <div
-                  className="flex flex-col items-center justify-center"
-                  style={{ transform: `rotate(${-rotation}deg)` }}
-                >
-                  <span className="px-1 text-[11px] font-semibold leading-tight">{t.name}</span>
-                  {t.occupied ? (
-                    <>
-                      <span className="max-w-[52px] truncate text-[10px] font-medium">
-                        {t.guestName || "—"}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {t.partySize ?? "?"} pax
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-[10px] text-muted-foreground">{t.seats}</span>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
-            {mode === "edit" && (
-              <button
-                type="button"
-                aria-label="Rotate"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => rotate(t.id, rotation, "table")}
-                className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border bg-background text-[10px] shadow-sm hover:bg-accent"
-              >
-                <RotateCwIcon className="size-3" />
-              </button>
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
