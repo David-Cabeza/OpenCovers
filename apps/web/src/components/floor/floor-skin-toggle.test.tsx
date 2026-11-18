@@ -12,7 +12,7 @@ const TABLE = { id: "t1", name: "T1", seats: 2, posX: 0, posY: 0 };
 describe("floor skins", () => {
   afterEach(() => useUiStore.setState({ floorSkin: "plano" }));
 
-  it("starts on the plan look and switches to the wood and stone looks", async () => {
+  it("starts on the plan look and switches to the ambiance look", async () => {
     const user = userEvent.setup();
     renderWithApp(
       <>
@@ -23,15 +23,10 @@ describe("floor skins", () => {
     expect(screen.getByRole("button", { name: "Plan" })).toHaveAttribute("aria-pressed", "true");
     const planFloor = screen.getByTestId("floor-canvas").getAttribute("style");
 
-    await user.click(screen.getByRole("button", { name: "Wood" }));
-    expect(screen.getByRole("button", { name: "Wood" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Ambiance" }));
+    expect(screen.getByRole("button", { name: "Ambiance" })).toHaveAttribute("aria-pressed", "true");
     expect(useUiStore.getState().floorSkin).toBe("ambiente");
-    const woodFloor = screen.getByTestId("floor-canvas").getAttribute("style");
-    expect(woodFloor).not.toBe(planFloor);
-
-    await user.click(screen.getByRole("button", { name: "Stone" }));
-    expect(useUiStore.getState().floorSkin).toBe("piedra");
-    expect(screen.getByTestId("floor-canvas").getAttribute("style")).not.toBe(woodFloor);
+    expect(screen.getByTestId("floor-canvas").getAttribute("style")).not.toBe(planFloor);
   });
 
   it("keeps the dot grid in edit mode on every look", () => {

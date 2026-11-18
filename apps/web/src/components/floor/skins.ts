@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 // A floor skin decides how the plan is drawn: the floor, the shadows under tables, chairs and room
 // elements, and the light. It never changes where anything is or what it means.
 // The choice is per user (see `floorSkin` in the UI store), not a venue setting.
-export type FloorSkinId = "plano" | "ambiente" | "piedra";
+export type FloorSkinId = "plano" | "ambiente";
 
 export interface FloorSkin {
   id: FloorSkinId;
@@ -40,20 +40,8 @@ export const FLOOR_SKINS: Record<FloorSkinId, FloorSkin> = {
   },
   ambiente: {
     id: "ambiente",
-    label: "Wood",
-    description: "Warm parquet floor, deeper shadows and a soft glow",
-    floor: (mode) =>
-      mode === "edit"
-        ? { ...DOT_GRID, ...GLOW }
-        : textured("color-mix(in oklab, var(--wood) 62%, var(--floor))", PARQUET, "96px 96px"),
-    tableShadow: "shadow-[0_8px_16px_rgb(0_0_0/0.3)]",
-    chairShadow: "shadow-[0_3px_5px_rgb(0_0_0/0.3)]",
-    itemShadow: "drop-shadow-[0_5px_6px_rgb(0_0_0/0.28)]",
-  },
-  piedra: {
-    id: "piedra",
-    label: "Stone",
-    description: "Large stone tiles with grout, deeper shadows and a soft glow",
+    label: "Ambiance",
+    description: "Large stone tiles, deeper shadows and a soft glow",
     floor: (mode) =>
       mode === "edit"
         ? { ...DOT_GRID, ...GLOW }
@@ -70,25 +58,6 @@ const svgUrl = (body: string, w: number, h: number) =>
   `url("data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${body}</svg>`,
   )}")`;
-
-// Planks 16px wide and 96px long, joints staggered per row, each plank with its own tone and a
-// faint grain line.
-const PARQUET = (() => {
-  const joints = [0, 40, 72, 20, 56, 8];
-  const tones = [0.1, -0.06, 0.04, -0.1, 0.08, -0.03, 0.06, -0.08];
-  let body = "";
-  joints.forEach((offset, row) => {
-    for (let k = -1; k < 2; k++) {
-      const x = offset + k * 96;
-      const y = row * 16;
-      const t = tones[(row * 3 + k + 1 + 8) % tones.length];
-      body += `<rect x="${x}" y="${y}" width="96" height="16" fill="${t > 0 ? "#fff" : "#000"}" fill-opacity="${Math.abs(t)}"/>`;
-      body += `<line x1="${x + 6}" y1="${y + 8}" x2="${x + 70}" y2="${y + 8}" stroke="#000" stroke-opacity="0.05"/>`;
-      body += `<rect x="${x}" y="${y}" width="96" height="16" fill="none" stroke="#000" stroke-opacity="0.14"/>`;
-    }
-  });
-  return svgUrl(body, 96, 96);
-})();
 
 // 4 x 4 tiles of 64px with grout lines; each tile gets its own small tone shift.
 const STONE_TILES = (() => {
