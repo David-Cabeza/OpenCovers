@@ -3,6 +3,9 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "cn";
+import { PageHeader } from "@/components/layout/page-header";
+import { Pill } from "@/components/pill";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,14 +15,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useServices } from "@/hooks/use-services";
 import { useTables } from "@/hooks/use-tables";
 import { api, type Service, type Table as TableInfo } from "@/lib/api";
@@ -34,17 +29,126 @@ import { ApiKeysCard } from "./api-keys-card";
 import { FloorEditor } from "./floor-editor";
 import type { Role } from "@/lib/api";
 
-export function SetupView({ venueId, role }: { venueId: string; role?: Role }) {
+interface Section {
+  id: string;
+  label: string;
+  description: string;
+  adminOnly?: boolean;
+}
+
+const SECTIONS: Section[] = [
+  { id: "venue", label: "General", description: "Name, hours and how bookings are accepted." },
+  {
+    id: "online",
+    label: "Online",
+    description: "Your public page and the widget guests use to book.",
+    adminOnly: true,
+  },
+  { id: "room", label: "Dining room", description: "Tables, the floor plan and your services." },
+  {
+    id: "developers",
+    label: "Developers",
+    description: "API keys for integrations and agents.",
+    adminOnly: true,
+  },
+];
+
+function SectionNav({ sections }: { sections: Section[] }) {
   return (
-    <div className="space-y-8">
-      <VenueSettings venueId={venueId} role={role} />
-      <BookingPolicyCard venueId={venueId} role={role} />
-      {role === "admin" && <PublicProfileCard venueId={venueId} />}
-      {role === "admin" && <OnlineBookingCard venueId={venueId} />}
-      <TablesSection venueId={venueId} />
-      <FloorEditor venueId={venueId} />
-      <ServicesSection venueId={venueId} />
-      {role === "admin" && <ApiKeysCard venueId={venueId} />}
+    <nav
+      aria-label="Settings sections"
+      className="sticky top-16 z-[5] -mx-4 flex gap-2 overflow-x-auto border-b bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+    >
+      {sections.map((section) => (
+        <button
+          key={section.id}
+          type="button"
+          onClick={() =>
+            document.getElementById(`settings-${section.id}`)?.scrollIntoView?.({ behavior: "smooth" })
+          }
+          className={cn(
+            "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors",
+            "hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+          )}
+        >
+          {section.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function SettingsSection({
+  section,
+  children,
+}: {
+  section: Section;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={`settings-${section.id}`} aria-labelledby={`settings-${section.id}-title`} className="scroll-mt-32 space-y-4">
+      <div>
+        <h3 id={`settings-${section.id}-title`} className="font-display text-2xl">
+          {section.label}
+        </h3>
+        <p className="text-sm text-muted-foreground">{section.description}</p>
+      </div>
+      <div className="space-y-6">{children}</div>
+    </section>
+  );
+}
+
+export function SetupView({ venueId, role }: { venueId: string; role?: Role }) {
+  const isAdmin = role === "admin";
+  const sections = SECTIONS.filter((s) => !s.adminOnly || isAdmin);
+  const section = (id: string) => SECTIONS.find((s) => s.id === id) as Section;
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Settings" description="Everything that shapes how this venue takes bookings." />
+      <SectionNav sections={sections} />
+      <div className="space-y-12">
+        <SettingsSection section={section("venue")}>
+          <VenueSettings venueId={venueId} role={role} />
+          <BookingPolicyCard venueId={venueId} role={role} />
+        </SettingsSection>
+        {isAdmin && (
+          <SettingsSection section={section("online")}>
+            <PublicProfileCard venueId={venueId} />
+            <OnlineBookingCard venueId={venueId} />
+          </SettingsSection>
+        )}
+        <SettingsSection section={section("room")}>
+          <TablesSection venueId={venueId} />
+          <FloorEditor venueId={venueId} />
+          <ServicesSection venueId={venueId} />
+        </SettingsSection>
+        {isAdmin && (
+          <SettingsSection section={section("developers")}>
+            <ApiKeysCard venueId={venueId} />
+          </SettingsSection>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RowActions({
+  label,
+  onEdit,
+  onRemove,
+}: {
+  label: string;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex gap-1">
+      <Button variant="ghost" size="icon" aria-label={`Edit ${label}`} onClick={onEdit}>
+        <PencilIcon className="size-4" />
+      </Button>
+      <Button variant="ghost" size="icon" aria-label={`Remove ${label}`} onClick={onRemove}>
+        <Trash2Icon className="size-4" />
+      </Button>
     </div>
   );
 }
@@ -68,10 +172,10 @@ function TablesSection({ venueId }: { venueId: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between">
+      <CardHeader className="flex items-center justify-between gap-4">
         <div>
           <CardTitle>Tables</CardTitle>
-          <CardDescription>Your floor plan and seating.</CardDescription>
+          <CardDescription>Seating for each table and its zone.</CardDescription>
         </div>
         <Button
           size="sm"
@@ -89,46 +193,29 @@ function TablesSection({ venueId }: { venueId: string }) {
         ) : tables.length === 0 ? (
           <p className="text-sm text-muted-foreground">No tables yet.</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Seats</TableHead>
-                <TableHead>Zone</TableHead>
-                <TableHead className="w-20" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tables.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-medium">{t.name}</TableCell>
-                  <TableCell>{t.seats}</TableCell>
-                  <TableCell>{t.zone || "—"}</TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditing(t);
-                          setOpen(true);
-                        }}
-                      >
-                        <PencilIcon className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => remove.mutate(t.id)}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <ul className="-my-2 divide-y">
+            {tables.map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{t.name}</div>
+                  <div className="text-sm text-muted-foreground">{t.zone || "No zone"}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Pill tone="muted">
+                    {t.seats} {t.seats === 1 ? "seat" : "seats"}
+                  </Pill>
+                  <RowActions
+                    label={t.name}
+                    onEdit={() => {
+                      setEditing(t);
+                      setOpen(true);
+                    }}
+                    onRemove={() => remove.mutate(t.id)}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </CardContent>
       <TableFormDialog
@@ -160,7 +247,7 @@ function ServicesSection({ venueId }: { venueId: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between">
+      <CardHeader className="flex items-center justify-between gap-4">
         <div>
           <CardTitle>Services</CardTitle>
           <CardDescription>Your meal periods and their hours.</CardDescription>
@@ -181,48 +268,29 @@ function ServicesSection({ venueId }: { venueId: string }) {
         ) : services.length === 0 ? (
           <p className="text-sm text-muted-foreground">No services yet.</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Opens</TableHead>
-                <TableHead>Closes</TableHead>
-                <TableHead>Days</TableHead>
-                <TableHead className="w-20" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {services.map((s) => (
-                <TableRow key={s.name}>
-                  <TableCell className="font-medium capitalize">{s.name}</TableCell>
-                  <TableCell>{s.openStart}</TableCell>
-                  <TableCell>{s.openEnd}</TableCell>
-                  <TableCell>{formatDays(s.days)}</TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditing(s);
-                          setOpen(true);
-                        }}
-                      >
-                        <PencilIcon className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => remove.mutate(s.name)}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <ul className="-my-2 divide-y">
+            {services.map((sv) => (
+              <li key={sv.name} className="flex items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <div className="truncate font-medium first-letter:uppercase">{sv.name}</div>
+                  <div className="text-sm text-muted-foreground">{formatDays(sv.days)}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Pill tone="info">
+                    {sv.openStart}–{sv.openEnd}
+                  </Pill>
+                  <RowActions
+                    label={sv.name}
+                    onEdit={() => {
+                      setEditing(sv);
+                      setOpen(true);
+                    }}
+                    onRemove={() => remove.mutate(sv.name)}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </CardContent>
       <ServiceFormDialog

@@ -42,7 +42,7 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between">
+      <CardHeader className="flex items-center justify-between gap-4">
         <div>
           <CardTitle>API keys</CardTitle>
           <CardDescription>
