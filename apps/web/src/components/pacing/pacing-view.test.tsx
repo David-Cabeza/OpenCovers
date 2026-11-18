@@ -55,4 +55,15 @@ describe("PacingView", () => {
 
     expect(await screen.findByText("No services configured")).toBeInTheDocument();
   });
+
+  it("names the peak slot of a service and says so when nothing is booked", async () => {
+    mockPacing([
+      { service: "lunch", slots: [{ time: "13:00", capacity: 10, covers: 2 }, { time: "13:15", capacity: 4, covers: 4 }] },
+      { service: "dinner", slots: [{ time: "20:00", capacity: 10, covers: 0 }] },
+    ]);
+    renderView();
+
+    expect(await screen.findByText("Peak 4/4 at 13:15")).toBeInTheDocument();
+    expect(screen.getByText("Nothing booked yet")).toBeInTheDocument();
+  });
 });

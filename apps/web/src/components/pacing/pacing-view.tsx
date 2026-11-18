@@ -1,11 +1,28 @@
 import { useState } from "react";
 import { GaugeIcon } from "lucide-react";
+import { cn } from "cn";
+import { DayNav } from "@/components/day-nav";
 import { EmptyState } from "@/components/empty-state";
-import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/layout/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePacing } from "@/hooks/use-pacing";
 import type { PacingSlot } from "@/lib/api";
-import { todayIso } from "@/lib/date";
+import { longDate, todayIso } from "@/lib/date";
+import {
+  HIGH_FROM,
+  MEDIUM_FROM,
+  pacingLevel,
+  pacingRatio,
+  peakSlot,
+  type PacingLevel,
+} from "@/lib/pacing";
+
+const LEVEL: Record<PacingLevel, { bar: string; text: string; swatch: string }> = {
+  empty: { bar: "bg-muted", text: "text-muted-foreground", swatch: "bg-muted" },
+  low: { bar: "bg-success", text: "text-success", swatch: "bg-success" },
+  medium: { bar: "bg-warning", text: "text-warning", swatch: "bg-warning" },
+  high: { bar: "bg-destructive", text: "text-destructive", swatch: "bg-destructive" },
+};
 
 export function PacingView({ venueId }: { venueId: string }) {
   const [date, setDate] = useState(todayIso());
@@ -14,21 +31,17 @@ export function PacingView({ venueId }: { venueId: string }) {
   const pacing = data?.pacing ?? [];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="font-display text-2xl">Pacing</h2>
-          <p className="text-sm text-muted-foreground">
-            Covers booked versus capacity, per time slot.
-          </p>
-        </div>
-        <Input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="w-fit"
-        />
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Pacing"
+        description={
+          <>
+            <span className="first-letter:uppercase">{longDate(date)}</span> · Covers booked versus
+            capacity, per time slot.
+          </>
+        }
+        actions={<DayNav date={date} onChange={setDate} />}
+      />
 
       {isPending ? (
         <Skeleton className="h-64 w-full" />
@@ -39,62 +52,86 @@ export function PacingView({ venueId }: { venueId: string }) {
           description="Add services under Settings to see covers versus capacity."
         />
       ) : (
-        <div className="space-y-6">
-          {pacing.map((service) => (
-            <div key={service.service} className="space-y-2">
-              <h3 className="font-medium capitalize">{service.service}</h3>
-              <div
-                className="grid gap-1"
-                style={{
-                  gridTemplateColumns: `repeat(${service.slots.length}, minmax(0, 1fr))`,
-                }}
-              >
-                {service.slots.map((slot) => (
-                  <SlotCell key={slot.time} slot={slot} />
-                ))}
-              </div>
-            </div>
-          ))}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <Legend color="bg-emerald-500/80" label="Low" />
-            <Legend color="bg-amber-500/80" label="Medium" />
-            <Legend color="bg-red-500/80" label="High" />
+        <>
+          {pacing.map((service) => {
+            const peak = peakSlot(service.slots);
+            return (
+              <section key={service.service} className="space-y-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-1">
+                  <h3 className="font-display text-lg first-letter:uppercase">{service.service}</h3>
+                  <span className="text-sm text-muted-foreground tabular-nums">
+                    {peak ? `Peak ${peak.covers}/${peak.capacity} at ${peak.time}` : "Nothing booked yet"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-x-6 gap-y-5 rounded-xl border bg-card p-4">
+                  {groupByHour(service.slots).map((hour) => (
+                    <div
+                      key={hour[0].time}
+                      className="grid gap-1.5"
+                      style={{ gridTemplateColumns: `repeat(${hour.length}, 3rem)` }}
+                    >
+                      {hour.map((slot) => (
+                        <SlotColumn key={slot.time} slot={slot} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-sm text-muted-foreground">
+            <Legend level="low" label="Low" hint={`under ${MEDIUM_FROM * 100}%`} />
+            <Legend level="medium" label="Medium" hint={`${MEDIUM_FROM * 100}–${HIGH_FROM * 100 - 1}%`} />
+            <Legend level="high" label="High" hint={`${HIGH_FROM * 100}% or more`} />
           </div>
-        </div>
+        </>
       )}
     </div>
   );
 }
 
-function SlotCell({ slot }: { slot: PacingSlot }) {
-  const ratio = slot.capacity > 0 ? slot.covers / slot.capacity : 0;
-  const color =
-    slot.covers === 0
-      ? "bg-muted text-muted-foreground"
-      : ratio >= 0.8
-        ? "bg-red-500/80 text-white"
-        : ratio >= 0.5
-          ? "bg-amber-500/80 text-white"
-          : "bg-emerald-500/80 text-white";
+/** Slots grouped by the hour they start in, so a long service wraps into rows instead of scrolling. */
+function groupByHour(slots: PacingSlot[]): PacingSlot[][] {
+  const groups: PacingSlot[][] = [];
+  for (const slot of slots) {
+    const last = groups[groups.length - 1];
+    if (last && last[0].time.slice(0, 2) === slot.time.slice(0, 2)) last.push(slot);
+    else groups.push([slot]);
+  }
+  return groups;
+}
 
+function SlotColumn({ slot }: { slot: PacingSlot }) {
+  const level = pacingLevel(slot);
+  const ratio = Math.min(pacingRatio(slot), 1);
+  const style = LEVEL[level];
   return (
     <div
-      className={`rounded p-2 text-center ${color}`}
+      className="flex flex-col items-center gap-1.5"
       title={`${slot.time} — ${slot.covers}/${slot.capacity} covers`}
     >
-      <div className="text-xs font-semibold">
+      <div className="flex h-20 w-full items-end overflow-hidden rounded-md bg-muted/60">
+        {slot.covers > 0 && (
+          <div
+            className={cn("w-full rounded-md transition-[height]", style.bar)}
+            style={{ height: `${Math.max(ratio * 100, 6)}%` }}
+          />
+        )}
+      </div>
+      <div className={cn("text-xs font-semibold tabular-nums", style.text)}>
         {slot.covers}/{slot.capacity}
       </div>
-      <div className="text-[10px] opacity-80">{slot.time}</div>
+      <div className="text-[11px] text-muted-foreground tabular-nums">{slot.time}</div>
     </div>
   );
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
+function Legend({ level, label, hint }: { level: PacingLevel; label: string; hint: string }) {
   return (
-    <span className="flex items-center gap-1.5">
-      <span className={`inline-block size-3 rounded ${color}`} />
-      {label}
+    <span className="inline-flex items-center gap-2">
+      <span aria-hidden="true" className={cn("size-3 rounded", LEVEL[level].swatch)} />
+      <span className="font-medium text-foreground">{label}</span>
+      <span className="text-xs">{hint}</span>
     </span>
   );
 }

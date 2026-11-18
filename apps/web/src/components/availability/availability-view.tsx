@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { CalendarXIcon } from "lucide-react";
+import { CalendarXIcon, MinusIcon, PlusIcon } from "lucide-react";
+import { cn } from "cn";
+import { DayNav } from "@/components/day-nav";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAvailability } from "@/hooks/use-availability";
-import { todayIso } from "@/lib/date";
+import { longDate, todayIso } from "@/lib/date";
 import type { AvailabilitySlot } from "@/lib/api";
 import { NewReservationDialog } from "@/components/reservation/new-reservation-dialog";
 
@@ -20,33 +23,47 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="font-display text-2xl">Availability</h2>
-          <p className="text-sm text-muted-foreground">
-            Free tables for the selected day and party size.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-fit"
-          />
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              min={1}
-              value={partySize}
-              onChange={(e) => setPartySize(Number(e.target.value) || 1)}
-              className="w-24"
-              aria-label="Party size"
-            />
-            <span className="text-sm text-muted-foreground">guests</span>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Availability"
+        description={
+          <>
+            <span className="first-letter:uppercase">{longDate(date)}</span> · Pick a free time to
+            book a table for {partySize} {partySize === 1 ? "guest" : "guests"}.
+          </>
+        }
+        actions={
+          <>
+            <DayNav date={date} onChange={setDate} />
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Fewer guests"
+                disabled={partySize <= 1}
+                onClick={() => setPartySize((n) => Math.max(1, n - 1))}
+              >
+                <MinusIcon />
+              </Button>
+              <Input
+                type="number"
+                min={1}
+                value={partySize}
+                onChange={(e) => setPartySize(Math.max(1, Math.floor(Number(e.target.value)) || 1))}
+                className="w-16 text-center tabular-nums"
+                aria-label="Party size"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="More guests"
+                onClick={() => setPartySize((n) => n + 1)}
+              >
+                <PlusIcon />
+              </Button>
+            </div>
+          </>
+        }
+      />
 
       {isPending ? (
         <Skeleton className="h-64 w-full" />
@@ -90,23 +107,34 @@ function ServiceSlots({
   slots: AvailabilitySlot[];
   onSelect: (time: string) => void;
 }) {
+  const free = slots.filter((s) => s.available).length;
   return (
-    <div className="space-y-3">
-      <h3 className="font-medium capitalize">{service}</h3>
-      <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
+    <section className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3 px-1">
+        <h3 className="font-display text-lg first-letter:uppercase">{service}</h3>
+        <span className="text-sm text-muted-foreground tabular-nums">
+          {free} of {slots.length} free
+        </span>
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2 rounded-xl border bg-card p-4">
         {slots.map((slot) => (
           <Button
             key={slot.time}
             type="button"
-            variant={slot.available ? "outline" : "ghost"}
+            variant="outline"
             disabled={!slot.available}
             onClick={() => onSelect(slot.time)}
-            className="h-9"
+            className={cn(
+              "h-10 tabular-nums",
+              slot.available
+                ? "border-primary/30 text-primary hover:border-primary hover:bg-accent"
+                : "border-transparent bg-muted/60 text-muted-foreground line-through",
+            )}
           >
             {slot.time}
           </Button>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
