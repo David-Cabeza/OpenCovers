@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { FloorCanvas } from "@/components/floor/floor-canvas";
+import { FloorSkinToggle } from "@/components/floor/floor-skin-toggle";
 import { useFloor } from "@/hooks/use-floor";
 import { useFloorItems } from "@/hooks/use-floor-items";
 import { api, type FloorTable } from "@/lib/api";
@@ -80,6 +81,9 @@ export function FloorView({ venueId }: { venueId: string }) {
           <Legend tone="free" label="Free" value={free} />
           <Legend tone="occupied" label="Occupied" value={occupied} />
           <span className="text-muted-foreground tabular-nums">{seatedCovers} guests at tables</span>
+          <span className="ml-auto">
+            <FloorSkinToggle />
+          </span>
         </div>
       )}
 
