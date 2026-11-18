@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_THEME, FONT_STACKS, isLogoUrl } from "@/lib/online-booking";
@@ -120,19 +120,66 @@ describe("OnlineBookingCard", () => {
     expect(api.calls("PUT", PATH)).toHaveLength(0);
   });
 
-  it("explains what is missing on online_booking_incomplete", async () => {
+  it("reverts the switch and lists only what is missing on online_booking_incomplete", async () => {
     const user = userEvent.setup();
-    setup({}, { [`PUT ${PATH}`]: { status: 409, body: { code: "online_booking_incomplete" } } });
+    setup(
+      {},
+      {
+        [`PUT ${PATH}`]: { status: 409, body: { code: "online_booking_incomplete" } },
+        "GET /v1/venues": { body: { venues: [{ id: "v1", name: "Casa", timezone: "UTC", enabled: true, role: "admin" }] } },
+        "GET /v1/venues/v1/services": { body: { services: [] } },
+      },
+    );
     renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await screen.findByLabelText("Largest party");
+
+    await user.click(screen.getByLabelText("Accept online bookings"));
+    expect(screen.getByLabelText("Accept online bookings")).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+
+    expect(await screen.findByText(/Nothing was saved/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Accept online bookings")).not.toBeChecked();
+    expect(screen.getByText(/Add at least one service/)).toBeInTheDocument();
+    expect(screen.queryByText(/The venue needs a name/)).not.toBeInTheDocument();
+  });
+
+  it("lists the missing venue name", async () => {
+    const user = userEvent.setup();
+    setup(
+      {},
+      {
+        [`PUT ${PATH}`]: { status: 409, body: { code: "online_booking_incomplete" } },
+        "GET /v1/venues": { body: { venues: [{ id: "v1", name: " ", timezone: "UTC", enabled: true, role: "admin" }] } },
+      },
+    );
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+    await user.click(screen.getByLabelText("Accept online bookings"));
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+    expect(await screen.findByText(/The venue needs a name/)).toBeInTheDocument();
+    expect(screen.queryByText(/Add at least one service/)).not.toBeInTheDocument();
+  });
+
+  it("keeps unsaved edits when the settings refetch with the same values", async () => {
+    const user = userEvent.setup();
+    setup();
+    const { queryClient } = renderWithApp(<OnlineBookingCard venueId="v1" />);
     await loaded();
 
     await user.click(screen.getByLabelText("Accept online bookings"));
-    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+    await user.clear(screen.getByLabelText("Largest party"));
+    await user.type(screen.getByLabelText("Largest party"), "5");
+    // A new object with the same saved values, as a refetch or a cache write can produce.
+    act(() => {
+      queryClient.setQueryData(["online-booking", "v1"], { ...SETTINGS, theme: {} });
+    });
+    await queryClient.invalidateQueries({ queryKey: ["online-booking", "v1"] });
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
 
-    expect(await screen.findByText("Online booking cannot be turned on yet.")).toBeInTheDocument();
-    expect(screen.getByText(/The venue needs a name/)).toBeInTheDocument();
-    expect(screen.getByText(/has to open on at least one ticked day/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Accept online bookings")).toBeChecked();
+    expect(screen.getByLabelText("Largest party")).toHaveValue("5");
   });
+
 
   it("shows the key and copies it", async () => {
     const user = userEvent.setup();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CopyIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useOnlineBooking } from "@/hooks/use-online-booking";
 import { useServices } from "@/hooks/use-services";
+import { useVenues } from "@/hooks/use-venues";
 import { api } from "@/lib/api";
 import { errorMessage, isApiError } from "@/lib/error-message";
 import {
@@ -112,7 +113,10 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
   const { data, isPending } = useOnlineBooking(venueId);
   const { data: serviceData } = useServices(venueId);
-  const serviceNames = (serviceData?.services ?? []).map((s) => s.name);
+  const { data: venueData } = useVenues();
+  const services = serviceData?.services ?? [];
+  const serviceNames = services.map((s) => s.name);
+  const venueName = venueData?.venues.find((v) => v.id === venueId)?.name;
   const [form, setForm] = useState<OnlineBookingForm | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [incomplete, setIncomplete] = useState(false);
@@ -120,12 +124,17 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
   const [confirmRotate, setConfirmRotate] = useState(false);
   const [lowContrast, setLowContrast] = useState<number | null>(null);
 
+  // Reset the form only when the saved server value changes, so a refetch that returns the same
+  // settings does not wipe edits that are not saved yet.
+  const savedKey = useRef<string | null>(null);
   useEffect(() => {
-    if (data) {
-      setForm(toForm(data));
-      setErrors({});
-      setIncomplete(false);
-    }
+    if (!data) return;
+    const next = JSON.stringify(data);
+    if (next === savedKey.current) return;
+    savedKey.current = next;
+    setForm(toForm(data));
+    setErrors({});
+    setIncomplete(false);
   }, [data]);
 
   const save = useMutation({
@@ -140,6 +149,8 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
     },
     onError: (err) => {
       if (isApiError(err, "online_booking_incomplete")) {
+        // The server kept online booking off: show that, and keep the other edits.
+        setForm((f) => (f && data ? { ...f, enabled: data.enabled } : f));
         setIncomplete(true);
         return;
       }
@@ -223,6 +234,19 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
     });
   }
 
+  const bookable = services.some(
+    (s) =>
+      (form?.services == null || form.services.includes(s.name)) &&
+      (form === null || s.days.some((d) => form.weekdays.includes(d))),
+  );
+  const missing: string[] = [];
+  if (venueName !== undefined && venueName.trim() === "") missing.push("The venue needs a name.");
+  if (services.length === 0) missing.push("Add at least one service under Services below.");
+  else if (!bookable)
+    missing.push(
+      "At least one ticked service has to open on at least one ticked day. Check the days each service runs on.",
+    );
+  if (missing.length === 0) missing.push("Check the venue name and the services bookable online.");
   const key = data?.bookingKey ?? null;
   const hostOk = widgetOrigin(host) !== null;
   const snippet = key ? embedSnippet(host, key) : "";
@@ -263,17 +287,11 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                 role="alert"
                 className="rounded-md border border-destructive/50 p-3 text-sm text-destructive"
               >
-                <p>Online booking cannot be turned on yet.</p>
+                <p>Online booking cannot be turned on yet. Nothing was saved.</p>
                 <ul className="list-disc pl-5">
-                  <li>The venue needs a name.</li>
-                  {serviceNames.length === 0 ? (
-                    <li>Add at least one service under Services below.</li>
-                  ) : (
-                    <li>
-                      At least one ticked service has to open on at least one ticked day. Check
-                      the days each service runs on.
-                    </li>
-                  )}
+                  {missing.map((m) => (
+                    <li key={m}>{m}</li>
+                  ))}
                 </ul>
               </div>
             )}

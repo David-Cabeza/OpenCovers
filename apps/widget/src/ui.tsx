@@ -30,18 +30,21 @@ export const primaryButton = `${buttonClass} w-full bg-primary text-on-primary`;
 export const secondaryButton = `${buttonClass} border border-border bg-surface text-text`;
 export const dangerButton = `${buttonClass} w-full bg-danger text-on-primary`;
 
-/** The venue's logo from its theme, or nothing when the theme has no valid `https` logo. */
-export function Logo({ theme, venue }: { theme: unknown; venue: string }) {
+/**
+ * The venue's logo from its theme, or nothing when the theme has no valid `https` logo. With `named`, the venue name
+ * is already text beside the logo, so the image is decorative and has an empty alt (no double announcement).
+ */
+export function Logo({ theme, venue, named = false }: { theme: unknown; venue: string; named?: boolean }) {
   const src = logoSrc(theme);
   if (!src) return null;
-  return <img src={src} alt={venue} referrerPolicy="no-referrer" decoding="async" className="mb-4 h-12 w-auto max-w-full object-contain" />;
+  return <img src={src} alt={named ? "" : venue} referrerPolicy="no-referrer" decoding="async" className="mb-4 h-12 w-auto max-w-full object-contain" />;
 }
 
 /** The venue's logo, its name and its public phone, when it has one, above the step. */
 export function VenueHeader({ venue }: { venue: { name: string; phone: string | null; theme?: unknown } }) {
   return (
     <header className="mb-4">
-      <Logo theme={venue.theme} venue={venue.name} />
+      <Logo theme={venue.theme} venue={venue.name} named />
       <p className="font-medium [overflow-wrap:anywhere]">{venue.name}</p>
       {venue.phone && <p className="text-sm text-muted [overflow-wrap:anywhere]">{venue.phone}</p>}
     </header>

@@ -86,6 +86,12 @@ describe("production Caddyfile", () => {
     expect(maxSize(widget)).toBe("64KiB");
   });
 
+  it("proxies /favicon.ico on the widget site only, and the staff site never names it", () => {
+    expect(handle(widget, "/favicon.ico")).toMatch(/^handle \/favicon\.ico \{\s*reverse_proxy \{\$API_UPSTREAM:api:3000\}\s*$/);
+    expect(staff).not.toContain("favicon");
+    expect(widget).toMatch(/handle \{\s*respond 404\s*\}/);
+  });
+
   it("proxies the self-service page /r on the widget site only, with the API's headers", () => {
     expect(handle(widget, "/r")).toMatch(/^handle \/r \{\s*reverse_proxy \{\$API_UPSTREAM:api:3000\}\s*$/);
     expect(handle(staff, "/r")).toMatch(/^handle \/r \{\s*respond 404\s*$/);

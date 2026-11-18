@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { applyTheme, FONT_STACKS, logoSrc, themeVars } from "../src/theme";
-import { Logo } from "../src/ui";
+import { Logo, VenueHeader } from "../src/ui";
 
 const css = readFileSync(path.resolve(import.meta.dirname, "../src/styles.css"), "utf8");
 
@@ -115,5 +115,18 @@ describe("logo", () => {
   it("renders nothing without a valid logo", () => {
     expect(renderToStaticMarkup(createElement(Logo, { theme: { logoUrl: "javascript:alert(1)" }, venue: "Casa" }))).toBe("");
     expect(renderToStaticMarkup(createElement(Logo, { theme: {}, venue: "Casa" }))).toBe("");
+  });
+
+  it("gives the logo an empty alt when the venue name is text beside it", () => {
+    const venue = { name: "Casa Alba", phone: null, theme: { logoUrl: "https://example.com/l.png" } };
+    const html = renderToStaticMarkup(createElement(VenueHeader, { venue }));
+    expect(html).toContain('alt=""');
+    expect(html).toContain("Casa Alba</p>");
+    expect(html).not.toContain('alt="Casa Alba"');
+  });
+
+  it("keeps the venue name as alt when no name is rendered next to the logo", () => {
+    const html = renderToStaticMarkup(createElement(Logo, { theme: { logoUrl: "https://example.com/l.png" }, venue: "Casa Alba" }));
+    expect(html).toContain('alt="Casa Alba"');
   });
 });

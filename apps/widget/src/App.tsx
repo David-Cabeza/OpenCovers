@@ -123,7 +123,10 @@ function BookingForm(props: {
     });
   }, [api, config]);
 
+  // Runs again on every return to the times step, so slots that went stale while the guest filled in the
+  // details (taken, or inside the lead time by now) are never listed again.
   useEffect(() => {
+    if (step !== "choose") return;
     if (!date || party === "more") return setTimes({ kind: "pick-date" });
     if (!config.weekdays.includes(isoWeekday(date))) return setTimes({ kind: "closed" });
     let live = true;
@@ -135,7 +138,7 @@ function BookingForm(props: {
     return () => {
       live = false;
     };
-  }, [api, config, date, party, reload]);
+  }, [api, config, date, party, reload, step]);
 
   const partyLabel = (n: number) => (n === 1 ? t("field.partyOptionOne") : t("field.partyOption", { n }));
   const noticeText = (e: Explanation) =>
