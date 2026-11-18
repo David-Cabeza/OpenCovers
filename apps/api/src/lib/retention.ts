@@ -124,39 +124,58 @@ async function expireUnlinkedReservations(
 }
 
 async function expireWaitlist(db: Db, venueId: string, cutoff: Date, limit: number): Promise<number> {
-  const due = db
-    .select({ id: waitlist.id })
-    .from(waitlist)
-    .where(
+  // Pick the ids first and delete them by value. A `DELETE ... WHERE id IN (SELECT ... LIMIT ... FOR UPDATE)`
+  // lets the planner re-run the subquery per row (an unmaterialized nested loop), so the batch limit is lost.
+  return db.transaction(async (tx) => {
+    const due = await tx
+      .select({ id: waitlist.id })
+      .from(waitlist)
+      .where(
+        and(
+          eq(waitlist.venueId, venueId),
+          lt(waitlist.createdAt, cutoff),
+          or(ne(waitlist.guestName, ""), ne(waitlist.guestContact, "")),
+        ),
+      )
+      .orderBy(waitlist.createdAt, waitlist.id)
+      .limit(limit)
+      .for("update", { skipLocked: true });
+    if (due.length === 0) return 0;
+    await tx.delete(waitlist).where(
       and(
         eq(waitlist.venueId, venueId),
-        lt(waitlist.createdAt, cutoff),
-        or(ne(waitlist.guestName, ""), ne(waitlist.guestContact, "")),
+        inArray(
+          waitlist.id,
+          due.map((r) => r.id),
+        ),
       ),
-    )
-    .orderBy(waitlist.createdAt, waitlist.id)
-    .limit(limit)
-    .for("update", { skipLocked: true });
-  const deleted = await db
-    .delete(waitlist)
-    .where(and(eq(waitlist.venueId, venueId), inArray(waitlist.id, due)))
-    .returning({ id: waitlist.id });
-  return deleted.length;
+    );
+    return due.length;
+  });
 }
 
 async function expireBlocklist(db: Db, venueId: string, cutoff: Date, limit: number): Promise<number> {
-  const due = db
-    .select({ id: guestBlocklist.id })
-    .from(guestBlocklist)
-    .where(and(eq(guestBlocklist.venueId, venueId), lt(guestBlocklist.createdAt, cutoff)))
-    .orderBy(guestBlocklist.createdAt, guestBlocklist.id)
-    .limit(limit)
-    .for("update", { skipLocked: true });
-  const deleted = await db
-    .delete(guestBlocklist)
-    .where(and(eq(guestBlocklist.venueId, venueId), inArray(guestBlocklist.id, due)))
-    .returning({ id: guestBlocklist.id });
-  return deleted.length;
+  // Same shape as expireWaitlist: choose the ids, then delete exactly those (see the note there).
+  return db.transaction(async (tx) => {
+    const due = await tx
+      .select({ id: guestBlocklist.id })
+      .from(guestBlocklist)
+      .where(and(eq(guestBlocklist.venueId, venueId), lt(guestBlocklist.createdAt, cutoff)))
+      .orderBy(guestBlocklist.createdAt, guestBlocklist.id)
+      .limit(limit)
+      .for("update", { skipLocked: true });
+    if (due.length === 0) return 0;
+    await tx.delete(guestBlocklist).where(
+      and(
+        eq(guestBlocklist.venueId, venueId),
+        inArray(
+          guestBlocklist.id,
+          due.map((r) => r.id),
+        ),
+      ),
+    );
+    return due.length;
+  });
 }
 
 async function expireMembershipAudit(
