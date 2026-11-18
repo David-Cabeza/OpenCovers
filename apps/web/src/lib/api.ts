@@ -450,6 +450,9 @@ export const api = {
       `/v1/venues/${venueId}/agenda?date=${date}`,
     ),
 
+  getReservation: (venueId: string, id: string) =>
+    request<Reservation>(`/v1/venues/${venueId}/reservations/${id}`),
+
   availability: (venueId: string, date: string, partySize: number) =>
     request<{ availability: Availability }>(
       `/v1/venues/${venueId}/availability?date=${date}&partySize=${partySize}`,

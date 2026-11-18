@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { RotateCwIcon } from "lucide-react";
 import { cn } from "cn";
 import { useUiStore } from "@/stores/ui-store";
+import { FloorTableCard } from "./floor-table-card";
 import { FloorItemShape } from "./floor-item-shape";
 import { FLOOR_SKINS } from "./skins";
 
@@ -96,6 +97,7 @@ export function FloorCanvas({
   tables,
   items = [],
   mode,
+  venueId,
   onSeat,
   onMove,
   onTableUpdate,
@@ -105,6 +107,8 @@ export function FloorCanvas({
   tables: CanvasTable[];
   items?: CanvasItem[];
   mode: "view" | "edit";
+  /** Enables the reservation card on occupied tables (view mode only). */
+  venueId?: string;
   onSeat?: (tableId: string) => void;
   onMove?: (reservationId: string, targetTableId: string) => void;
   onTableUpdate?: (tableId: string, layout: { x?: number; y?: number; rotation?: number }) => void;
@@ -194,6 +198,7 @@ export function FloorCanvas({
   }
 
   // The plan uses absolute pixel positions, so on a narrow screen the stage scrolls instead of clipping.
+  const tableNames = Object.fromEntries(tables.map((t) => [t.id, t.name]));
   const extentX = Math.max(
     ...tables.map((t) => posOf("table", t.id, t.posX, t.posY).x + NODE),
     ...items.map((i) => posOf("item", i.id, i.posX, i.posY).x + sizeOf(i.id, i.width, i.height).w),
@@ -280,15 +285,15 @@ export function FloorCanvas({
           const movableInView = mode === "view" && t.occupied;
           const seatable = mode === "view" && !t.occupied;
           return (
+            <FloorTableCard key={t.id} venueId={venueId} table={t} tableNames={tableNames} enabled={Boolean(movableInView)}>
             <div
-              key={t.id}
               style={{ left: pos.x, top: pos.y, width: NODE, height: NODE }}
               className={cn(
                 "group absolute select-none",
                 mode === "edit" ? "cursor-move touch-none" : movableInView ? "cursor-grab" : "cursor-pointer",
               )}
               role={seatable ? "button" : undefined}
-              tabIndex={seatable ? 0 : undefined}
+              tabIndex={seatable || movableInView ? 0 : undefined}
               aria-label={
                 seatable
                   ? `Seat a walk-in at ${t.name}`
@@ -408,6 +413,7 @@ export function FloorCanvas({
                 </button>
               )}
             </div>
+            </FloorTableCard>
           );
         })}
       </div>
