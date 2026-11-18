@@ -63,7 +63,7 @@ export const FLOOR_SKINS: Record<FloorSkinId, FloorSkin> = {
 
 const GLOW = {
   backgroundImage:
-    "radial-gradient(ellipse 70% 60% at 50% 40%, color-mix(in oklab, oklch(0.96 0.06 85) 45%, transparent), transparent 75%)",
+    "radial-gradient(ellipse 70% 60% at 50% 40%, var(--floor-glow), transparent 75%)",
 };
 
 export const FLOOR_SKIN_LIST = Object.values(FLOOR_SKINS);
