@@ -70,7 +70,7 @@ A venue can take bookings on its own website ([ADR-0017](docs/adr/0017-booking-w
 
 ### 🪑 A visual floor plan
 
-Drag tables and room elements onto a floor, snap them to a grid, rotate them, and resize them. Tables come in round, square, and rectangle shapes with chairs; room elements (bar, kitchen, wall, window, door, plant, counter, entrance) are drawn as architectural symbols on a wood floor — so the plan reads like a plan, not a list.
+Drag tables and room elements onto a floor, snap them to a grid, rotate them, and resize them. Tables come in round, square, and rectangle shapes with chairs; room elements (bar, kitchen, wall, window, door, plant, large plant, counter, entrance, sofa, column, stairs, rug, umbrella) are drawn as architectural symbols on a wood floor — so the plan reads like a plan, not a list.
 
 ### 📧 Email confirmations
 
