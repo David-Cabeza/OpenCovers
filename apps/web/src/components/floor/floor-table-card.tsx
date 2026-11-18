@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactElement } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { XIcon } from "lucide-react";
+import { ArrowRightLeftIcon, XIcon } from "lucide-react";
 import { StatusBadge } from "@/components/agenda/status-badge";
 import { ReconfirmationPill } from "@/components/preshift/pre-shift-view";
 import { Button } from "@/components/ui/button";
@@ -35,12 +35,15 @@ export function FloorTableCard({
   table,
   tableNames,
   enabled,
+  onMoveRequest,
   children,
 }: {
   venueId?: string;
   table: CardTable;
   tableNames: Record<string, string>;
   enabled: boolean;
+  /** Adds a "Move to…" button to the card, which closes it and calls this. */
+  onMoveRequest?: () => void;
   children: ReactElement;
 }) {
   const reservationId = table.reservationId;
@@ -165,6 +168,14 @@ export function FloorTableCard({
           tableNames={tableNames}
           open={open}
           onClose={hide}
+          onMoveRequest={
+            onMoveRequest
+              ? () => {
+                  hide();
+                  onMoveRequest();
+                }
+              : undefined
+          }
         />
       </PopoverContent>
     </Popover>
@@ -178,6 +189,7 @@ function CardBody({
   tableNames,
   open,
   onClose,
+  onMoveRequest,
 }: {
   venueId: string;
   reservationId: string;
@@ -185,6 +197,7 @@ function CardBody({
   tableNames: Record<string, string>;
   open: boolean;
   onClose: () => void;
+  onMoveRequest?: () => void;
 }) {
   const { data, isPending, isError } = useQuery({
     queryKey: ["reservation", venueId, reservationId],
@@ -243,6 +256,12 @@ function CardBody({
           )}
           {r.commentary && <Row label="Notes">{r.commentary}</Row>}
         </dl>
+      )}
+
+      {onMoveRequest && (
+        <Button type="button" variant="outline" size="sm" className="w-full" onClick={onMoveRequest}>
+          <ArrowRightLeftIcon className="size-4" /> Move to…
+        </Button>
       )}
     </div>
   );

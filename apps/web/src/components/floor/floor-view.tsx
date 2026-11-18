@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { FloorCanvas } from "@/components/floor/floor-canvas";
 import { FloorSkinToggle } from "@/components/floor/floor-skin-toggle";
+import { MoveDialog } from "@/components/floor/move-dialog";
 import { useFloor } from "@/hooks/use-floor";
 import { useFloorItems } from "@/hooks/use-floor-items";
 import { api, type FloorTable } from "@/lib/api";
@@ -19,6 +20,7 @@ export function FloorView({ venueId }: { venueId: string }) {
   const [date, setDate] = useState(todayIso());
   const [time, setTime] = useState(nowTime());
   const [seatTable, setSeatTable] = useState<FloorTable | null>(null);
+  const [moveFrom, setMoveFrom] = useState<FloorTable | null>(null);
   const queryClient = useQueryClient();
   const { data, isPending } = useFloor(venueId, date, time);
   const { data: itemsData } = useFloorItems(venueId);
@@ -40,6 +42,7 @@ export function FloorView({ venueId }: { venueId: string }) {
       void queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
     },
     onError: (err) => toast.error(errorMessage(err, "Could not move.")),
+    onSettled: () => setMoveFrom(null),
   });
 
   return (
@@ -48,7 +51,7 @@ export function FloorView({ venueId }: { venueId: string }) {
         <div className="min-w-0">
           <h2 className="font-display text-3xl">Floor plan</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Drag a reservation to a free table, or click a free table to seat a walk-in.
+            Drag a reservation to a free table, or tap a seated table to see it and move it. Tap a free table to seat a walk-in.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -110,8 +113,20 @@ export function FloorView({ venueId }: { venueId: string }) {
           onMove={(reservationId, targetTableId) =>
             move.mutate({ reservationId, targetTableId })
           }
+          onMoveRequest={(tableId) => {
+            const table = tables.find((t) => t.id === tableId);
+            if (table?.reservationId) setMoveFrom(table);
+          }}
         />
       )}
+
+      <MoveDialog
+        source={moveFrom}
+        tables={tables}
+        pending={move.isPending}
+        onMove={(reservationId, targetTableId) => move.mutate({ reservationId, targetTableId })}
+        onClose={() => setMoveFrom(null)}
+      />
 
       <WalkInDialog
         venueId={venueId}

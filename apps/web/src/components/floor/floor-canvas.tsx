@@ -100,6 +100,7 @@ export function FloorCanvas({
   venueId,
   onSeat,
   onMove,
+  onMoveRequest,
   onTableUpdate,
   onItemUpdate,
   onDeleteItem,
@@ -111,6 +112,8 @@ export function FloorCanvas({
   venueId?: string;
   onSeat?: (tableId: string) => void;
   onMove?: (reservationId: string, targetTableId: string) => void;
+  /** Called from "Move to…" in a seated table's card, for moving it without dragging. */
+  onMoveRequest?: (tableId: string) => void;
   onTableUpdate?: (tableId: string, layout: { x?: number; y?: number; rotation?: number }) => void;
   onItemUpdate?: (
     itemId: string,
@@ -285,7 +288,7 @@ export function FloorCanvas({
           const movableInView = mode === "view" && t.occupied;
           const seatable = mode === "view" && !t.occupied;
           return (
-            <FloorTableCard key={t.id} venueId={venueId} table={t} tableNames={tableNames} enabled={Boolean(movableInView)}>
+            <FloorTableCard key={t.id} venueId={venueId} table={t} tableNames={tableNames} enabled={Boolean(movableInView)} onMoveRequest={onMoveRequest ? () => onMoveRequest(t.id) : undefined}>
             <div
               style={{ left: pos.x, top: pos.y, width: NODE, height: NODE }}
               className={cn(
