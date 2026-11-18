@@ -40,7 +40,7 @@ const WOOD_GRAIN =
 
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 
-function tableSize(shape: string | undefined, seats: number): { w: number; h: number } {
+export function tableSize(shape: string | undefined, seats: number): { w: number; h: number } {
   if (shape === "rectangle") return { w: 64, h: 46 };
   if (shape === "square") return { w: 52, h: 52 };
   if (shape === "oval") return { w: Math.min(56 + seats * 4, 96), h: 44 };
@@ -50,7 +50,7 @@ function tableSize(shape: string | undefined, seats: number): { w: number; h: nu
 
 const CHAIR_GAP = 8;
 
-function chairPositions(
+export function chairPositions(
   shape: string | undefined,
   seats: number,
   size: { w: number; h: number },
@@ -70,8 +70,24 @@ function chairPositions(
     // Chairs go round the outline, a little off the ellipse so they sit beside the table edge.
     const rx = size.w / 2 + CHAIR_GAP;
     const ry = size.h / 2 + CHAIR_GAP;
+    // Equal angles crowd the chairs at the ends of an ellipse, so space them by arc length instead.
+    const steps = 360;
+    const arc: number[] = [0];
+    for (let k = 1; k <= steps; k++) {
+      const a0 = ((k - 1) / steps) * 2 * Math.PI - Math.PI / 2;
+      const a1 = (k / steps) * 2 * Math.PI - Math.PI / 2;
+      arc.push(
+        arc[k - 1]! +
+          Math.hypot(rx * (Math.cos(a1) - Math.cos(a0)), ry * (Math.sin(a1) - Math.sin(a0))),
+      );
+    }
+    const total = arc[steps]!;
+    let k = 0;
     for (let i = 0; i < seats; i++) {
-      const a = (i / seats) * 2 * Math.PI - Math.PI / 2;
+      const target = (i / seats) * total;
+      while (k < steps && arc[k + 1]! < target) k++;
+      const span = arc[k + 1]! - arc[k]!;
+      const a = ((k + (span > 0 ? (target - arc[k]!) / span : 0)) / steps) * 2 * Math.PI - Math.PI / 2;
       pts.push({ x: Math.cos(a) * rx, y: Math.sin(a) * ry });
     }
   } else if (shape === "square") {

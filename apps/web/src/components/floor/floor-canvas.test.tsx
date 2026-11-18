@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { renderWithApp } from "@/test/mock-api";
-import { FloorCanvas } from "./floor-canvas";
+import { FloorCanvas, chairPositions, tableSize } from "./floor-canvas";
 
 const table = (shape: string, seats = 6) => ({ id: "t1", name: "T1", seats, shape, posX: 0, posY: 0 });
 
@@ -32,5 +32,17 @@ describe("table shapes", () => {
     const el = face();
     expect(el.style.width).toBe(el.style.height);
     expect(el.className).toContain("rounded-full");
+  });
+
+  it("spaces oval chairs evenly along the outline, with none crowded at the ends", () => {
+    for (const seats of [2, 6, 10]) {
+      const pts = chairPositions("oval", seats, tableSize("oval", seats));
+      expect(pts).toHaveLength(seats);
+      const gaps = pts.map((p, i) => {
+        const q = pts[(i + 1) % seats]!;
+        return Math.hypot(p.x - q.x, p.y - q.y);
+      });
+      expect(Math.max(...gaps) / Math.min(...gaps)).toBeLessThan(1.25);
+    }
   });
 });
