@@ -1,7 +1,9 @@
 import { useRef, useState } from "react";
 import { RotateCwIcon } from "lucide-react";
 import { cn } from "cn";
+import { useUiStore } from "@/stores/ui-store";
 import { FloorItemShape } from "./floor-item-shape";
+import { FLOOR_SKINS } from "./skins";
 
 export interface CanvasTable {
   id: string;
@@ -112,6 +114,7 @@ export function FloorCanvas({
   ) => void;
   onDeleteItem?: (itemId: string) => void;
 }) {
+  const skin = FLOOR_SKINS[useUiStore((s) => s.floorSkin)];
   const canvasRef = useRef<HTMLDivElement>(null);
   const [posOverrides, setPosOverrides] = useState<Record<string, { x: number; y: number }>>({});
   const [sizeOverrides, setSizeOverrides] = useState<Record<string, { w: number; h: number }>>({});
@@ -211,11 +214,7 @@ export function FloorCanvas({
         style={{
           minWidth: extentX + 24,
           minHeight: extentY + 24,
-          backgroundImage:
-            mode === "edit"
-              ? "radial-gradient(circle, var(--floor-line) 1.5px, transparent 1.5px)"
-              : "linear-gradient(var(--floor-line) 1px, transparent 1px), linear-gradient(90deg, var(--floor-line) 1px, transparent 1px)",
-          backgroundSize: mode === "edit" ? "24px 24px" : "96px 96px",
+          ...skin.floor(mode),
         }}
         onDragOver={(e) => e.preventDefault()}
       >
@@ -233,7 +232,10 @@ export function FloorCanvas({
               onPointerUp={onPointerUp}
               onPointerCancel={onPointerUp}
             >
-              <div className="absolute inset-0" style={{ transform: `rotate(${rotation}deg)` }}>
+              <div
+                className={cn("absolute inset-0", skin.itemShadow)}
+                style={{ transform: `rotate(${rotation}deg)` }}
+              >
                 <FloorItemShape type={item.type} />
               </div>
               {mode === "edit" && (
@@ -335,7 +337,10 @@ export function FloorCanvas({
                 {chairPositions(shape, t.seats, size).map((c, i) => (
                   <div
                     key={i}
-                    className="absolute h-[15px] w-[17px] rounded-[5px] border border-wood-edge bg-wood shadow-sm"
+                    className={cn(
+                      "absolute h-[15px] w-[17px] rounded-[5px] border border-wood-edge bg-wood",
+                      skin.chairShadow,
+                    )}
                     style={{
                       left: NODE / 2 + c.x - 8.5,
                       top: NODE / 2 + c.y - 7.5,
@@ -354,7 +359,7 @@ export function FloorCanvas({
                 <div
                   className={cn(
                     "absolute flex flex-col items-center justify-center border-2 text-center transition-colors group-focus-visible:ring-[3px] group-focus-visible:ring-ring/50",
-                    "shadow-[0_2px_6px_rgb(0_0_0/0.18)]",
+                    skin.tableShadow,
                     shape === "round" ? "rounded-full" : "rounded-lg",
                     t.occupied
                       ? "border-success bg-success-soft text-success"
