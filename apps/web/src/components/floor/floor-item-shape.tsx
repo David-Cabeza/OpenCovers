@@ -7,30 +7,42 @@ const STROKE = { vectorEffect: "non-scaling-stroke" as const, strokeWidth: 1 };
 
 const LEAF_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
 
+function Foliage({ size, layers }: { size: number; layers: { count: number; len: number; width: number; turn: number; tone: string }[] }) {
+  const c = size / 2;
+  return (
+    <>
+      {layers.map((l, li) =>
+        Array.from({ length: l.count }, (_, i) => {
+          const a = (360 / l.count) * i + l.turn;
+          const tip = c - l.len;
+          return (
+            <g key={`${li}-${i}`} transform={`rotate(${a} ${c} ${c})`}>
+              <path d={`M${c} ${c} C${c - l.width} ${c - l.len * 0.5} ${c - l.width * 0.7} ${tip + 3} ${c} ${tip} C${c + l.width * 0.7} ${tip + 3} ${c + l.width} ${c - l.len * 0.5} ${c} ${c} Z`} className={l.tone} />
+              <path d={`M${c} ${c - 1} L${c} ${tip + 3}`} className="stroke-tabletop/45" strokeWidth="0.7" strokeLinecap="round" fill="none" />
+              <path d={`M${c} ${c - 1} C${c + l.width * 0.5} ${c - l.len * 0.5} ${c + l.width * 0.5} ${tip + 4} ${c} ${tip + 1}`} className="fill-black/10" />
+            </g>
+          );
+        }),
+      )}
+    </>
+  );
+}
+
 function PlantShape() {
   return (
     <svg viewBox="0 0 40 40" className="size-full" preserveAspectRatio="xMidYMid meet">
-      <circle cx="20" cy="21" r="15" className="fill-black/10" />
-      {LEAF_ANGLES.map((a, i) => (
-        <path
-          key={a}
-          d="M20 20 C14 14 15 6 20 2 C25 6 26 14 20 20 Z"
-          transform={`rotate(${a} 20 20)`}
-          className={i % 2 ? "fill-primary" : "fill-primary/75"}
-        />
-      ))}
-      {LEAF_ANGLES.map((a) => (
-        <path
-          key={`v${a}`}
-          d="M20 19 L20 6"
-          transform={`rotate(${a} 20 20)`}
-          className="stroke-tabletop/50"
-          strokeWidth="0.8"
-          strokeLinecap="round"
-          fill="none"
-        />
-      ))}
-      <circle cx="20" cy="20" r="2.2" className="fill-primary" />
+      <circle cx="20" cy="22" r="16" className="fill-black/15" />
+      <circle cx="20" cy="20" r="14" className="fill-wood stroke-wood-edge" {...STROKE} />
+      <circle cx="20" cy="20" r="10" className="fill-black/25" />
+      <Foliage
+        size={40}
+        layers={[
+          { count: 8, len: 18, width: 6, turn: 0, tone: "fill-primary/80" },
+          { count: 8, len: 12, width: 4.5, turn: 22.5, tone: "fill-primary" },
+        ]}
+      />
+      <circle cx="20" cy="20" r="2" className="fill-primary" />
+      <circle cx="20" cy="20" r="0.9" className="fill-tabletop/60" />
     </svg>
   );
 }
@@ -90,9 +102,10 @@ function CounterShape() {
 
 function WallShape() {
   return (
-    <svg viewBox="0 0 160 10" className="size-full drop-shadow-[0_1px_2px_rgb(0_0_0/0.35)]" preserveAspectRatio="none">
-      <rect x="0" y="0" width="160" height="10" rx="1" className="fill-muted-foreground/70 stroke-foreground/40" {...STROKE} />
-      <rect x="0" y="3" width="160" height="4" className="fill-tabletop/25" />
+    <svg viewBox="0 0 160 16" className="size-full drop-shadow-[0_2px_3px_rgb(0_0_0/0.4)]" preserveAspectRatio="none">
+      <rect x="0" y="0" width="160" height="16" rx="1.5" className="fill-muted-foreground/75 stroke-foreground/45" {...STROKE} />
+      <rect x="0" y="0" width="160" height="5" rx="1.5" className="fill-tabletop/35" />
+      <rect x="0" y="12" width="160" height="4" rx="1.5" className="fill-black/25" />
     </svg>
   );
 }
@@ -125,13 +138,19 @@ function EntranceShape() {
 function SofaShape() {
   return (
     <svg viewBox="0 0 120 48" className="size-full" preserveAspectRatio="none">
-      <rect x="1" y="1" width="118" height="46" rx="6" className="fill-muted stroke-muted-foreground/40" {...STROKE} />
-      <rect x="1" y="1" width="118" height="12" rx="6" className="fill-muted-foreground/25" />
+      <rect x="2" y="4" width="118" height="44" rx="8" className="fill-black/15" />
+      <rect x="1" y="1" width="118" height="44" rx="8" className="fill-muted stroke-muted-foreground/45" {...STROKE} />
+      <rect x="1" y="1" width="118" height="15" rx="8" className="fill-muted-foreground/30" />
+      <line x1="8" y1="11" x2="112" y2="11" className="stroke-muted-foreground/40" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
       {[0, 1, 2].map((i) => (
-        <rect key={i} x={7 + i * 36} y="15" width="34" height="28" rx="5" className="fill-tabletop stroke-muted-foreground/30" {...STROKE} />
+        <g key={i}>
+          <rect x={10 + i * 34} y="17" width="32" height="26" rx="5" className="fill-tabletop stroke-muted-foreground/35" {...STROKE} />
+          <rect x={12 + i * 34} y="19" width="28" height="8" rx="4" className="fill-white/40" />
+        </g>
       ))}
-      <rect x="1" y="1" width="8" height="46" rx="4" className="fill-muted-foreground/20" />
-      <rect x="111" y="1" width="8" height="46" rx="4" className="fill-muted-foreground/20" />
+      <rect x="1" y="1" width="9" height="44" rx="4.5" className="fill-muted-foreground/30 stroke-muted-foreground/40" {...STROKE} />
+      <rect x="110" y="1" width="9" height="44" rx="4.5" className="fill-muted-foreground/30 stroke-muted-foreground/40" {...STROKE} />
+      <rect x="13" y="21" width="12" height="12" rx="3" transform="rotate(-12 19 27)" className="fill-primary/30" />
     </svg>
   );
 }
@@ -169,22 +188,21 @@ function RugShape() {
 }
 
 function LargePlantShape() {
-  const angles = Array.from({ length: 12 }, (_, i) => i * 30);
   return (
     <svg viewBox="0 0 64 64" className="size-full" preserveAspectRatio="xMidYMid meet">
-      <circle cx="32" cy="34" r="27" className="fill-black/10" />
-      {angles.map((a, i) => (
-        <path
-          key={a}
-          d="M32 32 C22 22 24 8 32 2 C40 8 42 22 32 32 Z"
-          transform={`rotate(${a + (i % 2 ? 15 : 0)} 32 32)`}
-          className={i % 2 ? "fill-primary" : "fill-primary/70"}
-        />
-      ))}
-      {angles.map((a) => (
-        <path key={`v${a}`} d="M32 30 L32 9" transform={`rotate(${a} 32 32)`} className="stroke-tabletop/40" strokeWidth="0.8" strokeLinecap="round" fill="none" />
-      ))}
-      <circle cx="32" cy="32" r="3.5" className="fill-primary" />
+      <circle cx="32" cy="35" r="27" className="fill-black/15" />
+      <circle cx="32" cy="32" r="22" className="fill-wood stroke-wood-edge" {...STROKE} />
+      <circle cx="32" cy="32" r="17" className="fill-black/25" />
+      <Foliage
+        size={64}
+        layers={[
+          { count: 10, len: 30, width: 9, turn: 0, tone: "fill-primary/70" },
+          { count: 10, len: 22, width: 7, turn: 18, tone: "fill-primary/90" },
+          { count: 8, len: 13, width: 5, turn: 9, tone: "fill-primary" },
+        ]}
+      />
+      <circle cx="32" cy="32" r="3" className="fill-primary" />
+      <circle cx="32" cy="32" r="1.3" className="fill-tabletop/60" />
     </svg>
   );
 }
