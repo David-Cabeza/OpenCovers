@@ -6,7 +6,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { AgendaView } from "./agenda/agenda-view";
 import { AvailabilityView } from "./availability/availability-view";
 import { FloorView } from "./floor/floor-view";
-import { Sidebar, type ViewId } from "./layout/sidebar";
+import { MobileNav, Sidebar, type ViewId } from "./layout/sidebar";
 import { Topbar } from "./layout/topbar";
 import { PacingView } from "./pacing/pacing-view";
 import { PreShiftView } from "./preshift/pre-shift-view";
@@ -21,6 +21,7 @@ export function Dashboard() {
   const venueId = useUiStore((s) => s.venueId);
   const setVenue = useUiStore((s) => s.setVenue);
   const [active, setActive] = useState<ViewId>("agenda");
+  const [navOpen, setNavOpen] = useState(false);
 
   const venues = data?.venues ?? [];
   const role = venues.find((v) => v.id === venueId)?.role;
@@ -37,9 +38,16 @@ export function Dashboard() {
   return (
     <div className="flex min-h-dvh">
       <Sidebar active={active} onSelect={setActive} role={role} />
+      <MobileNav
+        open={navOpen}
+        onOpenChange={setNavOpen}
+        active={active}
+        onSelect={setActive}
+        role={role}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar email={session?.user.email} />
-        <main className="flex-1 p-6 lg:p-8 print:p-0">
+        <Topbar email={session?.user.email} onMenu={() => setNavOpen(true)} />
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 print:p-0">
           {isPending ? (
             <div className="space-y-4">
               <Skeleton className="h-9 w-56" />

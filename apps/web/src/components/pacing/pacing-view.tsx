@@ -17,7 +17,7 @@ export function PacingView({ venueId }: { venueId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Pacing</h2>
+          <h2 className="font-display text-2xl">Pacing</h2>
           <p className="text-sm text-muted-foreground">
             Covers booked versus capacity, per time slot.
           </p>

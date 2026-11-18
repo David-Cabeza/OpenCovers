@@ -114,7 +114,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Agenda</h2>
+          <h2 className="font-display text-2xl">Agenda</h2>
           <p className="text-sm text-muted-foreground">
             Reservations for the selected day.
           </p>

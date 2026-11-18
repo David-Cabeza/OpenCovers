@@ -1,3 +1,4 @@
+import { MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -19,7 +20,7 @@ import { useVenues } from "@/hooks/use-venues";
 import { useUiStore } from "@/stores/ui-store";
 import { ThemeToggle } from "./theme-toggle";
 
-export function Topbar({ email }: { email?: string }) {
+export function Topbar({ email, onMenu }: { email?: string; onMenu?: () => void }) {
   const { data } = useVenues();
   const venueId = useUiStore((s) => s.venueId);
   const setVenue = useUiStore((s) => s.setVenue);
@@ -28,11 +29,20 @@ export function Topbar({ email }: { email?: string }) {
 
   return (
     <header className="print:hidden sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
-      <div className="flex items-center justify-between gap-4 px-6 py-3">
-        <div className="flex items-center gap-3">
+      <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={onMenu}
+            aria-label="Open menu"
+          >
+            <MenuIcon className="size-5" />
+          </Button>
           {venues.length > 0 && (
             <Select value={venueId ?? ""} onValueChange={setVenue}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-full min-w-0 sm:w-[220px]">
                 <SelectValue placeholder="Venue" />
               </SelectTrigger>
               <SelectContent>
