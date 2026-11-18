@@ -102,6 +102,7 @@ export function FloorView({ venueId }: { venueId: string }) {
           tables={tables}
           items={items}
           mode="view"
+          venueId={venueId}
           onSeat={(tableId) => {
             const table = tables.find((t) => t.id === tableId);
             if (table) setSeatTable(table);

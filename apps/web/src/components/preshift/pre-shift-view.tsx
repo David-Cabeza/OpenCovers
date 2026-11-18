@@ -204,7 +204,7 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
   );
 }
 
-function ReconfirmationPill({ value }: { value: Reconfirmation | undefined }) {
+export function ReconfirmationPill({ value }: { value: Reconfirmation | undefined }) {
   if (!value || value === "none") return null;
   const r = RECONFIRMATION[value];
   return <Pill tone={r.tone}>{r.label}</Pill>;
