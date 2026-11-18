@@ -25,6 +25,11 @@
   --ring: oklch(0.58 0.105 165);
     --success: oklch(0.52 0.105 165);
   --success-soft: oklch(0.955 0.03 165);
+  --floor: oklch(0.915 0.014 75);
+  --floor-line: oklch(0.88 0.016 75);
+  --wood: oklch(0.83 0.065 68);
+  --wood-edge: oklch(0.7 0.075 62);
+  --tabletop: oklch(0.995 0.002 90);
   --warning: oklch(0.55 0.13 70);
   --warning-soft: oklch(0.96 0.05 85);
   --info: oklch(0.5 0.13 255);
@@ -66,6 +71,11 @@
   --ring: oklch(0.72 0.13 160);
     --success: oklch(0.78 0.13 160);
   --success-soft: oklch(0.3 0.05 165);
+  --floor: oklch(0.27 0.012 75);
+  --floor-line: oklch(0.31 0.012 75);
+  --wood: oklch(0.55 0.06 65);
+  --wood-edge: oklch(0.42 0.06 62);
+  --tabletop: oklch(0.88 0.005 90);
   --warning: oklch(0.82 0.13 85);
   --warning-soft: oklch(0.32 0.05 80);
   --info: oklch(0.78 0.1 255);
@@ -94,6 +104,11 @@
 @theme inline {
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
+  --color-floor: var(--floor);
+  --color-floor-line: var(--floor-line);
+  --color-wood: var(--wood);
+  --color-wood-edge: var(--wood-edge);
+  --color-tabletop: var(--tabletop);
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
   --color-info: var(--info);
