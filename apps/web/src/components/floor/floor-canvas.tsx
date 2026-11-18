@@ -31,6 +31,10 @@ export interface CanvasItem {
 const NODE = 80;
 const SNAP = 8;
 
+// Faint grain lines for wooden table tops, drawn with the theme's wood edge colour.
+const WOOD_GRAIN =
+  "repeating-linear-gradient(90deg, transparent 0 6px, color-mix(in oklab, var(--wood-edge) 25%, transparent) 6px 7px)";
+
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 
 function tableSize(shape: string | undefined, seats: number): { w: number; h: number } {
@@ -338,9 +342,10 @@ export function FloorCanvas({
                       transform: `rotate(${(Math.atan2(c.y, c.x) * 180) / Math.PI + 90}deg)`,
                     }}
                   >
+                    <div className="absolute inset-x-0 top-0 h-[4px] rounded-t-[5px] bg-wood-edge" />
                     <div
                       className={cn(
-                        "absolute inset-x-[2px] top-[3px] bottom-[1px] rounded-[4px] transition-colors",
+                        "absolute inset-x-[2px] top-[5px] bottom-[1px] rounded-[3px] transition-colors",
                         t.occupied ? "bg-success-soft" : "bg-tabletop",
                       )}
                     />
@@ -363,6 +368,7 @@ export function FloorCanvas({
                     top: NODE / 2 - size.h / 2,
                     width: size.w,
                     height: size.h,
+                    ...(!t.occupied && shape !== "round" ? { backgroundImage: WOOD_GRAIN } : {}),
                   }}
                 >
                   <div

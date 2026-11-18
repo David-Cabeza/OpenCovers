@@ -90,8 +90,9 @@ function CounterShape() {
 
 function WallShape() {
   return (
-    <svg viewBox="0 0 160 8" className="size-full" preserveAspectRatio="none">
-      <rect x="0" y="0" width="160" height="8" rx="1" className="fill-muted-foreground/60" />
+    <svg viewBox="0 0 160 10" className="size-full drop-shadow-[0_1px_2px_rgb(0_0_0/0.35)]" preserveAspectRatio="none">
+      <rect x="0" y="0" width="160" height="10" rx="1" className="fill-muted-foreground/70 stroke-foreground/40" {...STROKE} />
+      <rect x="0" y="3" width="160" height="4" className="fill-tabletop/25" />
     </svg>
   );
 }
