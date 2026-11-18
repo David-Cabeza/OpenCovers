@@ -43,6 +43,8 @@ const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 function tableSize(shape: string | undefined, seats: number): { w: number; h: number } {
   if (shape === "rectangle") return { w: 64, h: 46 };
   if (shape === "square") return { w: 52, h: 52 };
+  // A long (banquet) table gets about 20 px per chair along each side.
+  if (shape === "long") return { w: Math.min(Math.max(Math.ceil(seats / 2) * 20 + 14, 110), 220), h: 36 };
   if (shape === "oval") return { w: Math.min(56 + seats * 4, 96), h: 44 };
   const d = Math.min(46 + seats * 3, 60);
   return { w: d, h: d };
@@ -56,7 +58,7 @@ function chairPositions(
   size: { w: number; h: number },
 ): { x: number; y: number }[] {
   const pts: { x: number; y: number }[] = [];
-  if (shape === "rectangle") {
+  if (shape === "rectangle" || shape === "long") {
     const perSide = Math.ceil(seats / 2);
     const span = size.w - 14;
     for (let i = 0; i < seats; i++) {
