@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AssignTablesDialog } from "@/components/reservation/assign-tables-dialog";
+import { CancelReservationDialog } from "@/components/reservation/cancel-reservation-dialog";
 import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { EmptyState } from "@/components/empty-state";
@@ -69,6 +70,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [editing, setEditing] = useState<Reservation | null>(null);
   const [assigning, setAssigning] = useState<Reservation | null>(null);
+  const [cancelling, setCancelling] = useState<Reservation | null>(null);
   const queryClient = useQueryClient();
   const { data, isPending } = useAgenda(venueId, date);
   const reservations = data?.reservations ?? [];
@@ -87,6 +89,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
       invalidate();
     },
     onError: (err) => toast.error(errorMessage(err, "Could not cancel.")),
+    onSettled: () => setCancelling(null),
   });
 
   const setStatus = useMutation({
@@ -163,7 +166,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
                     reservation={r}
                     tableNames={tableNames}
                     onAssign={() => setAssigning(r)}
-                    onCancel={() => cancel.mutate(r.id)}
+                    onCancel={() => setCancelling(r)}
                     onStatus={(status) => setStatus.mutate({ id: r.id, status })}
                     onEdit={() => setEditing(r)}
                   />
@@ -181,6 +184,12 @@ export function AgendaView({ venueId }: { venueId: string }) {
         onOpenChange={(open) => {
           if (!open) setAssigning(null);
         }}
+      />
+      <CancelReservationDialog
+        reservation={cancelling}
+        pending={cancel.isPending}
+        onConfirm={() => cancelling && cancel.mutate(cancelling.id)}
+        onClose={() => setCancelling(null)}
       />
       <EditReservationDialog
         venueId={venueId}
