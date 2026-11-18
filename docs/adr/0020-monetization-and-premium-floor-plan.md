@@ -1,6 +1,6 @@
 # ADR-0020: Monetization and the premium floor plan
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-18
 - Deciders: David Cabeza
 
@@ -19,13 +19,13 @@ Constraints:
 
 ## Decision
 
-Proposed, to be accepted after review with the brand and the CMO brief:
+Accepted on 2026-11-18:
 
 1. **The engine and the functional staff app stay free.** Availability, bookings, tables, the floor plan with its basic room elements, the "Plano" look, the widget, the MCP server and the API are Apache-2.0 and have no paid gates.
 2. **The first paid offer is a managed cloud**, not a feature lock. It charges for hosting, backups, updates, support and a widget on the venue's own domain. The code is the same as the self-hosted code.
 3. **A premium visual pack is optional and comes later.** The "Ambiente" look and themed furniture packs could be sold as a separate proprietary package loaded by the cloud, and installable on self-hosted setups with a licence key. It is not started until step 2 exists. If it happens, the open core exposes a small extension point (a floor "skin" registry) and does not contain the paid assets.
 4. **The look is chosen per user, stored in the browser.** It is not a venue setting and not part of the API contract, so it needs no migration and no change to `openapi.yaml`.
-5. **Nothing paid is built into the open core now.** Until this ADR is accepted, the "Ambiente" look is not published. New room elements are free.
+5. **Nothing paid is built into the open core now.** The "Ambiente" look stays unpublished until the skin registry exists. New room elements are free.
 
 ## Consequences
 
