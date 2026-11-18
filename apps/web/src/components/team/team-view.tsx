@@ -2,6 +2,10 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, Trash2Icon, UserCogIcon } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/layout/page-header";
+import { Pill, type PillTone } from "@/components/pill";
+import { Stat } from "@/components/stat";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,27 +24,78 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { api, type Member } from "@/lib/api";
+import { api, type Invitation, type InvitationStatus, type Member } from "@/lib/api";
 import { errorMessage } from "@/lib/error-message";
 import { AuditLog } from "./audit-log";
 import { InviteDialog } from "./invite-dialog";
 import { MakeCreatorButton, RoleSelect } from "./member-actions";
 import { removalMessage } from "./removal-message";
 
-export function TeamView({ venueId }: { venueId: string }) {
+const STATUS_TONE: Record<InvitationStatus, PillTone> = {
+  pending: "info",
+  redeemed: "success",
+  revoked: "muted",
+  expired: "warning",
+};
+
+function invitationDate(i: Invitation): string {
+  const when = (iso: string) => new Date(iso).toLocaleString();
+  if (i.status === "redeemed" && i.redeemedAt) return `Redeemed ${when(i.redeemedAt)}`;
+  if (i.status === "revoked" && i.revokedAt) return `Revoked ${when(i.revokedAt)}`;
+  return `${i.status === "pending" ? "Expires" : "Expired"} ${when(i.expiresAt)}`;
+}
+
+function initials(name: string): string {
   return (
-    <div className="space-y-8">
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "?"
+  );
+}
+
+export function TeamView({ venueId }: { venueId: string }) {
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const members = useQuery({
+    queryKey: ["members", venueId],
+    queryFn: () => api.listMembers(venueId),
+  });
+  const invitations = useQuery({
+    queryKey: ["invitations", venueId],
+    queryFn: () => api.listInvitations(venueId),
+  });
+  const list = members.data?.members ?? [];
+  const pending = (invitations.data?.invitations ?? []).filter((i) => i.status === "pending");
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Team"
+        description="Who can use this venue, and what changed. Only admins see this page."
+        actions={
+          <Button onClick={() => setInviteOpen(true)}>
+            <PlusIcon className="size-4" /> Invite
+          </Button>
+        }
+      />
+      {members.data && (
+        <div className="grid grid-cols-3 gap-3">
+          <Stat label="People" value={list.length} />
+          <Stat label="Admins" value={list.filter((m) => m.role === "admin").length} />
+          <Stat
+            label="Pending invites"
+            value={pending.length}
+            tone={pending.length > 0 ? "warning" : "default"}
+          />
+        </div>
+      )}
       <MembersCard venueId={venueId} />
       <InvitationsCard venueId={venueId} />
       <AuditLog venueId={venueId} />
+      <InviteDialog venueId={venueId} open={inviteOpen} onOpenChange={setInviteOpen} />
     </div>
   );
 }
@@ -79,40 +134,40 @@ function MembersCard({ venueId }: { venueId: string }) {
             <UserCogIcon className="size-4" /> No members.
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="w-16" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.map((m) => (
-                <TableRow key={m.userId}>
-                  <TableCell className="font-medium">{m.name}</TableCell>
-                  <TableCell>{m.email}</TableCell>
-                  <TableCell>
-                    <RoleSelect venueId={venueId} member={m} />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <MakeCreatorButton member={m} />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Remove ${m.email}`}
-                        onClick={() => setTarget(m)}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <ul className="-my-2 divide-y">
+            {members.map((m) => (
+              <li
+                key={m.userId}
+                className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar size="lg">
+                    <AvatarFallback className="bg-accent text-sm font-semibold text-accent-foreground">
+                      {initials(m.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{m.name}</div>
+                    <div className="truncate text-sm text-muted-foreground">{m.email}</div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <RoleSelect venueId={venueId} member={m} />
+                  <div className="flex gap-1">
+                    <MakeCreatorButton member={m} />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove ${m.email}`}
+                      onClick={() => setTarget(m)}
+                    >
+                      <Trash2Icon className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </CardContent>
       <Dialog open={target !== null} onOpenChange={(open) => !open && setTarget(null)}>
@@ -149,7 +204,6 @@ function InvitationsCard({ venueId }: { venueId: string }) {
     queryKey: ["invitations", venueId],
     queryFn: () => api.listInvitations(venueId),
   });
-  const [open, setOpen] = useState(false);
   const invitations = data?.invitations ?? [];
 
   const revoke = useMutation({
@@ -163,16 +217,11 @@ function InvitationsCard({ venueId }: { venueId: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <div>
-          <CardTitle>Invitations</CardTitle>
-          <CardDescription>
-            Invite someone to this venue. OpenCovers sends no email, so you pass the token on.
-          </CardDescription>
-        </div>
-        <Button size="sm" onClick={() => setOpen(true)}>
-          <PlusIcon className="size-4" /> Invite
-        </Button>
+      <CardHeader>
+        <CardTitle>Invitations</CardTitle>
+        <CardDescription>
+          OpenCovers sends no email, so you pass the token or link on yourself.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {isPending ? (
@@ -180,45 +229,34 @@ function InvitationsCard({ venueId }: { venueId: string }) {
         ) : invitations.length === 0 ? (
           <div className="py-2 text-sm text-muted-foreground">No invitations yet.</div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Expires</TableHead>
-                <TableHead className="w-16" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invitations.map((i) => (
-                <TableRow key={i.id}>
-                  <TableCell>{i.email ?? "Open link"}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{i.role}</Badge>
-                  </TableCell>
-                  <TableCell>{i.status}</TableCell>
-                  <TableCell>{new Date(i.expiresAt).toLocaleString()}</TableCell>
-                  <TableCell>
-                    <div className="flex justify-end">
-                      {i.status === "pending" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => revoke.mutate(i.id)}
-                        >
-                          Revoke
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <ul className="-my-2 divide-y">
+            {invitations.map((i) => (
+              <li
+                key={i.id}
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3"
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{i.email ?? "Open link"}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {invitationDate(i)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{i.role}</Badge>
+                  <Pill tone={STATUS_TONE[i.status]} dot>
+                    {i.status}
+                  </Pill>
+                  {i.status === "pending" && (
+                    <Button variant="ghost" size="sm" onClick={() => revoke.mutate(i.id)}>
+                      Revoke
+                    </Button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </CardContent>
-      <InviteDialog venueId={venueId} open={open} onOpenChange={setOpen} />
     </Card>
   );
 }
