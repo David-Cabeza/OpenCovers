@@ -73,6 +73,10 @@ A plain `<iframe>` keeps the height it is given. A venue that can paste a script
 
 The script adds the iframe right after its own tag, loads `https://book.example.com/w/BOOKING_KEY` (the origin the script came from), and sets the iframe's height as the widget's content changes. `data-title` sets the iframe's accessible title (default `Book a table`). A `data-key` that is not a booking key (`pk_...`) adds nothing and logs a warning. Several tags on one page each get their own iframe.
 
+`embed.js` creates the iframe with `loading="lazy"`, so the browser fetches the widget only when the iframe is near the viewport and it does not compete with the venue page for the first screen. The plain `<iframe>` snippet from Setup, Online booking carries the same attribute.
+
+Put the tag where the widget should appear, because the iframe is inserted right after it: in the booking section of the page, usually below the first screen. A widget placed at the very top of the page is in view at once, so lazy loading gives no saving there and can delay it slightly. In that case paste the plain `<iframe>` snippet and change `loading="lazy"` to `loading="eager"` (or remove the attribute). `embed.js` has no option to load eagerly.
+
 - The framed widget posts `{"type": "opencovers:height", "height": <pixels>}` to its parent, and nothing else. `embed.js` uses a message only when it comes from the widget origin and from its own iframe and has exactly those two keys, and keeps the height between 100 and 6000 pixels. No guest data crosses `postMessage`.
 - The API serves `/w/embed.js` from the widget build with `Content-Type: text/javascript`, `nosniff`, `Cross-Origin-Resource-Policy: cross-origin` and `Cache-Control: public, max-age=300` with an `ETag`, because the URL has no version. It follows the rules of the page: only on the `WIDGET_ADDRESS` host, never on the staff host, and not at all from a production API without `WIDGET_ADDRESS`. Caddy's existing `/w/*` rules cover it.
 - The venue's site still needs its origin in `allowedOrigins`, and with a `Content-Security-Policy` of its own it must allow the widget origin in both `script-src` and `frame-src`.
