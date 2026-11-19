@@ -502,3 +502,13 @@ A walkthrough found that `GET /v1/public/{bookingKey}/availability?date=2020-01-
 - **Data exposure.** The venue phone is already in the public config (`venue.phone`, the venue's `publicPhone`) and the widget shows it; nothing new is exposed.
 - **Self-service view.** `PublicReservation` gains `maxPartySize`, the online maximum already in the public config, so the change screen on `/r` stops there instead of at 100. The engine still decides, and a service with a narrower maximum still answers `party_size_too_large`. A "make a new booking" link on the cancelled page is not added: `/r` holds only the token, and putting the booking key in the view or the link would hand a key to anyone with a link.
 - **Widget header and embed.** Both pages show the venue name and, when the public profile has one, its phone. `embed.js` titles the iframe from `data-title`, otherwise `Book a table`; the iframe snippet in Setup says the same.
+
+## Amendment 2026-11-19: dark mode
+
+The widget gets dark built-in colors. The key set of the theme in section 5 does not change, and the contract (C39) says so.
+
+- **Where.** On the widget's own pages, `/w/{bookingKey}` and `/r` opened directly, for a visitor whose system asks for dark mode. A page inside an iframe stays light. The visitor's system setting says nothing about the venue's site, and a dark box on a light page would be a regression for every existing embed.
+- **When.** Only while the venue's theme sets no color. A theme with any valid color keeps the light built-in colors for the colors it leaves out. Mixing a venue's `background` with a dark built-in `text` would make unreadable text, and the contrast warning in section 5 compares against the light built-in pair.
+- **How.** `styles.css` holds the dark values under `@media (prefers-color-scheme: dark)` for `:root[data-scheme="system"]`. `main.tsx` sets `data-scheme` at once when the page is not framed, so the first paint is already right. When the theme arrives and sets a color, `applyThemeToDocument` removes the attribute. That is one flash to light for a venue with a colored theme and none for the default theme.
+- **Not done.** A venue cannot ask for dark in an embedded widget, or choose a dark palette in Setup. Either would be a new theme key or an `embed.js` option, which is a contract change of its own.
+
