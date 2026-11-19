@@ -18,6 +18,7 @@ import { consentColumns, type Consent } from "./consent";
 import { normalizeContact, venueCountry } from "./contact";
 import { linkGuest } from "./guests";
 import { claimKey } from "./idempotency";
+import { originColumns, type Origin } from "./origin";
 import { ratingColumns, type Rating } from "./rating";
 import { reconfirmationColumns, type Reconfirmation } from "./reconfirmation";
 import { linkWorks, mintLink, revokeForCancel, rotateLink } from "./self-service";
@@ -57,6 +58,7 @@ export interface CreateReservationInput {
   basis?: string;
   ownerPrincipal?: string;
   channel?: Channel;
+  origin?: Origin | null;
 }
 
 /** The online limits of ADR-0017 that tighten a venue's own rules for the public channel. */
@@ -91,6 +93,7 @@ export interface WalkInInput {
   bookedVia?: string;
   basis?: string;
   ownerPrincipal?: string;
+  origin?: Origin | null;
 }
 
 export interface ModifyReservationInput {
@@ -101,6 +104,7 @@ export interface ModifyReservationInput {
   commentary?: string;
   reconfirmation?: Reconfirmation;
   selfService?: SelfServiceWrite & { version: number; rules: OnlineRules };
+  origin?: Origin | null;
 }
 
 /** A guest write through a self-service link (ADR-0017). The checks run inside the write transaction. */
@@ -920,6 +924,7 @@ export async function createReservation(
         type: "created",
         reservationId: id,
         version: 1,
+        ...originColumns(input.origin),
       });
       return { id, version: 1, selfServiceToken: link?.token };
     });
@@ -958,6 +963,7 @@ export async function walkIn(
       bookedVia: input.bookedVia,
       basis: input.basis,
       ownerPrincipal: input.ownerPrincipal,
+      origin: input.origin,
     },
     key,
   );
@@ -1139,7 +1145,7 @@ export async function modifyReservation(
         }
       }
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "modify", version: nextVersion });
-      await tx.insert(events).values({ venueId, type: "modified", reservationId: id, version: nextVersion });
+      await tx.insert(events).values({ venueId, type: "modified", reservationId: id, version: nextVersion, ...originColumns(input.origin) });
       return nextVersion;
     });
     return { ok: true, id, version };
@@ -1157,6 +1163,7 @@ export async function cancelReservation(
   venueId: string,
   id: string,
   key: string,
+  origin: Origin | null,
   guest?: SelfServiceWrite,
 ): Promise<CancelResult> {
   const hash = await sha256Hex(id);
@@ -1186,7 +1193,7 @@ export async function cancelReservation(
       await tx.delete(tableAllocations).where(eq(tableAllocations.reservationId, id));
       await tx.insert(tombstones).values({ reservationId: id, venueId, hash });
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "cancel", version: nextVersion });
-      await tx.insert(events).values({ venueId, type: "cancelled", reservationId: id, version: nextVersion });
+      await tx.insert(events).values({ venueId, type: "cancelled", reservationId: id, version: nextVersion, ...originColumns(origin) });
       if (guest && !(await revokeForCancel(tx, guest.linkId, key))) {
         throw new ReservationError("self_service_link_invalid");
       }
@@ -1206,6 +1213,7 @@ export async function setStatus(
   id: string,
   status: StatusTransition,
   key: string,
+  origin: Origin | null,
 ): Promise<WriteResult> {
   try {
     const version = await db.transaction(async (tx) => {
@@ -1238,7 +1246,7 @@ export async function setStatus(
         await tx.update(tableAllocations).set({ active: false }).where(eq(tableAllocations.reservationId, id));
       }
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "status", version: nextVersion });
-      await tx.insert(events).values({ venueId, type: status, reservationId: id, version: nextVersion });
+      await tx.insert(events).values({ venueId, type: status, reservationId: id, version: nextVersion, ...originColumns(origin) });
       return nextVersion;
     });
     return { ok: true, id, version };
