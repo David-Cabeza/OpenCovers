@@ -246,6 +246,7 @@ function ServicesSection({ venueId }: { venueId: string }) {
   const { data, isPending } = useServices(venueId);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
+  const [removing, setRemoving] = useState<Service | null>(null);
   const services = data?.services ?? [];
 
   const remove = useMutation({
@@ -256,6 +257,7 @@ function ServicesSection({ venueId }: { venueId: string }) {
       toast.success("Service removed");
     },
     onError: (err) => toast.error(errorMessage(err, "Could not remove.")),
+    onSettled: () => setRemoving(null),
   });
 
   return (
@@ -298,7 +300,7 @@ function ServicesSection({ venueId }: { venueId: string }) {
                       setEditing(sv);
                       setOpen(true);
                     }}
-                    onRemove={() => remove.mutate(sv.name)}
+                    onRemove={() => setRemoving(sv)}
                   />
                 </div>
               </li>
@@ -306,6 +308,16 @@ function ServicesSection({ venueId }: { venueId: string }) {
           </ul>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={removing !== null}
+        title={removing ? `Remove ${removing.name}?` : "Remove service?"}
+        description="Its hours stop applying to availability and bookings, and this cannot be undone."
+        confirmLabel="Remove service"
+        keepLabel="Keep service"
+        pending={remove.isPending}
+        onConfirm={() => removing && remove.mutate(removing.name)}
+        onClose={() => setRemoving(null)}
+      />
       <ServiceFormDialog
         venueId={venueId}
         open={open}

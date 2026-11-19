@@ -58,7 +58,19 @@ describe("WaitlistView", () => {
     await user.click(await screen.findByRole("button", { name: "Seat" }));
     await waitFor(() => expect(api.calls("POST", "/v1/venues/v1/waitlist/w1/seat")).toHaveLength(1));
     await user.click(screen.getByRole("button", { name: "Remove from the waitlist" }));
+    expect(api.calls("POST", "/v1/venues/v1/waitlist/w1/cancel")).toHaveLength(0);
+    await user.click(await screen.findByRole("button", { name: "Remove from waitlist" }));
     await waitFor(() => expect(api.calls("POST", "/v1/venues/v1/waitlist/w1/cancel")).toHaveLength(1));
+  });
+
+  it("keeps the entry when the confirmation is declined", async () => {
+    const api = mockApi({ [LIST]: { body: { entries: [entry()] } } });
+    const user = userEvent.setup();
+    renderWithApp(<WaitlistView venueId="v1" />);
+    await user.click(await screen.findByRole("button", { name: "Remove from the waitlist" }));
+    await user.click(await screen.findByRole("button", { name: "Keep on waitlist" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(api.calls("POST", "/v1/venues/v1/waitlist/w1/cancel")).toHaveLength(0);
   });
 
   it("explains an empty waitlist", async () => {

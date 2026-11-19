@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { errorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -20,6 +21,7 @@ export function WaitlistView({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
   const { data, isPending } = useWaitlist(venueId);
   const [addOpen, setAddOpen] = useState(false);
+  const [removing, setRemoving] = useState<WaitlistEntry | null>(null);
   // First come, first seated: the queue is shown oldest first.
   const entries = [...(data?.entries ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
@@ -45,6 +47,7 @@ export function WaitlistView({ venueId }: { venueId: string }) {
       invalidate();
     },
     onError: (err) => toast.error(errorMessage(err, "Could not remove.")),
+    onSettled: () => setRemoving(null),
   });
 
   return (
@@ -89,13 +92,23 @@ export function WaitlistView({ venueId }: { venueId: string }) {
                 entry={e}
                 position={index + 1}
                 onSeat={() => seat.mutate(e.id)}
-                onRemove={() => cancel.mutate(e.id)}
+                onRemove={() => setRemoving(e)}
               />
             ))}
           </ol>
         </>
       )}
 
+      <ConfirmDialog
+        open={removing !== null}
+        title={removing ? `Remove ${removing.guestName || "this guest"} from the waitlist?` : "Remove from the waitlist?"}
+        description="They lose their place in the queue. Add them again if they come back."
+        confirmLabel="Remove from waitlist"
+        keepLabel="Keep on waitlist"
+        pending={cancel.isPending}
+        onConfirm={() => removing && cancel.mutate(removing.id)}
+        onClose={() => setRemoving(null)}
+      />
       <AddWaitlistDialog venueId={venueId} open={addOpen} onOpenChange={setAddOpen} />
     </div>
   );

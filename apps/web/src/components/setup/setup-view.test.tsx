@@ -75,6 +75,8 @@ describe("SetupView", () => {
     await user.click(await screen.findByRole("button", { name: "Remove table" }));
     await waitFor(() => expect(api.calls("DELETE", "/v1/venues/v1/tables/t1")).toHaveLength(1));
     await user.click(screen.getByRole("button", { name: "Remove dinner" }));
+    expect(api.calls("DELETE", "/v1/venues/v1/services/dinner")).toHaveLength(0);
+    await user.click(await screen.findByRole("button", { name: "Remove service" }));
     await waitFor(() => expect(api.calls("DELETE", "/v1/venues/v1/services/dinner")).toHaveLength(1));
   });
 
@@ -87,6 +89,17 @@ describe("SetupView", () => {
     await user.click(screen.getByRole("button", { name: "Keep table" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(api.calls("DELETE", "/v1/venues/v1/tables/t1")).toHaveLength(0);
+  });
+
+  it("keeps the service when the confirmation is declined", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<SetupView venueId="v1" role="write" />);
+    await user.click(await screen.findByRole("button", { name: "Remove dinner" }));
+    expect(await screen.findByRole("heading", { name: "Remove dinner?" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Keep service" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(api.calls("DELETE", "/v1/venues/v1/services/dinner")).toHaveLength(0);
   });
 
   it("opens the edit dialog from a table row", async () => {
