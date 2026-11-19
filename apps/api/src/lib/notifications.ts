@@ -2,6 +2,7 @@ import { and, count, eq, gt, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { reservations, sentEmails, venues } from "../db/schema";
 import * as schema from "../db/schema";
+import { mayEmail } from "../demo/limits";
 import { buildEmail, sendEmail, type EmailKind } from "./mailer";
 import { formatTime } from "./time";
 
@@ -47,6 +48,7 @@ export async function notifyReservation(
 
     const to = kind === "notice" ? venue.noticeAddress : reservation.guestContact;
     if (!to) return;
+    if (!(await mayEmail(db, venueId, to))) return;
 
     const already = (
       await db

@@ -203,6 +203,27 @@ curl -X DELETE https://your-domain/v1/venues/VENUE_ID/members/USER_ID -H 'Cookie
 - Webhook endpoints the person made keep delivering. They are not deleted or disabled. `GET /v1/venues/VENUE_ID/webhooks` shows `creatorDepartedAt` on them, so review each and delete any you do not trust. Endpoints made before ADR-0011 have no known creator.
 - Invitations created, revoked and redeemed, removals, role changes and creator transfers, are recorded ([ADR-0010](adr/0010-membership-audit.md)). `GET /v1/venues/VENUE_ID/audit` (an `admin` session or key) lists them, newest first, with `limit` and `cursor`. It holds ids and a role only, no emails or tokens. The Team screen of the staff app shows the log to admins, newest first with a Load more button, and names the people who are still members. Former members show as a shortened id. The remove-member toast reports how many keys, sessions and webhooks the removal revoked or flagged.
 
+## Hosted demo
+
+Most instances never need this. `DEMO_MODE=1` turns one deployment into the public demo described in [ADR-0022](adr/0022-hosted-demo-sandbox.md): each visitor signs in with a magic link or Google and gets a sandbox restaurant of their own. Run it on its own host and its own database, never next to real data. With `DEMO_MODE` unset or `0` nothing below applies and the instance behaves as before. Any other value stops the API at startup.
+
+What changes under `DEMO_MODE=1`:
+
+- Password sign-up is off. `POST /api/auth/sign-in/magic-link` mails a link (Resend, so `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are required when `NODE_ENV=production`; without them the link is printed to the API log, for local trials). One link per address per minute, on top of the `auth` budget. Disposable addresses (a short list in `apps/api/src/demo/disposable.ts`) are refused.
+- Google sign-in turns on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are both set. The account must report a verified email. Set both or neither.
+- The first verified sign-in builds a sandbox from `apps/api/src/demo/template.ts` and makes the visitor its `admin`, with online booking on, so `/w/{bookingKey}` works at once. A later sign-in returns the same sandbox. `POST /v1/venues` is refused: a visitor has the one.
+- A sandbox holds at most `DEMO_MAX_RESERVATIONS` reservations (default 150) and `DEMO_MAX_GUESTS` guests (default 100). It cannot create webhooks. Email goes only to the owner's verified address.
+- The sign-in request may carry `X-Demo-Consent: <version of the consent text shown>` when the visitor ticked the contact box, and `X-Demo-Locale`. Account and sandbox are created either way. The consent is stored with the visitor's contact in `demo_lead` once the address is verified, and no HTTP route returns leads.
+
+Housekeeping, run both from the repository root with the API's `DATABASE_URL`:
+
+```sh
+pnpm demo:cleanup   # delete sandboxes (and their accounts) whose owner last signed in over 14 days ago; keeps leads
+pnpm demo:leads     # print visitors who agreed to be contacted, as CSV
+```
+
+Schedule `demo:cleanup` daily. Both commands also run inside the API container with `pnpm --filter @opencovers/api demo:cleanup`. The hosted demo's compose file, deploy workflow and staff app screens are separate work.
+
 ## Public site
 
 The project's site is built by `.github/workflows/deploy-site.yml` and published to GitHub Pages at **opencovers.dev**. The `CNAME` file in `apps/site/public/` pins the custom domain. A fork has no need for this workflow. Build with `pnpm --filter @opencovers/site build` and serve `apps/site/dist` wherever you like.
@@ -226,6 +247,10 @@ The API reads these variables regardless of host:
 | `RATE_LIMIT` | no | `on` or `off`. Default `on` in `compose.prod.yaml`. See Rate limiting. |
 | `TRUST_PROXY` | no | `false` (default) or `true`. See Rate limiting. |
 | `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION`, `RATE_LIMIT_VENUE_CREATION`, `RATE_LIMIT_PUBLIC_READ`, `RATE_LIMIT_PUBLIC_BOOKING`, `RATE_LIMIT_PUBLIC_VENUE`, `RATE_LIMIT_PUBLIC_SELF_SERVICE`, `RATE_LIMIT_PUBLIC_DAYS` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |
+| `DEMO_MODE` | no | `1` runs the hosted demo, `0` or unset does not. See Hosted demo. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | Demo mode only. Both or neither. See Hosted demo. |
+| `DEMO_MAX_RESERVATIONS`, `DEMO_MAX_GUESTS` | no | Demo mode only. Caps per sandbox, defaults 150 and 100. |
+| `RATE_LIMIT_MAGIC_LINK` | no | Demo mode only. Default `1/1m`, per address. |
 | `PUBLIC_POW_DIFFICULTY` | no | Proof-of-work bits for a public booking, 0 to 32. Default `12`. `0` turns the proof of work off and keeps the signed challenge. The API logs the effective difficulty at startup, and a warning when it is `0` with `NODE_ENV=production`. See ADR-0017. |
 | `PUBLIC_CHALLENGE_SECRET` | no | Signs the public form challenge, at least 32 characters. Default: a random key per process, which is enough for one API process. Set it when several serve the widget. With `NODE_ENV=production` and no value, the API logs a warning at startup. |
 | `WIDGET_ADDRESS` | no | The booking widget's host, such as `book.example.com`. Caddy and the API both read it. Unset, a production API serves no widget page. It must not share the staff app's host name. See Booking widget. |

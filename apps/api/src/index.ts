@@ -5,16 +5,19 @@ import { blocklistKeys } from "./lib/blocklist";
 import { runRetention } from "./lib/retention";
 import { challengeConfigFromEnv, describeChallenge } from "./lib/public-challenge";
 import { describeRateLimit, rateLimitConfigFromEnv } from "./lib/rate-limit";
+import { describeDemo, demoSettings } from "./demo/settings";
 import { signupMode } from "./lib/signup";
 import { runWebhookDeliveries, webhookDepsFromEnv } from "./lib/webhooks";
 import { describeWidgetServing, widgetServingFromEnv } from "./lib/widget-page";
 
 const signup = signupMode();
+const demo = demoSettings();
 const rateLimit = rateLimitConfigFromEnv();
 const challenge = describeChallenge(challengeConfigFromEnv());
 const port = Number(process.env.PORT ?? 3000);
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`opencovers api listening on port ${info.port} (sign-up: ${signup}, trust proxy: ${rateLimit.trustProxy})`);
+  console.log(describeDemo(demo));
   console.log(describeRateLimit(rateLimit));
   console.log(describeWidgetServing(widgetServingFromEnv()));
   console.log(challenge.line);

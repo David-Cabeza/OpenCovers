@@ -624,4 +624,30 @@ export const selfServiceLinks = pgTable(
   ],
 );
 
+// Hosted demo (ADR-0022). One sandbox venue per account. `last_sign_in_at` starts the 14-day expiry. The rows
+// vanish with the account or the venue.
+export const demoSandboxes = pgTable("demo_sandbox", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  venueId: text("venue_id")
+    .notNull()
+    .unique()
+    .references(() => venues.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// A demo visitor's contact. Deliberately not tied to the account: it outlives the sandbox. No HTTP route reads it.
+export const demoLeads = pgTable("demo_lead", {
+  email: text("email").primaryKey(),
+  name: text("name"),
+  source: text("source").notNull(),
+  locale: text("locale").notNull().default("en"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  contactConsent: boolean("contact_consent").notNull().default(false),
+  consentTextVersion: text("consent_text_version"),
+});
+
 export const betterAuthSchema = { user, session, account, verification };
