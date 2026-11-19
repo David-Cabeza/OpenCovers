@@ -37,6 +37,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     apikey: apiKey,
+    "X-OpenCovers-Channel": "mcp",
   };
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
 
