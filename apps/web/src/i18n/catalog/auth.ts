@@ -34,6 +34,10 @@ export default defineMessages({
     "auth.invite.notNow": "Not now",
     "auth.invite.joined": "You joined the venue.",
     "auth.invite.joinFailed": "Could not join the venue.",
+    "auth.invite.invalidTitle": "This invitation does not work",
+    "auth.invite.invalidDescription": "The link is not valid any more: it may have been used, cancelled or expired. Ask whoever invited you for a new one.",
+    "auth.invite.invalidContinue": "Go to sign in",
+    "auth.invite.invalidContinueSignedIn": "Continue",
 
     "auth.unreachable.title": "We can't reach the server",
     "auth.unreachable.description":
@@ -72,6 +76,10 @@ export default defineMessages({
     "auth.invite.notNow": "Ahora no",
     "auth.invite.joined": "Te has unido al local.",
     "auth.invite.joinFailed": "No se pudo unir al local.",
+    "auth.invite.invalidTitle": "Esta invitación no funciona",
+    "auth.invite.invalidDescription": "El enlace ya no es válido: puede que se haya usado, cancelado o caducado. Pide a quien te invitó que te envíe uno nuevo.",
+    "auth.invite.invalidContinue": "Ir a iniciar sesión",
+    "auth.invite.invalidContinueSignedIn": "Continuar",
 
     "auth.unreachable.title": "No podemos conectar con el servidor",
     "auth.unreachable.description":

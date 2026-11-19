@@ -137,3 +137,62 @@ describe("invitation redeem flow", () => {
     expect(screen.queryByText("dashboard")).not.toBeInTheDocument();
   });
 });
+
+describe("invitation link check", () => {
+  beforeEach(() => {
+    auth.session = null;
+    useUiStore.setState({ venueId: null });
+  });
+  afterEach(resetApiMocks);
+
+  it("asks the server about the link without a venue or a session being needed", async () => {
+    const api = mockApi({ "POST /v1/invitations/check": { body: { valid: true } } });
+    renderWithApp(<App inviteToken={TOKEN} />);
+    expect(await screen.findByLabelText("Name")).toBeInTheDocument();
+    await waitFor(() => expect(api.calls("POST", "/v1/invitations/check")[0]?.body).toEqual({ token: TOKEN }));
+    expect(screen.queryByText("This invitation does not work")).not.toBeInTheDocument();
+  });
+
+  it("says a link that no longer works does not, instead of showing a sign-up that would be refused", async () => {
+    mockApi({ "POST /v1/invitations/check": { body: { valid: false } } });
+    const user = userEvent.setup();
+    renderWithApp(<App inviteToken={TOKEN} />);
+
+    expect(await screen.findByText("This invitation does not work")).toBeInTheDocument();
+    expect(screen.getByText(/Ask whoever invited you for a new one/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "Go to sign in" }));
+    expect(await screen.findByText("Welcome back")).toBeInTheDocument();
+  });
+
+  it("lets a signed-in person past a dead link to the app", async () => {
+    auth.session = { user: { email: "ana@example.com" } };
+    mockApi({ "POST /v1/invitations/check": { body: { valid: false } } });
+    const user = userEvent.setup();
+    renderWithApp(<App inviteToken={TOKEN} />);
+
+    expect(await screen.findByText("This invitation does not work")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Join" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByText("dashboard")).toBeInTheDocument();
+  });
+
+  it("does not turn a link away when the check itself fails, the redemption stays the real test", async () => {
+    mockApi({ "POST /v1/invitations/check": { status: 429, body: { code: "rate_limited" } } });
+    renderWithApp(<App inviteToken={TOKEN} />);
+    expect(await screen.findByLabelText("Name")).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText("This invitation does not work")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toBeInTheDocument();
+  });
+
+  it("is in Spanish too", async () => {
+    useUiStore.setState({ locale: "es" });
+    mockApi({ "POST /v1/invitations/check": { body: { valid: false } } });
+    renderWithApp(<App inviteToken={TOKEN} />);
+    expect(await screen.findByText("Esta invitación no funciona")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ir a iniciar sesión" })).toBeInTheDocument();
+  });
+});

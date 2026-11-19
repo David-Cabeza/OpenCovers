@@ -168,6 +168,30 @@ async function verifiedId(db: Pick<Db, "select">, token: string): Promise<string
   return row && same ? row.id : null;
 }
 
+/**
+ * Whether a token could still be redeemed right now: it names a real invitation, the secret matches, and the
+ * invitation is neither used, revoked nor expired. It answers nothing else (no venue, role or email), and it
+ * ignores the email an invitation is bound to, which only the person redeeming can be checked against. Nothing
+ * is claimed or written.
+ */
+export async function invitationUsable(db: Pick<Db, "select">, token: string): Promise<boolean> {
+  const id = await verifiedId(db, token);
+  if (!id) return false;
+  const [row] = await db
+    .select({ id: invitations.id })
+    .from(invitations)
+    .where(
+      and(
+        eq(invitations.id, id),
+        isNull(invitations.redeemedAt),
+        isNull(invitations.revokedAt),
+        gt(invitations.expiresAt, sql`now()`),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
 async function claim(
   db: Pick<Db, "update">,
   id: string,

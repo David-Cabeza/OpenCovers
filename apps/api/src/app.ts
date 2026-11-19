@@ -43,6 +43,7 @@ import {
   isExpiryHours,
   isInvitationEmail,
   listInvitations,
+  invitationUsable,
   redeemInvitation,
   revokeInvitation,
 } from "./lib/invitations";
@@ -777,6 +778,16 @@ app.post("/v1/invitations/redeem", async (c) => {
   const membership = await redeemInvitation(db, body.token, user);
   if (!membership) return error(c, "invalid_invitation");
   return c.json({ membership });
+});
+
+// Whether an invitation link still works, so the staff app can say so before asking for an account. Public like the
+// sign-up it precedes, it spends the same budget as a redemption and answers `valid` and nothing else.
+app.post("/v1/invitations/check", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  if (typeof body?.token !== "string" || body.token === "") {
+    return error(c, "invalid_request");
+  }
+  return c.json({ valid: await invitationUsable(db, body.token) });
 });
 
 app.get("/v1/auth/keys", async (c) => {

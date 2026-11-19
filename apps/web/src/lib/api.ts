@@ -464,6 +464,13 @@ export const api = {
       body: JSON.stringify({ token }),
     }),
 
+  /** Whether an invitation link still works. It names no venue or role, and spends no invitation. */
+  checkInvitation: (token: string) =>
+    request<{ valid: boolean }>("/v1/invitations/check", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+
   agenda: (venueId: string, date: string) =>
     request<{ reservations: Reservation[] }>(
       `/v1/venues/${venueId}/agenda?date=${date}`,

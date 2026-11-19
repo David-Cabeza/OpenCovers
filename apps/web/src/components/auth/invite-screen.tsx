@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,11 @@ import { SignInForm } from "./sign-in-form";
 import { SignUpForm } from "./sign-up-form";
 
 function Shell({
+  title,
   description,
   children,
 }: {
+  title?: string;
   description: string;
   children: ReactNode;
 }) {
@@ -29,7 +31,7 @@ function Shell({
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>{t("auth.invite.title")}</CardTitle>
+            <CardTitle>{title ?? t("auth.invite.title")}</CardTitle>
             <CardDescription>{description}</CardDescription>
           </CardHeader>
           <CardContent>{children}</CardContent>
@@ -37,6 +39,40 @@ function Shell({
       </div>
     </main>
   );
+}
+
+/**
+ * The screen for an invitation link, signed in or not. It asks the server whether the link still works and says so
+ * when it does not, instead of letting the person fill in a sign-up that is certain to be refused. The question never
+ * holds the page up and a failed answer is not a reason to turn the link away: the normal screen shows meanwhile, and
+ * the redemption itself remains the check that counts.
+ */
+export function InviteGate({
+  token,
+  signedIn,
+  onDone,
+}: {
+  token: string;
+  signedIn: boolean;
+  onDone: () => void;
+}) {
+  const t = useT();
+  const { data } = useQuery({
+    queryKey: ["invitation-check", token],
+    queryFn: () => api.checkInvitation(token),
+    retry: false,
+    staleTime: Infinity,
+  });
+  if (data?.valid === false) {
+    return (
+      <Shell title={t("auth.invite.invalidTitle")} description={t("auth.invite.invalidDescription")}>
+        <Button className="w-full" onClick={onDone}>
+          {signedIn ? t("auth.invite.invalidContinueSignedIn") : t("auth.invite.invalidContinue")}
+        </Button>
+      </Shell>
+    );
+  }
+  return signedIn ? <InviteJoin token={token} onDone={onDone} /> : <InviteSignedOut token={token} onDone={onDone} />;
 }
 
 /** A signed-out visitor with an invitation: sign up with the token, or sign in and join. */
