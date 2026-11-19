@@ -545,3 +545,6 @@ Section 5's key set grows by two: `darkRadius` and `darkFont`. They complete the
 - **Setup.** The dark section of the look editor has a corner radius field and a font select, both empty by default as "same as light", with the dark preview following them. A value equal to the light one is left out of the saved theme.
 - **Not done.** A logo per palette, and a palette that follows the venue's own site toggle.
 
+## Amendment 2026-11-19: the public profile's address
+
+The widget config of decision 4, in the `GET /v1/public/{bookingKey}` row of section 2, says "No address". [ADR-0021](0021-widget-day-status-zones-waitlist.md), section 5, reverses that for the public profile's address only (street, postal code and locality), as `PublicVenue.address`, and only while `publicProfileEnabled` is on (C64). `noticeAddress` stays private, and the widget still collects no guest address. The same amendment adds the online booking setting `privacyNoticeUrl` to section 5.

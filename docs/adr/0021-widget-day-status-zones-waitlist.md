@@ -170,7 +170,7 @@ For a party above the online maximum the widget shows the phone and a short cata
 ## 5. Summary and notice
 
 - **Summary step.** Before the details form the widget shows date, time, party size, zone when one was chosen, and the venue address. Edit links go back to each step. It costs no request.
-- **Address.** `PublicVenue` gains `address`, the street, postal code and locality of the public profile, or null. It follows the rule the phone follows today: shown when set (Q6). This reverses "No address" in ADR-0017 decision 4 for the profile's public address only. `noticeAddress` stays private.
+- **Address.** `PublicVenue` gains `address`, the street, postal code and locality of the public profile, or null. It is returned only while `publicProfileEnabled` is on, and is null otherwise (Q6, decided 2026-11-19). The phone keeps its rule: returned whenever the profile holds one. This reverses "No address" in ADR-0017 decision 4 for the profile's public address only. `noticeAddress` stays private.
 - **Notice.** A new online-booking field `privacyNoticeUrl`, `https` only, up to 2048 characters, default null. When set, the widget shows a link next to the submit button with a catalog label such as "Privacy notice". We write no legal text. When null, the widget shows no notice link. Whether a booking without one is acceptable is for the legal review (ADR-0017 Q11).
 - **Allergies and consent** stay as ADR-0017 decided: no allergy field, consent question only with `askConsent`, wording after the legal review (stages 8 and 11).
 - **Rule: never pre-tick.** No widget build renders a consent or marketing checkbox ticked by default, and no public route records `granted` unless the request carries it. A widget test pins the unticked default. We believe EU rules do not accept pre-ticked boxes as consent; the legal review should confirm it. We state it as our design rule, not as a legal conclusion.
@@ -260,13 +260,13 @@ The owner asked to keep wallet passes in view because they are trending and can 
 - **Q4. No zone preference.** A create without `zone` uses every table, as today. Public zones only filter when the guest picks one.
 - **Q9. Waitlist email.** The join sends email, and the guest has to accept it when joining: an unticked `emailConsent` box, required to join. This replaces the earlier proposal of no email in v1. The consent wording stays under the legal review (Q11).
 - **Q10. Blocklist on the waitlist.** Applied to the public join, last, with the same answer a blocked public create gets, so the list does not reveal who is on it. C57's "adding to the waitlist is not checked" holds for staff adds only.
+- **Q6. Address.** Only with `publicProfileEnabled`, the narrower reading, and not "whenever set" like the phone. A venue that did not enable its public profile did not choose to publish its address, and widening later is easy where retracting published data is not. The phone keeps its current rule, and whether it should follow the same one stays open. C64 specifies it.
 
 ## Open questions for the owner
 
 - **Q1. Range.** 14 days per call with paging for the calendar, or up to 42 for a month in one call at 3 times the cost?
 - **Q3. Service names.** Opt-in `showServiceNames` to group times by service (recommended), or no grouping?
 - **Q5. Zone labels.** Show stored zone names, or add a public label per zone and locale?
-- **Q6. Address.** Show the profile address whenever set, like the phone (recommended), or only with `publicProfileEnabled`? The phone has the same question today.
 - **Q7. Waitlist caps.** 2 open public entries per contact, 1 per date, 50 per date per venue. Constants or settings?
 - **Q8. Booking from an entry.** Add a `booked` waitlist status that links the staff booking, or have staff remove the entry after booking?
 - **Q11. Legal review.** Placement of the notice link, whether a booking without `privacyNoticeUrl` is acceptable, consent wording, and confirmation that pre-ticked boxes are not valid consent under EU rules.
