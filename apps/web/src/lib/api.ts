@@ -468,6 +468,11 @@ export const api = {
       `/v1/venues/${venueId}/agenda?date=${date}`,
     ),
 
+  searchReservations: (venueId: string, dateStart: string, dateEnd: string) =>
+    request<{ reservations: Reservation[] }>(
+      `/v1/venues/${venueId}/reservations/search?dateStart=${dateStart}&dateEnd=${dateEnd}`,
+    ),
+
   getReservation: (venueId: string, id: string) =>
     request<Reservation>(`/v1/venues/${venueId}/reservations/${id}`),
 

@@ -10,9 +10,9 @@ import { AuthScreen } from "./auth-screen";
 import { InviteSignedOut } from "./invite-screen";
 
 describe("the screens before sign-in", () => {
-  it("put the sign-in form in the main landmark, under the one level-one heading", () => {
+  it("put the sign-in form in the main landmark, under the one level-one heading", async () => {
     renderWithApp(<AuthScreen />);
-    expect(screen.getByRole("main")).toContainElement(screen.getByLabelText("Email"));
+    expect(screen.getByRole("main")).toContainElement(await screen.findByLabelText("Email"));
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
