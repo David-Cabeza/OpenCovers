@@ -3,6 +3,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { idempotencyKeys, waitlist } from "../db/schema";
 import * as schema from "../db/schema";
 import { claimKey } from "./idempotency";
+import type { Origin } from "./origin";
 import { walkIn, type WriteErrorCode } from "./reservations";
 
 export type Db = NodePgDatabase<typeof schema>;
@@ -100,6 +101,7 @@ export async function seatWaitlist(
   venueId: string,
   entryId: string,
   key: string,
+  origin: Origin | null,
 ): Promise<SeatResult> {
   return db.transaction(async (tx): Promise<SeatResult> => {
     // Key lock first, then the entry row, the order cancelWaitlist takes them in.
@@ -133,6 +135,7 @@ export async function seatWaitlist(
         zone: row.zone || undefined,
         guestName: row.guestName || undefined,
         guestContact: row.guestContact || undefined,
+        origin,
       },
       key,
     );

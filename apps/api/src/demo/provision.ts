@@ -155,9 +155,9 @@ async function build(
   for (const [n, s] of settle(created, timeInTz(tz, now)).entries()) {
     const res = created[s.index]!;
     const key = `demo-${venueId}-settle-${n}`;
-    if (s.action === "cancel") await cancelReservation(db, venueId, res.id, key);
+    if (s.action === "cancel") await cancelReservation(db, venueId, res.id, key, null);
     else if (s.action === "modify") await modifyReservation(db, venueId, res.id, { partySize: s.partySize }, key);
-    else await setStatus(db, venueId, res.id, s.action, key);
+    else await setStatus(db, venueId, res.id, s.action, key, null);
   }
 
   for (const w of template.waitlist) {

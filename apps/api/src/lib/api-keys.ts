@@ -8,12 +8,17 @@ export type Db = NodePgDatabase<typeof schema>;
 export type Role = "read" | "write" | "admin";
 
 export type AuthResult =
-  | { ok: true; principal: string; role: Role }
+  | { ok: true; principal: string; role: Role; keyId: string }
   | { ok: false; reason: "unauthorized" | "venue_not_found" };
 
 export type AdminResult =
   | { ok: true; principal: string }
   | { ok: false; reason: "unauthorized" | "forbidden" };
+
+/** A stable, non-secret reference to a key for audit trails: a prefix too short to authenticate with. */
+export function keyIdOf(hash: string): string {
+  return `key_${hash.slice(0, 12)}`;
+}
 
 export async function addKey(
   db: Db,
@@ -61,7 +66,7 @@ export async function authenticate(
       .limit(1)
   )[0];
   if (!granted) return { ok: false, reason: "venue_not_found" };
-  return { ok: true, principal: row.principal, role: row.role as Role };
+  return { ok: true, principal: row.principal, role: row.role as Role, keyId: keyIdOf(hash) };
 }
 
 export async function authenticateAdmin(db: Db, key: string): Promise<AdminResult> {

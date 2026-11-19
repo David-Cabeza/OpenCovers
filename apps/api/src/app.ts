@@ -21,6 +21,7 @@ import {
 import { auth, trustedOrigins } from "./lib/auth";
 import { getReservationTrace } from "./lib/reservation-trace";
 import { staffOriginGuard } from "./lib/staff-origin";
+import { CHANNEL_HEADER, keyOrigin, sessionOrigin, WIDGET, type Origin } from "./lib/origin";
 import {
   addToBlocklist,
   BLOCKLIST_DEFAULT_LIMIT,
@@ -161,6 +162,7 @@ type AppEnv = {
   Variables: {
     principal: string;
     role: string;
+    origin: Origin;
   };
 };
 
@@ -264,6 +266,7 @@ app.post("/v1/public/self-service/modify", async (c) => {
         version: input.version,
         rules: rulesOf(settings),
       },
+      origin: WIDGET,
     },
     storedKey(key),
   );
@@ -282,7 +285,7 @@ app.post("/v1/public/self-service/cancel", async (c) => {
   if (!link || (link.revokedAt && link.cancelKey !== storedKey(key))) return error(c, "self_service_link_invalid");
   const target = await publicVenueOf(db, link.venueId);
   if (!target) return error(c, "self_service_link_invalid");
-  const result = await cancelReservation(db, link.venueId, link.reservationId, storedKey(key), {
+  const result = await cancelReservation(db, link.venueId, link.reservationId, storedKey(key), WIDGET, {
     linkId: link.id,
     cutoffMinutes: target.settings.selfServiceCutoffMinutes,
   });
@@ -373,6 +376,7 @@ app.post("/v1/public/:bookingKey/reservations", async (c) => {
       basis: "service",
       ownerPrincipal: "widget",
       channel: { kind: "public", rules: rulesOf(target.settings) },
+      origin: WIDGET,
     },
     storedKey(key),
   );
@@ -461,6 +465,7 @@ app.use("/v1/venues/:venueId/*", async (c, next) => {
 
   let principal: string;
   let role: string;
+  let origin: Origin;
 
   if (key) {
     const result = await authenticate(db, key, venueId);
@@ -471,6 +476,7 @@ app.use("/v1/venues/:venueId/*", async (c, next) => {
     }
     principal = result.principal;
     role = result.role;
+    origin = keyOrigin(result.keyId, c.req.header(CHANNEL_HEADER));
   } else {
     const user = await sessionUser(c);
     if (!user) return error(c, "unauthorized");
@@ -478,6 +484,7 @@ app.use("/v1/venues/:venueId/*", async (c, next) => {
     if (!membership) return error(c, "venue_not_found");
     principal = user.email;
     role = membership.role;
+    origin = sessionOrigin(user.id);
   }
 
   const isWrite = ["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method);
@@ -486,6 +493,7 @@ app.use("/v1/venues/:venueId/*", async (c, next) => {
   }
   c.set("principal", principal);
   c.set("role", role);
+  c.set("origin", origin);
   await next();
 });
 
@@ -788,6 +796,7 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
       bookedVia: c.get("principal") as string,
       basis: "service",
       ownerPrincipal: c.get("principal") as string,
+      origin: c.get("origin"),
     },
     key,
   );
@@ -827,6 +836,7 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
       rating: body.rating,
       commentary: body.commentary,
       bookedVia: c.get("principal") as string,
+      origin: c.get("origin"),
       basis: "service",
       ownerPrincipal: c.get("principal") as string,
     },
@@ -870,7 +880,7 @@ app.post("/v1/venues/:venueId/waitlist/:id/seat", async (c) => {
   const id = c.req.param("id");
   const key = c.req.header("Idempotency-Key");
   if (!key) return error(c, "invalid_request");
-  const result = await seatWaitlist(db, venueId, id, key);
+  const result = await seatWaitlist(db, venueId, id, key, c.get("origin"));
   if (!result.ok) return error(c, result.code);
   const reservation = await getReservation(db, venueId, result.reservationId);
   if (!reservation) return error(c, "reservation_not_found");
@@ -909,7 +919,7 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
     db,
     venueId,
     id,
-    { partySize: body.partySize, tableIds: body.tables, consent: body.guest?.consent, rating: body.rating, commentary: body.commentary, reconfirmation: body.reconfirmation },
+    { partySize: body.partySize, tableIds: body.tables, consent: body.guest?.consent, rating: body.rating, commentary: body.commentary, reconfirmation: body.reconfirmation, origin: c.get("origin") },
     key,
   );
   if (result.ok && (body.partySize !== undefined || body.tables !== undefined)) {
@@ -923,7 +933,7 @@ app.post("/v1/venues/:venueId/reservations/:id/cancel", async (c) => {
   const id = c.req.param("id");
   const key = c.req.header("Idempotency-Key");
   if (!key) return error(c, "invalid_request");
-  const result = await cancelReservation(db, venueId, id, key);
+  const result = await cancelReservation(db, venueId, id, key, c.get("origin"));
   if (!result.ok) return error(c, result.code);
   const reservation = await getReservation(db, venueId, id);
   if (!reservation) return error(c, "reservation_not_found");
@@ -950,7 +960,7 @@ app.post("/v1/venues/:venueId/reservations/:id/status", async (c) => {
   if (body.status !== "seated" && body.status !== "attended" && body.status !== "no_show") {
     return error(c, "invalid_request");
   }
-  const result = await setStatus(db, venueId, id, body.status, key);
+  const result = await setStatus(db, venueId, id, body.status, key, c.get("origin"));
   return writeResponse(c, result, venueId);
 });
 
@@ -1457,7 +1467,7 @@ app.delete("/v1/venues/:venueId/webhooks/:webhookId", async (c) => {
 app.post("/v1/venues/:venueId/erasure", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const body = await c.req.json();
-  const result = await erase(db, venueId, body.guestId, body.principal, c.get("principal") as string);
+  const result = await erase(db, venueId, body.guestId, body.principal, c.get("principal") as string, c.get("origin"));
   return c.json(result);
 });
 

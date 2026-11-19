@@ -24,6 +24,7 @@ describe("api keys", () => {
       ok: true,
       principal: "test-principal",
       role: "write",
+      keyId: expect.stringMatching(/^key_[0-9a-f]{12}$/),
     });
     expect(await authenticate(db, "test-key", "venue-b")).toEqual({
       ok: false,
@@ -41,6 +42,7 @@ describe("api keys", () => {
       ok: true,
       principal: "wild-principal",
       role: "read",
+      keyId: expect.stringMatching(/^key_[0-9a-f]{12}$/),
     });
   });
 

@@ -15,6 +15,7 @@ import * as schema from "../db/schema";
 import type { CountryCode } from "libphonenumber-js";
 import type { DateRange } from "./booking-policy";
 import { consentColumns } from "./consent";
+import { originColumns, type Origin } from "./origin";
 import { countBlocklistEntries, guestContactKeys } from "./blocklist";
 import { normalizeContact, venueCountry } from "./contact";
 import { forgetMergeState, movedAtMerge } from "./guests";
@@ -199,6 +200,7 @@ export async function erase(
   guestId?: string,
   principal?: string,
   actor = "",
+  origin: Origin | null = null,
 ): Promise<ErasureResult> {
   const venue = (await db.select().from(venues).where(eq(venues.id, venueId)).limit(1))[0];
   if (!venue || (!guestId && !principal)) {
@@ -256,7 +258,7 @@ export async function erase(
             .for("update")
         : [];
     const family = await withMerged(tx, venueId, linkedGuests);
-    await eraseReservations(tx, venueId, matches);
+    await eraseReservations(tx, venueId, matches, origin);
 
     const targets = guestId ? byGuest : await unreferenced(tx, venueId, family);
     const targetIds = targets.map((g) => g.id);
@@ -291,6 +293,7 @@ export async function eraseReservations(
   tx: DbTx,
   venueId: string,
   rows: { id: string; version: number }[],
+  origin: Origin | null = null,
 ): Promise<void> {
   await deleteLinks(tx, venueId, rows.map((m) => m.id));
   for (const m of rows) {
@@ -316,6 +319,7 @@ export async function eraseReservations(
       reservationId: m.id,
       version: m.version,
       tombstoneHash: hash,
+      ...originColumns(origin),
     });
   }
 }

@@ -288,6 +288,13 @@
       "when": 1795099739203,
       "tag": "0040_breezy_triathlon",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795103538622,
+      "tag": "0041_sparkling_masked_marvel",
+      "breakpoints": true
     }
   ]
 }
