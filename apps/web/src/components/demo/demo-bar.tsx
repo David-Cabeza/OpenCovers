@@ -19,7 +19,7 @@ export function DemoBar({ status }: { status: DemoStatus }) {
   }, [venueId]);
   if (!venueId) return null;
   return (
-    <div className="print:hidden border-b border-primary/30 bg-primary/10 text-sm">
+    <div role="region" aria-label={t("demo.bar.label")} className="print:hidden border-b border-primary/30 bg-primary/10 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2 sm:px-6">
         <p>
           <strong className="font-medium">{t("demo.bar.title")}</strong> {t("demo.bar.sandbox")}

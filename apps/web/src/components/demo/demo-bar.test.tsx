@@ -37,6 +37,12 @@ beforeEach(() => {
 afterEach(resetApiMocks);
 
 describe("the demo bar", () => {
+  it("is a labelled region, so it sits inside a landmark", () => {
+    search([]);
+    renderWithApp(<DemoBar status={status} />);
+    expect(screen.getByRole("region", { name: "Demo sandbox" })).toBeInTheDocument();
+  });
+
   it("shows the expiry date, a deploy link, and a Diner link that opens the widget in a new tab", async () => {
     search([]);
     renderWithApp(<DemoBar status={status} />);
