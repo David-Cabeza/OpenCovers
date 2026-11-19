@@ -89,9 +89,9 @@ function SettingsSection({
   return (
     <section id={`settings-${section.id}`} aria-labelledby={`settings-${section.id}-title`} className="scroll-mt-32 space-y-4">
       <div>
-        <h3 id={`settings-${section.id}-title`} className="font-display text-2xl">
+        <h2 id={`settings-${section.id}-title`} className="font-display text-2xl">
           {section.label}
-        </h3>
+        </h2>
         <p className="text-sm text-muted-foreground">{section.description}</p>
       </div>
       <div className="space-y-6">{children}</div>

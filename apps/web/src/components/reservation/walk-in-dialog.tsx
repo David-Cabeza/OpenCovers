@@ -113,12 +113,12 @@ export function WalkInDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Contact consent</Label>
+            <Label htmlFor="walkin-consent">Contact consent</Label>
             <Controller
               name="consent"
               control={control}
               render={({ field }) => (
-                <ConsentSelect value={field.value} onChange={field.onChange} />
+                <ConsentSelect id="walkin-consent" value={field.value} onChange={field.onChange} />
               )}
             />
           </div>

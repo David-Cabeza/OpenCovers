@@ -51,7 +51,7 @@ export function FloorView({ venueId }: { venueId: string }) {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          <h2 className="font-display text-3xl">Floor plan</h2>
+          <h1 className="font-display text-3xl">Floor plan</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Drag a reservation to a free table, or tap a seated table to see it and move it. Tap a free table to seat a walk-in.
           </p>

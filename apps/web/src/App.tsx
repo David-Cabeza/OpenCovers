@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ServerUnreachable } from "@/components/auth/server-unreachable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { InviteJoin, InviteSignedOut } from "@/components/auth/invite-screen";
@@ -7,7 +8,7 @@ import { authClient } from "@/lib/auth-client";
 import { takeInviteToken } from "@/lib/invite-link";
 
 export default function App({ inviteToken = null }: { inviteToken?: string | null }) {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending, error, refetch } = authClient.useSession();
   const [token, setToken] = useState(inviteToken);
 
   useEffect(() => {
@@ -26,6 +27,9 @@ export default function App({ inviteToken = null }: { inviteToken?: string | nul
       </div>
     );
   }
+
+  // Not signed in and the session could not be read: the server did not answer, which is not the same as signed out.
+  if (!session && error) return <ServerUnreachable onRetry={() => void refetch()} />;
 
   if (token) {
     const done = () => setToken(null);

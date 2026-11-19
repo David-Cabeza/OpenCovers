@@ -14,15 +14,18 @@ export const CONSENT_OPTIONS: { value: Consent; label: string }[] = [
 ];
 
 export function ConsentSelect({
+  id,
   value,
   onChange,
 }: {
+  /** The id a `<Label htmlFor>` points at, so the select has a name of its own. */
+  id: string;
   value: Consent;
   onChange: (value: Consent) => void;
 }) {
   return (
     <Select value={value} onValueChange={(v) => onChange(v as Consent)}>
-      <SelectTrigger className="w-full">
+      <SelectTrigger id={id} className="w-full">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

@@ -3637,6 +3637,7 @@ components:
         - askConsent
         - locale
         - theme
+        - privacyNoticeUrl
       properties:
         enabled:
           type: boolean
@@ -3761,9 +3762,8 @@ components:
             2048 characters. Any other value fails with `invalid_request` and
             changes nothing. `null` clears it. The public config returns it,
             and the widget then shows a link to it next to the submit button.
-            OpenCovers writes no legal text (ADR-0021, section 5). Not yet
-            in `required`: stage 8 of ADR-0021 adds it there together with
-            the API that returns it, so the shape test stays true meanwhile.
+            The scheme may be written in any case, and the value is stored
+            as sent. OpenCovers writes no legal text (ADR-0021, section 5).
 
     OnlineBookingUpdate:
       type: object

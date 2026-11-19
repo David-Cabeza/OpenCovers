@@ -323,7 +323,7 @@ describe("C48 self-service read and the guest view", () => {
     const view = await res.json();
     const start = toTimestamp(SATURDAY, "20:00", "Europe/Madrid").getTime();
     expect(view).toEqual({
-      venue: { name: `Casa ${venueCount}`, locale: "es", theme: {}, phone: "+34 600 000 000" },
+      venue: { name: `Casa ${venueCount}`, locale: "es", theme: {}, phone: "+34 600 000 000", address: null },
       date: SATURDAY,
       time: "20:00",
       partySize: 2,
@@ -340,6 +340,23 @@ describe("C48 self-service read and the guest view", () => {
     for (const leak of [a.id, v.id, "t0", "dinner", "widget", "ana.garcia"]) expect(text).not.toContain(leak);
     expect(await eventCount(a.id)).toBe(1);
     expect(await linkRows(a.id)).toHaveLength(1);
+  });
+
+  it("shows the public profile's address in the guest view only while the profile is on (C64)", async () => {
+    const profile = { publicStreet: "Calle Mayor 1", publicPostalCode: "28013", publicLocality: "Madrid", publicRegion: "Madrid", noticeAddress: "owner@example.com" };
+    const v = await makeVenue({ venue: { ...profile, publicProfileEnabled: true } });
+    const off = await makeVenue({ venue: { ...profile, publicProfileEnabled: false } });
+    const a = await book(v);
+    const b = await book(off);
+    expect((await (await read(a.token)).json()).venue.address).toBe("Calle Mayor 1, 28013 Madrid");
+    expect((await (await read(b.token)).json()).venue.address).toBeNull();
+    await db.update(venues).set({ publicProfileEnabled: false }).where(eq(venues.id, v.id));
+    await db.update(venues).set({ publicStreet: "Plaza Nueva 2", publicProfileEnabled: true }).where(eq(venues.id, off.id));
+    const first = await (await read(a.token)).json();
+    const second = await (await read(b.token)).json();
+    expect(first.venue.address).toBeNull();
+    expect(second.venue.address).toBe("Plaza Nueva 2, 28013 Madrid");
+    expect(JSON.stringify([first, second])).not.toContain("owner@example.com");
   });
 
   it("masks a phone to its last two digits", async () => {

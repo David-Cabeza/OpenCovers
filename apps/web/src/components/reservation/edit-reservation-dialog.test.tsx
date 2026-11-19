@@ -50,6 +50,11 @@ describe("EditReservationDialog", () => {
     ).toBeInTheDocument();
   });
 
+  it("names the consent select by its label", () => {
+    setup();
+    expect(screen.getByRole("combobox", { name: "Contact consent" })).toBeInTheDocument();
+  });
+
   it("sends the new consent and keeps the rating and note as they were", async () => {
     const { api, onOpenChange, user } = setup();
 

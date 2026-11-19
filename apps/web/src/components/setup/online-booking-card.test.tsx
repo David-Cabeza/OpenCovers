@@ -3,7 +3,7 @@ import path from "node:path";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_THEME, FONT_STACKS, isLogoUrl, DEFAULT_DARK_COLORS } from "@/lib/online-booking";
+import { DEFAULT_THEME, FONT_STACKS, isLogoUrl, isPrivacyNoticeUrl, DEFAULT_DARK_COLORS } from "@/lib/online-booking";
 import { mockApi, renderWithApp, resetApiMocks } from "@/test/mock-api";
 import { OnlineBookingCard } from "./online-booking-card";
 import { SetupView } from "./setup-view";
@@ -26,6 +26,7 @@ const SETTINGS = {
   confirmationMode: "auto",
   askConsent: false,
   locale: "es",
+  privacyNoticeUrl: null as string | null,
   theme: {},
 };
 
@@ -404,6 +405,77 @@ describe("OnlineBookingCard", () => {
     await user.click(screen.getByRole("button", { name: "Save online booking" }));
     expect(await screen.findByText("Whole number of pixels from 0 to 24.")).toBeInTheDocument();
     expect(api.calls("PUT", PATH)).toHaveLength(0);
+  });
+
+  it("labels the privacy notice field and says the venue supplies its own notice", async () => {
+    setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    const field = screen.getByLabelText("Privacy notice address");
+    expect(field).toHaveValue("");
+    expect(field).toHaveAccessibleDescription(/You write and host it\. OpenCovers writes no legal text/);
+  });
+
+  it("saves a privacy notice address, trimmed, and sends only that field", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await user.type(screen.getByLabelText("Privacy notice address"), "  https://example.com/privacy  ");
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0]!.body).toEqual({ privacyNoticeUrl: "https://example.com/privacy" });
+  });
+
+  it("shows the stored address and clears it with null when emptied", async () => {
+    const user = userEvent.setup();
+    const api = setup({ privacyNoticeUrl: "https://example.com/privacy" });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    const field = screen.getByLabelText("Privacy notice address");
+    await waitFor(() => expect(field).toHaveValue("https://example.com/privacy"));
+    await user.clear(field);
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0]!.body).toEqual({ privacyNoticeUrl: null });
+  });
+
+  it("refuses a privacy notice address the API would refuse and sends nothing", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await user.type(screen.getByLabelText("Privacy notice address"), "http://example.com/privacy");
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+    const message = await screen.findByText("An https address with no spaces, up to 2048 characters.");
+    expect(message).toHaveAttribute("role", "alert");
+    expect(screen.getByLabelText("Privacy notice address")).toHaveAttribute("aria-invalid", "true");
+    expect(api.calls("PUT", PATH)).toHaveLength(0);
+
+    for (const bad of [
+      "http://example.com/p",
+      "javascript:alert(1)",
+      "data:text/html,hi",
+      "example.com/p",
+      "https://",
+      "https:///p",
+      "https:example.com/p",
+      "https://user:pw@example.com/",
+      "https://user@example.com/",
+      "https://example.com/a b",
+      "https://example.com/\n",
+      `https://example.com/${"a".repeat(2049 - 20)}`,
+    ]) {
+      expect(isPrivacyNoticeUrl(bad), bad).toBe(false);
+    }
+    for (const good of ["https://example.com/privacy", "HTTPS://Example.com/P?x=1#y", "https://example.com:8443/"]) {
+      expect(isPrivacyNoticeUrl(good), good).toBe(true);
+    }
+    expect(isPrivacyNoticeUrl(`https://example.com/${"a".repeat(2048 - 20)}`)).toBe(true);
   });
 
   it("resets the look to the built-in defaults with theme null", async () => {

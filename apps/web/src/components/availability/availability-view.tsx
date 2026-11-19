@@ -129,7 +129,7 @@ function ServiceSlots({
   return (
     <section className="space-y-2">
       <div className="flex items-baseline justify-between gap-3 px-1">
-        <h3 className="font-display text-lg first-letter:uppercase">{service}</h3>
+        <h2 className="font-display text-lg first-letter:uppercase">{service}</h2>
         <span className="text-sm text-muted-foreground tabular-nums">
           {free} of {slots.length} free
         </span>

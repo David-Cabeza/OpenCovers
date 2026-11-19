@@ -8,7 +8,7 @@ import type { Translate } from "./messages";
 import { solveInBackground } from "./pow";
 import { dateAfterPartyChange, nextFreeDay, pageBounds, startFor, STRIP_DAYS, visibleDays } from "./strip";
 import { createSubmitter, createTicketSource } from "./submit";
-import { watchTheme } from "./theme";
+import { noticeHref, watchTheme } from "./theme";
 import { Field, inputClass, primaryButton, secondaryButton, Section, VenueHeader } from "./ui";
 import { checkDetails, type DetailErrors } from "./validate";
 
@@ -27,6 +27,8 @@ type Times =
 
 // `hidden`: the days route failed or is limited, so the form works from the date field alone.
 type Strip = { kind: "loading" } | { kind: "ready"; days: PublicDay[] } | { kind: "hidden" };
+
+type Step = "choose" | "summary" | "details";
 
 type Sending = null | { kind: "checking" } | { kind: "sending" };
 
@@ -84,9 +86,9 @@ function BookingForm(props: {
   const today = todayLocal();
   const maxDate = config.maxAdvanceDays === null ? undefined : addDays(today, config.maxAdvanceDays);
 
-  const [step, setStepState] = useState<"choose" | "details">("choose");
+  const [step, setStepState] = useState<Step>("choose");
   const [moved, setMoved] = useState(false);
-  const setStep = (next: "choose" | "details") => {
+  const setStep = (next: Step) => {
     setMoved(true);
     setStepState(next);
   };
@@ -212,7 +214,7 @@ function BookingForm(props: {
       return;
     }
     setErrors({});
-    setStep("details");
+    setStep("summary");
   }
 
   async function book(event: FormEvent) {
@@ -350,6 +352,55 @@ function BookingForm(props: {
   }
 
   const partySize = party === "more" ? 0 : party;
+  if (step === "summary") {
+    const edit = (field: string) => (
+      <button
+        type="button"
+        className="min-h-11 shrink-0 px-2 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        aria-label={t("summary.edit", { field })}
+        onClick={() => setStep("choose")}
+      >
+        {t("action.edit")}
+      </button>
+    );
+    const rows = [
+      { label: t("field.date"), value: formatDate(date, locale) },
+      { label: t("field.time"), value: time },
+      { label: t("field.party"), value: partyLabel(partySize) },
+    ];
+    return (
+      <Section title={t("step.summary")} focus>
+        <ul className="divide-y divide-border rounded-oc border border-border bg-surface">
+          {rows.map((row) => (
+            <li key={row.label} className="flex items-center justify-between gap-3 px-3 py-1">
+              <p className="min-w-0">
+                <span className="block text-sm text-muted">{row.label}</span>
+                <span className="block font-medium [overflow-wrap:anywhere]">{row.value}</span>
+              </p>
+              {edit(row.label)}
+            </li>
+          ))}
+          {/* The zone line of ADR-0021 stage 6 goes here, in the same row shape, when zones exist. */}
+          {config.venue.address && (
+            <li className="px-3 py-2">
+              <span className="block text-sm text-muted">{t("summary.address")}</span>
+              <span className="block font-medium [overflow-wrap:anywhere]">{config.venue.address}</span>
+            </li>
+          )}
+        </ul>
+        <div className="flex gap-3">
+          <button type="button" className={secondaryButton} onClick={() => setStep("choose")}>
+            {t("action.back")}
+          </button>
+          <button type="button" className={primaryButton} onClick={() => setStep("details")}>
+            {t("action.continue")}
+          </button>
+        </div>
+      </Section>
+    );
+  }
+
+  const privacyHref = noticeHref(config.privacyNoticeUrl);
   const progress = Math.min(99, Math.floor((tries / 2 ** config.challenge.difficulty) * 100));
   return (
     <Section title={t("step.details")} focus>
@@ -430,7 +481,7 @@ function BookingForm(props: {
             disabled={sending !== null}
             onClick={() => {
               setNotice(null);
-              setStep("choose");
+              setStep("summary");
             }}
           >
             {t("action.back")}
@@ -439,6 +490,13 @@ function BookingForm(props: {
             {t("action.book")}
           </button>
         </div>
+        {privacyHref && (
+          <p>
+            <a href={privacyHref} target="_blank" rel="noopener noreferrer" className="inline-block min-h-11 py-2 underline [overflow-wrap:anywhere]">
+              {t("notice.privacy")}
+            </a>
+          </p>
+        )}
       </form>
     </Section>
   );

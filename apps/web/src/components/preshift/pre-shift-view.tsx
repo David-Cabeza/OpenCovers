@@ -214,7 +214,7 @@ function WaitlistPending({ entries }: { entries: WaitlistEntry[] }) {
   if (entries.length === 0) return null;
   return (
     <section className="space-y-2">
-      <h3 className="px-1 font-display text-lg">Waitlist now ({entries.length})</h3>
+      <h2 className="px-1 font-display text-lg">Waitlist now ({entries.length})</h2>
       <ul className="divide-y overflow-hidden rounded-xl border bg-card text-sm print:rounded-none print:border-x-0">
         {entries.map((e) => (
           <li key={e.id} className="flex items-center justify-between gap-4 px-4 py-2.5">

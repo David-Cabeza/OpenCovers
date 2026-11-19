@@ -6,7 +6,7 @@ import { SignUpForm } from "./sign-up-form";
 
 export function AuthScreen() {
   return (
-    <div className="flex min-h-dvh items-center justify-center p-6">
+    <main className="flex min-h-dvh items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <BrandMark className="size-14 text-primary" />
@@ -41,6 +41,6 @@ export function AuthScreen() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

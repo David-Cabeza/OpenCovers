@@ -134,3 +134,18 @@ export function logoSrc(theme: unknown): string | null {
     return null;
   }
 }
+
+/**
+ * The venue's privacy notice address when it is an `https` URL with a host and no credentials, as the URL parser
+ * writes it, or null. The widget links to it only through this, so a bad value shows no link.
+ */
+export function noticeHref(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.length > 2048 || /[\s\x00-\x1f\x7f]/.test(raw)) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.hostname === "" || url.username !== "" || url.password !== "") return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
