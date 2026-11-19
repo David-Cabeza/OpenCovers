@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
+import { LoadError } from "@/components/load-error";
 import { PageHeader } from "@/components/layout/page-header";
 import { Pill } from "@/components/pill";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,7 +20,7 @@ import { AddWaitlistDialog } from "./add-waitlist-dialog";
 
 export function WaitlistView({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
-  const { data, isPending } = useWaitlist(venueId);
+  const { data, isPending, isError, error, isRefetching, refetch } = useWaitlist(venueId);
   const [addOpen, setAddOpen] = useState(false);
   const [removing, setRemoving] = useState<WaitlistEntry | null>(null);
   // First come, first seated: the queue is shown oldest first.
@@ -71,6 +72,8 @@ export function WaitlistView({ venueId }: { venueId: string }) {
           </div>
           <Skeleton className="h-32 w-full" />
         </div>
+      ) : isError && !data ? (
+        <LoadError what="the waitlist" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : entries.length === 0 ? (
         <EmptyState
           icon={ArmchairIcon}

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVenueConfig } from "@/hooks/use-venue-config";
 import { api, type Role } from "@/lib/api";
@@ -27,7 +28,7 @@ function parseCeiling(value: string): number | null {
 
 export function VenueSettings({ venueId, role }: { venueId: string; role?: Role }) {
   const queryClient = useQueryClient();
-  const { data, isPending } = useVenueConfig(venueId);
+  const { data, isPending, isError, error, isRefetching, refetch } = useVenueConfig(venueId);
   const [enabled, setEnabled] = useState(false);
   const [noticeAddress, setNoticeAddress] = useState("");
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -99,6 +100,8 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
       <CardContent className="space-y-6">
         {isPending ? (
           <Skeleton className="h-24 w-full" />
+        ) : isError && !data ? (
+          <LoadError compact what="the venue settings" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : (
           <>
             <Group title="Reservations" description="Whether platforms and agents may book this venue.">

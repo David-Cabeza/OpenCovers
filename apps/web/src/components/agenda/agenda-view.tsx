@@ -26,6 +26,7 @@ import { CancelReservationDialog } from "@/components/reservation/cancel-reserva
 import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { EmptyState } from "@/components/empty-state";
+import { LoadError } from "@/components/load-error";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useTables } from "@/hooks/use-tables";
 import { api, type Reservation } from "@/lib/api";
@@ -72,7 +73,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const [assigning, setAssigning] = useState<Reservation | null>(null);
   const [cancelling, setCancelling] = useState<Reservation | null>(null);
   const queryClient = useQueryClient();
-  const { data, isPending } = useAgenda(venueId, date);
+  const { data, isPending, isError, error, isRefetching, refetch } = useAgenda(venueId, date);
   const reservations = data?.reservations ?? [];
   const { data: tablesData } = useTables(venueId);
   const tableNames = new Map((tablesData?.tables ?? []).map((t) => [t.id, t.name]));
@@ -135,6 +136,8 @@ export function AgendaView({ venueId }: { venueId: string }) {
           </div>
           <Skeleton className="h-64 w-full" />
         </div>
+      ) : isError && !data ? (
+        <LoadError what="the agenda" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : reservations.length === 0 ? (
         <EmptyState
           icon={CalendarPlusIcon}

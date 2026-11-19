@@ -92,4 +92,17 @@ describe("Dashboard accessibility", () => {
     expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
     expect(window.location.hash).toBe(before);
   });
+
+  it("says the venues could not be loaded, instead of offering to create a first one", async () => {
+    mockApi({ "GET /v1/venues": { status: 500, body: { code: "transient" } } });
+    renderWithApp(
+      <ThemeProvider>
+        <Dashboard />
+      </ThemeProvider>,
+    );
+    expect(await screen.findByText("Could not load your venues")).toBeInTheDocument();
+    expect(screen.queryByText("No venues yet")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Create your first venue/ })).not.toBeInTheDocument();
+  });
 });
+

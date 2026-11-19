@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVenueKeys } from "@/hooks/use-venue-keys";
 import { api, type ApiKey, type Role } from "@/lib/api";
@@ -22,7 +23,7 @@ const ROLE_TONE: Record<Role, PillTone> = { admin: "warning", write: "info", rea
 
 export function ApiKeysCard({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
-  const { data, isPending } = useVenueKeys(venueId);
+  const { data, isPending, isError, error, isRefetching, refetch } = useVenueKeys(venueId);
   const [open, setOpen] = useState(false);
   const [revoking, setRevoking] = useState<ApiKey | null>(null);
   const keys = data?.keys ?? [];
@@ -53,6 +54,8 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
       <CardContent>
         {isPending ? (
           <Skeleton className="h-24 w-full" />
+        ) : isError && !data ? (
+          <LoadError compact what="the API keys" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : keys.length === 0 ? (
           <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
             <KeyRoundIcon className="size-4" /> No keys yet.

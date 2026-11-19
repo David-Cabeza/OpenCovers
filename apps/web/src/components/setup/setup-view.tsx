@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useServices } from "@/hooks/use-services";
 import { useTables } from "@/hooks/use-tables";
@@ -156,7 +157,7 @@ function RowActions({
 
 function TablesSection({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
-  const { data, isPending } = useTables(venueId);
+  const { data, isPending, isError, error, isRefetching, refetch } = useTables(venueId);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TableInfo | null>(null);
   const [removing, setRemoving] = useState<TableInfo | null>(null);
@@ -193,6 +194,8 @@ function TablesSection({ venueId }: { venueId: string }) {
       <CardContent>
         {isPending ? (
           <Skeleton className="h-24 w-full" />
+        ) : isError && !data ? (
+          <LoadError compact what="the tables" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : tables.length === 0 ? (
           <p className="text-sm text-muted-foreground">No tables yet.</p>
         ) : (
@@ -243,7 +246,7 @@ function TablesSection({ venueId }: { venueId: string }) {
 
 function ServicesSection({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
-  const { data, isPending } = useServices(venueId);
+  const { data, isPending, isError, error, isRefetching, refetch } = useServices(venueId);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [removing, setRemoving] = useState<Service | null>(null);
@@ -280,6 +283,8 @@ function ServicesSection({ venueId }: { venueId: string }) {
       <CardContent>
         {isPending ? (
           <Skeleton className="h-24 w-full" />
+        ) : isError && !data ? (
+          <LoadError compact what="the services" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : services.length === 0 ? (
           <p className="text-sm text-muted-foreground">No services yet.</p>
         ) : (

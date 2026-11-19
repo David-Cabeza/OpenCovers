@@ -4,6 +4,7 @@ import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { DayNav } from "@/components/day-nav";
 import { EmptyState } from "@/components/empty-state";
+import { LoadError } from "@/components/load-error";
 import { PageHeader } from "@/components/layout/page-header";
 import { Pill, type PillTone } from "@/components/pill";
 import {
@@ -100,6 +101,13 @@ export function PreShiftView({ venueId }: { venueId: string }) {
           </div>
           <Skeleton className="h-64 w-full" />
         </div>
+      ) : agenda.isError && !agenda.data ? (
+        <LoadError
+          what="the pre-shift list"
+          error={agenda.error}
+          retrying={agenda.isRefetching}
+          onRetry={() => void agenda.refetch()}
+        />
       ) : rows.length === 0 ? (
         <EmptyState
           icon={ClipboardListIcon}
