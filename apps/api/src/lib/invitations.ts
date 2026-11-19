@@ -4,6 +4,7 @@ import { invitations } from "../db/schema";
 import { grantMembership, type Db, type Role } from "./memberships";
 import { recordMembershipAudit } from "./membership-audit";
 import { sha256Hex } from "./reservations";
+import { enforceSandboxCap } from "../demo/limits";
 
 export const INVITATION_TOKEN_HEADER = "x-invitation-token";
 export const DEFAULT_EXPIRY_HOURS = 72;
@@ -69,6 +70,7 @@ export async function createInvitation(
   const hours = input.expiresInHours ?? DEFAULT_EXPIRY_HOURS;
   const tokenHash = await sha256Hex(secret);
   const row = await db.transaction(async (tx) => {
+    await enforceSandboxCap(tx as unknown as Db, venueId, "invitations");
     const [created] = await tx
       .insert(invitations)
       .values({

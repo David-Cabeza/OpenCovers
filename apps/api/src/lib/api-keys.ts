@@ -3,6 +3,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { apiKeys, grants } from "../db/schema";
 import * as schema from "../db/schema";
 import { sha256Hex } from "./reservations";
+import { enforceSandboxCap } from "../demo/limits";
 
 export type Db = NodePgDatabase<typeof schema>;
 export type Role = "read" | "write" | "admin";
@@ -119,7 +120,11 @@ export async function addVenueKey(
   role: Role = "read",
   createdBy: string | null = null,
 ): Promise<void> {
-  await addKey(db, key, principal, [venueId], role, createdBy);
+  await db.transaction(async (tx) => {
+    // A key made in a sandbox counts against the sandbox's cap, under its venue lock.
+    await enforceSandboxCap(tx as unknown as Db, venueId, "apiKeys");
+    await addKey(tx as unknown as Db, key, principal, [venueId], role, createdBy);
+  });
 }
 
 export async function revokeVenueKey(

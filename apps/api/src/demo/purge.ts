@@ -28,6 +28,10 @@ export const VENUE_TABLES_IN_DELETE_ORDER = [
  */
 export async function purgeVenue(db: Db, venueId: string): Promise<void> {
   await db.transaction(async (tx) => {
+    // INVARIANT: no code path deletes a venue that has no demo_sandbox row. Checked inside the transaction that
+    // deletes, so the row cannot vanish in between.
+    const marked = await tx.execute(sql`SELECT 1 FROM demo_sandbox WHERE venue_id = ${venueId} FOR SHARE`);
+    if (marked.rows.length === 0) throw new Error(`purgeVenue refused: ${venueId} is not a demo sandbox`);
     for (const table of VENUE_TABLES_IN_DELETE_ORDER) {
       await tx.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE venue_id = ${venueId}`);
     }

@@ -62,6 +62,12 @@ A visitor plays two roles in the same demo, and the demo must connect them:
 - **Numbers** proposed in decisions 7 and 8: lead retention (12 months), magic-link limits, the global and daily sandbox caps, the per-sandbox reservation and guest caps.
 - **Whether the unsubscribe route belongs in the engine** or in a small separate service next to it.
 
+## Amendment, 2026-11-20: consent is recorded by the signed-in account
+
+Decision 7 said a lead exists only for a visitor who ticked the consent box, and the first implementation took the tick from headers on the magic link request (and from a cookie across the Google redirect). The security audit of the implementation (finding F8) showed that this lets anyone request a link for another person's address with the tick set and a name of their choosing: the inbox owner only opens a mail that never mentions consent, and a lead is recorded for them. Consent is therefore recorded by the signed-in account, not by whoever requested the link.
+
+After sign-in the form calls `POST /api/demo/consent` with the session cookie and `{ version, locale, name? }`. The server writes the `demo_lead` row for the verified address of that session, never for an address named in the request, and accepts only the current consent text version and a supported locale. The `X-Demo-Consent` and `X-Demo-Locale` headers and the claim cookie no longer exist. A sign-in alone creates no `demo_lead` row. The unsubscribe route of decision 7 is not part of this amendment.
+
 ## Alternatives considered
 
 - **One shared demo venue.** Cheapest, but visitors overwrite each other's data and the venue looks broken after the first hour. A nightly reset would still break live sessions. Rejected.

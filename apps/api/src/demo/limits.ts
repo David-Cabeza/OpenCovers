@@ -1,12 +1,24 @@
-// What a sandbox venue may not do (ADR-0022, decision 8). Every check returns the permissive answer at once when
-// DEMO_MODE is off, so a self-hosted instance pays nothing and behaves as before.
-import { and, count, eq } from "drizzle-orm";
-import { demoSandboxes, guests, reservations, user, venueMemberships } from "../db/schema";
+// What a sandbox venue may not do (ADR-0022, decision 8). A venue is a sandbox when it has a `demo_sandbox` row, and
+// for nothing else: the answer does not depend on DEMO_MODE, so the restrictions cannot vanish with the flag (audit
+// F9). The API refuses to start with the flag off while that table has rows (demo/guard.ts).
+import { and, count, eq, sql } from "drizzle-orm";
+import {
+  demoSandboxes,
+  floorItems,
+  grants,
+  guests,
+  invitations,
+  reservations,
+  services,
+  tables,
+  user,
+  venueMemberships,
+  waitlist,
+} from "../db/schema";
 import type { Db } from "../lib/venue";
-import { demoMode, sandboxCaps } from "./settings";
+import { sandboxLimits, type SandboxLimits } from "./settings";
 
 export async function isSandboxVenue(db: Db, venueId: string): Promise<boolean> {
-  if (!demoMode()) return false;
   const [row] = await db
     .select({ venueId: demoSandboxes.venueId })
     .from(demoSandboxes)
@@ -15,14 +27,67 @@ export async function isSandboxVenue(db: Db, venueId: string): Promise<boolean> 
   return row !== undefined;
 }
 
-/** True when a sandbox already holds its most reservations or guests. A real venue is never capped. */
-export async function sandboxFull(db: Db, venueId: string): Promise<boolean> {
-  if (!(await isSandboxVenue(db, venueId))) return false;
-  const caps = sandboxCaps();
-  const [booked] = await db.select({ n: count() }).from(reservations).where(eq(reservations.venueId, venueId));
-  if ((booked?.n ?? 0) >= caps.reservations) return true;
-  const [known] = await db.select({ n: count() }).from(guests).where(eq(guests.venueId, venueId));
-  return (known?.n ?? 0) >= caps.guests;
+/** A sandbox hit one of its caps. The app answers 409 `demo_limit_reached`, a code outside docs/contract. */
+export class DemoLimitError extends Error {
+  constructor(public readonly kind: string) {
+    super(`demo sandbox limit reached: ${kind}`);
+  }
+}
+
+/** Serializes the writes that count against a sandbox's caps, per venue. Held until the transaction ends. */
+export async function lockSandbox(tx: Db, venueId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`sandbox-cap:${venueId}`}, 0))`);
+}
+
+/**
+ * Inside the booking transaction, after the idempotency key was claimed: true when a sandbox already holds its most
+ * reservations. Takes the per-venue lock, so two concurrent bookings cannot both pass the last free place.
+ * `extraGuests` is checked by `sandboxGuestsFull` once the guest row exists.
+ */
+export async function sandboxReservationsFull(tx: Db, venueId: string): Promise<boolean> {
+  if (!(await isSandboxVenue(tx, venueId))) return false;
+  await lockSandbox(tx, venueId);
+  const [booked] = await tx.select({ n: count() }).from(reservations).where(eq(reservations.venueId, venueId));
+  return (booked?.n ?? 0) >= sandboxLimits().reservations;
+}
+
+/** After the guest was linked in the same transaction: true when the sandbox now holds more guests than its cap. */
+export async function sandboxGuestsFull(tx: Db, venueId: string): Promise<boolean> {
+  if (!(await isSandboxVenue(tx, venueId))) return false;
+  await lockSandbox(tx, venueId);
+  const [known] = await tx.select({ n: count() }).from(guests).where(eq(guests.venueId, venueId));
+  return (known?.n ?? 0) > sandboxLimits().guests;
+}
+
+type CapKind = "waitlist" | "tables" | "services" | "floorItems" | "invitations" | "apiKeys";
+
+async function held(tx: Db, kind: CapKind, venueId: string): Promise<number> {
+  const table = {
+    waitlist: waitlist,
+    tables: tables,
+    services: services,
+    floorItems: floorItems,
+    invitations: invitations,
+    apiKeys: grants,
+  }[kind];
+  const [row] = await tx.select({ n: count() }).from(table).where(eq(table.venueId, venueId));
+  return row?.n ?? 0;
+}
+
+/**
+ * Call inside the write's own transaction, before it inserts. Throws `DemoLimitError` when `venueId` is a sandbox
+ * that already holds its cap of `kind`. A real venue is never capped. Counting under the venue lock keeps the cap
+ * exact under concurrent writes.
+ */
+export async function enforceSandboxCap(tx: Db, venueId: string, kind: CapKind): Promise<void> {
+  if (!(await isSandboxVenue(tx, venueId))) return;
+  await lockSandbox(tx, venueId);
+  if ((await held(tx, kind, venueId)) >= sandboxLimits()[kind as keyof SandboxLimits]) throw new DemoLimitError(kind);
+}
+
+/** The blocklist cap of a sandbox, or null for a real venue. The blocklist already counts under its own lock. */
+export async function sandboxBlocklistMax(tx: Db, venueId: string): Promise<number | null> {
+  return (await isSandboxVenue(tx, venueId)) ? sandboxLimits().blocklist : null;
 }
 
 /** Sandbox venues have no webhooks: an endpoint is a way to send traffic to an address the visitor chose. */
@@ -43,4 +108,18 @@ export async function mayEmail(db: Db, venueId: string, to: string): Promise<boo
     .where(and(eq(venueMemberships.venueId, venueId), eq(venueMemberships.role, "admin")));
   const target = to.trim().toLowerCase();
   return owners.some((o) => o.verified && o.email.toLowerCase() === target);
+}
+
+/**
+ * The Resend key and sender to mail a venue's guests with. A sandbox always uses the operator's configured sender
+ * (empty values fall back to the environment in `sendEmail`): whatever `fromEmail` or `resendApiKey` a visitor
+ * stored in a sandbox is ignored (audit F12).
+ */
+export async function mailIdentity(
+  db: Db,
+  venueId: string,
+  venue: { resendApiKey: string | null; fromEmail: string },
+): Promise<{ apiKey: string; from: string }> {
+  if (await isSandboxVenue(db, venueId)) return { apiKey: "", from: "" };
+  return { apiKey: venue.resendApiKey ?? "", from: venue.fromEmail };
 }

@@ -5,6 +5,7 @@ import * as schema from "../db/schema";
 import { claimKey } from "./idempotency";
 import type { Origin } from "./origin";
 import { walkIn, type WriteErrorCode } from "./reservations";
+import { enforceSandboxCap } from "../demo/limits";
 
 export type Db = NodePgDatabase<typeof schema>;
 
@@ -67,6 +68,7 @@ export async function addWaitlist(
           return { ok: true as const, id: stored.reservationId };
         }
       }
+      await enforceSandboxCap(tx as unknown as Db, venueId, "waitlist");
       const id = crypto.randomUUID();
       await tx.insert(waitlist).values({
         id,

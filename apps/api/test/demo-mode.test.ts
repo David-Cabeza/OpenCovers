@@ -1,10 +1,13 @@
-import { and, count, eq, like, sql } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.hoisted(() => {
   process.env.PUBLIC_CHALLENGE_SECRET = "test-secret-for-the-public-form-challenge";
   process.env.PUBLIC_POW_DIFFICULTY = "4";
+  // The operator's own sender. A sandbox always mails with it (audit F12).
+  process.env.RESEND_API_KEY = "re_operator";
+  process.env.RESEND_FROM_EMAIL = "operator@opencovers.test";
 });
 
 import app from "../src/app";
@@ -19,14 +22,14 @@ import {
   tables,
   user,
   venueMemberships,
-  venues,
   verification,
+  venues,
   webhookEndpoints,
 } from "../src/db/schema";
 import { createAuth, requireVerifiedGoogleEmail } from "../src/lib/auth";
 import { cleanupExpiredSandboxes } from "../src/demo/cleanup";
 import { isDisposableEmail } from "../src/demo/disposable";
-import { consentedLeadsCsv } from "../src/demo/leads";
+import { consentedLeadsCsv, recordConsent } from "../src/demo/leads";
 import {
   CHALLENGE_HEADER,
   CHALLENGE_MAX_AGE_MS,
@@ -52,7 +55,11 @@ import { createReservation } from "../src/lib/reservations";
 import { setConfig } from "../src/lib/venue";
 
 const DEMO_ENV = { DEMO_MODE: "1" };
-const demoAuth = createAuth(demoSettings(DEMO_ENV));
+const sent: { to: string; text: string }[] = [];
+const capture = async (to: string, _subject: string, text: string) => {
+  sent.push({ to, text });
+};
+const demoAuth = createAuth(demoSettings(DEMO_ENV), { sendMail: capture });
 const challengeConfig = challengeConfigFromEnv();
 
 beforeAll(async () => {
@@ -60,7 +67,10 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  sent.length = 0;
   vi.stubEnv("DEMO_MODE", "1");
+  // No test mails anyone: a stray send would otherwise reach the network.
+  vi.stubGlobal("fetch", async () => new Response("{}", { status: 200 }));
   await db.execute(
     sql`TRUNCATE TABLE demo_lead, demo_sandbox, account, session, verification, "user", venue_memberships, sent_emails, waitlist, events, tombstones, idempotency_keys, table_allocations, reservations, guests, guest_audit, self_service_links, grants, api_keys, services, tables, floor_items, webhook_endpoints, venue_online_booking, venues RESTART IDENTITY CASCADE`,
   );
@@ -91,16 +101,9 @@ const requestLink = (email: string, extra: Record<string, string> = {}) =>
 /** Signs in with a magic link the way a visitor does: ask for it, then open it. Returns the account and its cookie. */
 async function signInWithMagicLink(email: string, headers: Record<string, string> = {}) {
   await requestLink(email, headers);
-  const [row] = await db
-    .select({ token: verification.identifier })
-    .from(verification)
-    .where(and(sql`${verification.value}::jsonb ->> 'email' = ${email}`, like(verification.identifier, "magic-link:%")))
-    .limit(1);
-  const res = await demoAuth.api.magicLinkVerify({
-    query: { token: row!.token.replace(/^magic-link:/, "") },
-    headers: new Headers(),
-    asResponse: true,
-  });
+  const mail = sent.filter((m) => m.to === email).pop()!;
+  const token = new URL(mail.text.match(/https?:\/\/\S+/)![0]).searchParams.get("token")!;
+  const res = await demoAuth.api.magicLinkVerify({ query: { token }, headers: new Headers(), asResponse: true });
   const cookie = res.headers
     .getSetCookie()
     .map((c) => c.split(";")[0])
@@ -285,7 +288,7 @@ describe("sign-in", () => {
     await expect(
       requestLink("ghost@mailinator.com"),
     ).rejects.toMatchObject({ body: { code: "DISPOSABLE_EMAIL" } });
-    expect((await db.select().from(verification)).length).toBe(0);
+    expect(sent).toEqual([]);
     expect((await db.select().from(user)).length).toBe(0);
   });
 
@@ -314,7 +317,7 @@ describe("sign-in", () => {
     expect(requireVerifiedGoogleEmail({ email_verified: true })).toEqual({});
   });
 
-  it("starts Google sign-in with a claim cookie that carries the consent across the redirect", async () => {
+  it("starts Google sign-in without any claim cookie or consent header handling", async () => {
     const google = createAuth(
       demoSettings({ ...DEMO_ENV, GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" }),
     );
@@ -326,10 +329,7 @@ describe("sign-in", () => {
       }),
     );
     expect(res.status).toBe(200);
-    const cookie = res.headers.getSetCookie().find((c) => c.startsWith("oc_demo_claim="));
-    expect(cookie).toBeDefined();
-    const claim = JSON.parse(Buffer.from(cookie!.split(";")[0]!.split("=")[1]!, "base64url").toString());
-    expect(claim).toMatchObject({ consentVersion: "v1", locale: "es" });
+    expect(res.headers.getSetCookie().some((c) => c.startsWith("oc_demo_claim="))).toBe(false);
   });
 });
 
@@ -363,8 +363,7 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
   };
 
   const answerHeaders = (email: string) => Object.fromEntries(solvedHeaders(email).entries());
-  const mailsFor = () => db.select().from(verification).where(like(verification.identifier, "magic-link:%"));
-  const quiet = () => vi.spyOn(console, "log").mockImplementation(() => {});
+  const mailsFor = () => sent;
 
   it("refuses a request with no challenge, with a code the form can act on", async () => {
     const res = await post(front(), MAGIC, { email: freshEmail() });
@@ -407,28 +406,24 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
   });
 
   it("sends exactly one email for a valid challenge and refuses its replay", async () => {
-    const log = quiet();
     const email = freshEmail();
     const headers = answerHeaders(email);
     // The address limit is lifted here, so a refused replay is the challenge's doing and not the limiter's.
     const host = front(Date.now, { ...DEFAULT_RULES, magic_link: { max: 100, windowMs: 60_000 } });
     expect((await post(host, MAGIC, { email }, headers)).status).toBe(200);
     expect((await mailsFor()).length).toBe(1);
-    expect(log.mock.calls.filter(([line]) => String(line).startsWith("demo magic link for"))).toHaveLength(1);
 
     // The replay uses another IP, so the rate limit is not what refuses it.
     const replay = await post(host, MAGIC, { email }, headers, "198.51.100.77");
     expect(replay.status).toBe(400);
     expect(await replay.json()).toMatchObject({ code: "CHALLENGE_INVALID" });
     expect((await mailsFor()).length).toBe(1);
-    expect(log.mock.calls.filter(([line]) => String(line).startsWith("demo magic link for"))).toHaveLength(1);
-    log.mockRestore();
   });
 
   it("refuses a challenge after its five minutes", async () => {
     let now = 1_000_000;
     const clock = createMagicLinkChallenges(challengeConfig, { now: () => now });
-    const clocked = createAuth(demoSettings(DEMO_ENV), () => clock);
+    const clocked = createAuth(demoSettings(DEMO_ENV), { sendMail: capture, challenges: () => clock });
     const email = freshEmail();
     const { challenge } = clock.issue(email);
     const headers = { [CHALLENGE_HEADER]: JSON.stringify(challenge), [SOLUTION_HEADER]: solve(challenge) };
@@ -437,7 +432,6 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
     expect(await res.json()).toMatchObject({ code: "CHALLENGE_INVALID" });
 
     // Just inside the window it still works.
-    quiet();
     now = 2_000_000;
     const fresh = clock.issue(email).challenge;
     now += CHALLENGE_MAX_AGE_MS;
@@ -448,11 +442,9 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
       { [CHALLENGE_HEADER]: JSON.stringify(fresh), [SOLUTION_HEADER]: solve(fresh) },
     );
     expect(ok.status).toBe(200);
-    vi.restoreAllMocks();
   });
 
   it("refuses a challenge issued for another address, and treats case as the same address", async () => {
-    quiet();
     const mine = freshEmail();
     const theirs = freshEmail();
     const res = await post(front(), MAGIC, { email: theirs }, answerHeaders(mine));
@@ -460,7 +452,6 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
     expect((await mailsFor()).length).toBe(0);
     const spaced = await post(front(), MAGIC, { email: mine.toUpperCase() }, answerHeaders(mine));
     expect(spaced.status).toBe(200);
-    vi.restoreAllMocks();
   });
 
   it("does not let a booking challenge unlock a link, or a link challenge unlock a booking", async () => {
@@ -481,7 +472,6 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
   });
 
   it("answers the same for an address with an account and one without", async () => {
-    quiet();
     const known = freshEmail();
     await signInWithMagicLink(known);
     const stranger = freshEmail();
@@ -491,20 +481,16 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
     expect(a.status).toBe(200);
     expect(b.status).toBe(a.status);
     expect(await b.json()).toEqual(await a.json());
-    vi.restoreAllMocks();
   });
 
   it("does not spend an address's budget on a refused request", async () => {
-    quiet();
     const host = front();
     const email = freshEmail();
     for (let i = 0; i < 3; i += 1) expect((await post(host, MAGIC, { email })).status).toBe(400);
     expect((await post(host, MAGIC, { email }, answerHeaders(email))).status).toBe(200);
-    vi.restoreAllMocks();
   });
 
   it("limits a link to 1 per address per minute and 5 per address per day", async () => {
-    quiet();
     let now = Date.now();
     const host = front(() => now);
     const email = freshEmail();
@@ -524,11 +510,9 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
     expect(Number(sixth.headers.get("retry-after"))).toBeGreaterThan(60);
     now += 24 * 3_600_000;
     expect((await ask("203.0.113.8")).status).toBe(200);
-    vi.restoreAllMocks();
   });
 
   it("limits a link to 10 per IP per hour", async () => {
-    quiet();
     let now = Date.now();
     const host = front(() => now);
     const ask = (ip = "203.0.113.50") => {
@@ -540,11 +524,9 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
     expect((await ask("203.0.113.51")).status).toBe(200); // another IP is not affected
     now += 3_600_000 + 1;
     expect((await ask()).status).toBe(200);
-    vi.restoreAllMocks();
   });
 
   it("issues a challenge on POST /api/demo/magic-link-challenge and limits it per IP", async () => {
-    quiet();
     const email = freshEmail();
     const host = front();
     const res = await post(host, CHALLENGE, { email });
@@ -566,7 +548,6 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
     expect((await post(small, CHALLENGE, { email })).status).toBe(200);
     expect((await post(small, CHALLENGE, { email })).status).toBe(200);
     expect((await post(small, CHALLENGE, { email })).status).toBe(429);
-    vi.restoreAllMocks();
   });
 
   it("leaves a self-hosted instance alone: no link route, no challenge route", async () => {
@@ -580,46 +561,22 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
 });
 
 describe("leads", () => {
-  it("records consent from the request and keeps the account either way", async () => {
-    const yes = freshEmail();
-    const no = freshEmail();
-    await signInWithMagicLink(yes, { "x-demo-consent": "2026-11-v1", "x-demo-locale": "es" });
-    await signInWithMagicLink(no);
-    expect(await sandboxOf(yes)).toBeDefined();
-    expect(await sandboxOf(no)).toBeDefined();
-
-    const [a] = await db.select().from(demoLeads).where(eq(demoLeads.email, yes));
-    expect(a).toMatchObject({ source: "magic-link", locale: "es", contactConsent: true, consentTextVersion: "2026-11-v1" });
-    const [b] = await db.select().from(demoLeads).where(eq(demoLeads.email, no));
-    expect(b).toMatchObject({ contactConsent: false, consentTextVersion: null, locale: "en" });
-  });
-
-  it("does not count a consent claim made for an address nobody opened", async () => {
-    const email = freshEmail();
-    await requestLink(email, { "x-demo-consent": "v1" });
+  it("a sign-in alone creates no lead", async () => {
+    await signInWithMagicLink(freshEmail(), { "x-demo-consent": "v1" });
     expect((await db.select().from(demoLeads)).length).toBe(0);
-    expect((await db.select().from(user)).length).toBe(0);
   });
 
-  it("ticking the box on a later sign-in adds consent, unticking never removes it", async () => {
-    const email = freshEmail();
-    await signInWithMagicLink(email);
-    await signInWithMagicLink(email, { "x-demo-consent": "v1" });
-    await signInWithMagicLink(email);
-    const [lead] = await db.select().from(demoLeads).where(eq(demoLeads.email, email));
-    expect(lead).toMatchObject({ contactConsent: true, consentTextVersion: "v1" });
-    expect((await db.select().from(demoLeads)).length).toBe(1);
-  });
-
-  it("exports only consented leads as CSV, and no route returns leads", async () => {
-    await signInWithMagicLink("yes@example.com", { "x-demo-consent": "v1" });
-    await signInWithMagicLink("no@example.com");
+  it("exports only consented, not withdrawn leads as CSV, and no route returns leads", async () => {
+    const consent = { version: "v1", locale: "es", name: null };
+    await recordConsent(db, { email: "yes@example.com", source: "magic-link", consent });
+    await recordConsent(db, { email: "gone@example.com", source: "magic-link", consent });
+    await db.update(demoLeads).set({ withdrawnAt: new Date() }).where(eq(demoLeads.email, "gone@example.com"));
     const csv = await consentedLeadsCsv(db);
     const lines = csv.trim().split("\n");
     expect(lines[0]).toBe("email,name,source,locale,created_at,last_seen_at,consent_text_version");
     expect(lines).toHaveLength(2);
     expect(lines[1]).toMatch(/^yes@example\.com,/);
-    expect(app.routes.some((r) => /lead/i.test(r.path))).toBe(false);
+    expect(app.routes.some((r) => /lead/i.test(r.path) && r.method === "GET")).toBe(false);
   });
 
   it("neutralizes spreadsheet formulas in the export", async () => {
@@ -684,7 +641,7 @@ describe("abuse limits", () => {
     const { account } = await signInWithMagicLink(owner);
     const { venueId } = (await sandboxOf(owner))!;
     await setConfig(db, venueId, { resendApiKey: "re_test", fromEmail: "demo@opencovers.test" });
-    const fetched: { to: string[] }[] = [];
+    const fetched: { to: string[]; from: string }[] = [];
     vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
       fetched.push(JSON.parse(init.body));
       return new Response("{}", { status: 200 });
@@ -698,13 +655,16 @@ describe("abuse limits", () => {
     expect(fetched).toEqual([]);
     await notifyReservation(db, venueId, own.id, own.version, "confirmation");
     expect(fetched.map((f) => f.to)).toEqual([[owner]]);
+    // The visitor's own sender and key were ignored: mail goes out with the operator's (audit F12).
+    expect(fetched[0]!.from).toBe("operator@opencovers.test");
     void account;
   });
 });
 
 describe("lifecycle", () => {
   it("deletes expired sandboxes and their accounts, keeps live ones and every lead", async () => {
-    const old = await signInWithMagicLink(freshEmail(), { "x-demo-consent": "v1" });
+    const old = await signInWithMagicLink(freshEmail());
+    await recordConsent(db, { email: old.account.email, source: "magic-link", consent: { version: "v1", locale: "en", name: null } });
     const fresh = await signInWithMagicLink(freshEmail());
     const oldBox = (await sandboxOf(old.account.email))!;
     const freshBox = (await sandboxOf(fresh.account.email))!;
@@ -723,7 +683,7 @@ describe("lifecycle", () => {
       .where(eq(demoSandboxes.userId, justInside.account.id));
 
     const result = await cleanupExpiredSandboxes(db);
-    expect(result).toEqual({ sandboxes: 1, accounts: 1 });
+    expect(result).toMatchObject({ sandboxes: 1, accounts: 1, orphanAccounts: 0, leads: 0 });
 
     expect(await sandboxOf(old.account.email)).toBeUndefined();
     expect((await db.select().from(user).where(eq(user.id, old.account.id))).length).toBe(0);
@@ -738,21 +698,14 @@ describe("lifecycle", () => {
     expect(await sandboxOf(justInside.account.email)).toBeDefined();
     expect((await db.select({ n: count() }).from(reservations).where(eq(reservations.venueId, freshBox.venueId)))[0]!.n).toBeGreaterThan(0);
 
-    // The leads stay, expired or not, with their consent.
+    // The consented lead stays after its account went: it is the one thing that outlives it (12 months).
     const leads = await db.select().from(demoLeads);
-    expect(leads).toHaveLength(3);
-    expect(leads.find((l) => l.email === old.account.email)?.contactConsent).toBe(true);
+    expect(leads).toHaveLength(1);
+    expect(leads[0]!.email).toBe(old.account.email);
 
     // Signing in again after deletion builds a fresh sandbox.
     await signInWithMagicLink(old.account.email);
     expect(await sandboxOf(old.account.email)).toBeDefined();
-  });
-
-  it("drops claims whose link was never opened", async () => {
-    await requestLink(freshEmail(), { "x-demo-consent": "v1" });
-    await db.execute(sql`UPDATE verification SET expires_at = now() - interval '1 minute'`);
-    await cleanupExpiredSandboxes(db);
-    expect((await db.select({ n: count() }).from(verification).where(like(verification.identifier, "demo-lead:%")))[0]!.n).toBe(0);
   });
 
   it("deletes from every table that holds a venue_id", async () => {

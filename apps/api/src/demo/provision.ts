@@ -18,7 +18,9 @@ import {
 import { upsertService, upsertTable, updateTableLayout } from "../lib/catalog";
 import { addWaitlist } from "../lib/waitlist";
 import { createVenue, setConfig, type Db } from "../lib/venue";
-import { purgeVenue } from "./purge";
+import { admissionFor, DemoRefusal } from "./admission";
+import { normalizeEmail } from "./normalize";
+import { sandboxLimits } from "./settings";
 import {
   DEMO_TEMPLATE,
   planReservations,
@@ -56,33 +58,75 @@ function demoOrigin(): string | null {
   }
 }
 
-/** Gives `userId` a sandbox, or returns the one they have and extends its life by touching `last_sign_in_at`. */
+/** Builds at most `provisionConcurrency` sandboxes at a time and queues the rest, so builds never starve the pool. */
+const slots = { active: 0, waiting: [] as (() => void)[] };
+
+async function inSlot<T>(run: () => Promise<T>): Promise<T> {
+  const limits = sandboxLimits();
+  if (slots.active >= limits.provisionConcurrency) {
+    if (slots.waiting.length >= limits.provisionQueue) throw new DemoRefusal("busy");
+    // The finishing build hands its slot straight to the next waiter, so `active` does not change.
+    await new Promise<void>((resolve) => slots.waiting.push(resolve));
+  } else {
+    slots.active += 1;
+  }
+  try {
+    return await run();
+  } finally {
+    const next = slots.waiting.shift();
+    if (next) next();
+    else slots.active -= 1;
+  }
+}
+
+async function existingSandbox(db: Db, userId: string): Promise<Sandbox | null> {
+  const existing = (await db.select().from(demoSandboxes).where(eq(demoSandboxes.userId, userId)).limit(1))[0];
+  if (!existing) return null;
+  await db.update(demoSandboxes).set({ lastSignInAt: new Date() }).where(eq(demoSandboxes.userId, userId));
+  const settings = await getOnlineBooking(db, existing.venueId);
+  return { venueId: existing.venueId, bookingKey: settings?.bookingKey ?? null, created: false };
+}
+
+/**
+ * Gives `userId` a sandbox, or returns the one they have and extends its life by touching `last_sign_in_at`.
+ *
+ * The whole build (venue, admin membership, template, and the `demo_sandbox` row that marks it) runs on ONE
+ * transaction, so it holds one pool connection and never waits for a second (audit F1), and an interrupted build
+ * leaves nothing behind: no unmarked venue (audit F5). The domain functions get the transaction as their `Db`, and
+ * their own transactions become savepoints. Throws `DemoRefusal` when the demo is full or the address has a sandbox.
+ */
 export async function provisionSandbox(db: Db, userId: string, options: ProvisionOptions = {}): Promise<Sandbox> {
-  // One provisioner per account at a time. The lock is held by a transaction that does nothing else, and the
-  // build runs on other pool connections, so a failed build cannot leave a half-open transaction behind.
-  return db.transaction(async (guard) => {
-    await guard.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`demo-sandbox:${userId}`}, 0))`);
-    const existing = (await db.select().from(demoSandboxes).where(eq(demoSandboxes.userId, userId)).limit(1))[0];
-    if (existing) {
-      await db.update(demoSandboxes).set({ lastSignInAt: new Date() }).where(eq(demoSandboxes.userId, userId));
-      const settings = await getOnlineBooking(db, existing.venueId);
-      return { venueId: existing.venueId, bookingKey: settings?.bookingKey ?? null, created: false };
-    }
+  const returning = await existingSandbox(db, userId);
+  if (returning) return returning;
+  return inSlot(() =>
+    db.transaction(async (guard) => {
+      const tx = guard as unknown as Db;
+      // One provisioner per account at a time.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`demo-sandbox:${userId}`}, 0))`);
+      const again = await existingSandbox(tx, userId);
+      if (again) return again;
 
-    const owner = (await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1))[0];
-    if (!owner) throw new Error(`demo sandbox: no account ${userId}`);
+      const owner = (await tx.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1))[0];
+      if (!owner) throw new Error(`demo sandbox: no account ${userId}`);
+      const normalized = normalizeEmail(owner.email);
+      if (normalized === null) throw new DemoRefusal("invalid_address");
+      // Cheap early refusal, so a full demo does not pay for a build. The authoritative check is below, under the lock.
+      const early = await admissionFor(tx, normalized, userId);
+      if (early) throw new DemoRefusal(early);
 
-    const template = options.template ?? DEMO_TEMPLATE;
-    const { id: venueId } = await createVenue(db, userId, template.venue);
-    try {
-      await db.insert(demoSandboxes).values({ userId, venueId });
-      const bookingKey = await build(db, venueId, userId, owner.email, template, options);
+      const template = options.template ?? DEMO_TEMPLATE;
+      const { id: venueId } = await createVenue(tx, userId, template.venue);
+      const bookingKey = await build(tx, venueId, userId, owner.email, template, options);
+
+      // Counting live sandboxes is only exact while no other build commits in between: one global lock, held only
+      // from here to the commit. The unique indexes on user_id and normalized_email are the last line.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('demo-admission', 0))`);
+      const final = await admissionFor(tx, normalized, userId);
+      if (final) throw new DemoRefusal(final);
+      await tx.insert(demoSandboxes).values({ userId, venueId, normalizedEmail: normalized });
       return { venueId, bookingKey, created: true };
-    } catch (error) {
-      await purgeVenue(db, venueId);
-      throw error;
-    }
-  });
+    }),
+  );
 }
 
 async function build(
