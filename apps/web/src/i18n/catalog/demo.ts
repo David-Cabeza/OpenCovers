@@ -20,6 +20,7 @@ export default defineMessages({
     "demo.consent.optional": "Optional. The demo works the same either way.",
     "demo.consent.privacy": "Privacy notice",
 
+    "demo.bar.label": "Demo sandbox",
     "demo.bar.title": "Demo.",
     "demo.bar.sandbox": "This is your own sandbox restaurant.",
     "demo.bar.expires": "It is deleted on {date}.",
@@ -58,6 +59,7 @@ export default defineMessages({
     "demo.consent.optional": "Opcional. La demo funciona igual en ambos casos.",
     "demo.consent.privacy": "Aviso de privacidad",
 
+    "demo.bar.label": "Entorno de prueba de la demo",
     "demo.bar.title": "Demo.",
     "demo.bar.sandbox": "Este es tu propio restaurante de pruebas.",
     "demo.bar.expires": "Se borra el {date}.",

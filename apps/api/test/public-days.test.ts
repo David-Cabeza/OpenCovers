@@ -22,6 +22,12 @@ afterEach(() => vi.useRealTimers());
 
 const today = () => localDateTime(new Date(), "Europe/Madrid").date;
 
+// The default service ends in the evening, so a test that reads today's status must not depend on the hour it runs at.
+function atMidday() {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(toTimestamp(today(), "12:00", "Europe/Madrid"));
+}
+
 beforeAll(async () => {
   await migrateDb();
   await db.execute(
@@ -150,6 +156,7 @@ describe("C63 public day status", () => {
   });
 
   it("a blocked date before today is outside_window, the first status that applies", async () => {
+    atMidday();
     const v = await makeVenue({ venue: { blockedDates: [{ from: addDays(today(), -5), to: addDays(today(), -1) }] } });
     const { body } = await days(v, `from=${addDays(today(), -2)}&days=3&partySize=2`);
     expect(body.days.map((d) => d.status)).toEqual(["outside_window", "outside_window", "available"]);
@@ -245,6 +252,7 @@ describe("C63 public day status", () => {
   });
 
   it("from in the past gives outside_window before today, and a range past the horizon is outside_window from there", async () => {
+    atMidday();
     const v = await makeVenue({ settings: { maxAdvanceDays: 10 } });
     const past = await days(v, `from=${addDays(today(), -3)}&days=5&partySize=2`);
     expect(past.body.days.map((d) => d.status)).toEqual([

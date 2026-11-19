@@ -123,6 +123,22 @@ describe("the sign-in screen on a demo", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("expired or was already used");
   });
 
+  it.each([
+    ["en", "Some of the details are not valid"],
+    ["es", "Algunos datos no son válidos"],
+  ] as const)("shows the catalog message, not the raw code, when the challenge refuses the address (%s)", async (locale, text) => {
+    useUiStore.setState({ locale });
+    demoOn(false, { status: 400, body: { code: "invalid_request" } });
+    const user = userEvent.setup();
+    renderWithApp(<AuthScreen />);
+    await user.type(await screen.findByLabelText("Email"), "nope@example.com");
+    await user.click(await screen.findByRole("button", { name: /^(Email me a sign-in link|Envíame un enlace de acceso)$/ }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(text);
+    expect(alert).not.toHaveTextContent("invalid_request");
+    useUiStore.setState({ locale: "en" });
+  });
+
   it("waits when the challenge request is rate limited, and sends no link", async () => {
     demoOn(false, { status: 429, body: { code: "rate_limited" } });
     const user = userEvent.setup();
