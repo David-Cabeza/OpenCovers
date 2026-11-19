@@ -76,6 +76,7 @@ import {
 import { canResend, parseResendEmail, resendLinks } from "./lib/link-resend";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import { demoMode } from "./demo/settings";
+import { demoStatus } from "./demo/status";
 import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/signup";
 import { changeMemberRole, listMembers, removeMember } from "./lib/members";
 import {
@@ -184,6 +185,14 @@ app.use("/v1/*", staffOriginGuard(trustedOrigins));
 app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
 
 app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// The staff app asks this before it shows a sign-in form (ADR-0022). Demo off: `enabled: false` and nothing else.
+// Signed in with a sandbox: that session's own sandbox, and no one else's.
+app.get("/api/demo/status", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  c.header("Cache-Control", "no-store");
+  return c.json(await demoStatus(db, session?.user.id ?? null));
+});
 
 // Public and unauthenticated by design (ADR-0012). It must stay above the
 // venue auth middleware below. GET is not rate limited (ADR-0007).
