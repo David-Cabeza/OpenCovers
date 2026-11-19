@@ -281,6 +281,13 @@
       "when": 1795096757480,
       "tag": "0039_dark_the_enforcers",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795102613432,
+      "tag": "0040_jazzy_next_avengers",
+      "breakpoints": true
     }
   ]
 }
