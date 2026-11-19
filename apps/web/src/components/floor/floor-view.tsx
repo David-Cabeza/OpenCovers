@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArmchairIcon } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
+import { canEditSetup, useNavigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +18,7 @@ import { api, type FloorTable } from "@/lib/api";
 import { nowTime, todayIso } from "@/lib/date";
 
 export function FloorView({ venueId }: { venueId: string }) {
+  const nav = useNavigation();
   const [date, setDate] = useState(todayIso());
   const [time, setTime] = useState(nowTime());
   const [seatTable, setSeatTable] = useState<FloorTable | null>(null);
@@ -99,6 +101,13 @@ export function FloorView({ venueId }: { venueId: string }) {
           icon={ArmchairIcon}
           title="No tables yet"
           description="Add tables under Settings, then arrange them on the floor plan."
+          action={
+            nav && canEditSetup(nav.role) ? (
+              <Button className="mt-2" onClick={() => nav.goTo("setup", "room")}>
+                Add tables
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <FloorCanvas

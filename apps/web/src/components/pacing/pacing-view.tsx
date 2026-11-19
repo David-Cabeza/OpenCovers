@@ -3,6 +3,8 @@ import { GaugeIcon } from "lucide-react";
 import { cn } from "cn";
 import { DayNav } from "@/components/day-nav";
 import { EmptyState } from "@/components/empty-state";
+import { canEditSetup, useNavigation } from "@/components/layout/navigation";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePacing } from "@/hooks/use-pacing";
@@ -25,6 +27,7 @@ const LEVEL: Record<PacingLevel, { bar: string; text: string; swatch: string }> 
 };
 
 export function PacingView({ venueId }: { venueId: string }) {
+  const nav = useNavigation();
   const [date, setDate] = useState(todayIso());
   const { data, isPending } = usePacing(venueId, date);
 
@@ -50,6 +53,13 @@ export function PacingView({ venueId }: { venueId: string }) {
           icon={GaugeIcon}
           title="No services configured"
           description="Add services under Settings to see covers versus capacity."
+          action={
+            nav && canEditSetup(nav.role) ? (
+              <Button className="mt-2" onClick={() => nav.goTo("setup", "services")}>
+                Add services
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <>

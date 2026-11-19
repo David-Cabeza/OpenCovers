@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CalendarXIcon, MinusIcon, PlusIcon } from "lucide-react";
 import { DayNav } from "@/components/day-nav";
 import { EmptyState } from "@/components/empty-state";
+import { canEditSetup, useNavigation } from "@/components/layout/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import { SlotExplanation } from "@/components/availability/slot-explanation";
 import { NewReservationDialog } from "@/components/reservation/new-reservation-dialog";
 
 export function AvailabilityView({ venueId }: { venueId: string }) {
+  const nav = useNavigation();
   const [date, setDate] = useState(todayIso());
   const [partySize, setPartySize] = useState(2);
   const [slot, setSlot] = useState<{ time: string } | null>(null);
@@ -72,6 +74,13 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
           icon={CalendarXIcon}
           title="No services configured"
           description="Add services under Settings to see free tables."
+          action={
+            nav && canEditSetup(nav.role) ? (
+              <Button className="mt-2" onClick={() => nav.goTo("setup", "services")}>
+                Add services
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="space-y-6">
