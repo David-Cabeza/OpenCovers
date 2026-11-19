@@ -44,7 +44,7 @@ describe("reservation dialogs in Spanish", () => {
     expect(screen.queryByText("Seat at Mesa 1")).not.toBeInTheDocument();
   });
 
-  it("trace: source, actor and event labels", async () => {
+  it("trace: channel, actor and event labels", async () => {
     const reservation = {
       id: "r1", venueId: "v1", date: "2026-11-20", time: "20:30", service: "dinner", partySize: 2,
       status: "cancelled", version: 3, bookedVia: "widget",
@@ -54,15 +54,22 @@ describe("reservation dialogs in Spanish", () => {
       "GET /v1/venues/v1/reservations/r1/trace": {
         body: {
           reservationId: "r1",
-          source: "widget",
-          actor: "widget",
-          entries: [{ eventId: "10", type: "created", version: 1, occurredAt: "2026-11-19T18:00:00.000Z", idempotencyKey: null }],
+          entries: [
+            { eventId: "10", type: "created", version: 1, occurredAt: "2026-11-19T18:00:00.000Z", idempotencyKey: null, channel: "widget", actor: null, recorded: true },
+            { eventId: "11", type: "modified", version: 2, occurredAt: "2026-11-19T18:01:00.000Z", idempotencyKey: null, channel: "mcp", actor: "key_0123456789ab", recorded: true },
+            { eventId: "12", type: "modified", version: 3, occurredAt: "2026-11-19T18:02:00.000Z", idempotencyKey: null, channel: "staff", actor: null, recorded: true },
+            { eventId: "13", type: "cancelled", version: 4, occurredAt: "2026-11-19T18:03:00.000Z", idempotencyKey: null, channel: null, actor: null, recorded: false },
+          ],
         },
       },
     });
     renderWithApp(<ReservationTraceDialog venueId="v1" reservation={reservation} onOpenChange={() => {}} />);
     expect(await screen.findByText("Widget de reservas en línea")).toBeInTheDocument();
-    expect(screen.getByText("Un cliente, desde el widget")).toBeInTheDocument();
+    expect(screen.getByText(/Un cliente, desde el widget/)).toBeInTheDocument();
+    expect(screen.getByText("MCP")).toBeInTheDocument();
+    expect(screen.getByText(/Clave de API key_0123456789ab/)).toBeInTheDocument();
+    expect(screen.getByText(/Miembro del equipo/)).toBeInTheDocument();
+    expect(screen.getByText("Origen desconocido")).toBeInTheDocument();
     expect(screen.getByText("Reservada")).toBeInTheDocument();
     expect(screen.getByText("Versión 1")).toBeInTheDocument();
     expect(screen.queryByText("Online booking widget")).not.toBeInTheDocument();

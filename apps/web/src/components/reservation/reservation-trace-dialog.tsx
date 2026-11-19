@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useReservationTrace } from "@/hooks/use-reservation-trace";
 import { useT } from "@/i18n";
 import { errorMessage } from "@/lib/error-message";
-import { actorLabel, eventLabel, sourceLabel, traceTime } from "@/lib/reservation-trace";
+import { actorLabel, channelLabel, eventLabel, traceTime } from "@/lib/reservation-trace";
 import type { Reservation } from "@/lib/api";
 
 export function ReservationTraceDialog({
@@ -56,13 +56,6 @@ export function ReservationTraceDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 rounded-lg bg-muted/50 p-3 text-sm">
-              <dt className="text-muted-foreground">{t("reservation.trace.cameFrom")}</dt>
-              <dd className="font-medium">{sourceLabel(data.source)}</dd>
-              <dt className="text-muted-foreground">{t("reservation.trace.madeBy")}</dt>
-              <dd className="min-w-0 truncate font-medium">{actorLabel(data)}</dd>
-            </dl>
-
             {data.entries.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {t("reservation.trace.empty")}
@@ -85,6 +78,12 @@ export function ReservationTraceDialog({
                         {traceTime(entry.occurredAt)}
                       </time>
                     </div>
+                    <p className="text-sm font-medium">
+                      {channelLabel(entry)}
+                      {actorLabel(entry) && (
+                        <span className="font-normal text-muted-foreground"> · {actorLabel(entry)}</span>
+                      )}
+                    </p>
                     {entry.idempotencyKey && (
                       <p className="truncate text-xs text-muted-foreground">
                         {t("reservation.trace.idempotencyKey")}{" "}

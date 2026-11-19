@@ -2,7 +2,7 @@ import type { PillTone } from "@/components/pill";
 import { t, type MessageKey } from "@/i18n";
 import { dateTime } from "@/lib/date";
 
-export type TraceSource = "widget" | "staff" | "api";
+export type TraceChannel = "widget" | "staff" | "api" | "mcp";
 
 /** One event of a reservation as the API sends it (`GET .../reservations/{id}/trace`). */
 export interface TraceEntryDto {
@@ -11,12 +11,15 @@ export interface TraceEntryDto {
   version: number;
   occurredAt: string;
   idempotencyKey: string | null;
+  /** Absent from a server older than ADR-0023's trace; read as unknown. */
+  channel?: TraceChannel | null;
+  actor?: string | null;
+  recorded?: boolean;
 }
 
+/** The top-level `source` and `actor` are deprecated (the booking's creator); the app reads each entry instead. */
 export interface ReservationTraceDto {
   reservationId: string;
-  source: TraceSource;
-  actor: string;
   entries: TraceEntryDto[];
 }
 
@@ -29,11 +32,13 @@ export interface TraceEntry {
   version: number;
   occurredAt: string;
   idempotencyKey: string | null;
+  channel: TraceChannel | null;
+  actor: string | null;
+  /** False when the origin was not stored: the channel is inferred from the booking, or unknown. */
+  recorded: boolean;
 }
 
 export interface Trace {
-  source: TraceSource;
-  actor: string;
   entries: TraceEntry[];
 }
 
@@ -47,10 +52,11 @@ const EVENT_TYPES: Record<string, { key: MessageKey; tone: PillTone }> = {
   erased: { key: "reservation.trace.event.erased", tone: "muted" },
 };
 
-const SOURCES: Record<TraceSource, MessageKey> = {
-  widget: "reservation.trace.source.widget",
-  staff: "reservation.trace.source.staff",
-  api: "reservation.trace.source.api",
+const CHANNELS: Record<TraceChannel, MessageKey> = {
+  widget: "reservation.trace.channel.widget",
+  staff: "reservation.trace.channel.staff",
+  api: "reservation.trace.channel.api",
+  mcp: "reservation.trace.channel.mcp",
 };
 
 /** A type this app does not know yet still shows, under its own name. */
@@ -59,18 +65,31 @@ export function eventLabel(type: string): { label: string; tone: PillTone } {
   return known ? { label: t(known.key), tone: known.tone } : { label: type, tone: "muted" };
 }
 
-export function sourceLabel(source: TraceSource): string {
-  return SOURCES[source] ? t(SOURCES[source]) : source;
+/** Where a change came from. A channel the app does not know, or none, reads as unknown; an inferred one says so. */
+export function channelLabel(entry: Pick<TraceEntry, "channel" | "recorded">): string {
+  const key = entry.channel ? CHANNELS[entry.channel] : undefined;
+  if (!key) return t("reservation.trace.channel.unknown");
+  return entry.recorded ? t(key) : t("reservation.trace.channel.inferred", { channel: t(key) });
 }
 
-export function actorLabel(trace: Pick<Trace, "source" | "actor">): string {
-  return trace.source === "widget" ? t("reservation.trace.guestViaWidget") : trace.actor;
+/** Who made it, as a label. Null when there is nothing honest to show. */
+export function actorLabel(entry: Pick<TraceEntry, "channel" | "actor" | "recorded">): string | null {
+  if (!entry.recorded) return null;
+  switch (entry.channel) {
+    case "widget":
+      return t("reservation.trace.guestViaWidget");
+    case "staff":
+      return entry.actor ?? t("reservation.trace.actor.staff");
+    case "api":
+    case "mcp":
+      return entry.actor ? t("reservation.trace.actor.key", { key: entry.actor }) : null;
+    default:
+      return null;
+  }
 }
 
 export function toTrace(dto: ReservationTraceDto): Trace {
   return {
-    source: dto.source,
-    actor: dto.actor,
     entries: dto.entries.map((e) => ({
       id: e.eventId,
       type: e.type,
@@ -78,6 +97,9 @@ export function toTrace(dto: ReservationTraceDto): Trace {
       version: e.version,
       occurredAt: e.occurredAt,
       idempotencyKey: e.idempotencyKey,
+      channel: e.channel ?? null,
+      actor: e.actor ?? null,
+      recorded: e.recorded ?? false,
     })),
   };
 }

@@ -24,12 +24,10 @@ const TRACE = "GET /v1/venues/v1/reservations/r1/trace";
 
 const widgetTrace: ReservationTraceDto = {
   reservationId: "r1",
-  source: "widget",
-  actor: "widget",
   entries: [
-    { eventId: "10", type: "created", version: 1, occurredAt: "2026-11-19T18:00:00.000Z", idempotencyKey: "key-create" },
-    { eventId: "11", type: "modified", version: 2, occurredAt: "2026-11-19T18:05:00.000Z", idempotencyKey: "key-modify" },
-    { eventId: "12", type: "cancelled", version: 3, occurredAt: "2026-11-19T18:10:00.000Z", idempotencyKey: null },
+    { eventId: "10", type: "created", version: 1, occurredAt: "2026-11-19T18:00:00.000Z", idempotencyKey: "key-create", channel: "widget", actor: null, recorded: true },
+    { eventId: "11", type: "modified", version: 2, occurredAt: "2026-11-19T18:05:00.000Z", idempotencyKey: "key-modify", channel: "widget", actor: null, recorded: true },
+    { eventId: "12", type: "cancelled", version: 3, occurredAt: "2026-11-19T18:10:00.000Z", idempotencyKey: null, channel: "widget", actor: null, recorded: true },
   ],
 };
 
@@ -40,11 +38,10 @@ describe("ReservationTraceDialog", () => {
     mockApi({ [TRACE]: { body: widgetTrace } });
     renderWithApp(<ReservationTraceDialog venueId="v1" reservation={reservation} onOpenChange={() => {}} />);
 
-    expect(await screen.findByText("Online booking widget")).toBeInTheDocument();
-    expect(screen.getByText("A guest, through the widget")).toBeInTheDocument();
-
-    const events = within(screen.getByRole("list", { name: "Events" })).getAllByRole("listitem");
+    const events = within(await screen.findByRole("list", { name: "Events" })).getAllByRole("listitem");
     expect(events).toHaveLength(3);
+    expect(within(events[0]).getByText("Online booking widget")).toBeInTheDocument();
+    expect(within(events[0]).getByText(/A guest, through the widget/)).toBeInTheDocument();
     expect(within(events[0]).getByText("Booked")).toBeInTheDocument();
     expect(within(events[0]).getByText("Version 1")).toBeInTheDocument();
     expect(within(events[0]).getByText("key-create")).toBeInTheDocument();
@@ -53,15 +50,63 @@ describe("ReservationTraceDialog", () => {
     expect(within(events[2]).queryByText(/Idempotency key/)).not.toBeInTheDocument();
   });
 
-  it("names a staff member as the actor", async () => {
+  it("shows each entry's own channel and actor, MCP apart from API", async () => {
+    const at = "2026-11-19T18:00:00.000Z";
+    const entry = (eventId: string, type: string, extra: object) => ({
+      eventId, type, version: Number(eventId), occurredAt: at, idempotencyKey: null, ...extra,
+    });
     mockApi({
-      [TRACE]: { body: { ...widgetTrace, source: "staff", actor: "chef@example.com", entries: [] } },
+      [TRACE]: {
+        body: {
+          reservationId: "r1",
+          entries: [
+            entry("1", "created", { channel: "mcp", actor: "key_0123456789ab", recorded: true }),
+            entry("2", "modified", { channel: "api", actor: "key_ba9876543210", recorded: true }),
+            entry("3", "modified", { channel: "staff", actor: "Marta Chef", recorded: true }),
+            entry("4", "seated", { channel: "staff", actor: null, recorded: true }),
+            entry("5", "cancelled", { channel: "widget", actor: null, recorded: true }),
+          ],
+        },
+      },
     });
     renderWithApp(<ReservationTraceDialog venueId="v1" reservation={reservation} onOpenChange={() => {}} />);
 
-    expect(await screen.findByText("Staff app")).toBeInTheDocument();
-    expect(screen.getByText("chef@example.com")).toBeInTheDocument();
-    expect(screen.getByText(/No events are kept/)).toBeInTheDocument();
+    const items = within(await screen.findByRole("list", { name: "Events" })).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("MCP · API key key_0123456789ab");
+    expect(items[1]).toHaveTextContent("API · API key key_ba9876543210");
+    expect(items[2]).toHaveTextContent("Staff app · Marta Chef");
+    expect(items[3]).toHaveTextContent("Staff app · Staff member");
+    expect(items[4]).toHaveTextContent("Online booking widget · A guest, through the widget");
+    expect(screen.queryByText(/API or MCP/)).not.toBeInTheDocument();
+  });
+
+  it("reads an entry without a stored origin as inferred or unknown, and an older server's entries as unknown", async () => {
+    const at = "2026-11-19T18:00:00.000Z";
+    mockApi({
+      [TRACE]: {
+        body: {
+          reservationId: "r1",
+          entries: [
+            { eventId: "1", type: "created", version: 1, occurredAt: at, idempotencyKey: null, channel: "staff", actor: null, recorded: false },
+            { eventId: "2", type: "modified", version: 2, occurredAt: at, idempotencyKey: null, channel: null, actor: null, recorded: false },
+            { eventId: "3", type: "cancelled", version: 3, occurredAt: at, idempotencyKey: null },
+          ],
+        },
+      },
+    });
+    renderWithApp(<ReservationTraceDialog venueId="v1" reservation={reservation} onOpenChange={() => {}} />);
+
+    const items = within(await screen.findByRole("list", { name: "Events" })).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Staff app (inferred)");
+    expect(items[0]).not.toHaveTextContent("Staff member");
+    expect(items[1]).toHaveTextContent("Unknown origin");
+    expect(items[2]).toHaveTextContent("Unknown origin");
+  });
+
+  it("says there are no events when none are kept", async () => {
+    mockApi({ [TRACE]: { body: { ...widgetTrace, entries: [] } } });
+    renderWithApp(<ReservationTraceDialog venueId="v1" reservation={reservation} onOpenChange={() => {}} />);
+    expect(await screen.findByText(/No events are kept/)).toBeInTheDocument();
   });
 
   it("shows an event type it does not know under its own name", async () => {
@@ -90,7 +135,7 @@ describe("ReservationTraceDialog", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("This reservation no longer exists.");
 
     await user.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByText("Online booking widget")).toBeInTheDocument();
+    expect(await screen.findAllByText("Online booking widget")).toHaveLength(3);
   });
 });
 
@@ -112,7 +157,7 @@ describe("opening the trace from the agenda", () => {
     await user.click(await screen.findByRole("menuitem", { name: "View trace" }));
 
     const dialog = await screen.findByRole("dialog", { name: "Reservation trace" });
-    expect(await within(dialog).findByText("Online booking widget")).toBeInTheDocument();
+    expect(await within(dialog).findAllByText("Online booking widget")).toHaveLength(3);
     expect(api.calls("GET", "/v1/venues/v1/reservations/r1/trace")).toHaveLength(1);
   });
 });
