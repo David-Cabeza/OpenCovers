@@ -78,6 +78,7 @@ import {
 import { canResend, parseResendEmail, resendLinks } from "./lib/link-resend";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import { demoMode } from "./demo/settings";
+import { magicLinkChallenges } from "./demo/magic-link-challenge";
 import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/signup";
 import { changeMemberRole, listMembers, removeMember } from "./lib/members";
 import {
@@ -187,6 +188,17 @@ app.use("/v1/*", staffOriginGuard(trustedOrigins));
 app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
 
 app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// ADR-0022, decision 8(a): the proof-of-work challenge a demo magic link needs. Outside the contract, public, rate
+// limited per IP (lib/rate-limit.ts). Issuing says nothing about the address, so it does not touch the accounts.
+app.post("/api/demo/magic-link-challenge", async (c) => {
+  if (!demoMode()) return c.notFound();
+  const body = (await c.req.json().catch(() => null)) as { email?: unknown } | null;
+  const email = body?.email;
+  if (typeof email !== "string" || email.length > 254 || !email.includes("@")) return error(c, "invalid_request");
+  c.header("Cache-Control", "no-store");
+  return c.json(magicLinkChallenges().issue(email));
+});
 
 // Public and unauthenticated by design (ADR-0012). It must stay above the
 // venue auth middleware below. GET is not rate limited (ADR-0007).

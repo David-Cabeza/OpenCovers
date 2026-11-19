@@ -27,12 +27,26 @@ import { createAuth, requireVerifiedGoogleEmail } from "../src/lib/auth";
 import { cleanupExpiredSandboxes } from "../src/demo/cleanup";
 import { isDisposableEmail } from "../src/demo/disposable";
 import { consentedLeadsCsv } from "../src/demo/leads";
+import {
+  CHALLENGE_HEADER,
+  CHALLENGE_MAX_AGE_MS,
+  SOLUTION_HEADER,
+  createMagicLinkChallenges,
+  magicLinkChallenges,
+} from "../src/demo/magic-link-challenge";
 import { provisionSandbox } from "../src/demo/provision";
 import { purgeVenue, VENUE_TABLES_IN_DELETE_ORDER } from "../src/demo/purge";
 import { demoSettings } from "../src/demo/settings";
 import { DEMO_TEMPLATE, dateInTz } from "../src/demo/template";
 import { notifyReservation } from "../src/lib/notifications";
-import { challengeConfigFromEnv, issueChallenge, solve } from "../src/lib/public-challenge";
+import {
+  challengeConfigFromEnv,
+  createChallengeVerifier,
+  issueChallenge,
+  solve,
+  solves,
+  type FormChallenge,
+} from "../src/lib/public-challenge";
 import { createRateLimiter, DEFAULT_RULES, rateLimitConfigFromEnv, rulesFor } from "../src/lib/rate-limit";
 import { createReservation } from "../src/lib/reservations";
 import { setConfig } from "../src/lib/venue";
@@ -60,9 +74,23 @@ afterEach(() => {
 let n = 0;
 const freshEmail = () => `visitor-${++n}-${Math.random().toString(36).slice(2, 8)}@example.com`;
 
+/** The headers a sign-in form sends: a fresh challenge for the address, solved, plus any extra headers. */
+function solvedHeaders(email: string, extra: Record<string, string> = {}): Headers {
+  const { challenge } = magicLinkChallenges().issue(email);
+  return new Headers({
+    [CHALLENGE_HEADER]: JSON.stringify(challenge),
+    [SOLUTION_HEADER]: solve(challenge),
+    ...extra,
+  });
+}
+
+/** Asks for a magic link with a solved challenge. */
+const requestLink = (email: string, extra: Record<string, string> = {}) =>
+  demoAuth.api.signInMagicLink({ body: { email }, headers: solvedHeaders(email, extra) });
+
 /** Signs in with a magic link the way a visitor does: ask for it, then open it. Returns the account and its cookie. */
 async function signInWithMagicLink(email: string, headers: Record<string, string> = {}) {
-  await demoAuth.api.signInMagicLink({ body: { email }, headers: new Headers(headers) });
+  await requestLink(email, headers);
   const [row] = await db
     .select({ token: verification.identifier })
     .from(verification)
@@ -255,7 +283,7 @@ describe("sign-in", () => {
     expect(isDisposableEmail("someone@sub.Mailinator.com")).toBe(true);
     expect(isDisposableEmail("someone@gmail.com")).toBe(false);
     await expect(
-      demoAuth.api.signInMagicLink({ body: { email: "ghost@mailinator.com" }, headers: new Headers() }),
+      requestLink("ghost@mailinator.com"),
     ).rejects.toMatchObject({ body: { code: "DISPOSABLE_EMAIL" } });
     expect((await db.select().from(verification)).length).toBe(0);
     expect((await db.select().from(user)).length).toBe(0);
@@ -274,7 +302,7 @@ describe("sign-in", () => {
         body,
       });
     };
-    expect(rulesFor("POST", "/api/auth/sign-in/magic-link", false)).toEqual(["auth", "magic_link"]);
+    expect(rulesFor("POST", "/api/auth/sign-in/magic-link", false)).toEqual(["auth", "magic_link", "magic_link_day", "magic_link_ip"]);
     expect((await ask("a@example.com")).status).toBe(200);
     expect((await ask(" A@Example.com ")).status).toBe(429);
     expect((await ask("b@example.com")).status).toBe(200);
@@ -305,6 +333,252 @@ describe("sign-in", () => {
   });
 });
 
+describe("magic-link challenge (ADR-0022, decision 8a)", () => {
+  const MAGIC = "/api/auth/sign-in/magic-link";
+  const CHALLENGE = "/api/demo/magic-link-challenge";
+
+  /** The rate limiter in front of the real demo auth handler and the real challenge route, as `app.ts` composes them. */
+  function front(now: () => number = Date.now, rules = DEFAULT_RULES, auth = demoAuth) {
+    const config = { ...rateLimitConfigFromEnv({ RATE_LIMIT: "on", TRUST_PROXY: "true" }), rules };
+    const host = new Hono();
+    host.use("*", createRateLimiter(config, { now }).middleware);
+    host.post(CHALLENGE, (c) => app.fetch(c.req.raw));
+    host.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+    return host;
+  }
+
+  const post = (host: Hono, path: string, body: unknown, headers: Record<string, string> = {}, ip = "198.51.100.1") => {
+    const raw = JSON.stringify(body);
+    return host.request(path, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(raw.length),
+        origin: "http://localhost:5173",
+        "x-forwarded-for": ip,
+        ...headers,
+      },
+      body: raw,
+    });
+  };
+
+  const answerHeaders = (email: string) => Object.fromEntries(solvedHeaders(email).entries());
+  const mailsFor = () => db.select().from(verification).where(like(verification.identifier, "magic-link:%"));
+  const quiet = () => vi.spyOn(console, "log").mockImplementation(() => {});
+
+  it("refuses a request with no challenge, with a code the form can act on", async () => {
+    const res = await post(front(), MAGIC, { email: freshEmail() });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: "CHALLENGE_REQUIRED" });
+    expect((await mailsFor()).length).toBe(0);
+  });
+
+  it("refuses a challenge without its solution, and a solution without its challenge", async () => {
+    const email = freshEmail();
+    const { challenge } = magicLinkChallenges().issue(email);
+    const host = front();
+    const noSolution = await post(host, MAGIC, { email }, { [CHALLENGE_HEADER]: JSON.stringify(challenge) });
+    expect(await noSolution.json()).toMatchObject({ code: "CHALLENGE_REQUIRED" });
+    const noChallenge = await post(host, MAGIC, { email }, { [SOLUTION_HEADER]: solve(challenge) });
+    expect(await noChallenge.json()).toMatchObject({ code: "CHALLENGE_REQUIRED" });
+    expect((await mailsFor()).length).toBe(0);
+  });
+
+  it("refuses a wrong solution, a malformed challenge and a forged signature", async () => {
+    const email = freshEmail();
+    const { challenge } = magicLinkChallenges().issue(email);
+    const right = solve(challenge);
+    let wrong = 0;
+    while (solves(challenge.nonce, String(wrong), challenge.difficulty)) wrong += 1;
+    const host = front();
+    const attempts: Record<string, string>[] = [
+      { [CHALLENGE_HEADER]: JSON.stringify(challenge), [SOLUTION_HEADER]: String(wrong) },
+      { [CHALLENGE_HEADER]: JSON.stringify(challenge), [SOLUTION_HEADER]: "not-a-number" },
+      { [CHALLENGE_HEADER]: "{not json", [SOLUTION_HEADER]: right },
+      { [CHALLENGE_HEADER]: JSON.stringify({ ...challenge, signature: "A".repeat(43) }), [SOLUTION_HEADER]: right },
+      { [CHALLENGE_HEADER]: JSON.stringify({ ...challenge, difficulty: 0 }), [SOLUTION_HEADER]: "0" },
+    ];
+    for (const headers of attempts) {
+      const res = await post(host, MAGIC, { email }, headers);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: "CHALLENGE_INVALID" });
+    }
+    expect((await mailsFor()).length).toBe(0);
+  });
+
+  it("sends exactly one email for a valid challenge and refuses its replay", async () => {
+    const log = quiet();
+    const email = freshEmail();
+    const headers = answerHeaders(email);
+    // The address limit is lifted here, so a refused replay is the challenge's doing and not the limiter's.
+    const host = front(Date.now, { ...DEFAULT_RULES, magic_link: { max: 100, windowMs: 60_000 } });
+    expect((await post(host, MAGIC, { email }, headers)).status).toBe(200);
+    expect((await mailsFor()).length).toBe(1);
+    expect(log.mock.calls.filter(([line]) => String(line).startsWith("demo magic link for"))).toHaveLength(1);
+
+    // The replay uses another IP, so the rate limit is not what refuses it.
+    const replay = await post(host, MAGIC, { email }, headers, "198.51.100.77");
+    expect(replay.status).toBe(400);
+    expect(await replay.json()).toMatchObject({ code: "CHALLENGE_INVALID" });
+    expect((await mailsFor()).length).toBe(1);
+    expect(log.mock.calls.filter(([line]) => String(line).startsWith("demo magic link for"))).toHaveLength(1);
+    log.mockRestore();
+  });
+
+  it("refuses a challenge after its five minutes", async () => {
+    let now = 1_000_000;
+    const clock = createMagicLinkChallenges(challengeConfig, { now: () => now });
+    const clocked = createAuth(demoSettings(DEMO_ENV), () => clock);
+    const email = freshEmail();
+    const { challenge } = clock.issue(email);
+    const headers = { [CHALLENGE_HEADER]: JSON.stringify(challenge), [SOLUTION_HEADER]: solve(challenge) };
+    now += CHALLENGE_MAX_AGE_MS + 1;
+    const res = await post(front(() => now, DEFAULT_RULES, clocked), MAGIC, { email }, headers);
+    expect(await res.json()).toMatchObject({ code: "CHALLENGE_INVALID" });
+
+    // Just inside the window it still works.
+    quiet();
+    now = 2_000_000;
+    const fresh = clock.issue(email).challenge;
+    now += CHALLENGE_MAX_AGE_MS;
+    const ok = await post(
+      front(() => now, DEFAULT_RULES, clocked),
+      MAGIC,
+      { email },
+      { [CHALLENGE_HEADER]: JSON.stringify(fresh), [SOLUTION_HEADER]: solve(fresh) },
+    );
+    expect(ok.status).toBe(200);
+    vi.restoreAllMocks();
+  });
+
+  it("refuses a challenge issued for another address, and treats case as the same address", async () => {
+    quiet();
+    const mine = freshEmail();
+    const theirs = freshEmail();
+    const res = await post(front(), MAGIC, { email: theirs }, answerHeaders(mine));
+    expect(await res.json()).toMatchObject({ code: "CHALLENGE_INVALID" });
+    expect((await mailsFor()).length).toBe(0);
+    const spaced = await post(front(), MAGIC, { email: mine.toUpperCase() }, answerHeaders(mine));
+    expect(spaced.status).toBe(200);
+    vi.restoreAllMocks();
+  });
+
+  it("does not let a booking challenge unlock a link, or a link challenge unlock a booking", async () => {
+    const email = freshEmail();
+    const booking = issueChallenge(challengeConfig, email.toLowerCase());
+    const asBooking = await post(
+      front(),
+      MAGIC,
+      { email },
+      { [CHALLENGE_HEADER]: JSON.stringify(booking), [SOLUTION_HEADER]: solve(booking) },
+    );
+    expect(await asBooking.json()).toMatchObject({ code: "CHALLENGE_INVALID" });
+    expect((await mailsFor()).length).toBe(0);
+
+    const link = magicLinkChallenges().issue(email).challenge;
+    const bookingVerifier = createChallengeVerifier(challengeConfig, { now: () => Date.parse(link.issuedAt) + 10_000 });
+    expect(bookingVerifier.verify(email.toLowerCase(), link, solve(link), "key")).toBe(false);
+  });
+
+  it("answers the same for an address with an account and one without", async () => {
+    quiet();
+    const known = freshEmail();
+    await signInWithMagicLink(known);
+    const stranger = freshEmail();
+    const host = front();
+    const a = await post(host, MAGIC, { email: known }, answerHeaders(known), "198.51.100.10");
+    const b = await post(host, MAGIC, { email: stranger }, answerHeaders(stranger), "198.51.100.11");
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(a.status);
+    expect(await b.json()).toEqual(await a.json());
+    vi.restoreAllMocks();
+  });
+
+  it("does not spend an address's budget on a refused request", async () => {
+    quiet();
+    const host = front();
+    const email = freshEmail();
+    for (let i = 0; i < 3; i += 1) expect((await post(host, MAGIC, { email })).status).toBe(400);
+    expect((await post(host, MAGIC, { email }, answerHeaders(email))).status).toBe(200);
+    vi.restoreAllMocks();
+  });
+
+  it("limits a link to 1 per address per minute and 5 per address per day", async () => {
+    quiet();
+    let now = Date.now();
+    const host = front(() => now);
+    const email = freshEmail();
+    const ask = (ip: string) => post(host, MAGIC, { email }, answerHeaders(email), ip);
+
+    expect((await ask("203.0.113.1")).status).toBe(200);
+    const tooSoon = await ask("203.0.113.2");
+    expect(tooSoon.status).toBe(429);
+    expect(Number(tooSoon.headers.get("retry-after"))).toBeLessThanOrEqual(60);
+    for (let i = 3; i <= 6; i += 1) {
+      now += 61_000;
+      expect((await ask(`203.0.113.${i}`)).status).toBe(200); // links 2 to 5 of the day
+    }
+    now += 61_000;
+    const sixth = await ask("203.0.113.7");
+    expect(sixth.status).toBe(429);
+    expect(Number(sixth.headers.get("retry-after"))).toBeGreaterThan(60);
+    now += 24 * 3_600_000;
+    expect((await ask("203.0.113.8")).status).toBe(200);
+    vi.restoreAllMocks();
+  });
+
+  it("limits a link to 10 per IP per hour", async () => {
+    quiet();
+    let now = Date.now();
+    const host = front(() => now);
+    const ask = (ip = "203.0.113.50") => {
+      const email = freshEmail();
+      return post(host, MAGIC, { email }, answerHeaders(email), ip);
+    };
+    for (let i = 0; i < 10; i += 1) expect((await ask()).status).toBe(200);
+    expect((await ask()).status).toBe(429);
+    expect((await ask("203.0.113.51")).status).toBe(200); // another IP is not affected
+    now += 3_600_000 + 1;
+    expect((await ask()).status).toBe(200);
+    vi.restoreAllMocks();
+  });
+
+  it("issues a challenge on POST /api/demo/magic-link-challenge and limits it per IP", async () => {
+    quiet();
+    const email = freshEmail();
+    const host = front();
+    const res = await post(host, CHALLENGE, { email });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    const issued = (await res.json()) as { challenge: FormChallenge; expiresAt: string };
+    expect(issued.challenge.difficulty).toBe(challengeConfig.difficulty);
+    expect(Date.parse(issued.expiresAt)).toBeGreaterThan(Date.now());
+    const solved = {
+      [CHALLENGE_HEADER]: JSON.stringify(issued.challenge),
+      [SOLUTION_HEADER]: solve(issued.challenge),
+    };
+    expect((await post(host, MAGIC, { email }, solved)).status).toBe(200);
+
+    expect((await post(host, CHALLENGE, { email: "not-an-address" })).status).toBe(400);
+    expect((await post(host, CHALLENGE, {})).status).toBe(400);
+
+    const small = front(Date.now, { ...DEFAULT_RULES, demo_challenge: { max: 2, windowMs: 3_600_000 } });
+    expect((await post(small, CHALLENGE, { email })).status).toBe(200);
+    expect((await post(small, CHALLENGE, { email })).status).toBe(200);
+    expect((await post(small, CHALLENGE, { email })).status).toBe(429);
+    vi.restoreAllMocks();
+  });
+
+  it("leaves a self-hosted instance alone: no link route, no challenge route", async () => {
+    vi.stubEnv("DEMO_MODE", "");
+    const email = freshEmail();
+    const host = front();
+    expect((await post(host, CHALLENGE, { email })).status).toBe(404);
+    expect((await app.request(MAGIC, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:5173" }, body: JSON.stringify({ email }) })).status).toBe(404);
+    expect((await db.select().from(verification)).length).toBe(0);
+  });
+});
+
 describe("leads", () => {
   it("records consent from the request and keeps the account either way", async () => {
     const yes = freshEmail();
@@ -322,7 +596,7 @@ describe("leads", () => {
 
   it("does not count a consent claim made for an address nobody opened", async () => {
     const email = freshEmail();
-    await demoAuth.api.signInMagicLink({ body: { email }, headers: new Headers({ "x-demo-consent": "v1" }) });
+    await requestLink(email, { "x-demo-consent": "v1" });
     expect((await db.select().from(demoLeads)).length).toBe(0);
     expect((await db.select().from(user)).length).toBe(0);
   });
@@ -475,7 +749,7 @@ describe("lifecycle", () => {
   });
 
   it("drops claims whose link was never opened", async () => {
-    await demoAuth.api.signInMagicLink({ body: { email: freshEmail() }, headers: new Headers({ "x-demo-consent": "v1" }) });
+    await requestLink(freshEmail(), { "x-demo-consent": "v1" });
     await db.execute(sql`UPDATE verification SET expires_at = now() - interval '1 minute'`);
     await cleanupExpiredSandboxes(db);
     expect((await db.select({ n: count() }).from(verification).where(like(verification.identifier, "demo-lead:%")))[0]!.n).toBe(0);
