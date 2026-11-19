@@ -55,8 +55,16 @@ export function isFramed(win: Pick<Window, "self" | "top">): boolean {
 }
 
 /**
- * The widget follows the visitor's light or dark setting only on its own pages (`/w/{key}` and `/r` opened directly),
- * and only while the venue's theme sets no color. `main.tsx` marks the page at once, so the first paint is already
+ * True when the page should follow the visitor's light or dark setting: on its own page always, and in an iframe only
+ * when the embedding site asked for it with `?scheme=auto` (the `data-scheme="auto"` of `embed.js`).
+ */
+export function followsSystemScheme(win: Pick<Window, "self" | "top" | "location">): boolean {
+  return !isFramed(win) || new URLSearchParams(win.location.search).get("scheme") === "auto";
+}
+
+/**
+ * The widget follows the visitor's light or dark setting on its own pages (`/w/{key}` and `/r` opened directly)
+ * and, when the embed asks for it, in an iframe, and only while the venue's theme sets no color. `main.tsx` marks the page at once, so the first paint is already
  * right, and this removes the mark when the theme turns out to set colors.
  */
 export function applyThemeToDocument(theme: unknown, doc: Pick<Document, "documentElement">): void {

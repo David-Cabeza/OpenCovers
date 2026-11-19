@@ -1,6 +1,7 @@
 /*
  * OpenCovers booking widget embed (ADR-0017 section 1, stage 10).
  *   <script src="https://book.example.com/w/embed.js" data-key="pk_..." async></script>
+ * Optional: data-scheme="auto" lets the widget follow the visitor's light or dark setting (it stays light otherwise).
  * Puts the widget's iframe right after this tag and sets its height from the widget's height messages. It reads
  * nothing else from the page, and nothing but a height crosses postMessage.
  */
@@ -23,7 +24,9 @@
   var origin = new URL(script.src).origin;
 
   var iframe = document.createElement("iframe");
-  iframe.src = origin + "/w/" + key;
+  // Only the one value `auto` means anything, and it is sent as a fixed string, never the attribute's own text.
+  var scheme = script.getAttribute("data-scheme") === "auto" ? "?scheme=auto" : "";
+  iframe.src = origin + "/w/" + key + scheme;
   iframe.title = script.getAttribute("data-title") || "Book a table";
   iframe.setAttribute("loading", "lazy");
   iframe.style.display = "block";

@@ -91,6 +91,16 @@ describe("embed.js", () => {
     expect(node.style).toEqual({ display: "block", width: "100%", height: "640px", border: "0" });
   });
 
+  it("asks the widget to follow the visitor's light or dark setting only for data-scheme=auto", () => {
+    run(scriptTag({ "data-key": KEY, "data-scheme": "auto" }));
+    expect(page.inserted[0].node.src).toBe(`${WIDGET}/w/${KEY}?scheme=auto`);
+    for (const value of ["dark", "AUTO", "auto&x=1", '"><img>', ""]) {
+      page.inserted.length = 0;
+      run(scriptTag({ "data-key": KEY, "data-scheme": value }));
+      expect(page.inserted[0].node.src, value).toBe(`${WIDGET}/w/${KEY}`);
+    }
+  });
+
   it("takes the title from data-title", () => {
     run(scriptTag({ "data-key": KEY, "data-title": "Book a table" }));
     expect(page.inserted[0].node.title).toBe("Book a table");

@@ -14,7 +14,7 @@
   --oc-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Dark defaults, only on the widget's own pages (`main.tsx` sets data-scheme) and only while the venue's theme sets no
+/* Dark defaults, only on the widget's own pages or an embed that asked for them (`main.tsx` sets data-scheme) and only while the venue's theme sets no
    color, so a venue's palette is never mixed with these. The primary and its text are chosen as a pair. */
 @media (prefers-color-scheme: dark) {
   :root[data-scheme="system"] {
