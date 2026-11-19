@@ -66,7 +66,7 @@ export function DayStrip(props: {
           ref={scroller}
           role="group"
           aria-label={t("strip.label")}
-          className="relative flex min-w-0 flex-1 snap-x gap-1 overflow-x-auto pb-1 motion-safe:scroll-smooth"
+          className="relative flex min-w-0 flex-1 snap-x gap-1 overflow-x-auto pb-1 [scrollbar-width:none] motion-safe:scroll-smooth [&::-webkit-scrollbar]:hidden"
         >
           {days.map((day) => {
             const status = day.status === "outside_window" ? "closed" : day.status;
