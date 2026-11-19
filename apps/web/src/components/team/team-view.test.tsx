@@ -177,9 +177,22 @@ describe("TeamView", () => {
       },
     });
     await user.click(await screen.findByRole("button", { name: "Revoke" }));
+    expect(api.calls("DELETE", "/v1/venues/v1/invitations/i1")).toHaveLength(0);
+    await user.click(await screen.findByRole("button", { name: "Revoke invitation" }));
     await waitFor(() =>
       expect(api.calls("DELETE", "/v1/venues/v1/invitations/i1")).toHaveLength(1),
     );
+  });
+
+  it("keeps a pending invitation when the confirmation is declined", async () => {
+    const { api, user } = setup();
+    await user.click(await screen.findByRole("button", { name: "Revoke" }));
+    expect(
+      await screen.findByRole("heading", { name: `Revoke the invitation for ${INVITATION.email}?` }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Keep invitation" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(api.calls("DELETE", "/v1/venues/v1/invitations/i1")).toHaveLength(0);
   });
 });
 
