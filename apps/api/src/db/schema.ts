@@ -566,6 +566,7 @@ export const venueOnlineBooking = pgTable(
     askConsent: boolean("ask_consent").notNull().default(false),
     locale: text("locale").notNull().default("es"),
     theme: jsonb("theme").$type<Record<string, unknown>>().notNull().default({}),
+    privacyNoticeUrl: text("privacy_notice_url"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -590,6 +591,10 @@ export const venueOnlineBooking = pgTable(
     ),
     check("venue_online_booking_services", sql`${t.services} IS NULL OR jsonb_array_length(${t.services}) >= 1`),
     check("venue_online_booking_origins", sql`jsonb_array_length(${t.allowedOrigins}) <= 10`),
+    check(
+      "venue_online_booking_privacy_url",
+      sql`${t.privacyNoticeUrl} IS NULL OR (${t.privacyNoticeUrl} ~* '^https://[^/?#@[:space:][:cntrl:]]' AND ${t.privacyNoticeUrl} !~ '[[:space:][:cntrl:]]' AND char_length(${t.privacyNoticeUrl}) <= 2048)`,
+    ),
   ],
 );
 

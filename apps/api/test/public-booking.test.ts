@@ -139,7 +139,7 @@ describe("C40 public surface and venue isolation", () => {
     expect(first.headers.get("set-cookie")).toBeNull();
     const a = await first.json();
     expect(a).toEqual({
-      venue: { name: `Casa ${venueCount}`, locale: "es", theme: {}, phone: "+34 600 123 456" },
+      venue: { name: `Casa ${venueCount}`, locale: "es", theme: {}, phone: "+34 600 123 456", address: null },
       minPartySize: 2,
       maxPartySize: 6,
       weekdays: [5, 6],
@@ -150,6 +150,7 @@ describe("C40 public surface and venue isolation", () => {
       challenge: { nonce: expect.any(String), issuedAt: expect.any(String), difficulty: 4, signature: expect.any(String) },
       captcha: null,
       linkResend: false,
+      privacyNoticeUrl: null,
     });
     const b = await (await getPublic(v.key)).json();
     expect(b.challenge.nonce).not.toBe(a.challenge.nonce);
@@ -300,7 +301,7 @@ describe("C43 public create and attribution", () => {
     const answer = await res.json();
     expect(answer).toEqual({
       reservation: {
-        venue: { name: expect.any(String), locale: "es", theme: {}, phone: null },
+        venue: { name: expect.any(String), locale: "es", theme: {}, phone: null, address: null },
         date: SATURDAY,
         time: "20:00",
         partySize: 2,

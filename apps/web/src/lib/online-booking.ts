@@ -14,6 +14,7 @@ export interface OnlineBooking {
   askConsent: boolean;
   locale: string;
   theme: Theme;
+  privacyNoticeUrl: string | null;
 }
 
 export interface OnlineBookingSaved extends OnlineBooking {
@@ -130,6 +131,22 @@ export function isLogoUrl(text: string): boolean {
   }
 }
 
+/**
+ * A privacy notice address the API accepts (C64): `https` in any case of the scheme, a host, no credentials, no
+ * whitespace or control characters, up to 2048 characters.
+ */
+export function isPrivacyNoticeUrl(text: string): boolean {
+  if (!/^https:\/\//i.test(text) || text.length > 2048 || /[\s\x00-\x1f\x7f]/.test(text)) return false;
+  const authority = text.slice(8).split(/[/?#]/, 1)[0] ?? "";
+  if (authority === "" || authority.includes("@")) return false;
+  try {
+    const u = new URL(text);
+    return u.protocol === "https:" && u.hostname !== "" && u.username === "" && u.password === "";
+  } catch {
+    return false;
+  }
+}
+
 /** The theme with every key that equals the built-in value left out, in a fixed key order. */
 function compact(theme: Theme): Theme {
   const out: Theme = {};
@@ -215,6 +232,7 @@ export interface OnlineBookingForm {
   maxOpenBookingsPerContact: string;
   allowedOrigins: string;
   locale: string;
+  privacyNoticeUrl: string;
   theme: ThemeForm;
 }
 
@@ -236,6 +254,7 @@ export function toForm(s: OnlineBooking): OnlineBookingForm {
       s.maxOpenBookingsPerContact === null ? "" : String(s.maxOpenBookingsPerContact),
     allowedOrigins: s.allowedOrigins.join("\n"),
     locale: s.locale,
+    privacyNoticeUrl: s.privacyNoticeUrl ?? "",
     theme: themeToForm(s.theme),
   };
 }
@@ -321,6 +340,11 @@ export function parseForm(
   }
 
   if (form.locale !== stored.locale) update.locale = form.locale;
+
+  const notice = form.privacyNoticeUrl.trim();
+  if (notice !== "" && !isPrivacyNoticeUrl(notice))
+    errors.privacyNoticeUrl = "An https address with no spaces, up to 2048 characters.";
+  else if (notice !== (stored.privacyNoticeUrl ?? "")) update.privacyNoticeUrl = notice === "" ? null : notice;
 
   const theme = parseTheme(form.theme, errors);
   if (theme && JSON.stringify(theme) !== JSON.stringify(compact(stored.theme)))

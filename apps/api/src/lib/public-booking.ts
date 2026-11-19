@@ -36,6 +36,7 @@ export interface PublicVenue {
     | "askConsent"
     | "locale"
     | "theme"
+    | "privacyNoticeUrl"
   >;
 }
 
@@ -85,8 +86,22 @@ export function rulesOf(settings: PublicVenue["settings"]): OnlineRules {
   };
 }
 
+/** The public profile's address as one line (C64), or null while the profile is off or holds no street. */
+export function publicAddress(venue: VenueRow): string | null {
+  const street = venue.publicStreet?.trim();
+  if (!venue.publicProfileEnabled || !street) return null;
+  const city = [venue.publicPostalCode?.trim(), venue.publicLocality?.trim()].filter(Boolean).join(" ");
+  return city ? `${street}, ${city}` : street;
+}
+
 function venueView({ venue, settings }: PublicVenue) {
-  return { name: venue.name, locale: settings.locale, theme: settings.theme, phone: venue.publicPhone };
+  return {
+    name: venue.name,
+    locale: settings.locale,
+    theme: settings.theme,
+    phone: venue.publicPhone,
+    address: publicAddress(venue),
+  };
 }
 
 export async function publicConfig(db: Db, target: PublicVenue, challenge: FormChallenge, linkResend: boolean) {
@@ -109,6 +124,7 @@ export async function publicConfig(db: Db, target: PublicVenue, challenge: FormC
     challenge,
     captcha: null,
     linkResend,
+    privacyNoticeUrl: settings.privacyNoticeUrl,
   };
 }
 
