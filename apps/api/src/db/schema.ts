@@ -642,6 +642,8 @@ export const demoSandboxes = pgTable("demo_sandbox", {
     .references(() => venues.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }).notNull().defaultNow(),
+  // The visitor's address with Gmail dots and +tags removed (demo/normalize.ts). One sandbox per value (audit F4).
+  normalizedEmail: text("normalized_email").notNull().unique(),
 });
 
 // A demo visitor's contact. Deliberately not tied to the account: it outlives the sandbox. No HTTP route reads it.
@@ -654,6 +656,8 @@ export const demoLeads = pgTable("demo_lead", {
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
   contactConsent: boolean("contact_consent").notNull().default(false),
   consentTextVersion: text("consent_text_version"),
+  // Set by the unsubscribe route or by an operator. A withdrawn row is excluded from the export.
+  withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
 });
 
 export const betterAuthSchema = { user, session, account, verification };
