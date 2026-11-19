@@ -12,9 +12,16 @@ const MAX_LOGO_URL = 2048;
 /** The widget's built-in text and background colors (`apps/widget/src/styles.css`), used for a key a theme leaves out. */
 export const DEFAULT_TEXT = "#1c1b19";
 export const DEFAULT_BACKGROUND = "#ffffff";
+/** The same for the widget's dark built-in colors, used for a key a theme's `darkColors` leaves out. */
+export const DEFAULT_DARK_TEXT = "#f1eee8";
+export const DEFAULT_DARK_BACKGROUND = "#181715";
+
+type ColorSet = Partial<Record<(typeof COLOR_KEYS)[number], string>>;
 
 export interface Theme {
-  colors?: Partial<Record<(typeof COLOR_KEYS)[number], string>>;
+  colors?: ColorSet;
+  /** The palette for a visitor in dark mode. Present, even empty, means the widget offers its dark look. */
+  darkColors?: ColorSet;
   radius?: number;
   font?: (typeof FONTS)[number];
   logoUrl?: string;
@@ -42,6 +49,8 @@ export interface Warning {
   code: "low_contrast";
   message: string;
   ratio: number;
+  /** The palette the contrast was measured in. */
+  palette: "light" | "dark";
 }
 
 export type OnlineBookingInput = Partial<Omit<OnlineBooking, "bookingKey" | "theme">> & { theme?: Theme | null };
@@ -117,19 +126,25 @@ export function normalizeOrigin(v: unknown): string | null {
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 
+function parseColors(val: unknown): ColorSet | null {
+  if (!isObject(val)) return null;
+  const colors: ColorSet = {};
+  for (const [ck, cv] of Object.entries(val)) {
+    if (!(COLOR_KEYS as readonly string[]).includes(ck)) return null;
+    if (typeof cv !== "string" || !HEX.test(cv)) return null;
+    colors[ck as (typeof COLOR_KEYS)[number]] = cv.toLowerCase();
+  }
+  return colors;
+}
+
 function parseTheme(v: unknown): Theme | null {
   if (!isObject(v)) return null;
   const out: Theme = {};
   for (const [k, val] of Object.entries(v)) {
-    if (k === "colors") {
-      if (!isObject(val)) return null;
-      const colors: NonNullable<Theme["colors"]> = {};
-      for (const [ck, cv] of Object.entries(val)) {
-        if (!(COLOR_KEYS as readonly string[]).includes(ck)) return null;
-        if (typeof cv !== "string" || !HEX.test(cv)) return null;
-        colors[ck as (typeof COLOR_KEYS)[number]] = cv.toLowerCase();
-      }
-      out.colors = colors;
+    if (k === "colors" || k === "darkColors") {
+      const colors = parseColors(val);
+      if (!colors) return null;
+      out[k] = colors;
     } else if (k === "radius") {
       if (!intIn(val, 0, 24)) return null;
       out.radius = val;
@@ -228,21 +243,42 @@ function luminance(hex: string): number {
   return 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
 }
 
-/** Warns when the text color, as the widget shows it, has a contrast below WCAG AA against the background. */
-export function contrastWarnings(theme: Theme): Warning[] {
-  const fg = theme.colors?.text ?? DEFAULT_TEXT;
-  const bg = theme.colors?.background ?? DEFAULT_BACKGROUND;
+function contrast(fg: string, bg: string): number {
   const [a, b] = [luminance(fg), luminance(bg)];
-  const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-  if (ratio >= 4.5) return [];
-  const rounded = Math.round(ratio * 100) / 100;
-  return [
-    {
+  return Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100;
+}
+
+/**
+ * Warns when the text color, as the widget shows it, has a contrast below WCAG AA against the background. The light
+ * pair is always checked. The dark pair is checked only when the theme has `darkColors`, since without it the widget
+ * uses its own dark colors.
+ */
+export function contrastWarnings(theme: Theme): Warning[] {
+  const warnings: Warning[] = [];
+  const light = contrast(theme.colors?.text ?? DEFAULT_TEXT, theme.colors?.background ?? DEFAULT_BACKGROUND);
+  if (light < 4.5) {
+    warnings.push({
       code: "low_contrast",
-      message: `The text color has a contrast of ${rounded}:1 against the background color, below the 4.5:1 of WCAG AA.`,
-      ratio: rounded,
-    },
-  ];
+      message: `The text color has a contrast of ${light}:1 against the background color, below the 4.5:1 of WCAG AA.`,
+      ratio: light,
+      palette: "light",
+    });
+  }
+  if (theme.darkColors) {
+    const dark = contrast(
+      theme.darkColors.text ?? DEFAULT_DARK_TEXT,
+      theme.darkColors.background ?? DEFAULT_DARK_BACKGROUND,
+    );
+    if (dark < 4.5) {
+      warnings.push({
+        code: "low_contrast",
+        message: `The dark text color has a contrast of ${dark}:1 against the dark background color, below the 4.5:1 of WCAG AA.`,
+        ratio: dark,
+        palette: "dark",
+      });
+    }
+  }
+  return warnings;
 }
 
 export async function getOnlineBooking(db: Db, venueId: string): Promise<OnlineBooking | null> {

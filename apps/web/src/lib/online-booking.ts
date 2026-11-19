@@ -17,7 +17,7 @@ export interface OnlineBooking {
 }
 
 export interface OnlineBookingSaved extends OnlineBooking {
-  warnings: { code: string; message: string; ratio?: number }[];
+  warnings: { code: string; message: string; ratio?: number; palette?: "light" | "dark" }[];
 }
 
 export type OnlineBookingUpdate = Partial<
@@ -43,6 +43,8 @@ export type Font = (typeof FONTS)[number];
 /** The theme tokens of ADR-0017 section 5. An absent key uses the widget's built-in value. */
 export interface Theme {
   colors?: Partial<Record<ColorKey, string>>;
+  /** The palette for a visitor in dark mode. Present, even empty, means the widget offers its dark look. */
+  darkColors?: Partial<Record<ColorKey, string>>;
   radius?: number;
   font?: Font;
   logoUrl?: string | null;
@@ -63,6 +65,17 @@ export const DEFAULT_THEME = {
   font: "system",
 } as const satisfies Theme;
 
+/** The widget's dark built-in colors, as the dark block of `apps/widget/src/styles.css` sets them. */
+export const DEFAULT_DARK_COLORS: Record<ColorKey, string> = {
+  primary: "#6fcf9f",
+  onPrimary: "#0d2018",
+  background: "#181715",
+  surface: "#262420",
+  text: "#f1eee8",
+  muted: "#a8a39b",
+  border: "#4a4640",
+};
+
 export const FONT_STACKS: Record<Font, string> = {
   system: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
   serif: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
@@ -72,6 +85,8 @@ export const FONT_STACKS: Record<Font, string> = {
 
 export interface ThemeForm {
   colors: Record<ColorKey, string>;
+  /** The dark palette as the form holds it, or null while the venue has none. */
+  darkColors: Record<ColorKey, string> | null;
   radius: string;
   font: Font;
   logoUrl: string;
@@ -80,6 +95,7 @@ export interface ThemeForm {
 export function themeToForm(theme: Theme): ThemeForm {
   return {
     colors: { ...DEFAULT_THEME.colors, ...theme.colors },
+    darkColors: theme.darkColors ? { ...DEFAULT_DARK_COLORS, ...theme.darkColors } : null,
     radius: String(theme.radius ?? DEFAULT_THEME.radius),
     font: theme.font ?? DEFAULT_THEME.font,
     logoUrl: theme.logoUrl ?? "",
@@ -110,6 +126,15 @@ function compact(theme: Theme): Theme {
     if (c && c !== DEFAULT_THEME.colors[k]) colors[k] = c;
   }
   if (Object.keys(colors).length > 0) out.colors = colors;
+  if (theme.darkColors) {
+    // Kept even when empty: a dark palette that equals the built-in one still tells the widget to offer dark mode.
+    const dark: Partial<Record<ColorKey, string>> = {};
+    for (const k of COLOR_KEYS) {
+      const c = theme.darkColors[k]?.toLowerCase();
+      if (c && c !== DEFAULT_DARK_COLORS[k]) dark[k] = c;
+    }
+    out.darkColors = dark;
+  }
   if (theme.radius !== undefined && theme.radius !== DEFAULT_THEME.radius) out.radius = theme.radius;
   if (theme.font !== undefined && theme.font !== DEFAULT_THEME.font) out.font = theme.font;
   if (theme.logoUrl) out.logoUrl = theme.logoUrl;
@@ -133,7 +158,12 @@ function parseTheme(form: ThemeForm, errors: FormErrors): Theme | null {
     errors.themeColors = "Each color is #rrggbb.";
     ok = false;
   }
-  return ok ? compact({ colors: form.colors, radius: radius ?? undefined, font: form.font, logoUrl: logo || undefined }) : null;
+  const dark = form.darkColors;
+  if (dark && COLOR_KEYS.some((k) => !HEX.test(dark[k].toLowerCase()))) {
+    errors.themeDarkColors = "Each color is #rrggbb.";
+    ok = false;
+  }
+  return ok ? compact({ colors: form.colors, darkColors: dark ?? undefined, radius: radius ?? undefined, font: form.font, logoUrl: logo || undefined }) : null;
 }
 
 const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7];
@@ -156,7 +186,7 @@ export interface OnlineBookingForm {
 }
 
 export type FormErrors = Partial<
-  Record<Exclude<keyof OnlineBookingForm, "theme"> | "themeRadius" | "themeLogoUrl" | "themeColors", string>
+  Record<Exclude<keyof OnlineBookingForm, "theme"> | "themeRadius" | "themeLogoUrl" | "themeColors" | "themeDarkColors", string>
 >;
 
 export function toForm(s: OnlineBooking): OnlineBookingForm {

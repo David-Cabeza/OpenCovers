@@ -3544,19 +3544,20 @@ components:
         While a theme sets no color, the widget's own pages use dark built-in
         colors for a visitor whose system asks for dark mode, and a framed
         widget does too when the embed asks with `?scheme=auto`. A theme with
-        any color keeps the light built-in ones for the colors it leaves out.
+        any `colors` and no `darkColors` keeps the light built-in ones for
+        the colors it leaves out, for every visitor.
       properties:
-        colors:
-          type: object
-          additionalProperties: false
-          properties:
-            primary: { $ref: "#/components/schemas/HexColor" }
-            onPrimary: { $ref: "#/components/schemas/HexColor" }
-            background: { $ref: "#/components/schemas/HexColor" }
-            surface: { $ref: "#/components/schemas/HexColor" }
-            text: { $ref: "#/components/schemas/HexColor" }
-            muted: { $ref: "#/components/schemas/HexColor" }
-            border: { $ref: "#/components/schemas/HexColor" }
+        colors: { $ref: "#/components/schemas/ThemeColors" }
+        darkColors:
+          allOf:
+            - $ref: "#/components/schemas/ThemeColors"
+          description: |
+            The palette for a visitor in dark mode, when the widget follows
+            the visitor's setting. A key it leaves out uses the widget's dark
+            built-in color, never `colors` and never the light built-in one.
+            Present, even as `{}`, means the venue wants the widget's dark
+            look next to its own light `colors`. Absent, a theme with any
+            `colors` keeps the widget light for every visitor.
         radius:
           type: integer
           minimum: 0
@@ -3575,6 +3576,18 @@ components:
             https only, with a host, no credentials and no whitespace or
             control characters. The widget shows it as an image with no
             referrer, and the guest's browser fetches it from that address.
+
+    ThemeColors:
+      type: object
+      additionalProperties: false
+      properties:
+        primary: { $ref: "#/components/schemas/HexColor" }
+        onPrimary: { $ref: "#/components/schemas/HexColor" }
+        background: { $ref: "#/components/schemas/HexColor" }
+        surface: { $ref: "#/components/schemas/HexColor" }
+        text: { $ref: "#/components/schemas/HexColor" }
+        muted: { $ref: "#/components/schemas/HexColor" }
+        border: { $ref: "#/components/schemas/HexColor" }
 
     HexColor:
       type: string
@@ -3773,6 +3786,14 @@ components:
                     description: The theme's text color has a contrast below 4.5:1 (WCAG AA) against its background color, either one the built-in color when the theme leaves it out.
                   message: { type: string }
                   ratio: { type: number, example: 3.2 }
+                  palette:
+                    type: string
+                    enum: [light, dark]
+                    description: |
+                      The palette the contrast was measured in. `dark` is
+                      reported only for a theme with `darkColors`, against
+                      the widget's dark built-in text and background for a
+                      key it leaves out.
 
     PublicVenue:
       type: object

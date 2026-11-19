@@ -23,15 +23,23 @@ export const FONT_STACKS = {
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const own = <T extends object>(o: T, k: string): k is Extract<keyof T, string> => Object.hasOwn(o, k);
 
-/** The CSS custom properties a theme sets, each from a value that passed the rules. Absent or invalid keys are left out. */
-export function themeVars(theme: unknown): [name: string, value: string][] {
-  if (!isObject(theme)) return [];
+function colorVars(colors: unknown): [string, string][] {
   const vars: [string, string][] = [];
-  if (isObject(theme.colors)) {
-    for (const [key, value] of Object.entries(theme.colors)) {
+  if (isObject(colors)) {
+    for (const [key, value] of Object.entries(colors)) {
       if (own(COLOR_VARS, key) && typeof value === "string" && HEX.test(value)) vars.push([COLOR_VARS[key], value.toLowerCase()]);
     }
   }
+  return vars;
+}
+
+/**
+ * The CSS custom properties a theme sets, each from a value that passed the rules. Absent or invalid keys are left
+ * out. The colors come from `colors`, or from `darkColors` for the dark palette.
+ */
+export function themeVars(theme: unknown, palette: "light" | "dark" = "light"): [name: string, value: string][] {
+  if (!isObject(theme)) return [];
+  const vars = colorVars(palette === "dark" ? theme.darkColors : theme.colors);
   const { radius, font } = theme;
   if (typeof radius === "number" && Number.isInteger(radius) && radius >= 0 && radius <= 24) vars.push(["--oc-radius", `${radius}px`]);
   if (typeof font === "string" && own(FONT_STACKS, font)) vars.push(["--oc-font", FONT_STACKS[font]]);
@@ -49,6 +57,11 @@ export function setsColors(theme: unknown): boolean {
   return themeVars(theme).some(([name]) => colorVars.includes(name));
 }
 
+/** True when the theme has a dark palette, even an empty one. The widget then offers its dark look whatever `colors` say. */
+export function setsDarkColors(theme: unknown): boolean {
+  return isObject(theme) && isObject(theme.darkColors);
+}
+
 /** True inside an iframe. A page on the venue's own site picks its look, and the visitor's system setting says nothing about it. */
 export function isFramed(win: Pick<Window, "self" | "top">): boolean {
   return win.self !== win.top;
@@ -62,14 +75,39 @@ export function followsSystemScheme(win: Pick<Window, "self" | "top" | "location
   return !isFramed(win) || new URLSearchParams(win.location.search).get("scheme") === "auto";
 }
 
+type ThemeStyle = Pick<CSSStyleDeclaration, "setProperty" | "removeProperty">;
+type ThemeDocument = { documentElement: Pick<HTMLElement, "dataset"> & { style: ThemeStyle } };
+
 /**
- * The widget follows the visitor's light or dark setting on its own pages (`/w/{key}` and `/r` opened directly)
- * and, when the embed asks for it, in an iframe, and only while the venue's theme sets no color. `main.tsx` marks the page at once, so the first paint is already
- * right, and this removes the mark when the theme turns out to set colors.
+ * Sets the theme on the page. The widget follows the visitor's light or dark setting on its own pages (`/w/{key}` and
+ * `/r` opened directly) and, when the embed asks for it, in an iframe. `main.tsx` marks such a page at once, so the
+ * first paint is already right.
+ *
+ * - With `dark` true on a page that follows the setting, a theme with `darkColors` shows that palette. Everything else
+ *   shows `colors`, and a key left out falls to the built-in value, dark when `styles.css` says so.
+ * - A theme with `colors` and no `darkColors` takes the page out of the mode, so the venue's palette is never mixed
+ *   with the dark built-in one. A theme with `darkColors` keeps it.
  */
-export function applyThemeToDocument(theme: unknown, doc: Pick<Document, "documentElement">): void {
-  applyTheme(theme, doc.documentElement.style);
-  if (setsColors(theme)) delete doc.documentElement.dataset.scheme;
+export function applyThemeToDocument(theme: unknown, doc: ThemeDocument, dark = false): void {
+  const root = doc.documentElement;
+  const palette = dark && root.dataset.scheme === "system" && setsDarkColors(theme) ? "dark" : "light";
+  for (const name of Object.values(COLOR_VARS)) root.style.removeProperty(name);
+  for (const [name, value] of themeVars(theme, palette)) root.style.setProperty(name, value);
+  if (setsColors(theme) && !setsDarkColors(theme)) delete root.dataset.scheme;
+}
+
+let stopWatching: (() => void) | null = null;
+
+/** Applies the theme, and applies it again when the visitor changes the system setting, if the theme has a dark palette. */
+export function watchTheme(theme: unknown, win: { document: ThemeDocument; matchMedia?: Window["matchMedia"] }): void {
+  stopWatching?.();
+  stopWatching = null;
+  const query = win.matchMedia?.("(prefers-color-scheme: dark)");
+  applyThemeToDocument(theme, win.document, query?.matches ?? false);
+  if (!query || !setsDarkColors(theme)) return;
+  const again = (e: { matches: boolean }) => applyThemeToDocument(theme, win.document, e.matches);
+  query.addEventListener("change", again);
+  stopWatching = () => query.removeEventListener("change", again);
 }
 
 /** The logo address when it is an `https` URL with a host and no credentials, as the URL parser writes it. */

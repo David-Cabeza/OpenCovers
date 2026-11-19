@@ -7,7 +7,7 @@ import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
 import { services, venueOnlineBooking, venues } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
-import { DEFAULT_BACKGROUND, DEFAULT_TEXT } from "../src/lib/online-booking";
+import { DEFAULT_BACKGROUND, DEFAULT_DARK_BACKGROUND, DEFAULT_DARK_TEXT, DEFAULT_TEXT } from "../src/lib/online-booking";
 
 const KEY = /^pk_[A-Za-z0-9_-]{22}$/;
 
@@ -243,6 +243,19 @@ describe("online booking settings", () => {
       { theme: { css: "body{}", colors: { text: "#000000" } } },
       { theme: { template: "{{name}}" } },
       { theme: { html: "<b>x</b>" } },
+      { theme: { darkColors: { primary: "red" } } },
+      { theme: { darkColors: { primary: "#fff" } } },
+      { theme: { darkColors: { accent: "#ffffff" } } },
+      { theme: { darkColors: { text: "rgb(0,0,0)" } } },
+      { theme: { darkColors: { text: "var(--x)" } } },
+      { theme: { darkColors: { text: null } } },
+      { theme: { darkColors: "#000000" } },
+      { theme: { darkColors: ["#000000"] } },
+      { theme: { darkColors: null } },
+      { theme: { darkColors: { background: "#000000;}body{display:none" } } },
+      { theme: { darkColors: { text: "#00000000" } } },
+      { theme: { colors: { text: "#000000" }, darkColors: { radius: 4 } } },
+      { theme: { darkColors: Object.fromEntries(Array.from({ length: 5000 }, (_, i) => [`k${i}`, "#000000"])) } },
       { theme: { colors: Object.fromEntries(Array.from({ length: 5000 }, (_, i) => [`k${i}`, "#000000"])) } },
       { locale: "en", maxPartySize: 500 },
     ];
@@ -297,6 +310,46 @@ describe("online booking settings", () => {
     await put("oa", "oa-admin", { theme: null });
   });
 
+  it("saves a dark palette, lower-cases it and reads it back", async () => {
+    const res = await put("oa", "oa-admin", {
+      theme: { colors: { primary: "#AA0000" }, darkColors: { background: "#101010", text: "#F0F0F0", primary: "#FF8877" } },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.theme).toEqual({
+      colors: { primary: "#aa0000" },
+      darkColors: { background: "#101010", text: "#f0f0f0", primary: "#ff8877" },
+    });
+    expect(body.warnings).toEqual([]);
+    expect((await read()).theme).toEqual(body.theme);
+    const empty = await (await put("oa", "oa-admin", { theme: { darkColors: {} } })).json();
+    expect(empty.theme).toEqual({ darkColors: {} });
+    expect(empty.warnings).toEqual([]);
+    expect((await (await put("oa", "oa-admin", { theme: { radius: 4 } })).json()).theme).toEqual({ radius: 4 });
+    await put("oa", "oa-admin", { theme: null });
+  });
+
+  it("warns about the dark pair on its own, against the widget's dark built-in colors", async () => {
+    const light = await (await put("oa", "oa-admin", { theme: { colors: { background: "#222222" } } })).json();
+    expect(light.warnings).toEqual([expect.objectContaining({ code: "low_contrast", palette: "light" })]);
+    const bright = await (await put("oa", "oa-admin", { theme: { darkColors: { background: "#eeeeee" } } })).json();
+    expect(bright.warnings).toEqual([expect.objectContaining({ code: "low_contrast", palette: "dark" })]);
+    expect(bright.warnings[0].message).toMatch(/^The dark text color/);
+    const dim = await (await put("oa", "oa-admin", { theme: { darkColors: { text: "#555555" } } })).json();
+    expect(dim.warnings).toEqual([expect.objectContaining({ palette: "dark" })]);
+    const both = await (
+      await put("oa", "oa-admin", {
+        theme: { colors: { text: "#777777", background: "#888888" }, darkColors: { text: "#555555" } },
+      })
+    ).json();
+    expect(both.warnings.map((w: { palette: string }) => w.palette)).toEqual(["light", "dark"]);
+    const fine = await (
+      await put("oa", "oa-admin", { theme: { darkColors: { text: "#ffffff", background: "#000000" } } })
+    ).json();
+    expect(fine.warnings).toEqual([]);
+    await put("oa", "oa-admin", { theme: null });
+  });
+
   it("checks a color the theme leaves out against the widget's built-in one", async () => {
     const dark = await put("oa", "oa-admin", { theme: { colors: { background: "#222222" } } });
     expect(dark.status).toBe(200);
@@ -316,6 +369,8 @@ describe("online booking settings", () => {
     const css = readFileSync(path.resolve(import.meta.dirname, "../../widget/src/styles.css"), "utf8");
     expect(css).toContain(`--oc-text: ${DEFAULT_TEXT};`);
     expect(css).toContain(`--oc-background: ${DEFAULT_BACKGROUND};`);
+    expect(css).toContain(`--oc-text: ${DEFAULT_DARK_TEXT};`);
+    expect(css).toContain(`--oc-background: ${DEFAULT_DARK_BACKGROUND};`);
   });
 });
 

@@ -3,7 +3,7 @@ import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { applyTheme, applyThemeToDocument, followsSystemScheme, FONT_STACKS, isFramed, logoSrc, setsColors, themeVars } from "../src/theme";
+import { applyTheme, applyThemeToDocument, followsSystemScheme, FONT_STACKS, isFramed, logoSrc, setsColors, setsDarkColors, themeVars, watchTheme } from "../src/theme";
 import { Logo, VenueHeader } from "../src/ui";
 
 const css = readFileSync(path.resolve(import.meta.dirname, "../src/styles.css"), "utf8");
@@ -176,10 +176,17 @@ describe("dark mode", () => {
     const set: Record<string, string> = {};
     const dataset: DOMStringMap = scheme ? { scheme } : {};
     const documentElement = {
-      style: { setProperty: (n: string, v: string | null) => void (set[n] = v ?? "") },
+      style: {
+        setProperty: (n: string, v: string | null) => void (set[n] = v ?? ""),
+        removeProperty: (n: string) => {
+          const old = set[n] ?? "";
+          delete set[n];
+          return old;
+        },
+      },
       dataset,
-    } as unknown as HTMLElement;
-    return { doc: { documentElement } as Pick<Document, "documentElement">, set, dataset };
+    };
+    return { doc: { documentElement }, set, dataset };
   }
 
   it("keeps following the system when the theme sets no color", () => {
@@ -194,5 +201,119 @@ describe("dark mode", () => {
     applyThemeToDocument({ colors: { primary: "#aa0000" } }, doc);
     expect(set).toEqual({ "--oc-primary": "#aa0000" });
     expect(dataset.scheme).toBeUndefined();
+  });
+
+  const PALETTES = {
+    colors: { primary: "#aa0000", background: "#ffffff" },
+    darkColors: { primary: "#ff8877", background: "#101010", text: "#f0f0f0" },
+  };
+
+  it("reads the dark palette from darkColors, and never mixes it with colors", () => {
+    expect(themeVars(PALETTES, "dark")).toEqual([
+      ["--oc-primary", "#ff8877"],
+      ["--oc-background", "#101010"],
+      ["--oc-text", "#f0f0f0"],
+    ]);
+    expect(themeVars(PALETTES)).toEqual([
+      ["--oc-primary", "#aa0000"],
+      ["--oc-background", "#ffffff"],
+    ]);
+    expect(themeVars({ darkColors: { primary: "red", text: "#12345", background: "#ABCDEF" } }, "dark")).toEqual([
+      ["--oc-background", "#abcdef"],
+    ]);
+    expect(themeVars({ colors: { primary: "#aa0000" } }, "dark")).toEqual([]);
+  });
+
+  it("counts a theme as having a dark palette when darkColors is an object, even an empty one", () => {
+    expect(setsDarkColors(PALETTES)).toBe(true);
+    expect(setsDarkColors({ darkColors: {} })).toBe(true);
+    for (const theme of [undefined, null, {}, { colors: { primary: "#aa0000" } }, { darkColors: null }, { darkColors: [] }, { darkColors: "#000000" }]) {
+      expect(setsDarkColors(theme), JSON.stringify(theme)).toBe(false);
+    }
+  });
+
+  it("shows the dark palette on a page that follows the system, in dark mode, and clears the light colors", () => {
+    const { doc, set, dataset } = docFor("system");
+    applyThemeToDocument({ ...PALETTES, radius: 4 }, doc, true);
+    expect(set).toEqual({ "--oc-primary": "#ff8877", "--oc-background": "#101010", "--oc-text": "#f0f0f0", "--oc-radius": "4px" });
+    expect(dataset.scheme).toBe("system");
+  });
+
+  it("shows the light colors in light mode, and swaps back and forth without leaving the other palette behind", () => {
+    const { doc, set, dataset } = docFor("system");
+    applyThemeToDocument(PALETTES, doc, true);
+    applyThemeToDocument(PALETTES, doc, false);
+    expect(set).toEqual({ "--oc-primary": "#aa0000", "--oc-background": "#ffffff" });
+    applyThemeToDocument(PALETTES, doc, true);
+    expect(set).toEqual({ "--oc-primary": "#ff8877", "--oc-background": "#101010", "--oc-text": "#f0f0f0" });
+    expect(dataset.scheme).toBe("system");
+  });
+
+  it("ignores the dark palette on a page that does not follow the system", () => {
+    const { doc, set } = docFor(undefined);
+    applyThemeToDocument(PALETTES, doc, true);
+    expect(set).toEqual({ "--oc-primary": "#aa0000", "--oc-background": "#ffffff" });
+  });
+
+  it("keeps following the system for an empty dark palette, so the built-in dark colors show next to light colors", () => {
+    const { doc, set, dataset } = docFor("system");
+    applyThemeToDocument({ colors: { primary: "#aa0000" }, darkColors: {} }, doc, true);
+    expect(set).toEqual({});
+    expect(dataset.scheme).toBe("system");
+    applyThemeToDocument({ colors: { primary: "#aa0000" }, darkColors: {} }, doc, false);
+    expect(set).toEqual({ "--oc-primary": "#aa0000" });
+    expect(dataset.scheme).toBe("system");
+  });
+
+  it("still leaves the system mode for colors without a dark palette", () => {
+    const { doc, dataset } = docFor("system");
+    applyThemeToDocument({ colors: { primary: "#aa0000" } }, doc, true);
+    expect(dataset.scheme).toBeUndefined();
+  });
+
+  describe("watchTheme", () => {
+    function winFor(matches: boolean) {
+      const page = docFor("system");
+      const listeners: ((e: { matches: boolean }) => void)[] = [];
+      const win = {
+        document: page.doc,
+        matchMedia: (q: string) => {
+          expect(q).toBe("(prefers-color-scheme: dark)");
+          return {
+            matches,
+            addEventListener: (_: string, l: (e: { matches: boolean }) => void) => void listeners.push(l),
+            removeEventListener: (_: string, l: (e: { matches: boolean }) => void) => void listeners.splice(listeners.indexOf(l), 1),
+          };
+        },
+      } as unknown as Parameters<typeof watchTheme>[1];
+      return { win, listeners, ...page };
+    }
+
+    it("applies the palette for the current setting and again when the setting changes", () => {
+      const { win, listeners, set } = winFor(true);
+      watchTheme(PALETTES, win);
+      expect(set["--oc-background"]).toBe("#101010");
+      listeners[0]({ matches: false });
+      expect(set["--oc-background"]).toBe("#ffffff");
+      listeners[0]({ matches: true });
+      expect(set["--oc-background"]).toBe("#101010");
+    });
+
+    it("does not listen without a dark palette, and drops the previous listener when called again", () => {
+      const first = winFor(true);
+      watchTheme(PALETTES, first.win);
+      expect(first.listeners).toHaveLength(1);
+      const second = winFor(false);
+      watchTheme({ colors: { primary: "#aa0000" } }, second.win);
+      expect(first.listeners).toHaveLength(0);
+      expect(second.listeners).toHaveLength(0);
+    });
+
+    it("works where the browser has no matchMedia", () => {
+      const { win, set } = winFor(true);
+      (win as { matchMedia?: unknown }).matchMedia = undefined;
+      watchTheme(PALETTES, win);
+      expect(set).toEqual({ "--oc-primary": "#aa0000", "--oc-background": "#ffffff" });
+    });
   });
 });

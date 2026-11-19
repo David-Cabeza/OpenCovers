@@ -37,6 +37,7 @@ import {
   FONT_STACKS,
   LOCALES,
   LOCALE_NAMES,
+  DEFAULT_DARK_COLORS,
   defaultThemeForm,
   embedSnippet,
   isLogoUrl,
@@ -76,12 +77,20 @@ const FONT_LABELS: Record<Font, string> = { system: "System", serif: "Serif", ro
  * A small likeness of the booking page. The staff app's CSP loads no image from other sites, so a valid logo
  * address shows as a placeholder here and loads only in the widget.
  */
-function ThemePreview({ theme }: { theme: ThemeForm }) {
-  const c = theme.colors;
+function ThemePreview({
+  theme,
+  colors,
+  label = "Preview of the booking page",
+}: {
+  theme: ThemeForm;
+  colors?: ThemeForm["colors"];
+  label?: string;
+}) {
+  const c = colors ?? theme.colors;
   const radius = `${Math.min(24, Math.max(0, Number(theme.radius) || 0))}px`;
   return (
     <div
-      aria-label="Preview of the booking page"
+      aria-label={label}
       role="img"
       className="space-y-3 border p-4 text-sm"
       style={{ background: c.background, color: c.text, fontFamily: FONT_STACKS[theme.font], borderColor: c.border, borderRadius: radius }}
@@ -158,6 +167,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
   const [followDark, setFollowDark] = useState(false);
   const [confirmRotate, setConfirmRotate] = useState(false);
   const [lowContrast, setLowContrast] = useState<number | null>(null);
+  const [lowContrastDark, setLowContrastDark] = useState<number | null>(null);
 
   // Reset the form only when the saved server value changes, so a refetch that returns the same
   // settings does not wipe edits that are not saved yet.
@@ -179,8 +189,10 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
       queryClient.setQueryData(["online-booking", venueId], settings);
       setIncomplete(false);
       toast.success("Online booking saved");
-      const low = warnings.find((w) => w.code === "low_contrast");
+      const low = warnings.find((w) => w.code === "low_contrast" && w.palette !== "dark");
       setLowContrast(low ? (low.ratio ?? 0) : null);
+      const lowDark = warnings.find((w) => w.code === "low_contrast" && w.palette === "dark");
+      setLowContrastDark(lowDark ? (lowDark.ratio ?? 0) : null);
     },
     onError: (err) => {
       if (isApiError(err, "online_booking_incomplete")) {
@@ -224,6 +236,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
     setErrors({});
     setIncomplete(false);
     setLowContrast(null);
+    setLowContrastDark(null);
     if (Object.keys(result.update).length === 0) {
       toast.success("Nothing to save");
       return;
@@ -470,6 +483,50 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     ))}
                   </div>
                   {error("themeColors")}
+                  <div className="space-y-3 rounded-lg border p-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <Label htmlFor="ob-dark-palette">Choose colors for dark mode</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Off: a visitor in dark mode sees the standard dark look if you kept the
+                          default colors above, and your colors above otherwise. On: they see the
+                          colors below.
+                        </p>
+                      </div>
+                      <Switch
+                        id="ob-dark-palette"
+                        checked={form.theme.darkColors !== null}
+                        onCheckedChange={(on) =>
+                          setTheme({ darkColors: on ? { ...DEFAULT_DARK_COLORS } : null })
+                        }
+                      />
+                    </div>
+                    {form.theme.darkColors && (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          {COLOR_KEYS.map((k) => (
+                            <div key={k} className="flex items-center gap-2">
+                              <input
+                                id={`ob-dark-color-${k}`}
+                                type="color"
+                                value={form.theme.darkColors?.[k] ?? DEFAULT_DARK_COLORS[k]}
+                                onChange={(e) =>
+                                  setTheme({
+                                    darkColors: { ...DEFAULT_DARK_COLORS, ...form.theme.darkColors, [k]: e.target.value },
+                                  })
+                                }
+                                className="h-8 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent"
+                              />
+                              <Label htmlFor={`ob-dark-color-${k}`} className="font-normal">
+                                Dark: {COLOR_LABELS[k].toLowerCase()}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                        {error("themeDarkColors")}
+                      </>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="ob-radius">Corner radius (px)</Label>
@@ -524,8 +581,15 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     Reset look to defaults
                   </Button>
                 </div>
-                <div className="sm:sticky sm:top-36 sm:self-start">
+                <div className="space-y-3 sm:sticky sm:top-36 sm:self-start">
                   <ThemePreview theme={form.theme} />
+                  {form.theme.darkColors && (
+                    <ThemePreview
+                      theme={form.theme}
+                      colors={form.theme.darkColors}
+                      label="Preview of the booking page in dark mode"
+                    />
+                  )}
                 </div>
               </div>
               {lowContrast !== null && (
@@ -536,6 +600,16 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                   Saved, but the text color has a contrast of {lowContrast}:1 against the background.
                   WCAG AA asks for at least 4.5:1, so some guests may find the booking page hard to
                   read. Pick a darker text or a lighter background, or the other way round.
+                </div>
+              )}
+              {lowContrastDark !== null && (
+                <div
+                  role="alert"
+                  className="rounded-md border border-amber-500/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100"
+                >
+                  Saved, but the dark text color has a contrast of {lowContrastDark}:1 against the dark
+                  background. WCAG AA asks for at least 4.5:1, so some guests may find the booking
+                  page hard to read in dark mode.
                 </div>
               )}
             </fieldset>
