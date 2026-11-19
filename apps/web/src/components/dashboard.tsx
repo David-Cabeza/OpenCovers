@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { LoadError } from "@/components/load-error";
 import { useDemoStatus } from "@/lib/demo";
 import { DemoBar } from "./demo/demo-bar";
 import { ServerBanner } from "@/components/server-banner";
@@ -21,7 +22,7 @@ import { WaitlistView } from "./waitlist/waitlist-view";
 
 export function Dashboard() {
   const { data: session } = authClient.useSession();
-  const { data, isPending } = useVenues();
+  const { data, isPending, isError, error, isRefetching, refetch } = useVenues();
   const demo = useDemoStatus();
   const venueId = useUiStore((s) => s.venueId);
   const setVenue = useUiStore((s) => s.setVenue);
@@ -98,6 +99,8 @@ export function Dashboard() {
                 <Skeleton className="h-9 w-56" />
                 <Skeleton className="h-64 w-full" />
               </div>
+            ) : isError && !data ? (
+              <LoadError what="your venues" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
             ) : venues.length === 0 ? (
               <EmptyVenues />
             ) : venueId ? (

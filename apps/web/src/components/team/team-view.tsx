@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, Trash2Icon, UserCogIcon } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { LoadError } from "@/components/load-error";
 import { PageHeader } from "@/components/layout/page-header";
 import { Pill, type PillTone } from "@/components/pill";
 import { Stat } from "@/components/stat";
@@ -103,7 +104,7 @@ export function TeamView({ venueId }: { venueId: string }) {
 
 function MembersCard({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
-  const { data, isPending } = useQuery({
+  const { data, isPending, isError, error, isRefetching, refetch } = useQuery({
     queryKey: ["members", venueId],
     queryFn: () => api.listMembers(venueId),
   });
@@ -130,6 +131,8 @@ function MembersCard({ venueId }: { venueId: string }) {
       <CardContent>
         {isPending ? (
           <Skeleton className="h-24 w-full" />
+        ) : isError && !data ? (
+          <LoadError compact what="the members" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : members.length === 0 ? (
           <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
             <UserCogIcon className="size-4" /> No members.
@@ -201,7 +204,7 @@ function MembersCard({ venueId }: { venueId: string }) {
 
 function InvitationsCard({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
-  const { data, isPending } = useQuery({
+  const { data, isPending, isError, error, isRefetching, refetch } = useQuery({
     queryKey: ["invitations", venueId],
     queryFn: () => api.listInvitations(venueId),
   });
@@ -229,6 +232,8 @@ function InvitationsCard({ venueId }: { venueId: string }) {
       <CardContent>
         {isPending ? (
           <Skeleton className="h-24 w-full" />
+        ) : isError && !data ? (
+          <LoadError compact what="the invitations" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : invitations.length === 0 ? (
           <div className="py-2 text-sm text-muted-foreground">No invitations yet.</div>
         ) : (

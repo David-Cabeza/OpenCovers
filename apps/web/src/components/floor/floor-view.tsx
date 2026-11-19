@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArmchairIcon } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
+import { LoadError } from "@/components/load-error";
 import { canEditSetup, useNavigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +25,7 @@ export function FloorView({ venueId }: { venueId: string }) {
   const [seatTable, setSeatTable] = useState<FloorTable | null>(null);
   const [moveFrom, setMoveFrom] = useState<FloorTable | null>(null);
   const queryClient = useQueryClient();
-  const { data, isPending } = useFloor(venueId, date, time);
+  const { data, isPending, isError, error, isRefetching, refetch } = useFloor(venueId, date, time);
   const { data: itemsData } = useFloorItems(venueId);
 
   const tables = data?.tables ?? [];
@@ -96,6 +97,8 @@ export function FloorView({ venueId }: { venueId: string }) {
 
       {isPending ? (
         <Skeleton className="h-[480px] w-full" />
+      ) : isError && !data ? (
+        <LoadError what="the floor plan" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : tables.length === 0 ? (
         <EmptyState
           icon={ArmchairIcon}

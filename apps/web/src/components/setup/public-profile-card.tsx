@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePublicProfile } from "@/hooks/use-public-profile";
 import { api } from "@/lib/api";
@@ -48,7 +49,7 @@ type TextKey = Exclude<keyof PublicProfileForm, "publicProfileEnabled">;
 
 export function PublicProfileCard({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
-  const { data, isPending } = usePublicProfile(venueId);
+  const { data, isPending, isError, error: loadError, isRefetching, refetch } = usePublicProfile(venueId);
   const [form, setForm] = useState<PublicProfileForm>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [incomplete, setIncomplete] = useState<string[] | null>(null);
@@ -142,6 +143,8 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
       <CardContent className="space-y-6">
         {isPending ? (
           <Skeleton className="h-24 w-full" />
+        ) : isError && !data ? (
+          <LoadError compact what="the public profile" error={loadError} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : (
           <>
             <StatusPanel
