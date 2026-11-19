@@ -254,7 +254,7 @@ The repository ships the pieces. The project's own demo is `demo.opencovers.dev`
 
 **3. Google sign-in (optional).** In Google Cloud, create an OAuth client of type Web application and a consent screen. Add the authorized redirect URI `https://demo.opencovers.dev/api/auth/callback/google`. Put the client ID and secret in `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Set both or neither. The consent screen needs the privacy policy link and, before it leaves testing mode, Google's own verification.
 
-**4. The server.** Any VPS with Docker Engine and the Compose plugin. 2 vCPU and 2 GB of RAM are a reasonable start for the default caps (a guess, not measured). Create a user for the deploy, let it use Docker, and clone the repository once:
+**4. The server.** Any VPS with Docker Engine and the Compose plugin. 2 vCPU and 2 GB of RAM are a reasonable start for the default caps (a guess, not measured). A deploy rebuilds the images on the server, and the build plus PostgreSQL can run out of memory on 2 GB, so use 4 GB or add swap. Docker keeps container logs without a size limit by default: set `log-driver` `json-file` with `max-size` and `max-file` in `/etc/docker/daemon.json` so they cannot fill the disk. Create a user for the deploy, let it use Docker, and clone the repository once:
 
 ```sh
 git clone https://github.com/David-Cabeza/OpenCovers.git opencovers   # in the deploy user's home
@@ -263,10 +263,11 @@ cp .env.demo.example .env.demo
 chmod 600 .env.demo
 openssl rand -base64 32   # BETTER_AUTH_SECRET
 openssl rand -base64 32   # BLOCKLIST_KEY, a different value
+openssl rand -base64 32   # PUBLIC_CHALLENGE_SECRET (optional, recommended)
 openssl rand -hex 16      # POSTGRES_PASSWORD, letters and digits only
 ```
 
-Paste the three values into `.env.demo` and fill the Resend (and Google) values.
+Paste the values into `.env.demo` and fill the Resend (and Google) values. `PUBLIC_CHALLENGE_SECRET` is optional with one API process, which is how the stack runs. Without it the API signs challenges with a key made at start, so a restart voids the ones open at that moment (they last 5 minutes) and the API logs a warning. Set it to avoid that.
 
 **5. First deploy.** By hand, to see it work before the workflow does it for you:
 
@@ -287,7 +288,7 @@ The API migrates the database when it starts. Never point `.env.demo` at a datab
 | `DEMO_SSH_PORT` | Optional. Default 22. |
 | `DEMO_SSH_KNOWN_HOSTS` | Optional but recommended: the output of `ssh-keyscan -p PORT HOST`, taken from a network you trust. Without it the workflow trusts the host key it sees on first contact, and warns. |
 
-Optional repository variables: `DEMO_DIR` (the clone's path under the user's home, default `opencovers`) and `DEMO_URL` (default `https://demo.opencovers.dev`). A deploy fetches `main`, checks out the pushed commit, runs `docker compose ... up -d --build --wait --remove-orphans` and `pnpm db:migrate`, then checks the staff app, `/health` and the demo's challenge route (it answers only under `DEMO_MODE=1`) from the runner. Deploys never overlap. Run one by hand from Actions, `deploy-demo`, Run workflow. Add a required reviewer to the `demo` environment if you want a pause before each deploy.
+Optional repository variables: `DEMO_DIR` (the clone's path under the user's home, default `opencovers`) and `DEMO_URL` (default `https://demo.opencovers.dev`). A deploy fetches `main`, checks out the pushed commit, runs `docker compose ... up -d --build --wait --remove-orphans` and `pnpm db:migrate`, then checks the staff app, `/health` and `/api/demo/status` (it reports `enabled:true` only under `DEMO_MODE=1`) from the runner. Deploys never overlap. Run one by hand from Actions, `deploy-demo`, Run workflow. Add a required reviewer to the `demo` environment if you want a pause before each deploy.
 
 **7. Read the leads.** On the server, in the clone (`$dc` stands for this Compose command in the steps that follow):
 
@@ -333,7 +334,7 @@ Resend (email) and Google (sign-in) process that data, so the privacy page shoul
 - [ ] DNS records resolve, and ports 80 and 443 are open on the server and nothing else.
 - [ ] Resend domain verified, and a test magic link reaches a real inbox (check spam too).
 - [ ] Google client created, its redirect URI added, and a test sign-in works (or both Google variables left empty).
-- [ ] The sign-in screens (the staff app's demo UI) are on `main`, so the demo has a way in.
+- [x] The sign-in screens (the staff app's demo UI) are on `main` (PR #216), so the demo has a way in.
 - [ ] `https://demo.opencovers.dev/health` answers, and a new visitor reaches a sandbox whose `/w/{bookingKey}` page opens on `book.demo.opencovers.dev`.
 - [ ] The caps (`DEMO_MAX_SANDBOXES`, `DEMO_MAX_NEW_PER_DAY`) fit the server and your email plan.
 - [ ] `DEMO_SSH_*` secrets set on the `demo` environment, and one manual run of `deploy-demo` is green.
