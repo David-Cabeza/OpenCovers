@@ -27,7 +27,9 @@ describe("errorMessage", () => {
     const mapped = Object.keys(CATALOG.en)
       .filter((key) => key.startsWith("errors.api."))
       .map((key) => key.slice("errors.api.".length));
-    for (const code of mapped) expect(documented).toContain(code);
+    // Codes only the hosted demo answers sit outside docs/contract.
+    const demoOnly = ["demo_limit_reached"];
+    for (const code of mapped) if (!demoOnly.includes(code)) expect(documented).toContain(code);
   });
 
   it("shows a retry-later message for any 429", () => {
@@ -51,5 +53,16 @@ describe("authErrorMessage", () => {
     );
     expect(authErrorMessage({ status: 400 }, "f")).toBe("f");
     expect(authErrorMessage({ status: 500 }, "f")).toMatch(/not responding/i);
+  });
+
+  it("falls back to the API catalog for an API code with no auth entry", () => {
+    expect(authErrorMessage({ status: 400, code: "invalid_request", message: "invalid_request" }, "f")).toBe(
+      t("errors.api.invalid_request"),
+    );
+  });
+
+  it("explains a demo sandbox at its limit", () => {
+    expect(errorMessage(new ApiError("demo_limit_reached", 409), "f")).toMatch(/reached its limit.*reset the demo/);
+    expect(CATALOG.es["errors.api.demo_limit_reached" as keyof typeof CATALOG.es]).toMatch(/límite/);
   });
 });
