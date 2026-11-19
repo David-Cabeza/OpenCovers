@@ -1,7 +1,6 @@
 import { authErrorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,13 +26,10 @@ export function SignInForm() {
       const { error } = await authClient.signIn.email(values);
       if (error) {
         setServerError(authErrorMessage(error, "Could not sign in."));
-        toast.error(authErrorMessage(error, "Could not sign in."));
       }
     } catch (err) {
       // The client throws when no answer comes back at all.
-      const message = isServerUnreachable(err) ? SERVER_UNREACHABLE : "Could not sign in.";
-      setServerError(message);
-      toast.error(message);
+      setServerError(isServerUnreachable(err) ? SERVER_UNREACHABLE : "Could not sign in.");
     }
   }
 
@@ -59,7 +55,6 @@ export function SignInForm() {
           id="signin-password"
           type="password"
           autoComplete="current-password"
-          placeholder="••••••••"
           {...register("password", { required: "Password is required." })}
         />
         {errors.password && (
@@ -67,7 +62,11 @@ export function SignInForm() {
         )}
       </div>
 
-      {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+      {serverError && (
+        <p role="alert" className="text-sm text-destructive">
+          {serverError}
+        </p>
+      )}
 
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "Signing in…" : "Sign in"}

@@ -19,6 +19,15 @@ export function contactLooksValid(value: string): boolean {
   return PHONE.test(contact) && digits >= 6 && digits <= 15;
 }
 
+/**
+ * The errors without the one for a field the guest has just changed, so a message about a typo goes away as soon as the
+ * typo is edited and not only at the next submit.
+ */
+export function withoutError<E extends object>(errors: E, field: keyof E): E {
+  const { [field]: _gone, ...rest } = errors;
+  return rest as E;
+}
+
 export interface DetailErrors {
   name?: MessageId;
   contact?: MessageId;

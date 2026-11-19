@@ -1,7 +1,6 @@
 import { authErrorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,12 +41,10 @@ export function SignUpForm({
       // The client throws when no answer comes back at all.
       const message = isServerUnreachable(err) ? SERVER_UNREACHABLE : "Could not create the account.";
       setServerError(message);
-      toast.error(message);
       return;
     }
     if (error) {
       setServerError(authErrorMessage(error, "Could not create the account."));
-      toast.error(authErrorMessage(error, "Could not create the account."));
       return;
     }
     onSuccess?.();
@@ -102,7 +99,11 @@ export function SignUpForm({
         )}
       </div>
 
-      {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+      {serverError && (
+        <p role="alert" className="text-sm text-destructive">
+          {serverError}
+        </p>
+      )}
 
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "Creating account…" : "Create account"}
