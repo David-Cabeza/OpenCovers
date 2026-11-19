@@ -6,6 +6,7 @@ import { db } from "../db/client";
 import { betterAuthSchema, user } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { isDisposableEmail } from "../demo/disposable";
+import { magicLinkChallenges, type MagicLinkChallenges } from "../demo/magic-link-challenge";
 import { claimFromHeaders, recordLead, stashClaim, takeClaim, type LeadClaim, type LeadSource } from "../demo/leads";
 import { provisionSandbox } from "../demo/provision";
 import { demoSettings, type DemoSettings } from "../demo/settings";
@@ -78,6 +79,12 @@ export function requireVerifiedGoogleEmail(profile: { email_verified?: boolean }
   return {};
 }
 
+const CHALLENGE_MESSAGES = {
+  CHALLENGE_REQUIRED: "Solve the sign-in challenge first. Ask POST /api/demo/magic-link-challenge for one.",
+  CHALLENGE_INVALID:
+    "The sign-in challenge is wrong, expired, already used or was issued for another address. Ask for a new one.",
+} as const;
+
 const DISPOSABLE = {
   code: "DISPOSABLE_EMAIL",
   message: "Disposable email addresses are not accepted. Use your own address.",
@@ -87,7 +94,7 @@ const DISPOSABLE = {
  * The account system. `settings` decides whether this is the hosted demo (ADR-0022): with it off, the instance is
  * exactly what it was before the demo existed. Exported as a factory so a test can build the demo variant.
  */
-export function createAuth(settings: DemoSettings) {
+export function createAuth(settings: DemoSettings, challenges: () => MagicLinkChallenges = magicLinkChallenges) {
   const demo = settings.enabled;
   const secure = (process.env.BETTER_AUTH_URL ?? "").startsWith("https://");
 
@@ -170,6 +177,10 @@ export function createAuth(settings: DemoSettings) {
               if (ctx.path === "/sign-in/magic-link") {
                 const email = (ctx.body as { email?: unknown } | undefined)?.email;
                 if (typeof email === "string" && isDisposableEmail(email)) throw new APIError("BAD_REQUEST", DISPOSABLE);
+                // ADR-0022, decision 8(a). The answer never depends on whether the address has an account.
+                const refusal =
+                  typeof email === "string" ? challenges().check(email, ctx.headers ?? undefined) : "CHALLENGE_REQUIRED";
+                if (refusal) throw new APIError("BAD_REQUEST", { code: refusal, message: CHALLENGE_MESSAGES[refusal] });
               }
               if (ctx.path === "/sign-in/social") {
                 const claim = claimFromHeaders(ctx.headers ?? undefined);
