@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { LoadError } from "@/components/load-error";
+import { useDemoStatus } from "@/lib/demo";
+import { DemoBar } from "./demo/demo-bar";
 import { ServerBanner } from "@/components/server-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVenues } from "@/hooks/use-venues";
@@ -23,6 +25,7 @@ export function Dashboard() {
   const t = useT();
   const { data: session } = authClient.useSession();
   const { data, isPending, isError, error, isRefetching, refetch } = useVenues();
+  const demo = useDemoStatus();
   const venueId = useUiStore((s) => s.venueId);
   const setVenue = useUiStore((s) => s.setVenue);
   const [active, setActive] = useState<ViewId>("agenda");
@@ -85,6 +88,7 @@ export function Dashboard() {
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <ServerBanner />
+          {demo?.enabled && <DemoBar status={demo} />}
           <Topbar email={session?.user.email} onMenu={() => setNavOpen(true)} />
           <main
             ref={mainRef}

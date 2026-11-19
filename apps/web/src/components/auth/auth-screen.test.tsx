@@ -13,7 +13,8 @@ describe("AuthScreen", () => {
   it("says Welcome back on the sign-in tab and Create your account on the sign-up tab", async () => {
     const user = userEvent.setup();
     renderWithApp(<AuthScreen />);
-    expect(screen.getByText("Welcome back")).toBeInTheDocument();
+    // The card appears once the demo status has answered "not a demo".
+    expect(await screen.findByText("Welcome back")).toBeInTheDocument();
     expect(screen.getByText("Sign in to manage your venue's reservations.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Sign up" }));
