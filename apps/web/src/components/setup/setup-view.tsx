@@ -261,7 +261,7 @@ function ServicesSection({ venueId }: { venueId: string }) {
   });
 
   return (
-    <Card>
+    <Card id="settings-services" className="scroll-mt-32">
       <CardHeader className="flex items-center justify-between gap-4">
         <div>
           <CardTitle>Services</CardTitle>

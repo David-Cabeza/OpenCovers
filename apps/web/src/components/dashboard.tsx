@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVenues } from "@/hooks/use-venues";
@@ -6,6 +6,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { AgendaView } from "./agenda/agenda-view";
 import { AvailabilityView } from "./availability/availability-view";
 import { FloorView } from "./floor/floor-view";
+import { NavigationProvider, useScrollToSection } from "./layout/navigation";
 import { MobileNav, Sidebar, type ViewId } from "./layout/sidebar";
 import { Topbar } from "./layout/topbar";
 import { PacingView } from "./pacing/pacing-view";
@@ -22,6 +23,7 @@ export function Dashboard() {
   const setVenue = useUiStore((s) => s.setVenue);
   const [active, setActive] = useState<ViewId>("agenda");
   const [navOpen, setNavOpen] = useState(false);
+  const [section, setSection] = useState<string | null>(null);
 
   const venues = data?.venues ?? [];
   const role = venues.find((v) => v.id === venueId)?.role;
@@ -35,40 +37,51 @@ export function Dashboard() {
     }
   }, [venues, venueId, setVenue]);
 
+  const goTo = useCallback((view: ViewId, to?: string) => {
+    setActive(view);
+    setSection(to ?? null);
+  }, []);
+  const navigation = useMemo(() => ({ goTo, role }), [goTo, role]);
+
+  const sectionDone = useCallback(() => setSection(null), []);
+  useScrollToSection(section, sectionDone);
+
   return (
-    <div className="flex min-h-dvh">
-      <Sidebar active={active} onSelect={setActive} role={role} />
-      <MobileNav
-        open={navOpen}
-        onOpenChange={setNavOpen}
-        active={active}
-        onSelect={setActive}
-        role={role}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar email={session?.user.email} onMenu={() => setNavOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 print:p-0">
-          {isPending ? (
-            <div className="space-y-4">
-              <Skeleton className="h-9 w-56" />
-              <Skeleton className="h-64 w-full" />
-            </div>
-          ) : venues.length === 0 ? (
-            <EmptyVenues />
-          ) : venueId ? (
-            <>
-              {active === "agenda" && <AgendaView venueId={venueId} />}
-              {active === "preshift" && <PreShiftView venueId={venueId} />}
-              {active === "floor" && <FloorView venueId={venueId} />}
-              {active === "availability" && <AvailabilityView venueId={venueId} />}
-              {active === "waitlist" && <WaitlistView venueId={venueId} />}
-              {active === "pacing" && <PacingView venueId={venueId} />}
-              {active === "team" && role === "admin" && <TeamView venueId={venueId} />}
-              {active === "setup" && <SetupView venueId={venueId} role={role} />}
-            </>
-          ) : null}
-        </main>
+    <NavigationProvider value={navigation}>
+      <div className="flex min-h-dvh">
+        <Sidebar active={active} onSelect={setActive} role={role} />
+        <MobileNav
+          open={navOpen}
+          onOpenChange={setNavOpen}
+          active={active}
+          onSelect={setActive}
+          role={role}
+        />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Topbar email={session?.user.email} onMenu={() => setNavOpen(true)} />
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 print:p-0">
+            {isPending ? (
+              <div className="space-y-4">
+                <Skeleton className="h-9 w-56" />
+                <Skeleton className="h-64 w-full" />
+              </div>
+            ) : venues.length === 0 ? (
+              <EmptyVenues />
+            ) : venueId ? (
+              <>
+                {active === "agenda" && <AgendaView venueId={venueId} />}
+                {active === "preshift" && <PreShiftView venueId={venueId} />}
+                {active === "floor" && <FloorView venueId={venueId} />}
+                {active === "availability" && <AvailabilityView venueId={venueId} />}
+                {active === "waitlist" && <WaitlistView venueId={venueId} />}
+                {active === "pacing" && <PacingView venueId={venueId} />}
+                {active === "team" && role === "admin" && <TeamView venueId={venueId} />}
+                {active === "setup" && <SetupView venueId={venueId} role={role} />}
+              </>
+            ) : null}
+          </main>
+        </div>
       </div>
-    </div>
+    </NavigationProvider>
   );
 }
