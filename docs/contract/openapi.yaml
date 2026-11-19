@@ -1827,12 +1827,15 @@ paths:
       description: |
         Public. Needs no credentials and reads no cookie or session. It
         returns the venue's display name, locale, theme, the public phone
-        when the public profile holds one, the online party limits, the
+        when the public profile holds one, the public profile's address
+        only while that profile is enabled, the online party limits, the
         weekdays with an online service, the effective lead time and
         horizon, whether the consent question is shown, the confirmation
-        mode, and a fresh form challenge. It never holds the venue id, an
-        address, `noticeAddress`, an email, a key other than the booking key
-        in the path, or any booking.
+        mode, the venue's privacy notice URL or null, and a fresh form
+        challenge. It never holds the venue id, any other address,
+        `noticeAddress`, an email, a key other than the booking key in the
+        path, or any booking. See
+        docs/adr/0021-widget-day-status-zones-waitlist.md, section 5.
 
         An unknown key, a rotated key, a key that does not match the key
         format, and a venue with online booking off all give the same `404`
@@ -3746,6 +3749,21 @@ components:
           $ref: "#/components/schemas/WidgetLocale"
         theme:
           $ref: "#/components/schemas/Theme"
+        privacyNoticeUrl:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 2048
+          default: null
+          description: |
+            The venue's own privacy notice. https only, with a host, no
+            credentials and no whitespace or control characters, at most
+            2048 characters. Any other value fails with `invalid_request` and
+            changes nothing. `null` clears it. The public config returns it,
+            and the widget then shows a link to it next to the submit button.
+            OpenCovers writes no legal text (ADR-0021, section 5). Not yet
+            in `required`: stage 8 of ADR-0021 adds it there together with
+            the API that returns it, so the shape test stays true meanwhile.
 
     OnlineBookingUpdate:
       type: object
@@ -3779,6 +3797,7 @@ components:
           allOf:
             - $ref: "#/components/schemas/Theme"
           nullable: true
+        privacyNoticeUrl: { type: string, format: uri, nullable: true, maxLength: 2048 }
 
     OnlineBookingSaved:
       allOf:
@@ -3810,8 +3829,10 @@ components:
 
     PublicVenue:
       type: object
-      required: [name, locale, theme, phone]
-      description: What the widget shows about the venue. No id, address, email or key.
+      required: [name, locale, theme, phone, address]
+      description: |
+        What the widget shows about the venue. No id, email or key, and no
+        address other than `address` below. `noticeAddress` never appears.
       properties:
         name:
           type: string
@@ -3822,6 +3843,22 @@ components:
           type: string
           nullable: true
           description: The phone of the venue's public profile, or null when it holds none.
+        address:
+          type: string
+          nullable: true
+          example: "Calle Mayor 1, 28013 Madrid"
+          description: |
+            The street, postal code and locality of the venue's public
+            profile (C33), as one line: `street`, then `postalCode` and
+            `locality` joined by a space, separated by `, `, leaving out a
+            part that is not set. Region, country and coordinates are not
+            included. Null when the public profile is not enabled, or when
+            it holds no street. Returned only while `publicProfileEnabled`
+            is true: a venue that did not enable its public profile did not
+            choose to publish its address, and a later widening is easy
+            where retracting published data is not (ADR-0021, section 5).
+            This differs from `phone`, which is returned whenever the
+            profile holds one. Never `noticeAddress`.
 
     FormChallenge:
       type: object
@@ -3862,6 +3899,7 @@ components:
         - challenge
         - captcha
         - linkResend
+        - privacyNoticeUrl
       properties:
         venue: { $ref: "#/components/schemas/PublicVenue" }
         minPartySize:
@@ -3900,6 +3938,14 @@ components:
             Whether a lost-link resend can send an email: `notificationsEnabled`
             on, a way to send, and a widget origin to link to. The widget offers
             the resend only when true. It says nothing about any guest (C51).
+        privacyNoticeUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            The online booking setting `privacyNoticeUrl` as stored, or null
+            when the venue set none. When set, the widget links to it next to
+            the submit button. When null, it shows no notice link (C64).
 
     PublicAvailability:
       type: object
