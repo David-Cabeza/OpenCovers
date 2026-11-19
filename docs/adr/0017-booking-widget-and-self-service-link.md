@@ -522,3 +522,15 @@ The dark mode of the amendment above stays off inside an iframe by default. An e
 - **Setup.** The embed section has a switch, "Follow my visitors' dark mode", that adds the option to both embed codes. It is not stored: it only changes the code shown.
 - **Not done.** A dark palette chosen by the venue in Setup, which would need a theme key.
 
+## Amendment 2026-11-19: a dark palette in the theme
+
+Section 5's key set grows by one: `darkColors`. A venue can now choose the colors a visitor sees in dark mode.
+
+- **Shape.** `darkColors` has the same seven keys and the same `#rrggbb` rule as `colors`, and is validated the same way. It is optional. `{}` is valid and means something: the venue wants the widget's dark look next to its own light `colors`.
+- **Why a second set and not a flag.** The dark built-in colors are chosen as a pair. A venue's light `colors` cannot be reused in dark mode, and a built-in dark `text` over a venue's light `background` would be unreadable. Two separate sets mean each palette is complete on its own: a key left out in `darkColors` falls to the dark built-in value, never to `colors`.
+- **What changes in the widget.** A page that follows the visitor's setting (its own page, or an embed with `?scheme=auto`) shows `darkColors` to a visitor in dark mode and `colors` in light mode, and applies the other palette again when the visitor changes the setting. A theme with `colors` and no `darkColors` still keeps the widget light, as in the first dark-mode amendment, so no venue changes without choosing to. A page that does not follow the setting ignores `darkColors`.
+- **Contrast.** Each saved warning now has a `palette` of `light` or `dark`. The dark pair is checked only when the theme has `darkColors`, against the dark built-in text `#f1eee8` and background `#181715` for a key it leaves out. A test ties those two values to the stylesheet, like the light pair.
+- **How.** The widget still sets one custom property at a time from a checked value. In dark mode it removes the color properties first, then sets the dark ones, so no light value stays behind.
+- **Setup.** The look editor has a switch for the dark palette, with its own colors, preview and contrast warning.
+- **Not done.** A palette that follows the venue's own site toggle instead of the visitor's system setting, and a radius, font or logo per palette.
+

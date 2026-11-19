@@ -4,7 +4,7 @@ import { formatDate, formatInstant } from "./dates";
 import { explainSelfService, type Explanation } from "./errors";
 import { localeOf, translator, type Locale, type MessageId, type Translate } from "./messages";
 import { createKeyedAction } from "./submit";
-import { applyThemeToDocument } from "./theme";
+import { watchTheme } from "./theme";
 import { dangerButton, Field, inputClass, primaryButton, secondaryButton, Section, VenueHeader } from "./ui";
 
 // The self-service page at /r (ADR-0017 section 2, stage 6). The token was read from the fragment before this
@@ -37,7 +37,7 @@ export function ManagePage(props: {
 
   const show = (view: PublicReservation, closedByEngine = false) => {
     if (!fixedLocale) setLocale(localeOf(view.venue.locale));
-    applyThemeToDocument(view.venue.theme, document);
+    watchTheme(view.venue.theme, window);
     setPage({ kind: "open", view, closed: closedByEngine || !isChangeable(view) });
   };
 

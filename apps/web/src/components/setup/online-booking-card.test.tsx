@@ -3,7 +3,7 @@ import path from "node:path";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_THEME, FONT_STACKS, isLogoUrl } from "@/lib/online-booking";
+import { DEFAULT_THEME, FONT_STACKS, isLogoUrl, DEFAULT_DARK_COLORS } from "@/lib/online-booking";
 import { mockApi, renderWithApp, resetApiMocks } from "@/test/mock-api";
 import { OnlineBookingCard } from "./online-booking-card";
 import { SetupView } from "./setup-view";
@@ -443,6 +443,104 @@ describe("OnlineBookingCard", () => {
     const alert = await screen.findByText(/contrast of 1.24:1 against the background/);
     expect(alert).toHaveTextContent("Saved, but");
     expect(alert).toHaveTextContent("4.5:1");
+  });
+
+  it("offers a dark palette that starts from the built-in dark colors, with its own preview", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    expect(screen.queryByLabelText("Dark: background")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Preview of the booking page in dark mode" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("switch", { name: "Choose colors for dark mode" }));
+
+    expect(screen.getByLabelText("Dark: buttons")).toHaveValue(DEFAULT_DARK_COLORS.primary);
+    expect(screen.getByLabelText("Dark: text")).toHaveValue(DEFAULT_DARK_COLORS.text);
+    const preview = screen.getByRole("img", { name: "Preview of the booking page in dark mode" });
+    expect(preview).toHaveStyle({ background: DEFAULT_DARK_COLORS.background });
+    fireEvent.change(screen.getByLabelText("Dark: background"), { target: { value: "#000000" } });
+    expect(preview).toHaveStyle({ background: "#000000" });
+    expect(screen.getByRole("img", { name: "Preview of the booking page" })).toHaveStyle({
+      background: DEFAULT_THEME.colors.background,
+    });
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0].body).toEqual({ theme: { darkColors: { background: "#000000" } } });
+  });
+
+  it("sends an empty dark palette when it is turned on and left as the built-in one", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    fireEvent.change(screen.getByLabelText("Buttons"), { target: { value: "#aa0000" } });
+    await user.click(screen.getByRole("switch", { name: "Choose colors for dark mode" }));
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0].body).toEqual({ theme: { colors: { primary: "#aa0000" }, darkColors: {} } });
+  });
+
+  it("loads a saved dark palette, and turning it off removes it", async () => {
+    const user = userEvent.setup();
+    const api = setup({ theme: { darkColors: { background: "#101010" } } } as Partial<typeof SETTINGS>, {
+      [`PUT ${PATH}`]: { body: { ...SETTINGS, warnings: [] } },
+    });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await waitFor(() => expect(screen.getByLabelText("Dark: background")).toHaveValue("#101010"));
+    expect(screen.getByLabelText("Dark: text")).toHaveValue(DEFAULT_DARK_COLORS.text);
+    expect(screen.getByRole("switch", { name: "Choose colors for dark mode" })).toBeChecked();
+    await user.click(screen.getByRole("switch", { name: "Choose colors for dark mode" }));
+    expect(screen.queryByLabelText("Dark: background")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0].body).toEqual({ theme: null });
+  });
+
+  it("shows the dark contrast warning apart from the light one", async () => {
+    const user = userEvent.setup();
+    setup({}, {
+      [`PUT ${PATH}`]: (r) => ({
+        body: {
+          ...SETTINGS,
+          ...(r.body as object),
+          warnings: [{ code: "low_contrast", message: "low", ratio: 2.1, palette: "dark" }],
+        },
+      }),
+    });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await user.click(screen.getByRole("switch", { name: "Choose colors for dark mode" }));
+    fireEvent.change(screen.getByLabelText("Dark: background"), { target: { value: "#eeeeee" } });
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+
+    const alert = await screen.findByText(/dark text color has a contrast of 2.1:1/);
+    expect(alert).toHaveTextContent("4.5:1");
+    expect(screen.queryByText(/Saved, but the text color has a contrast/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the built-in dark look equal to the widget's stylesheet", () => {
+    const css = readFileSync(path.resolve(import.meta.dirname, "../../../../widget/src/styles.css"), "utf8");
+    const dark = css.slice(css.indexOf("@media (prefers-color-scheme: dark)"), css.indexOf("@theme inline"));
+    const vars = {
+      primary: "--oc-primary",
+      onPrimary: "--oc-on-primary",
+      background: "--oc-background",
+      surface: "--oc-surface",
+      text: "--oc-text",
+      muted: "--oc-muted",
+      border: "--oc-border",
+    } as const;
+    for (const [key, name] of Object.entries(vars)) {
+      expect(dark).toContain(`${name}: ${DEFAULT_DARK_COLORS[key as keyof typeof vars]};`);
+    }
   });
 
   it("keeps the built-in look equal to the widget's stylesheet", () => {

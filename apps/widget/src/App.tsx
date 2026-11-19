@@ -7,7 +7,7 @@ import { findFreeDays, LOOKAHEAD_DAYS, type FreeDay } from "./nearby";
 import type { Translate } from "./messages";
 import { solveInBackground } from "./pow";
 import { createSubmitter, createTicketSource } from "./submit";
-import { applyThemeToDocument } from "./theme";
+import { watchTheme } from "./theme";
 import { Field, inputClass, primaryButton, secondaryButton, Section, VenueHeader } from "./ui";
 import { checkDetails, type DetailErrors } from "./validate";
 
@@ -37,7 +37,7 @@ export function App({ api, t, locale }: { api: PublicApi; t: Translate; locale: 
       if (!live) return;
       if (result.ok) {
         document.title = t("page.title", { venue: result.value.venue.name });
-        applyThemeToDocument(result.value.venue.theme, document);
+        watchTheme(result.value.venue.theme, window);
         setPhase({ kind: "booking", config: result.value });
       } else setPhase({ kind: "unavailable" });
     });
