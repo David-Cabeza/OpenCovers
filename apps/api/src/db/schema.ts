@@ -255,11 +255,17 @@ export const events = pgTable(
     reservationId: text("reservation_id").notNull(),
     version: integer("version").notNull(),
     tombstoneHash: text("tombstone_hash"),
+    // Who made the change (lib/origin.ts). Null on rows written before ADR-0023 and on system sweeps: unknown.
+    channel: text("channel"),
+    actor: text("actor"),
     occurredAt: timestamp("occurred_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("idx_events_venue_occurred").on(t.venueId, t.occurredAt)],
+  (t) => [
+    index("idx_events_venue_occurred").on(t.venueId, t.occurredAt),
+    check("events_channel", sql`${t.channel} IS NULL OR ${t.channel} IN ('widget', 'staff', 'api', 'mcp')`),
+  ],
 );
 
 export const webhookEndpoints = pgTable(

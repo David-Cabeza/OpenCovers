@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,8 +8,14 @@ import { DemoSignIn } from "./demo-sign-in";
 import { SignInForm } from "./sign-in-form";
 import { SignUpForm } from "./sign-up-form";
 
+const COPY = {
+  "sign-in": { title: "Welcome back", description: "Sign in to manage your venue's reservations." },
+  "sign-up": { title: "Create your account", description: "Set up OpenCovers for your restaurant." },
+} as const;
+
 export function AuthScreen() {
   const demo = useDemoStatus();
+  const [tab, setTab] = useState<keyof typeof COPY>("sign-in");
   return (
     <main className="flex min-h-dvh items-center justify-center p-6">
       <div className="w-full max-w-sm">
@@ -39,13 +46,11 @@ export function AuthScreen() {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle>Welcome back</CardTitle>
-              <CardDescription>
-                Sign in to manage your venue's reservations.
-              </CardDescription>
+              <CardTitle>{COPY[tab].title}</CardTitle>
+              <CardDescription>{COPY[tab].description}</CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="sign-in">
+              <Tabs value={tab} onValueChange={(v) => setTab(v as keyof typeof COPY)}>
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="sign-in">Sign in</TabsTrigger>
                   <TabsTrigger value="sign-up">Sign up</TabsTrigger>

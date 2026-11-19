@@ -26,6 +26,8 @@ describe("App", () => {
     session.current = { data: null, isPending: false, error: {}, refetch: vi.fn() };
     render(<App />);
     expect(screen.getByRole("alert")).toHaveTextContent("We can't reach the server");
+    expect(screen.getByRole("main")).toContainElement(screen.getByRole("alert"));
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
   });
 

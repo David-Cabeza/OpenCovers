@@ -1,5 +1,6 @@
 import type { OnlineBooking, OnlineBookingSaved, OnlineBookingUpdate } from "@/lib/online-booking";
 import type { PublicProfile } from "@/lib/public-profile";
+import type { ReservationTraceDto } from "@/lib/reservation-trace";
 
 export type Role ="read" | "write" | "admin";
 
@@ -475,6 +476,9 @@ export const api = {
 
   getReservation: (venueId: string, id: string) =>
     request<Reservation>(`/v1/venues/${venueId}/reservations/${id}`),
+
+  reservationTrace: (venueId: string, id: string) =>
+    request<ReservationTraceDto>(`/v1/venues/${venueId}/reservations/${id}/trace`),
 
   availability: (venueId: string, date: string, partySize: number) =>
     request<{ availability: Availability }>(
