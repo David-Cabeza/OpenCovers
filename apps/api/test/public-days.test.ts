@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 process.env.RATE_LIMIT = "on";
 process.env.TRUST_PROXY = "true";
@@ -21,6 +21,14 @@ afterAll(() => {
 afterEach(() => vi.useRealTimers());
 
 const today = () => localDateTime(new Date(), "Europe/Madrid").date;
+
+// The fixture venue serves dinner 20:00 to 23:00 Madrid time. Without a pinned clock, a run after about 22:30 there
+// sees today as closed and the tests that expect today to be available fail. Pin every test to noon of its own day;
+// a test that needs another hour sets its own time.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(toTimestamp(today(), "12:00", "Europe/Madrid"));
+});
 
 beforeAll(async () => {
   await migrateDb();
