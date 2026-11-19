@@ -308,9 +308,10 @@ export function FloorCanvas({
               )}
               role={seatable ? "button" : undefined}
               tabIndex={seatable || movableInView ? 0 : undefined}
+              // A free table is named by its own text, so the name always contains what is drawn on it.
               aria-label={
                 seatable
-                  ? `Seat a walk-in at ${t.name}`
+                  ? undefined
                   : mode === "view"
                     ? `${t.name}: ${t.guestName || "reserved"}, ${t.partySize ?? "?"} guests`
                     : undefined
@@ -405,12 +406,21 @@ export function FloorCanvas({
                         <span className="max-w-[48px] truncate text-[10px] font-medium leading-tight">
                           {t.guestName || "—"}
                         </span>
-                        <span className="text-[10px] leading-tight opacity-80">
+                        <span className="text-[10px] leading-tight">
                           {t.partySize ?? "?"} pax
                         </span>
                       </>
                     ) : (
-                      <span className="text-[10px] opacity-70">{t.seats}</span>
+                      <>
+                        <span aria-hidden="true" className="text-[10px] opacity-70">
+                          {t.seats}
+                        </span>
+                        {seatable && (
+                          <span className="sr-only">
+                            , {t.seats} {t.seats === 1 ? "seat" : "seats"}, seat a walk-in
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

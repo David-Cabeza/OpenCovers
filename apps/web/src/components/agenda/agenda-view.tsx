@@ -153,7 +153,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
           {groups.map((group) => (
             <section key={group.service} className="space-y-2">
               <div className="flex items-baseline justify-between gap-3 px-1">
-                <h3 className="font-display text-lg first-letter:uppercase">{group.service || "Service"}</h3>
+                <h2 className="font-display text-lg first-letter:uppercase">{group.service || "Service"}</h2>
                 <span className="text-sm text-muted-foreground tabular-nums">
                   {group.items.length} {group.items.length === 1 ? "booking" : "bookings"} ·{" "}
                   {group.items.reduce((n, r) => n + r.partySize, 0)} covers
@@ -229,7 +229,7 @@ function ReservationRow({
       data-slot="reservation-row"
       className={cn(
         "grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-muted/40 md:grid-cols-[4rem_minmax(0,1fr)_4.5rem_9rem_8rem_2.25rem] md:gap-x-4",
-        finished && "opacity-60",
+        finished && "text-muted-foreground",
       )}
     >
       <div className="font-display text-xl tabular-nums">{reservation.time}</div>

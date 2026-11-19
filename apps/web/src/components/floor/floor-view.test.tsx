@@ -56,7 +56,7 @@ describe("FloorView", () => {
 
   it("seats a walk-in at a free table from the keyboard", async () => {
     const user = setup([table()]);
-    const free = await screen.findByRole("button", { name: "Seat a walk-in at Table 1" });
+    const free = await screen.findByRole("button", { name: "Table 1, 2 seats, seat a walk-in" });
     free.focus();
     await user.keyboard("{Enter}");
     expect(await screen.findByLabelText("Guest name")).toBeInTheDocument();
@@ -152,7 +152,7 @@ describe("FloorView", () => {
 
     it("does not offer Move to… on a free table", async () => {
       const { user } = setupMove(tables);
-      await user.click(await screen.findByRole("button", { name: "Seat a walk-in at Table 2" }));
+      await user.click(await screen.findByRole("button", { name: "Table 2, 2 seats, seat a walk-in" }));
       expect(await screen.findByLabelText("Guest name")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Move to…" })).not.toBeInTheDocument();
     });

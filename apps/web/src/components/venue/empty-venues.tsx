@@ -8,7 +8,7 @@ export function EmptyVenues() {
         <CalendarDaysIcon className="size-6" />
       </div>
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold">No venues yet</h2>
+        <h1 className="text-lg font-semibold">No venues yet</h1>
         <p className="text-sm text-muted-foreground">
           Create your first venue to start taking reservations.
         </p>

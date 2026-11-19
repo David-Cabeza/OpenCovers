@@ -58,7 +58,7 @@ export function PacingView({ venueId }: { venueId: string }) {
             return (
               <section key={service.service} className="space-y-2">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-1">
-                  <h3 className="font-display text-lg first-letter:uppercase">{service.service}</h3>
+                  <h2 className="font-display text-lg first-letter:uppercase">{service.service}</h2>
                   <span className="text-sm text-muted-foreground tabular-nums">
                     {peak ? `Peak ${peak.covers}/${peak.capacity} at ${peak.time}` : "Nothing booked yet"}
                   </span>

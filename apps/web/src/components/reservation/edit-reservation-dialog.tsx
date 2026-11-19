@@ -92,12 +92,12 @@ export function EditReservationDialog({
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label>Contact consent</Label>
+            <Label htmlFor="edit-consent">Contact consent</Label>
             <Controller
               name="consent"
               control={control}
               render={({ field }) => (
-                <ConsentSelect value={field.value} onChange={field.onChange} />
+                <ConsentSelect id="edit-consent" value={field.value} onChange={field.onChange} />
               )}
             />
           </div>

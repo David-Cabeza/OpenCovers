@@ -19,7 +19,7 @@ export function Stat({
         tone === "danger" && "border-transparent bg-danger-soft text-destructive",
       )}
     >
-      <div className={cn("text-sm", tone === "default" ? "text-muted-foreground" : "opacity-90")}>
+      <div className={cn("text-sm", tone === "default" && "text-muted-foreground")}>
         {label}
       </div>
       <div className="mt-1 font-display text-3xl whitespace-nowrap tabular-nums sm:text-4xl">{value}</div>
