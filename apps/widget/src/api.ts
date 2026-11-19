@@ -11,6 +11,8 @@ export interface PublicVenue {
   name: string;
   locale: string;
   phone: string | null;
+  /** The public profile's street, postal code and locality, or null (C64). Absent from an older API. */
+  address?: string | null;
   /** Read through `theme.ts`, which checks every value again before use. */
   theme?: unknown;
 }
@@ -23,6 +25,8 @@ export interface PublicConfig {
   leadTimeMinutes: number;
   maxAdvanceDays: number | null;
   askConsent: boolean;
+  /** The venue's own privacy notice, an `https` URL or null (C64). Read through `noticeHref`, never rendered raw. */
+  privacyNoticeUrl?: string | null;
   challenge: FormChallenge;
   /** Whether the venue can email a lost link. Without it the widget does not offer the resend. */
   linkResend: boolean;
