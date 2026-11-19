@@ -12,7 +12,7 @@ Nothing in this record is built. It proposes the next widget features so that th
 | --- | --- | --- | --- |
 | 1 | Day status for a strip of days | A new route `GET /v1/public/{bookingKey}/days?from=&days=&partySize=`, at most 14 days, a status per day from the same functions as public availability, and the first free time. | N calls to the availability route per view. |
 | 2 | Zones in the public channel | An opt-in list `publicZones` in the online-booking settings. With two or more, availability says which zones have a table at each time and the create accepts one of them as `zone`. With one or none, nothing changes. | Every zone public by default. |
-| 3 | A public waitlist | `POST /v1/public/{bookingKey}/waitlist` for a full date, off by default, writing to the staff waitlist with a date and an optional window, and a leave link built like the booking link. No automatic offers. | A free-form "request" channel outside the waitlist. |
+| 3 | A public waitlist | `POST /v1/public/{bookingKey}/waitlist` for a full date, off by default, writing to the staff waitlist with a date and an optional window, and a leave link built like the booking link. A join needs an unticked email consent and sends one email with the leave link. No automatic offers. | A free-form "request" channel outside the waitlist. |
 | 4 | Groups above the online maximum | The phone of the public profile and a short catalog text. No data collected. Already built; this record keeps it. | A group request form. |
 | 5 | Summary and notice | A summary step with date, time, party, zone and address before the details form. A venue-set `privacyNoticeUrl`. A pre-ticked box is never allowed. | Notice text written by the project. |
 | 6 | Staging | Four independent tracks, each with the contract first. PR #192's behavior is kept and its requests move to the new route. | One large widget release. |
@@ -138,9 +138,9 @@ Option B, off by default (`waitlistEnabled` in the online-booking settings), con
 
 **Route.** `POST /v1/public/{bookingKey}/waitlist` with an `Idempotency-Key` UUID, stored with the `public:` prefix of ADR-0017. A key used for a public create and then for a join fails with `invalid_request`, as for a key of another kind (C44, C58).
 
-**Body: minimum data.** `name` (1 to 100), one `contact` that normalizes to an email or a phone, `partySize` within the online limits, `date`, an optional `window` `{ from, to }` of local times, and the form challenge, solution and `honeypot` of the create (C45). No note, no consent, no marketing field.
+**Body: minimum data.** `name` (1 to 100), one `contact` that must normalize to an email (the join sends an email), `emailConsent` (required, must be `true`), `partySize` within the online limits, `date`, an optional `window` `{ from, to }` of local times, and the form challenge, solution and `honeypot` of the create (C45). No note and no marketing field. `emailConsent` covers email about this waitlist entry only and is never a marketing consent. The entry stores the time of the consent (`consent_at`) as proof, and erasure keeps the proof and drops the contact like any other entry.
 
-**What it accepts.** A date inside the effective window (C61, C62), served online that day, and with waitlist on. A date that is `closed` or `outside_window` fails with `waitlist_unavailable` (a new code, 409). The route does not require the day to be `full`: availability can change between read and submit, and a waitlist entry books nothing, so no second check is needed. The widget offers the button only on a `full` day or a service with no time.
+**What it accepts.** A date inside the effective window (C61, C62), served online that day, with waitlist on and the venue's email on (the same switch that gates the lost-link email, ADR-0017 stage 12). `waitlistEnabled` cannot be set while the venue's email is off. A date that is `closed` or `outside_window` fails with `waitlist_unavailable` (a new code, 409). The route does not require the day to be `full`: availability can change between read and submit, and a waitlist entry books nothing, so no second check is needed. The widget offers the button only on a `full` day or a service with no time.
 
 **Abuse controls.**
 
@@ -150,7 +150,7 @@ Option B, off by default (`waitlistEnabled` in the online-booking settings), con
 - Per venue: at most 50 open public entries per date. Over it: `waitlist_unavailable` (Q7).
 - The guest blocklist of ADR-0018 applies, last, with `booking_declined`, only where the join would succeed (Q10).
 
-**What the guest receives.** The entry as the guest sees it (date, window, party, venue name, masked contact) and a leave token. The token follows ADR-0017's rules: `<linkId>.<secret>`, SHA-256 hash only, constant-time compare, in the URL fragment, read from `X-Self-Service-Token`. It lives in a separate table, `waitlist_links`, so a booking token can never reach a waitlist route or the reverse. It expires at the end of the entry's date. Routes: `GET /v1/public/waitlist-entry` and `POST /v1/public/waitlist-entry/leave` (UUID key). Leave cancels the entry through the staff cancel and revokes the link in one transaction. Every failure gives one `404 self_service_link_invalid`. The page is `/r/waitlist`, served like `/r`. No email in v1: the join confirmation waits for the legal review of REQ-N2, so the screen shows the leave link and says to keep it (Q9).
+**What the guest receives.** The entry as the guest sees it (date, window, party, venue name, masked contact) and a leave token. The token follows ADR-0017's rules: `<linkId>.<secret>`, SHA-256 hash only, constant-time compare, in the URL fragment, read from `X-Self-Service-Token`. It lives in a separate table, `waitlist_links`, so a booking token can never reach a waitlist route or the reverse. It expires at the end of the entry's date. Routes: `GET /v1/public/waitlist-entry` and `POST /v1/public/waitlist-entry/leave` (UUID key). Leave cancels the entry through the staff cancel and revokes the link in one transaction. Every failure gives one `404 self_service_link_invalid`. The page is `/r/waitlist`, served like `/r`. The join sends one email to the contact with the leave link, and the screen shows the same link. The consent wording and the email text wait for the legal review (Q11), so stage 12 does not ship before the owner confirms them.
 
 **Ties to the staff waitlist.**
 
@@ -193,14 +193,14 @@ Each stage is one pull request. A contract stage changes `openapi.yaml`, `confor
 | 8 | API and Setup: the two fields. | 7 | yes |
 | 9 | Widget: summary step, notice link, the unticked-box test. | 8, and 6 for the zone line | yes |
 | 10 | Contract: waitlist join, entry read, leave, `waitlist_unavailable`, the waitlist fields on staff routes and MCP. | 0 | yes |
-| 11 | API: migration, join, `waitlist_links`, leave, seat rule, retention. | 10 | yes |
-| 12 | Widget: join on a full day, `/r/waitlist` page. Staff app: date and source on the waitlist. | 11, 3 | yes |
+| 11 | API: migration (with `consent_at`), join, the join email, `waitlist_links`, leave, seat rule, retention. | 10 | yes |
+| 12 | Widget: join on a full day with the unticked consent box, `/r/waitlist` page. Staff app: date and source on the waitlist. Waits for the owner to confirm the consent and email wording (Q11). | 11, 3 | yes |
 
 **PR #192.** Merge it as it is. Its behavior stays: open on the first bookable day and offer nearby free days. Stage 3 moves its requests from per-day `/availability` calls to one `/days` call, and removes the per-day loop in `nearby.ts`. Beyond the strip, the calendar pages `/days` on demand. The API serves the widget build from the same image (ADR-0017 stage 5 amendment), so no widget runs against an API without `/days`, and no fallback to per-day calls is kept.
 
 ## 7. Non-goals
 
-Gift vouchers. Payments and deposits (Phase 12). Reserve with Google (Phase 14). AI and voice layers. Email confirmation of a waitlist join before the legal review. Automatic waitlist offers.
+Gift vouchers. Payments and deposits (Phase 12). Reserve with Google (Phase 14). AI and voice layers. Automatic waitlist offers (the entry's consent already covers email about it, but the hold and expiry are Phase 12). Wallet passes, see the section below.
 
 ## What this adds to each public route
 
@@ -212,9 +212,18 @@ New case ideas below start at the next free id, C63.
 | `GET .../days` (new) | `from`, `days` 1 to 14, `partySize` | `days[]` with `date`, `status`, `firstTime` | Agreement with `/availability` over a grid; each status; `days` bounds; party outside limits; no table, zone, service or count; unknown key 404. | `public_read` and `public_days` |
 | `GET .../availability` | optional `zone` | `slots[]` with `time`, `zones` (and `service` if opted in) | `times` is the union; per-zone agreement with a create in that zone; unknown zone `invalid_request`; no zones without the setting. | `public_read` |
 | `POST .../reservations` | optional `zone` | unchanged | Zone outside `publicZones` refused; booked table is in the zone; no zone behaves as today. | `public_booking`, `public_venue` |
-| `POST .../waitlist` (new) | name, contact, party, date, optional window, challenge, honeypot, UUID key | guest entry view and leave token | Idempotent replay; key-kind mismatch; closed day refused; caps per contact, per date and per venue; blocklist last; bot checks as C45; no reservation, event or table written. | `public_booking`, `public_venue` |
+| `POST .../waitlist` (new) | name, email contact, `emailConsent`, party, date, optional window, challenge, honeypot, UUID key | guest entry view and leave token | Idempotent replay; key-kind mismatch; `emailConsent` missing or false refused; a phone contact refused; a venue with email off refused; one email sent with the leave link and none on a refused join; closed day refused; caps per contact, per date and per venue; blocklist last; bot checks as C45; no reservation, event or table written. | `public_booking`, `public_venue` |
 | `GET /v1/public/waitlist-entry` (new) | `X-Self-Service-Token` | guest entry view | Booking token refused; identical failures; expiry at end of date. | `public_read`, `self_service` |
 | `POST /v1/public/waitlist-entry/leave` (new) | token, UUID key | cancelled entry view | Revokes in the same transaction; replay returns the result; staff list shows it cancelled. | `self_service` |
+
+## Wallet passes, kept in mind
+
+The owner asked to keep wallet passes in view because they are trending and can ease daily tasks (a booking reminder on the phone's lock screen, a waitlist status, a loyalty card later). This ADR does not build them. It avoids choices that would block them:
+
+- The booking link and the waitlist leave link are already random tokens with only a hash stored. A pass would carry the same kind of link, so it needs no new identity.
+- A pass changes when the booking changes, so it needs a way to push updates. The monotonic reservation version and the event feed already say what changed.
+- Not verified here: the account, signing and update requirements of Apple and Google wallet passes, and whether a pass needs guest consent beyond the one for the booking email. Both need checking before a design.
+- A ROADMAP entry and its own ADR come when the owner wants to start.
 
 ## Evidence and limits
 
@@ -229,7 +238,7 @@ New case ideas below start at the next free id, C63.
 
 **Harder.** Public answers gain zones, possibly service names, and an address, so C40's scan changes. The waitlist gains a date and becomes two lists in one: today's queue and future requests. Staff must turn future entries into bookings by hand. A new token table and a new page.
 
-**Accepted.** `/days` makes occupancy cheaper to scrape than today, bounded by `public_days`. Contacts on the waitlist are not verified, so caps per contact are weak, as ADR-0017 accepts for bookings. A waitlist join gets no email until the legal review.
+**Accepted.** `/days` makes occupancy cheaper to scrape than today, bounded by `public_days`. Contacts on the waitlist are not verified, so caps per contact are weak, as ADR-0017 accepts for bookings. A waitlist join is limited to guests with an email, and the first email depends on the wording the legal review confirms.
 
 **Changes to existing rules.** ADR-0017 section 2 "No table or zone choice" (zones only), ADR-0017 decision 4 and `PublicVenue` "no address", C40 (zone and service name), C42 (zones in the answer), C43 (`zone` in the create), C52 (new rule, waitlist route on two rules), C57 ("adding to the waitlist is not checked" stays true for staff only), and `WaitlistEntry` on staff routes and MCP.
 
@@ -245,16 +254,19 @@ New case ideas below start at the next free id, C63.
 - **Reusing `self_service_links` for waitlist tokens.** Rejected: a booking token must never name a waitlist entry, and that table's rows point to reservations.
 - **Notice text written by the project.** Rejected: legal text waits for the review.
 
+## Decided by the owner (2026-11-19)
+
+- **Q2. Full versus closed.** Expose both. No per-venue switch in v1. A venue that asks to hide `full` gets one later.
+- **Q4. No zone preference.** A create without `zone` uses every table, as today. Public zones only filter when the guest picks one.
+- **Q9. Waitlist email.** The join sends email, and the guest has to accept it when joining: an unticked `emailConsent` box, required to join. This replaces the earlier proposal of no email in v1. The consent wording stays under the legal review (Q11).
+- **Q10. Blocklist on the waitlist.** Applied to the public join, last, with the same answer a blocked public create gets, so the list does not reveal who is on it. C57's "adding to the waitlist is not checked" holds for staff adds only.
+
 ## Open questions for the owner
 
 - **Q1. Range.** 14 days per call with paging for the calendar, or up to 42 for a month in one call at 3 times the cost?
-- **Q2. Full versus closed.** Expose both (recommended), or a per-venue switch that reports `full` as `closed` and hides the waitlist?
 - **Q3. Service names.** Opt-in `showServiceNames` to group times by service (recommended), or no grouping?
-- **Q4. No zone preference.** A create without `zone` uses every table, as today (recommended), or only the tables of public zones?
 - **Q5. Zone labels.** Show stored zone names, or add a public label per zone and locale?
 - **Q6. Address.** Show the profile address whenever set, like the phone (recommended), or only with `publicProfileEnabled`? The phone has the same question today.
 - **Q7. Waitlist caps.** 2 open public entries per contact, 1 per date, 50 per date per venue. Constants or settings?
 - **Q8. Booking from an entry.** Add a `booked` waitlist status that links the staff booking, or have staff remove the entry after booking?
-- **Q9. Waitlist email.** Agree that the join confirmation waits for the legal review, with the link shown on screen only?
-- **Q10. Blocklist on the waitlist.** Apply it to the public join (recommended)?
 - **Q11. Legal review.** Placement of the notice link, whether a booking without `privacyNoticeUrl` is acceptable, consent wording, and confirmation that pre-ticked boxes are not valid consent under EU rules.
