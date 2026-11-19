@@ -19,6 +19,7 @@ import {
   listMembershipAudit,
 } from "./lib/membership-audit";
 import { auth, trustedOrigins } from "./lib/auth";
+import { getReservationTrace } from "./lib/reservation-trace";
 import { staffOriginGuard } from "./lib/staff-origin";
 import {
   addToBlocklist,
@@ -973,6 +974,12 @@ app.get("/v1/venues/:venueId/reservations/:id", async (c) => {
   const reservation = await getReservation(db, venueId, id);
   if (!reservation) return error(c, "reservation_not_found");
   return c.json(toApi(reservation, venueId));
+});
+
+app.get("/v1/venues/:venueId/reservations/:id/trace", async (c) => {
+  const trace = await getReservationTrace(db, c.req.param("venueId"), c.req.param("id"));
+  if (!trace) return error(c, "reservation_not_found");
+  return c.json(trace);
 });
 
 app.get("/v1/venues/:venueId/reservations", async (c) => {

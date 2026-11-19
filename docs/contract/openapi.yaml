@@ -382,7 +382,8 @@ paths:
         principal the engine recorded as `bookedVia`. Each entry is one event
         of the reservation from the feed, oldest first, with the
         `Idempotency-Key` of the write that produced it, or null when the
-        write carried none (erasure) or the key was pruned. It holds no guest
+        write carried none (erasure). For a public booking it is the key the
+        client sent. It holds no guest
         data. Events pruned by retention are absent. A reservation of another
         venue fails with `reservation_not_found`.
       parameters:
