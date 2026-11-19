@@ -453,7 +453,7 @@ describe("OnlineBookingCard", () => {
 
     expect(screen.queryByLabelText("Dark: background")).not.toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Preview of the booking page in dark mode" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("switch", { name: "Choose colors for dark mode" }));
+    await user.click(screen.getByRole("switch", { name: "Choose a look for dark mode" }));
 
     expect(screen.getByLabelText("Dark: buttons")).toHaveValue(DEFAULT_DARK_COLORS.primary);
     expect(screen.getByLabelText("Dark: text")).toHaveValue(DEFAULT_DARK_COLORS.text);
@@ -477,7 +477,7 @@ describe("OnlineBookingCard", () => {
     await loaded();
 
     fireEvent.change(screen.getByLabelText("Buttons"), { target: { value: "#aa0000" } });
-    await user.click(screen.getByRole("switch", { name: "Choose colors for dark mode" }));
+    await user.click(screen.getByRole("switch", { name: "Choose a look for dark mode" }));
     await user.click(screen.getByRole("button", { name: "Save online booking" }));
 
     await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
@@ -494,8 +494,8 @@ describe("OnlineBookingCard", () => {
 
     await waitFor(() => expect(screen.getByLabelText("Dark: background")).toHaveValue("#101010"));
     expect(screen.getByLabelText("Dark: text")).toHaveValue(DEFAULT_DARK_COLORS.text);
-    expect(screen.getByRole("switch", { name: "Choose colors for dark mode" })).toBeChecked();
-    await user.click(screen.getByRole("switch", { name: "Choose colors for dark mode" }));
+    expect(screen.getByRole("switch", { name: "Choose a look for dark mode" })).toBeChecked();
+    await user.click(screen.getByRole("switch", { name: "Choose a look for dark mode" }));
     expect(screen.queryByLabelText("Dark: background")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save online booking" }));
 
@@ -517,13 +517,87 @@ describe("OnlineBookingCard", () => {
     renderWithApp(<OnlineBookingCard venueId="v1" />);
     await loaded();
 
-    await user.click(screen.getByRole("switch", { name: "Choose colors for dark mode" }));
+    await user.click(screen.getByRole("switch", { name: "Choose a look for dark mode" }));
     fireEvent.change(screen.getByLabelText("Dark: background"), { target: { value: "#eeeeee" } });
     await user.click(screen.getByRole("button", { name: "Save online booking" }));
 
     const alert = await screen.findByText(/dark text color has a contrast of 2.1:1/);
     expect(alert).toHaveTextContent("4.5:1");
     expect(screen.queryByText(/Saved, but the text color has a contrast/)).not.toBeInTheDocument();
+  });
+
+  it("lets the dark look have its own corner radius and font, and the preview follows", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    expect(screen.queryByLabelText("Corner radius in dark mode (px)")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("switch", { name: "Choose a look for dark mode" }));
+    const radius = screen.getByLabelText("Corner radius in dark mode (px)");
+    expect(radius).toHaveValue("");
+    expect(radius).toHaveAttribute("placeholder", "Same as light");
+    expect(screen.getByLabelText("Font in dark mode")).toHaveValue("");
+
+    await user.type(radius, "16");
+    await user.selectOptions(screen.getByLabelText("Font in dark mode"), "serif");
+    const dark = screen.getByRole("img", { name: "Preview of the booking page in dark mode" });
+    expect(dark).toHaveStyle({ borderRadius: "16px" });
+    expect(dark.getAttribute("style")).toContain("serif");
+    expect(screen.getByRole("img", { name: "Preview of the booking page" })).toHaveStyle({ borderRadius: "8px" });
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0].body).toEqual({ theme: { darkColors: {}, darkRadius: 16, darkFont: "serif" } });
+  });
+
+  it("leaves out a dark radius or font that equals the light one", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await user.selectOptions(screen.getByLabelText("Font"), "serif");
+    await user.click(screen.getByRole("switch", { name: "Choose a look for dark mode" }));
+    await user.type(screen.getByLabelText("Corner radius in dark mode (px)"), "8");
+    await user.selectOptions(screen.getByLabelText("Font in dark mode"), "serif");
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0].body).toEqual({ theme: { font: "serif", darkColors: {} } });
+  });
+
+  it("refuses a dark corner radius outside 0 to 24 and sends nothing", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await user.click(screen.getByRole("switch", { name: "Choose a look for dark mode" }));
+    await user.type(screen.getByLabelText("Corner radius in dark mode (px)"), "30");
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+    expect(
+      await screen.findByText("Whole number of pixels from 0 to 24, or empty for the same as light mode."),
+    ).toBeInTheDocument();
+    expect(api.calls("PUT", PATH)).toHaveLength(0);
+  });
+
+  it("turns the switch on for a saved dark radius or font alone, and turning it off removes them", async () => {
+    const user = userEvent.setup();
+    const api = setup({ theme: { darkRadius: 16, darkFont: "rounded" } } as Partial<typeof SETTINGS>, {
+      [`PUT ${PATH}`]: { body: { ...SETTINGS, warnings: [] } },
+    });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await waitFor(() => expect(screen.getByLabelText("Corner radius in dark mode (px)")).toHaveValue("16"));
+    expect(screen.getByLabelText("Font in dark mode")).toHaveValue("rounded");
+    expect(screen.getByRole("switch", { name: "Choose a look for dark mode" })).toBeChecked();
+    await user.click(screen.getByRole("switch", { name: "Choose a look for dark mode" }));
+    await user.click(screen.getByRole("button", { name: "Save online booking" }));
+
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0].body).toEqual({ theme: null });
   });
 
   it("keeps the built-in dark look equal to the widget's stylesheet", () => {

@@ -80,20 +80,26 @@ const FONT_LABELS: Record<Font, string> = { system: "System", serif: "Serif", ro
 function ThemePreview({
   theme,
   colors,
+  radiusText,
+  font,
   label = "Preview of the booking page",
 }: {
   theme: ThemeForm;
   colors?: ThemeForm["colors"];
+  /** Overrides the corner radius, as text. Empty or absent keeps the theme's. */
+  radiusText?: string;
+  /** Overrides the font. Absent keeps the theme's. */
+  font?: Font;
   label?: string;
 }) {
   const c = colors ?? theme.colors;
-  const radius = `${Math.min(24, Math.max(0, Number(theme.radius) || 0))}px`;
+  const radius = `${Math.min(24, Math.max(0, Number(radiusText?.trim() ? radiusText : theme.radius) || 0))}px`;
   return (
     <div
       aria-label={label}
       role="img"
       className="space-y-3 border p-4 text-sm"
-      style={{ background: c.background, color: c.text, fontFamily: FONT_STACKS[theme.font], borderColor: c.border, borderRadius: radius }}
+      style={{ background: c.background, color: c.text, fontFamily: FONT_STACKS[font ?? theme.font], borderColor: c.border, borderRadius: radius }}
     >
       {isLogoUrl(theme.logoUrl.trim()) && (
         <div className="flex h-8 w-20 items-center justify-center border border-dashed text-xs" style={{ borderColor: c.border, color: c.muted }}>
@@ -486,11 +492,11 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                   <div className="space-y-3 rounded-lg border p-3">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <Label htmlFor="ob-dark-palette">Choose colors for dark mode</Label>
+                        <Label htmlFor="ob-dark-palette">Choose a look for dark mode</Label>
                         <p className="text-sm text-muted-foreground">
                           Off: a visitor in dark mode sees the standard dark look if you kept the
                           default colors above, and your colors above otherwise. On: they see the
-                          colors below.
+                          colors, corner radius and font below.
                         </p>
                       </div>
                       <Switch
@@ -524,6 +530,37 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                           ))}
                         </div>
                         {error("themeDarkColors")}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="ob-dark-radius">Corner radius in dark mode (px)</Label>
+                            <Input
+                              id="ob-dark-radius"
+                              inputMode="numeric"
+                              placeholder="Same as light"
+                              value={form.theme.darkRadius}
+                              aria-invalid={errors.themeDarkRadius ? true : undefined}
+                              aria-describedby={errors.themeDarkRadius ? "ob-themeDarkRadius-error" : undefined}
+                              onChange={(e) => setTheme({ darkRadius: e.target.value })}
+                            />
+                            {error("themeDarkRadius")}
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="ob-dark-font">Font in dark mode</Label>
+                            <select
+                              id="ob-dark-font"
+                              value={form.theme.darkFont}
+                              onChange={(e) => setTheme({ darkFont: e.target.value as Font | "" })}
+                              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                            >
+                              <option value="">Same as light</option>
+                              {FONTS.map((f) => (
+                                <option key={f} value={f}>
+                                  {FONT_LABELS[f]}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
                       </>
                     )}
                   </div>
@@ -587,6 +624,8 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     <ThemePreview
                       theme={form.theme}
                       colors={form.theme.darkColors}
+                      radiusText={form.theme.darkRadius}
+                      font={form.theme.darkFont || undefined}
                       label="Preview of the booking page in dark mode"
                     />
                   )}

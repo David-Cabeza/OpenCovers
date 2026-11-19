@@ -243,6 +243,18 @@ describe("online booking settings", () => {
       { theme: { css: "body{}", colors: { text: "#000000" } } },
       { theme: { template: "{{name}}" } },
       { theme: { html: "<b>x</b>" } },
+      { theme: { darkRadius: 25 } },
+      { theme: { darkRadius: -1 } },
+      { theme: { darkRadius: 1.5 } },
+      { theme: { darkRadius: "8px" } },
+      { theme: { darkRadius: "8" } },
+      { theme: { darkRadius: null } },
+      { theme: { darkRadius: 1e9 } },
+      { theme: { darkFont: "Comic Sans" } },
+      { theme: { darkFont: "https://fonts.example.com/f.woff" } },
+      { theme: { darkFont: "serif; } body { background: red" } },
+      { theme: { darkFont: ["serif"] } },
+      { theme: { darkFont: null } },
       { theme: { darkColors: { primary: "red" } } },
       { theme: { darkColors: { primary: "#fff" } } },
       { theme: { darkColors: { accent: "#ffffff" } } },
@@ -326,6 +338,19 @@ describe("online booking settings", () => {
     expect(empty.theme).toEqual({ darkColors: {} });
     expect(empty.warnings).toEqual([]);
     expect((await (await put("oa", "oa-admin", { theme: { radius: 4 } })).json()).theme).toEqual({ radius: 4 });
+    await put("oa", "oa-admin", { theme: null });
+  });
+
+  it("saves a dark radius and a dark font on their own and reads them back", async () => {
+    const res = await put("oa", "oa-admin", { theme: { radius: 4, font: "serif", darkRadius: 16, darkFont: "rounded" } });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.theme).toEqual({ radius: 4, font: "serif", darkRadius: 16, darkFont: "rounded" });
+    expect(body.warnings).toEqual([]);
+    expect((await read()).theme).toEqual(body.theme);
+    const alone = await (await put("oa", "oa-admin", { theme: { darkRadius: 0 } })).json();
+    expect(alone.theme).toEqual({ darkRadius: 0 });
+    expect((await (await put("oa", "oa-admin", { theme: { darkFont: "serif" } })).json()).theme).toEqual({ darkFont: "serif" });
     await put("oa", "oa-admin", { theme: null });
   });
 

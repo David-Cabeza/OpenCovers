@@ -3,7 +3,7 @@ import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { applyTheme, applyThemeToDocument, followsSystemScheme, FONT_STACKS, isFramed, logoSrc, setsColors, setsDarkColors, themeVars, watchTheme } from "../src/theme";
+import { applyTheme, applyThemeToDocument, followsSystemScheme, FONT_STACKS, isFramed, logoSrc, setsColors, offersDarkLook, themeVars, watchTheme } from "../src/theme";
 import { Logo, VenueHeader } from "../src/ui";
 
 const css = readFileSync(path.resolve(import.meta.dirname, "../src/styles.css"), "utf8");
@@ -224,11 +224,13 @@ describe("dark mode", () => {
     expect(themeVars({ colors: { primary: "#aa0000" } }, "dark")).toEqual([]);
   });
 
-  it("counts a theme as having a dark palette when darkColors is an object, even an empty one", () => {
-    expect(setsDarkColors(PALETTES)).toBe(true);
-    expect(setsDarkColors({ darkColors: {} })).toBe(true);
-    for (const theme of [undefined, null, {}, { colors: { primary: "#aa0000" } }, { darkColors: null }, { darkColors: [] }, { darkColors: "#000000" }]) {
-      expect(setsDarkColors(theme), JSON.stringify(theme)).toBe(false);
+  it("counts a theme as offering a dark look for darkColors (even empty), a valid darkRadius or a valid darkFont", () => {
+    expect(offersDarkLook(PALETTES)).toBe(true);
+    expect(offersDarkLook({ darkColors: {} })).toBe(true);
+    expect(offersDarkLook({ darkRadius: 0 })).toBe(true);
+    expect(offersDarkLook({ darkFont: "serif" })).toBe(true);
+    for (const theme of [undefined, null, {}, { colors: { primary: "#aa0000" } }, { darkColors: null }, { darkColors: [] }, { darkColors: "#000000" }, { darkRadius: 25 }, { darkRadius: "8px" }, { darkRadius: 1.5 }, { darkFont: "Comic Sans" }, { darkFont: null }, { radius: 4, font: "serif" }]) {
+      expect(offersDarkLook(theme), JSON.stringify(theme)).toBe(false);
     }
   });
 
@@ -315,5 +317,36 @@ describe("dark mode", () => {
       watchTheme(PALETTES, win);
       expect(set).toEqual({ "--oc-primary": "#aa0000", "--oc-background": "#ffffff" });
     });
+  });
+
+  it("takes the radius and the font of the dark look from darkRadius and darkFont, each falling back to the light one", () => {
+    const theme = { radius: 4, font: "serif", darkRadius: 16, darkFont: "rounded" };
+    expect(themeVars(theme, "dark")).toEqual([["--oc-radius", "16px"], ["--oc-font", FONT_STACKS.rounded]]);
+    expect(themeVars(theme)).toEqual([["--oc-radius", "4px"], ["--oc-font", FONT_STACKS.serif]]);
+    expect(themeVars({ radius: 4, font: "serif", darkRadius: 0 }, "dark")).toEqual([["--oc-radius", "0px"], ["--oc-font", FONT_STACKS.serif]]);
+    expect(themeVars({ radius: 4, darkFont: "rounded" }, "dark")).toEqual([["--oc-radius", "4px"], ["--oc-font", FONT_STACKS.rounded]]);
+    expect(themeVars({ radius: 4, font: "serif", darkRadius: 99, darkFont: "Comic Sans" }, "dark")).toEqual([
+      ["--oc-radius", "4px"],
+      ["--oc-font", FONT_STACKS.serif],
+    ]);
+    expect(themeVars({ darkRadius: 16, darkFont: "serif" })).toEqual([]);
+  });
+
+  it("swaps the radius and the font with the palette and leaves nothing of the other one behind", () => {
+    const theme = { darkRadius: 16, darkFont: "serif", colors: { primary: "#aa0000" } };
+    const { doc, set, dataset } = docFor("system");
+    applyThemeToDocument(theme, doc, true);
+    expect(set).toEqual({ "--oc-radius": "16px", "--oc-font": FONT_STACKS.serif });
+    expect(dataset.scheme).toBe("system");
+    applyThemeToDocument(theme, doc, false);
+    expect(set).toEqual({ "--oc-primary": "#aa0000" });
+    applyThemeToDocument(theme, doc, true);
+    expect(set).toEqual({ "--oc-radius": "16px", "--oc-font": FONT_STACKS.serif });
+  });
+
+  it("does not use darkRadius on a page that does not follow the system", () => {
+    const { doc, set } = docFor(undefined);
+    applyThemeToDocument({ radius: 4, darkRadius: 16 }, doc, true);
+    expect(set).toEqual({ "--oc-radius": "4px" });
   });
 });

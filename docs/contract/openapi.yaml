@@ -3544,8 +3544,9 @@ components:
         While a theme sets no color, the widget's own pages use dark built-in
         colors for a visitor whose system asks for dark mode, and a framed
         widget does too when the embed asks with `?scheme=auto`. A theme with
-        any `colors` and no `darkColors` keeps the light built-in ones for
-        the colors it leaves out, for every visitor.
+        any `colors` and no dark look keeps the light built-in ones for the
+        colors it leaves out, for every visitor. A dark look is any of
+        `darkColors`, `darkRadius` and `darkFont`.
       properties:
         colors: { $ref: "#/components/schemas/ThemeColors" }
         darkColors:
@@ -3567,6 +3568,18 @@ components:
           type: string
           enum: [system, serif, rounded]
           description: One of the font stacks shipped with the widget.
+        darkRadius:
+          type: integer
+          minimum: 0
+          maximum: 24
+          description: |
+            Corner radius in pixels for a visitor in dark mode, when the widget
+            follows the visitor's setting. Absent, `radius` applies.
+        darkFont:
+          type: string
+          enum: [system, serif, rounded]
+          description: |
+            The font stack for a visitor in dark mode. Absent, `font` applies.
         logoUrl:
           type: string
           format: uri

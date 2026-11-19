@@ -24,6 +24,9 @@ export interface Theme {
   darkColors?: ColorSet;
   radius?: number;
   font?: (typeof FONTS)[number];
+  /** The corner radius and the font for a visitor in dark mode. Each falls back to `radius` or `font`. */
+  darkRadius?: number;
+  darkFont?: (typeof FONTS)[number];
   logoUrl?: string;
 }
 
@@ -145,12 +148,12 @@ function parseTheme(v: unknown): Theme | null {
       const colors = parseColors(val);
       if (!colors) return null;
       out[k] = colors;
-    } else if (k === "radius") {
+    } else if (k === "radius" || k === "darkRadius") {
       if (!intIn(val, 0, 24)) return null;
-      out.radius = val;
-    } else if (k === "font") {
+      out[k] = val;
+    } else if (k === "font" || k === "darkFont") {
       if (typeof val !== "string" || !(FONTS as readonly string[]).includes(val)) return null;
-      out.font = val as (typeof FONTS)[number];
+      out[k] = val as (typeof FONTS)[number];
     } else if (k === "logoUrl") {
       if (val === null) continue;
       if (typeof val !== "string" || val.length > MAX_LOGO_URL || /[\s\x00-\x1f\x7f]/.test(val)) return null;

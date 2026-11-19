@@ -47,6 +47,9 @@ export interface Theme {
   darkColors?: Partial<Record<ColorKey, string>>;
   radius?: number;
   font?: Font;
+  /** The corner radius and font for a visitor in dark mode. Each falls back to `radius` or `font`. */
+  darkRadius?: number;
+  darkFont?: Font;
   logoUrl?: string | null;
 }
 
@@ -87,17 +90,27 @@ export interface ThemeForm {
   colors: Record<ColorKey, string>;
   /** The dark palette as the form holds it, or null while the venue has none. */
   darkColors: Record<ColorKey, string> | null;
+  /** Corner radius in dark mode as text. Empty means the same as in light mode. */
+  darkRadius: string;
   radius: string;
   font: Font;
+  /** Font in dark mode. Empty means the same as in light mode. */
+  darkFont: Font | "";
   logoUrl: string;
 }
 
 export function themeToForm(theme: Theme): ThemeForm {
   return {
     colors: { ...DEFAULT_THEME.colors, ...theme.colors },
-    darkColors: theme.darkColors ? { ...DEFAULT_DARK_COLORS, ...theme.darkColors } : null,
+    // The switch is on for any part of a dark look, so a dark radius or font saved without colors is not lost.
+    darkColors:
+      theme.darkColors || theme.darkRadius !== undefined || theme.darkFont
+        ? { ...DEFAULT_DARK_COLORS, ...theme.darkColors }
+        : null,
     radius: String(theme.radius ?? DEFAULT_THEME.radius),
+    darkRadius: theme.darkRadius === undefined ? "" : String(theme.darkRadius),
     font: theme.font ?? DEFAULT_THEME.font,
+    darkFont: theme.darkFont ?? "",
     logoUrl: theme.logoUrl ?? "",
   };
 }
@@ -126,17 +139,21 @@ function compact(theme: Theme): Theme {
     if (c && c !== DEFAULT_THEME.colors[k]) colors[k] = c;
   }
   if (Object.keys(colors).length > 0) out.colors = colors;
-  if (theme.darkColors) {
-    // Kept even when empty: a dark palette that equals the built-in one still tells the widget to offer dark mode.
+  // Any part of a dark look (colors, radius or font) means the widget offers dark mode, and that is kept even when
+  // everything equals the built-in value, so it is written as a possibly empty `darkColors`.
+  if (theme.darkColors !== undefined || theme.darkRadius !== undefined || theme.darkFont !== undefined) {
     const dark: Partial<Record<ColorKey, string>> = {};
     for (const k of COLOR_KEYS) {
-      const c = theme.darkColors[k]?.toLowerCase();
+      const c = theme.darkColors?.[k]?.toLowerCase();
       if (c && c !== DEFAULT_DARK_COLORS[k]) dark[k] = c;
     }
     out.darkColors = dark;
   }
   if (theme.radius !== undefined && theme.radius !== DEFAULT_THEME.radius) out.radius = theme.radius;
   if (theme.font !== undefined && theme.font !== DEFAULT_THEME.font) out.font = theme.font;
+  // A dark radius or font equal to the light one says nothing, so it is left out.
+  if (theme.darkRadius !== undefined && theme.darkRadius !== (theme.radius ?? DEFAULT_THEME.radius)) out.darkRadius = theme.darkRadius;
+  if (theme.darkFont !== undefined && theme.darkFont !== (theme.font ?? DEFAULT_THEME.font)) out.darkFont = theme.darkFont;
   if (theme.logoUrl) out.logoUrl = theme.logoUrl;
   return out;
 }
@@ -144,10 +161,16 @@ function compact(theme: Theme): Theme {
 /** The theme the form describes, or null after writing its errors into `errors`. */
 function parseTheme(form: ThemeForm, errors: FormErrors): Theme | null {
   const radius = int(form.radius, 0, 24, false);
+  const darkRadiusText = form.darkRadius.trim();
+  const darkRadius = darkRadiusText === "" ? undefined : (int(darkRadiusText, 0, 24, false) ?? undefined);
   const logo = form.logoUrl.trim();
   let ok = true;
   if (radius == null) {
     errors.themeRadius = "Whole number of pixels from 0 to 24.";
+    ok = false;
+  }
+  if (form.darkColors && darkRadiusText !== "" && darkRadius === undefined) {
+    errors.themeDarkRadius = "Whole number of pixels from 0 to 24, or empty for the same as light mode.";
     ok = false;
   }
   if (logo !== "" && !isLogoUrl(logo)) {
@@ -163,7 +186,17 @@ function parseTheme(form: ThemeForm, errors: FormErrors): Theme | null {
     errors.themeDarkColors = "Each color is #rrggbb.";
     ok = false;
   }
-  return ok ? compact({ colors: form.colors, darkColors: dark ?? undefined, radius: radius ?? undefined, font: form.font, logoUrl: logo || undefined }) : null;
+  return ok
+    ? compact({
+        colors: form.colors,
+        darkColors: dark ?? undefined,
+        radius: radius ?? undefined,
+        font: form.font,
+        darkRadius: dark ? (darkRadius ?? undefined) : undefined,
+        darkFont: dark && form.darkFont !== "" ? form.darkFont : undefined,
+        logoUrl: logo || undefined,
+      })
+    : null;
 }
 
 const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7];
@@ -186,7 +219,7 @@ export interface OnlineBookingForm {
 }
 
 export type FormErrors = Partial<
-  Record<Exclude<keyof OnlineBookingForm, "theme"> | "themeRadius" | "themeLogoUrl" | "themeColors" | "themeDarkColors", string>
+  Record<Exclude<keyof OnlineBookingForm, "theme"> | "themeRadius" | "themeLogoUrl" | "themeColors" | "themeDarkColors" | "themeDarkRadius", string>
 >;
 
 export function toForm(s: OnlineBooking): OnlineBookingForm {

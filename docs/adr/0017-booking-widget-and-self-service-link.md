@@ -534,3 +534,14 @@ Section 5's key set grows by one: `darkColors`. A venue can now choose the color
 - **Setup.** The look editor has a switch for the dark palette, with its own colors, preview and contrast warning.
 - **Not done.** A palette that follows the venue's own site toggle instead of the visitor's system setting, and a radius, font or logo per palette.
 
+## Amendment 2026-11-19: a dark radius and font
+
+Section 5's key set grows by two: `darkRadius` and `darkFont`. They complete the dark look of the amendment above.
+
+- **Shape.** `darkRadius` has the rules of `radius` (an integer from 0 to 24), and `darkFont` those of `font` (one of the shipped stacks). Both are optional, and no value takes CSS, a template or a font address.
+- **Fallback.** In dark mode each falls back to `radius` or `font`, not to a built-in value. This differs from the colors on purpose: colors are chosen as a pair and a half-set palette can be unreadable, while a shape and a typeface do not depend on each other, so the venue's light choice is a good default.
+- **A dark look.** It is now any of `darkColors` (even `{}`), a valid `darkRadius` or a valid `darkFont`. A dark look keeps the widget following the visitor's setting even when `colors` are set. A theme with `colors` and no dark look still keeps the widget light, so no venue changes without choosing to.
+- **In the widget.** `applyThemeToDocument` clears the radius and font properties together with the colors on every change, then sets the ones for the current palette, so a dark value never stays after the visitor switches back.
+- **Setup.** The dark section of the look editor has a corner radius field and a font select, both empty by default as "same as light", with the dark preview following them. A value equal to the light one is left out of the saved theme.
+- **Not done.** A logo per palette, and a palette that follows the venue's own site toggle.
+
