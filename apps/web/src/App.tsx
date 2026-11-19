@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ServerUnreachable } from "@/components/auth/server-unreachable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AuthScreen } from "@/components/auth/auth-screen";
-import { InviteJoin, InviteSignedOut } from "@/components/auth/invite-screen";
+import { InviteGate } from "@/components/auth/invite-screen";
 import { Dashboard } from "@/components/dashboard";
 import { authClient } from "@/lib/auth-client";
 import { takeInviteToken } from "@/lib/invite-link";
@@ -32,12 +32,7 @@ export default function App({ inviteToken = null }: { inviteToken?: string | nul
   if (!session && error) return <ServerUnreachable onRetry={() => void refetch()} />;
 
   if (token) {
-    const done = () => setToken(null);
-    return session ? (
-      <InviteJoin token={token} onDone={done} />
-    ) : (
-      <InviteSignedOut token={token} onDone={done} />
-    );
+    return <InviteGate token={token} signedIn={Boolean(session)} onDone={() => setToken(null)} />;
   }
 
   return session ? <Dashboard /> : <AuthScreen />;

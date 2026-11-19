@@ -165,7 +165,7 @@ export function rulesFor(method: string, rawPath: string, hasInvitationToken: bo
   const path = normalizePath(rawPath);
   if (path.startsWith("/v1/public/")) return publicRules(method.toUpperCase(), path);
   if (SAFE_METHODS.has(method.toUpperCase())) return [];
-  if (path === "/v1/invitations/redeem") return ["invitation"];
+  if (path === "/v1/invitations/redeem" || path === "/v1/invitations/check") return ["invitation"];
   if (path === "/v1/venues" && method.toUpperCase() === "POST") return ["venue_creation"];
   if (path === "/api/auth" || path.startsWith("/api/auth/")) {
     if (path.startsWith("/api/auth/sign-up")) {

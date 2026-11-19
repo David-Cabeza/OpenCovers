@@ -1712,6 +1712,45 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /invitations/check:
+    post:
+      operationId: invitation.check
+      summary: Ask whether an invitation link still works
+      description: |
+        Needs no session and no key. Answers `valid: true` when the token
+        names an invitation that could be redeemed now, and `valid: false` for
+        an unknown id, a wrong secret, and an expired, used, or revoked
+        invitation, the same answer for every cause. It answers nothing else:
+        no venue, role, email, or reason. An invitation bound to an email
+        counts as valid, because only the person redeeming it can be checked
+        against that address. Nothing is claimed or written, so asking never
+        uses the invitation up. A missing or empty `token` fails with
+        `invalid_request`. It spends the same `RATE_LIMIT_INVITATION` budget as
+        a redemption. See docs/adr/0006-staff-invitations.md, the amendment on
+        checking a link.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: Whether the link works
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [valid]
+                properties:
+                  valid: { type: boolean }
+        default:
+          $ref: "#/components/responses/Error"
+
   /venues/{venueId}/online-booking:
     get:
       operationId: venue.getOnlineBooking

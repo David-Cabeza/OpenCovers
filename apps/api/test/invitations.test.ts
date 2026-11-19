@@ -706,3 +706,57 @@ describe("retention and deletion", () => {
     expect(await db.select().from(invitations)).toHaveLength(0);
   });
 });
+
+describe("check", () => {
+  const check = (token: unknown) => call(null, "POST", "/v1/invitations/check", { token });
+
+  it("says a pending link works, to a caller with no session, and writes nothing", async () => {
+    const admin = await adminOf("v1");
+    const open = await invite(admin, "v1");
+    const bound = await invite(admin, "v1", { role: "write", email: "ana@example.com" });
+    const res = await check(open.token);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ valid: true });
+    expect(await (await check(bound.token)).json()).toEqual({ valid: true });
+    expect(await (await check(open.token)).json()).toEqual({ valid: true });
+    const rows = await db.select().from(invitations);
+    expect(rows.every((r) => r.redeemedAt === null && r.revokedAt === null)).toBe(true);
+    expect(await accountCount()).toBe(1);
+  });
+
+  it("answers the same, valid false and nothing more, for every way a link fails", async () => {
+    const admin = await adminOf("v1");
+    const used = await invite(admin, "v1");
+    expect((await redeem(await signUp(), used.token)).status).toBe(200);
+    const revoked = await invite(admin, "v1");
+    await call(admin, "DELETE", `/v1/venues/v1/invitations/${revoked.id}`);
+    const expired = await invite(admin, "v1");
+    await db
+      .update(invitations)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(invitations.id, expired.id));
+    const live = await invite(admin, "v1");
+    const wrongSecret = `${live.id}.${"x".repeat(43)}`;
+    for (const token of [used.token, revoked.token, expired.token, wrongSecret, "nonsense", `${crypto.randomUUID()}.abc`, "."]) {
+      const res = await check(token);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ valid: false });
+    }
+  });
+
+  it("needs a token", async () => {
+    for (const token of [undefined, "", 7, null]) {
+      const res = await check(token);
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe("invalid_request");
+    }
+  });
+
+  it("agrees with a redemption: a link it calls valid redeems, one it calls invalid does not", async () => {
+    const admin = await adminOf("v1");
+    const created = await invite(admin, "v1");
+    expect(await (await check(created.token)).json()).toEqual({ valid: true });
+    expect((await redeem(await signUp(), created.token)).status).toBe(200);
+    expect(await (await check(created.token)).json()).toEqual({ valid: false });
+  });
+});

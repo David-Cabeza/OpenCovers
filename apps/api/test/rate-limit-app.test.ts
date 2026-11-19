@@ -155,6 +155,18 @@ describe("rate limiting on the real app", () => {
     expect(other.status).not.toBe(429);
   });
 
+  it("counts the link check on the same budget as a redemption", async () => {
+    const ip = freshIp();
+    const check: number[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      check.push((await post("/v1/invitations/check", ip, { token: "x.y" })).status);
+    }
+    expect(check.slice(0, 4)).not.toContain(429);
+    expect(check[4]).toBe(429);
+    expect((await post("/v1/invitations/redeem", ip, { token: "x.y" })).status).toBe(429);
+    expect((await post("/v1/invitations/check", freshIp(), { token: "x.y" })).status).not.toBe(429);
+  });
+
   it("never limits health, session reads or other reads", async () => {
     const ip = freshIp();
     for (const path of ["/health", "/api/auth/get-session", "/v1/venues"]) {

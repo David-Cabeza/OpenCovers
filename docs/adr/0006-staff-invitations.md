@@ -120,3 +120,15 @@ No email sending, no staff screen in `apps/web`, no way to list or remove member
 - **Let `admin` keys invite.** Rejected for now. A key is not a person, and an agent that holds `admin` can already do what the invited person could. It can be allowed later without a schema change.
 - **Cap pending invitations per venue.** Rejected. The cap bounds nothing, because redeemed invitations stop counting, and rate limiting is the real control.
 - **Delete the email at redemption.** Rejected. Admins want to see who joined, and the retention sweep bounds the life of the address.
+
+## Amendment: checking a link before sign-up
+
+Date: 2026-11-19.
+
+A person who opens an invitation link that no longer works only learns it after filling in a sign-up, which is then refused with the same message every cause shares. The staff app now asks first.
+
+`POST /v1/invitations/check` takes `{ token }` and answers `{ valid: boolean }`. It needs no session, because the person asking has no account yet. `valid` is true only when the token names an invitation that could be redeemed right now, and the answer is the same body for an unknown id, a wrong secret, and an expired, used, or revoked invitation. An email-bound invitation counts as valid, since the address can only be checked against the account being made.
+
+What this lets a stranger learn is whether one exact token works. They already learn that by redeeming it, and the secret is 256 bits, so the route reveals no more than the redeem route does. It returns no venue, role, email or reason, it claims nothing, and it writes nothing, so asking never uses the invitation up. It uses the same constant-time comparison as redemption and the same per-address budget (`RATE_LIMIT_INVITATION`), so guessing through it costs what guessing through redemption costs. A POST keeps the token out of URLs and access logs.
+
+The check is a courtesy and never a gate. The staff app shows the invalid-link screen only on a clear `valid: false`. If the check fails or is rate limited, it shows the usual screen, and redemption remains the one decision that counts.
