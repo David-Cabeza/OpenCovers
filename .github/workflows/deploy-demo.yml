@@ -101,9 +101,13 @@ jobs:
           echo "api"
           curl -fsS "${retry[@]}" "$DEMO_URL/health"
           echo
-          echo "demo mode on (the proof-of-work challenge answers only under DEMO_MODE=1)"
-          curl -fsS "${retry[@]}" -X POST -H "Origin: $DEMO_URL" -H 'Content-Type: application/json' \
-            -d '{"email":"healthcheck@example.org"}' -o /dev/null "$DEMO_URL/api/demo/magic-link-challenge"
+          echo "demo mode on (a server without DEMO_MODE=1 answers enabled:false and fails this check)"
+          body=$(curl -fsS "${retry[@]}" "$DEMO_URL/api/demo/status")
+          echo "$body"
+          case "$body" in
+            *'"enabled":true'*) ;;
+            *) echo "::error::$DEMO_URL/api/demo/status did not report enabled:true"; exit 1 ;;
+          esac
 
       - name: Remove the SSH key
         if: always() && steps.cfg.outputs.go == 'true'
