@@ -155,6 +155,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
   const [errors, setErrors] = useState<FormErrors>({});
   const [incomplete, setIncomplete] = useState(false);
   const [host, setHost] = useState(window.location.origin);
+  const [followDark, setFollowDark] = useState(false);
   const [confirmRotate, setConfirmRotate] = useState(false);
   const [lowContrast, setLowContrast] = useState<number | null>(null);
 
@@ -283,8 +284,8 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
   if (missing.length === 0) missing.push("Check the venue name and the services bookable online.");
   const key = data?.bookingKey ?? null;
   const hostOk = widgetOrigin(host) !== null;
-  const snippet = key ? embedSnippet(host, key) : "";
-  const script = key ? scriptSnippet(host, key) : "";
+  const snippet = key ? embedSnippet(host, key, followDark) : "";
+  const script = key ? scriptSnippet(host, key, followDark) : "";
 
   return (
     <Card>
@@ -596,6 +597,18 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                       Enter the address as https://host, with no path.
                     </p>
                   )}
+
+                  <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
+                    <div>
+                      <Label htmlFor="ob-follow-dark">Follow my visitors&apos; dark mode</Label>
+                      <p className="text-sm text-muted-foreground">
+                        The embedded booking page turns dark for visitors whose device asks for dark
+                        mode. Leave it off if your website is always light. A theme with colors
+                        always stays as you set it.
+                      </p>
+                    </div>
+                    <Switch id="ob-follow-dark" checked={followDark} onCheckedChange={setFollowDark} />
+                  </div>
 
                   <Label htmlFor="ob-script">Embed code with automatic height (recommended)</Label>
                   <div className="flex gap-2">

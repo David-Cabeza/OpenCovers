@@ -266,9 +266,9 @@ export function parseForm(
   return Object.keys(errors).length > 0 ? { ok: false, errors } : { ok: true, update };
 }
 
-export function embedSnippet(origin: string, key: string): string {
+export function embedSnippet(origin: string, key: string, followDark = false): string {
   const base = origin.trim().replace(/\/+$/, "");
-  return `<iframe src="${base}/w/${key}" title="Book a table" width="100%" height="640" style="border:0" loading="lazy"></iframe>`;
+  return `<iframe src="${base}/w/${key}${followDark ? "?scheme=auto" : ""}" title="Book a table" width="100%" height="640" style="border:0" loading="lazy"></iframe>`;
 }
 
 /** The widget address as an origin without a trailing slash, or null when it is not one (http or https, no path). */
@@ -284,7 +284,7 @@ export function widgetOrigin(input: string): string | null {
 }
 
 /** The recommended snippet: `embed.js` adds an iframe that follows the widget's height. */
-export function scriptSnippet(origin: string, key: string): string {
+export function scriptSnippet(origin: string, key: string, followDark = false): string {
   const base = origin.trim().replace(/\/+$/, "");
-  return `<script src="${base}/w/embed.js" data-key="${key}" async></script>`;
+  return `<script src="${base}/w/embed.js" data-key="${key}"${followDark ? ' data-scheme="auto"' : ""} async></script>`;
 }

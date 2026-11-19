@@ -512,3 +512,13 @@ The widget gets dark built-in colors. The key set of the theme in section 5 does
 - **How.** `styles.css` holds the dark values under `@media (prefers-color-scheme: dark)` for `:root[data-scheme="system"]`. `main.tsx` sets `data-scheme` at once when the page is not framed, so the first paint is already right. When the theme arrives and sets a color, `applyThemeToDocument` removes the attribute. That is one flash to light for a venue with a colored theme and none for the default theme.
 - **Not done.** A venue cannot ask for dark in an embedded widget, or choose a dark palette in Setup. Either would be a new theme key or an `embed.js` option, which is a contract change of its own.
 
+## Amendment 2026-11-19: dark mode for an embedded widget (opt-in)
+
+The dark mode of the amendment above stays off inside an iframe by default. An embedding site can now ask for it.
+
+- **How.** `embed.js` reads `data-scheme="auto"` on its tag and adds `?scheme=auto` to the iframe address. A plain iframe snippet can carry the same query. The widget page reads that query and, when it is exactly `scheme=auto`, follows the visitor's setting as it does on its own page. Any other value, or none, keeps the widget light.
+- **Why a query and not a theme key.** The choice belongs to the website that embeds the widget, which knows whether its own page is dark or light, and not to the venue's stored theme. A theme key would change the closed key set of section 5, the API validation and every client. The query changes none of them.
+- **What stays.** A theme with any color still wins: the dark colors apply only while the theme sets none. The query is read by the widget script only, as a fixed comparison. `embed.js` sends the fixed string `?scheme=auto` and never copies the attribute's text into the address.
+- **Setup.** The embed section has a switch, "Follow my visitors' dark mode", that adds the option to both embed codes. It is not stored: it only changes the code shown.
+- **Not done.** A dark palette chosen by the venue in Setup, which would need a theme key.
+

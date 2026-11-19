@@ -226,6 +226,25 @@ describe("OnlineBookingCard", () => {
     expect(writeText).toHaveBeenLastCalledWith((frame as HTMLTextAreaElement).value);
   });
 
+  it("adds the dark-mode option to both snippets when asked", async () => {
+    const user = userEvent.setup();
+    setup({ enabled: true, bookingKey: "pk_abc123" });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    const o = window.location.origin;
+    const script = screen.getByLabelText(/Embed code with automatic height/);
+    const frame = screen.getByLabelText("Embed code with a fixed height");
+    await user.click(screen.getByRole("switch", { name: /Follow my visitors/ }));
+    expect(script).toHaveValue(`<script src="${o}/w/embed.js" data-key="pk_abc123" data-scheme="auto" async></script>`);
+    expect(frame).toHaveValue(
+      `<iframe src="${o}/w/pk_abc123?scheme=auto" title="Book a table" width="100%" height="640" style="border:0" loading="lazy"></iframe>`,
+    );
+
+    await user.click(screen.getByRole("switch", { name: /Follow my visitors/ }));
+    expect(script).toHaveValue(`<script src="${o}/w/embed.js" data-key="pk_abc123" async></script>`);
+  });
+
   it("flags an address that is not an origin and disables both copy buttons", async () => {
     const user = userEvent.setup();
     setup({ enabled: true, bookingKey: "pk_abc123" });

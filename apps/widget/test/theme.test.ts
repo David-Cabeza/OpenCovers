@@ -3,7 +3,7 @@ import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { applyTheme, applyThemeToDocument, FONT_STACKS, isFramed, logoSrc, setsColors, themeVars } from "../src/theme";
+import { applyTheme, applyThemeToDocument, followsSystemScheme, FONT_STACKS, isFramed, logoSrc, setsColors, themeVars } from "../src/theme";
 import { Logo, VenueHeader } from "../src/ui";
 
 const css = readFileSync(path.resolve(import.meta.dirname, "../src/styles.css"), "utf8");
@@ -156,6 +156,20 @@ describe("dark mode", () => {
     const top = {} as Window;
     expect(isFramed({ self: top, top })).toBe(false);
     expect(isFramed({ self: {} as Window, top })).toBe(true);
+  });
+
+  it("follows the system on its own page, and in an iframe only when the embed asks", () => {
+    const top = {} as Window;
+    const own = { self: top, top, location: { search: "" } as Location };
+    expect(followsSystemScheme(own)).toBe(true);
+    const frame = { self: {} as Window, top };
+    expect(followsSystemScheme({ ...frame, location: { search: "" } as Location })).toBe(false);
+    expect(followsSystemScheme({ ...frame, location: { search: "?lang=en" } as Location })).toBe(false);
+    for (const search of ["?scheme=dark", "?scheme=AUTO", "?scheme=", "?x=scheme=auto"]) {
+      expect(followsSystemScheme({ ...frame, location: { search } as Location }), search).toBe(false);
+    }
+    expect(followsSystemScheme({ ...frame, location: { search: "?scheme=auto" } as Location })).toBe(true);
+    expect(followsSystemScheme({ ...frame, location: { search: "?lang=en&scheme=auto" } as Location })).toBe(true);
   });
 
   function docFor(scheme: string | undefined) {
