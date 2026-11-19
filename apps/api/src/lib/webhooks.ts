@@ -3,6 +3,7 @@ import http from "node:http";
 import https from "node:https";
 import type { LookupFunction } from "node:net";
 import { and, asc, eq, inArray, lte, notInArray, sql } from "drizzle-orm";
+import { sandboxWebhooksBlocked } from "../demo/limits";
 import { events, venues, webhookEndpoints } from "../db/schema";
 import { getEvents, getEventsWatermark, type Db } from "./reservations";
 import {
@@ -87,6 +88,7 @@ export async function createWebhook(
   policy: TargetPolicy,
   createdBy: string | null = null,
 ): Promise<CreateWebhookResult> {
+  if (await sandboxWebhooksBlocked(db, venueId)) return { ok: false, code: "webhook_url_rejected" };
   const checked = await checkTarget(rawUrl, policy);
   if (!checked.ok) return { ok: false, code: "webhook_url_rejected" };
   const url = checked.target.url.href;

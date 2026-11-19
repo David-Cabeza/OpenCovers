@@ -25,7 +25,7 @@ Rows written before this change, and events written by a system sweep (retention
 
 - The events feed and the signed webhook payload do not change. The values are persisted for a later reader (the reservation trace in the staff app) and the contract is untouched. Exposing them is a contract change that needs its own conformance case.
 - A staff user id is personal data of staff, not of a guest. Erasing a user leaves their id in events. A key id is a prefix of a hash, not the key.
-- Migration `0040` may collide with another open pull request's. The one that merges second regenerates its migration with `pnpm db:generate`.
+- Migration `0041` may collide with another open pull request's. The one that merges second regenerates its migration with `pnpm db:generate`.
 
 ## Alternatives considered
 

@@ -87,7 +87,11 @@ export function InviteJoin({ token, onDone }: { token: string; onDone: () => voi
   return (
     <Shell description="Join the venue with the account you are signed in with.">
       <div className="space-y-4">
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
         <Button className="w-full" onClick={join} disabled={pending}>
           {pending ? "Joining…" : "Join"}
         </Button>

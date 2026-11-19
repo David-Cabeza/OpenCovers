@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SignInForm } from "./sign-in-form";
 
@@ -79,5 +80,40 @@ describe("SignInForm", () => {
 
     expect(await screen.findByText("The server is not responding right now. Try again in a moment.")).toBeInTheDocument();
   });
-});
 
+  it("shows a refused sign-in once, as an alert next to the form, and not also as a toast", async () => {
+    const toastError = vi.spyOn(toast, "error");
+    signInEmail.mockResolvedValue({ error: { status: 401, message: "Invalid email or password" } });
+    const user = userEvent.setup();
+    render(<SignInForm />);
+
+    await user.type(screen.getByLabelText("Email"), "host@example.com");
+    await user.type(screen.getByLabelText("Password"), "hunter2hunter2");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
+    expect(screen.getAllByText("Invalid email or password")).toHaveLength(1);
+    expect(toastError).not.toHaveBeenCalled();
+    toastError.mockRestore();
+  });
+
+  it("does not raise a toast for a server that does not answer either", async () => {
+    const toastError = vi.spyOn(toast, "error");
+    signInEmail.mockResolvedValue({ error: { status: 503, statusText: "" } });
+    const user = userEvent.setup();
+    render(<SignInForm />);
+
+    await user.type(screen.getByLabelText("Email"), "host@example.com");
+    await user.type(screen.getByLabelText("Password"), "hunter2hunter2");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The server is not responding");
+    expect(toastError).not.toHaveBeenCalled();
+    toastError.mockRestore();
+  });
+
+  it("leaves the empty password field looking empty", () => {
+    render(<SignInForm />);
+    expect(screen.getByLabelText("Password")).not.toHaveAttribute("placeholder");
+  });
+});

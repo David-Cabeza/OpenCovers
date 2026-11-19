@@ -13,6 +13,7 @@ export const RULE_NAMES = [
   "public_venue",
   "self_service",
   "public_days",
+  "magic_link",
 ] as const;
 export type RuleName = (typeof RULE_NAMES)[number];
 
@@ -33,6 +34,8 @@ export const DEFAULT_RULES: Rules = {
   public_venue: { max: 100, windowMs: 60 * 60_000 },
   self_service: { max: 60, windowMs: 15 * 60_000 },
   public_days: { max: 60, windowMs: 15 * 60_000 },
+  // Demo mode only (ADR-0022): one magic link per address per minute, on top of `auth`.
+  magic_link: { max: 1, windowMs: 60_000 },
 };
 
 export interface RateLimitConfig {
@@ -57,6 +60,7 @@ const RULE_ENV: Record<RuleName, string> = {
   public_venue: "RATE_LIMIT_PUBLIC_VENUE",
   self_service: "RATE_LIMIT_PUBLIC_SELF_SERVICE",
   public_days: "RATE_LIMIT_PUBLIC_DAYS",
+  magic_link: "RATE_LIMIT_MAGIC_LINK",
 };
 
 const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
@@ -148,7 +152,7 @@ export function rulesFor(method: string, rawPath: string, hasInvitationToken: bo
     if (path.startsWith("/api/auth/sign-up")) {
       return hasInvitationToken ? ["signup", "invitation"] : ["signup"];
     }
-    return ["auth"];
+    return path === "/api/auth/sign-in/magic-link" ? ["auth", "magic_link"] : ["auth"];
   }
   return [];
 }
@@ -181,6 +185,18 @@ function socketAddress(c: Context): string | undefined {
     return getConnInfo(c).remote.address;
   } catch {
     return undefined;
+  }
+}
+
+/** The address a magic link is asked for, lower case, or null when the body is missing, large or not JSON. */
+async function magicLinkAddress(c: Context): Promise<string | null> {
+  const length = Number(c.req.header("content-length") ?? Number.NaN);
+  if (!(length > 0 && length <= 4096)) return null;
+  try {
+    const body = (await c.req.raw.clone().json()) as { email?: unknown };
+    return typeof body.email === "string" && body.email.length <= 254 ? body.email.trim().toLowerCase() : null;
+  } catch {
+    return null;
   }
 }
 
@@ -280,7 +296,12 @@ export function createRateLimiter(config: RateLimitConfig, options: RateLimitOpt
     const names = rulesFor(c.req.method, c.req.path, Boolean(c.req.header(INVITATION_HEADER)?.trim()));
     if (names.length === 0) return next();
     const client = clientOf(c);
-    const subjectOf = (name: RuleName) => (name === "public_venue" ? `venue:${bookingKeyOf(c.req.path)}` : client);
+    const address = names.includes("magic_link") ? await magicLinkAddress(c) : null;
+    const subjectOf = (name: RuleName) => {
+      if (name === "public_venue") return `venue:${bookingKeyOf(c.req.path)}`;
+      if (name === "magic_link" && address !== null) return `mail:${address}`;
+      return client;
+    };
     const { retryAfter, charges } = consume(names, subjectOf, now());
     if (retryAfter === 0) {
       await next();

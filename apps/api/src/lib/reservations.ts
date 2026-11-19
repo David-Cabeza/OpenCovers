@@ -17,7 +17,8 @@ import { normalizeCommentary } from "./commentary";
 import { consentColumns, type Consent } from "./consent";
 import { normalizeContact, venueCountry } from "./contact";
 import { linkGuest } from "./guests";
-import { claimKey } from "./idempotency";
+import { sandboxFull } from "../demo/limits";
+import { claimKey, findKey } from "./idempotency";
 import { originColumns, type Origin } from "./origin";
 import { ratingColumns, type Rating } from "./rating";
 import { reconfirmationColumns, type Reconfirmation } from "./reconfirmation";
@@ -758,6 +759,10 @@ export async function createReservation(
   const storedVenue = await venueOf(db, venueId);
   if (!storedVenue) return { ok: false, code: "venue_not_found" };
   if (!isCalendarDate(input.date) || !TIME.test(input.time)) return { ok: false, code: "invalid_request" };
+  // A demo sandbox has lower caps (ADR-0022). A replayed key still replays. No-op unless DEMO_MODE=1.
+  if (!(await findKey(db, venueId, key)) && (await sandboxFull(db, venueId))) {
+    return { ok: false, code: "guest_booking_limit" };
+  }
   const channel = input.channel ?? STAFF;
   const { venue, serviceRows } = applyChannel(
     storedVenue,

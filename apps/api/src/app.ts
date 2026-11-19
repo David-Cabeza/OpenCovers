@@ -76,6 +76,7 @@ import {
 } from "./lib/widget-page";
 import { canResend, parseResendEmail, resendLinks } from "./lib/link-resend";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
+import { demoMode } from "./demo/settings";
 import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/signup";
 import { changeMemberRole, listMembers, removeMember } from "./lib/members";
 import {
@@ -528,7 +529,8 @@ app.post("/v1/account/transfer-creator", async (c) => {
 app.post("/v1/venues", async (c) => {
   const user = await sessionUser(c);
   if (!user) return error(c, "unauthorized");
-  if (!(await mayCreateVenue(db, signupMode(), user.id))) {
+  // A demo visitor has the one sandbox they were given (ADR-0022).
+  if (demoMode() || !(await mayCreateVenue(db, signupMode(), user.id))) {
     return error(c, "venue_creation_closed");
   }
   const body = await c.req.json().catch(() => null);

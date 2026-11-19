@@ -50,6 +50,15 @@ function tableSize(shape: string | undefined, seats: number): { w: number; h: nu
   return { w: d, h: d };
 }
 
+/**
+ * The room a label drawn upright has on a table: the table's width when it lies flat, its depth when it stands on end,
+ * and in between the chord a horizontal line makes across the turned table.
+ */
+function labelRoom(size: { w: number; h: number }, rotation: number): number {
+  const across = Math.abs(Math.sin((rotation * Math.PI) / 180));
+  return Math.min(size.w, across < 0.001 ? size.w : size.h / across) - 6;
+}
+
 const CHAIR_GAP = 8;
 
 function chairPositions(
@@ -400,7 +409,14 @@ export function FloorCanvas({
                     className="flex flex-col items-center justify-center"
                     style={{ transform: `rotate(${-rotation}deg)` }}
                   >
-                    <span className="px-1 text-[11px] font-semibold leading-tight">{t.name}</span>
+                    <span
+                      className={cn("px-1 text-[11px] font-semibold leading-tight", shape === "long" && "block truncate")}
+                      // A long table is narrow, and its name is drawn upright, so turned on its side the name has only
+                      // the table's width to fit in.
+                      style={shape === "long" ? { maxWidth: labelRoom(size, rotation) } : undefined}
+                    >
+                      {t.name}
+                    </span>
                     {t.occupied ? (
                       <>
                         <span className="max-w-[48px] truncate text-[10px] font-medium leading-tight">

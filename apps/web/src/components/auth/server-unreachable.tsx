@@ -21,7 +21,7 @@ export function ServerUnreachable({ onRetry }: { onRetry: () => void }) {
   }, [onRetry]);
 
   return (
-    <div className="flex min-h-dvh items-center justify-center p-6">
+    <main className="flex min-h-dvh items-center justify-center p-6">
       <div role="alert" className="w-full max-w-sm space-y-6 text-center">
         <BrandMark className="mx-auto size-14 text-primary" />
         <div className="space-y-2">
@@ -36,6 +36,6 @@ export function ServerUnreachable({ onRetry }: { onRetry: () => void }) {
           {trying ? "Trying…" : "Try again"}
         </Button>
       </div>
-    </div>
+    </main>
   );
 }
