@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -160,7 +161,7 @@ async function copyText(text: string, done: string) {
 
 export function OnlineBookingCard({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
-  const { data, isPending } = useOnlineBooking(venueId);
+  const { data, isPending, isError, error: loadError, isRefetching, refetch } = useOnlineBooking(venueId);
   const { data: serviceData } = useServices(venueId);
   const { data: venueData } = useVenues();
   const services = serviceData?.services ?? [];
@@ -316,7 +317,9 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {isPending || !form || !data ? (
+        {isError && !data ? (
+          <LoadError compact what="online booking" error={loadError} retrying={isRefetching} onRetry={() => void refetch()} />
+        ) : isPending || !form || !data ? (
           <Skeleton className="h-24 w-full" />
         ) : (
           <>

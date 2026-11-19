@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CalendarXIcon, MinusIcon, PlusIcon } from "lucide-react";
 import { DayNav } from "@/components/day-nav";
 import { EmptyState } from "@/components/empty-state";
+import { LoadError } from "@/components/load-error";
 import { canEditSetup, useNavigation } from "@/components/layout/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
   const [date, setDate] = useState(todayIso());
   const [partySize, setPartySize] = useState(2);
   const [slot, setSlot] = useState<{ time: string } | null>(null);
-  const { data, isPending } = useAvailability(venueId, date, partySize);
+  const { data, isPending, isError, error, isRefetching, refetch } = useAvailability(venueId, date, partySize);
 
   const availability = data?.availability ?? {};
   const services = Object.entries(availability);
@@ -69,6 +70,8 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
 
       {isPending ? (
         <Skeleton className="h-64 w-full" />
+      ) : isError && !data ? (
+        <LoadError what="availability" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : services.length === 0 ? (
         <EmptyState
           icon={CalendarXIcon}

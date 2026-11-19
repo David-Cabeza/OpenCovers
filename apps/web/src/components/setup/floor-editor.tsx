@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FloorCanvas } from "@/components/floor/floor-canvas";
 import { useTables } from "@/hooks/use-tables";
@@ -24,7 +25,7 @@ import { FLOOR_ITEM_TYPES } from "@/lib/floor-item-types";
 
 export function FloorEditor({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
-  const { data: tablesData, isPending } = useTables(venueId);
+  const { data: tablesData, isPending, isError, error, isRefetching, refetch } = useTables(venueId);
   const { data: itemsData } = useFloorItems(venueId);
   const tables = tablesData?.tables ?? [];
   const items = itemsData?.items ?? [];
@@ -97,6 +98,8 @@ export function FloorEditor({ venueId }: { venueId: string }) {
       <CardContent>
         {isPending ? (
           <Skeleton className="h-[480px] w-full" />
+        ) : isError && !tablesData ? (
+          <LoadError compact what="the tables" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : (
           <FloorCanvas
             tables={tables}

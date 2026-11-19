@@ -3,6 +3,7 @@ import { GaugeIcon } from "lucide-react";
 import { cn } from "cn";
 import { DayNav } from "@/components/day-nav";
 import { EmptyState } from "@/components/empty-state";
+import { LoadError } from "@/components/load-error";
 import { canEditSetup, useNavigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/page-header";
@@ -29,7 +30,7 @@ const LEVEL: Record<PacingLevel, { bar: string; text: string; swatch: string }> 
 export function PacingView({ venueId }: { venueId: string }) {
   const nav = useNavigation();
   const [date, setDate] = useState(todayIso());
-  const { data, isPending } = usePacing(venueId, date);
+  const { data, isPending, isError, error, isRefetching, refetch } = usePacing(venueId, date);
 
   const pacing = data?.pacing ?? [];
 
@@ -48,6 +49,8 @@ export function PacingView({ venueId }: { venueId: string }) {
 
       {isPending ? (
         <Skeleton className="h-64 w-full" />
+      ) : isError && !data ? (
+        <LoadError what="pacing" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : pacing.length === 0 ? (
         <EmptyState
           icon={GaugeIcon}

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useVenueConfig } from "@/hooks/use-venue-config";
@@ -33,7 +34,7 @@ const EMPTY_FORM: BookingPolicyForm = {
 
 export function BookingPolicyCard({ venueId, role }: { venueId: string; role?: Role }) {
   const queryClient = useQueryClient();
-  const { data, isPending } = useVenueConfig(venueId);
+  const { data, isPending, isError, error: loadError, isRefetching, refetch } = useVenueConfig(venueId);
   const [form, setForm] = useState<BookingPolicyForm>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const canEdit = role === undefined || role === "admin";
@@ -107,6 +108,8 @@ export function BookingPolicyCard({ venueId, role }: { venueId: string; role?: R
       <CardContent className="space-y-6">
         {isPending ? (
           <Skeleton className="h-24 w-full" />
+        ) : isError && !data ? (
+          <LoadError compact what="the booking policy" error={loadError} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
