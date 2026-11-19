@@ -209,11 +209,19 @@ Most instances never need this. `DEMO_MODE=1` turns one deployment into the publ
 
 What changes under `DEMO_MODE=1`:
 
-- Password sign-up is off. `POST /api/auth/sign-in/magic-link` mails a link (Resend, so `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are required when `NODE_ENV=production`; without them the link is printed to the API log, for local trials). One link per address per minute, on top of the `auth` budget. Disposable addresses (a short list in `apps/api/src/demo/disposable.ts`) are refused.
+- Password sign-up is off. `POST /api/auth/sign-in/magic-link` mails a link (Resend, so `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are required when `NODE_ENV=production`; without them the link is printed to the API log, for local trials). Disposable addresses (a short list in `apps/api/src/demo/disposable.ts`) are refused. The request needs a solved proof-of-work challenge, and a link is limited to 1 per address per minute, 5 per address per day and 10 per IP per hour, all on top of the `auth` budget (ADR-0022, decision 8a). The flow is below.
 - Google sign-in turns on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are both set. The account must report a verified email. Set both or neither.
 - The first verified sign-in builds a sandbox from `apps/api/src/demo/template.ts` and makes the visitor its `admin`, with online booking on, so `/w/{bookingKey}` works at once. A later sign-in returns the same sandbox. `POST /v1/venues` is refused: a visitor has the one.
 - A sandbox holds at most `DEMO_MAX_RESERVATIONS` reservations (default 150) and `DEMO_MAX_GUESTS` guests (default 100). It cannot create webhooks. Email goes only to the owner's verified address.
 - The sign-in request may carry `X-Demo-Consent: <version of the consent text shown>` when the visitor ticked the contact box, and `X-Demo-Locale`. Account and sandbox are created either way. The consent is stored with the visitor's contact in `demo_lead` once the address is verified, and no HTTP route returns leads.
+
+Asking for a magic link, as a sign-in form does it (outside `docs/contract`, demo mode only; with `DEMO_MODE` off both routes answer 404):
+
+1. `POST /api/demo/magic-link-challenge` with `{ "email": "visitor@example.com" }`. Public, limited to 60 per IP per hour. It answers `200 { "challenge": { "nonce", "issuedAt", "difficulty", "signature" }, "expiresAt": "<ISO time>" }` and says nothing about whether the address has an account. The challenge is bound to that address (trimmed and lower-cased), is good for one request and expires after 5 minutes.
+2. Find a decimal `solution` (a string of 1 to 16 digits, counting from `0`) such that `SHA-256("<nonce>:<solution>")` starts with at least `difficulty` zero bits. This is the booking widget's scheme (ADR-0017); the difficulty is `PUBLIC_POW_DIFFICULTY`, 12 by default. A browser solves it in well under a second in a Web Worker.
+3. `POST /api/auth/sign-in/magic-link` with `{ "email": ... }` (the same address) and two extra headers: `X-Demo-Challenge: <the challenge object from step 1, as JSON>` and `X-Demo-Solution: <solution>`. The `X-Demo-Consent` and `X-Demo-Locale` headers go here too.
+
+Refusals, all `400` with a body `{ "code", "message" }` and no email sent: `CHALLENGE_REQUIRED` (a header is missing), `CHALLENGE_INVALID` (wrong solution, bad signature, expired, already used, issued for another address or for a booking), `DISPOSABLE_EMAIL`. A `400` does not spend the address's or the IP's link budget, so a bot cannot lock a visitor out by posting without a challenge. `429` with `Retry-After` means a limit tripped: ask again with a new challenge once the wait is over. The answer to a valid request is the same whether or not the address already has a sandbox. Whoever solves a challenge for an address can still send that address up to 5 links a day, by design of decision 8a.
 
 Housekeeping, run both from the repository root with the API's `DATABASE_URL`:
 
@@ -250,7 +258,7 @@ The API reads these variables regardless of host:
 | `DEMO_MODE` | no | `1` runs the hosted demo, `0` or unset does not. See Hosted demo. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | Demo mode only. Both or neither. See Hosted demo. |
 | `DEMO_MAX_RESERVATIONS`, `DEMO_MAX_GUESTS` | no | Demo mode only. Caps per sandbox, defaults 150 and 100. |
-| `RATE_LIMIT_MAGIC_LINK` | no | Demo mode only. Default `1/1m`, per address. |
+| `RATE_LIMIT_MAGIC_LINK`, `RATE_LIMIT_MAGIC_LINK_DAY`, `RATE_LIMIT_MAGIC_LINK_IP`, `RATE_LIMIT_DEMO_CHALLENGE` | no | Demo mode only. Magic links per address (default `1/1m`), per address per day (`5/24h`) and per IP (`10/1h`); challenge requests per IP (`60/1h`). Same `max/window` form as the other `RATE_LIMIT_*` variables. |
 | `PUBLIC_POW_DIFFICULTY` | no | Proof-of-work bits for a public booking, 0 to 32. Default `12`. `0` turns the proof of work off and keeps the signed challenge. The API logs the effective difficulty at startup, and a warning when it is `0` with `NODE_ENV=production`. See ADR-0017. |
 | `PUBLIC_CHALLENGE_SECRET` | no | Signs the public form challenge, at least 32 characters. Default: a random key per process, which is enough for one API process. Set it when several serve the widget. With `NODE_ENV=production` and no value, the API logs a warning at startup. |
 | `WIDGET_ADDRESS` | no | The booking widget's host, such as `book.example.com`. Caddy and the API both read it. Unset, a production API serves no widget page. It must not share the staff app's host name. See Booking widget. |
