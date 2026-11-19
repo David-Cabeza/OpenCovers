@@ -1,7 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../db/schema";
-import { events, idempotencyKeys, reservations, user } from "../db/schema";
+import { events, idempotencyKeys, reservations, user, venueMemberships } from "../db/schema";
+import type { EventChannel } from "./origin";
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -13,6 +14,12 @@ export interface TraceEntry {
   version: number;
   occurredAt: string;
   idempotencyKey: string | null;
+  /** Read from the event. Null: stored without an origin and not derivable. */
+  channel: EventChannel | null;
+  /** A label, never an email or an id: a member's display name, or a key reference. Null for a guest or unknown. */
+  actor: string | null;
+  /** False when the event has no stored origin; `channel` is then derived from `bookedVia` (created) or null. */
+  recorded: boolean;
 }
 
 export interface ReservationTrace {
@@ -40,6 +47,17 @@ async function sourceOf(db: Db, bookedVia: string): Promise<TraceSource> {
   if (bookedVia === "widget") return "widget";
   const member = (await db.select({ id: user.id }).from(user).where(eq(user.email, bookedVia)).limit(1))[0];
   return member ? "staff" : "api";
+}
+
+/** A staff user id is shown by display name, only for a member of this venue. A name that looks like an email is dropped. */
+async function memberNames(db: Db, venueId: string, userIds: string[]): Promise<Map<string, string>> {
+  if (userIds.length === 0) return new Map();
+  const rows = await db
+    .select({ id: user.id, name: user.name })
+    .from(venueMemberships)
+    .innerJoin(user, eq(user.id, venueMemberships.userId))
+    .where(and(eq(venueMemberships.venueId, venueId), inArray(venueMemberships.userId, userIds), isNotNull(user.name)));
+  return new Map(rows.filter((r) => r.name.trim() !== "" && !r.name.includes("@")).map((r) => [r.id, r.name]));
 }
 
 export async function getReservationTrace(
@@ -72,6 +90,11 @@ export async function getReservationTrace(
       ),
     );
   const source = await sourceOf(db, reservation.bookedVia);
+  const names = await memberNames(
+    db,
+    venueId,
+    rows.filter((e) => e.channel === "staff" && e.actor).map((e) => e.actor as string),
+  );
   // The public channel stores its client's key under a `public:` prefix, so the trace shows the key the client sent.
   const shown = (key: string) => (source === "widget" ? key.replace(/^public:/, "") : key);
   const keyOf = (type: string, version: number) => {
@@ -89,6 +112,9 @@ export async function getReservationTrace(
       version: e.version,
       occurredAt: e.occurredAt.toISOString(),
       idempotencyKey: keyOf(e.type, e.version),
+      channel: (e.channel as EventChannel | null) ?? (e.type === "created" ? source : null),
+      actor: e.channel === "staff" ? (e.actor ? (names.get(e.actor) ?? null) : null) : e.channel ? e.actor : null,
+      recorded: e.channel !== null,
     })),
   };
 }
