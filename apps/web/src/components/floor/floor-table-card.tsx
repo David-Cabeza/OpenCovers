@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type Reservation } from "@/lib/api";
+import { useT } from "@/i18n";
 import { longDate } from "@/lib/date";
+import { guestsText } from "./guests-text";
 
 const OPEN_DELAY = 250;
 const CLOSE_DELAY = 150;
@@ -46,6 +48,7 @@ export function FloorTableCard({
   onMoveRequest?: () => void;
   children: ReactElement;
 }) {
+  const t = useT();
   const reservationId = table.reservationId;
   const active = enabled && Boolean(venueId) && Boolean(reservationId);
   const [open, setOpen] = useState(false);
@@ -142,7 +145,7 @@ export function FloorTableCard({
         id={contentId}
         ref={contentRef}
         side="top"
-        aria-label={`Reservation for ${table.guestName || table.name}`}
+        aria-label={t("floor.card.label", { name: table.guestName || table.name })}
         onOpenAutoFocus={(e) => {
           if (!focusCard.current) e.preventDefault();
         }}
@@ -199,6 +202,7 @@ function CardBody({
   onClose: () => void;
   onMoveRequest?: () => void;
 }) {
+  const t = useT();
   const { data, isPending, isError } = useQuery({
     queryKey: ["reservation", venueId, reservationId],
     queryFn: () => api.getReservation(venueId, reservationId),
@@ -217,50 +221,50 @@ function CardBody({
         <div className="min-w-0">
           <p className="truncate font-display text-lg leading-tight">{name}</p>
           <p className="text-muted-foreground">
-            {party ?? "?"} {party === 1 ? "guest" : "guests"} · {table.name}
+            {t("floor.card.summary", { guests: guestsText(party), table: table.name })}
           </p>
         </div>
-        <Button type="button" variant="ghost" size="icon" className="-mr-1 -mt-1 size-7 shrink-0" aria-label="Close" onClick={onClose}>
+        <Button type="button" variant="ghost" size="icon" className="-mr-1 -mt-1 size-7 shrink-0" aria-label={t("common.close")} onClick={onClose}>
           <XIcon className="size-4" />
         </Button>
       </div>
 
       {isError ? (
         <p role="alert" className="text-destructive">
-          Could not load the reservation.
+          {t("floor.card.loadFailed")}
         </p>
       ) : isPending || !r ? (
-        <div data-testid="card-loading" role="status" aria-label="Loading reservation" className="space-y-2">
+        <div data-testid="card-loading" role="status" aria-label={t("floor.card.loading")} className="space-y-2">
           <Skeleton className="h-4 w-3/4" />
           <Skeleton className="h-4 w-1/2" />
           <Skeleton className="h-4 w-2/3" />
         </div>
       ) : (
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
-          <Row label="When">
+          <Row label={t("floor.card.when")}>
             {longDate(r.date)} · {r.time}
           </Row>
-          <Row label="Service">{r.service || "—"}</Row>
-          <Row label="Status">
+          <Row label={t("floor.card.service")}>{r.service || "—"}</Row>
+          <Row label={t("floor.card.status")}>
             <StatusBadge status={r.status} />
           </Row>
-          <Row label="Tables">
-            {(r.tables ?? []).map((id) => tableNames[id] ?? "Table").join(", ") || "—"}
+          <Row label={t("floor.card.tables")}>
+            {(r.tables ?? []).map((id) => tableNames[id] ?? t("floor.card.table")).join(", ") || "—"}
           </Row>
-          <Row label="Contact">{r.guest.contact || "—"}</Row>
-          <Row label="Booked via">{r.bookedVia || "—"}</Row>
+          <Row label={t("floor.card.contact")}>{r.guest.contact || "—"}</Row>
+          <Row label={t("floor.card.bookedVia")}>{r.bookedVia || "—"}</Row>
           {r.reconfirmation && r.reconfirmation !== "none" && (
-            <Row label="Reconfirmation">
+            <Row label={t("floor.card.reconfirmation")}>
               <ReconfirmationPill value={r.reconfirmation} />
             </Row>
           )}
-          {r.commentary && <Row label="Notes">{r.commentary}</Row>}
+          {r.commentary && <Row label={t("floor.card.notes")}>{r.commentary}</Row>}
         </dl>
       )}
 
       {onMoveRequest && (
         <Button type="button" variant="outline" size="sm" className="w-full" onClick={onMoveRequest}>
-          <ArrowRightLeftIcon className="size-4" /> Move to…
+          <ArrowRightLeftIcon className="size-4" /> {t("floor.card.move")}
         </Button>
       )}
     </div>

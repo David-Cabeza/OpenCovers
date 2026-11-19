@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api";
 import { authErrorMessage } from "@/lib/error-message";
-import { isServerUnreachable, SERVER_ERROR } from "@/lib/server-status";
+import { t } from "@/i18n";
+import { isServerUnreachable } from "@/lib/server-status";
 
 describe("isServerUnreachable", () => {
   it("is true for what browsers throw when no answer comes back", () => {
@@ -33,8 +34,8 @@ describe("isServerUnreachable", () => {
 
 describe("authErrorMessage for a server error", () => {
   it("says the server is not responding for any 5xx, whatever message came with it", () => {
-    expect(authErrorMessage({ status: 502 }, "Could not sign in.")).toBe(SERVER_ERROR);
-    expect(authErrorMessage({ status: 500, message: "boom at db.ts:12" }, "Could not sign in.")).toBe(SERVER_ERROR);
+    expect(authErrorMessage({ status: 502 }, "Could not sign in.")).toBe(t("errors.serverError"));
+    expect(authErrorMessage({ status: 500, message: "boom at db.ts:12" }, "Could not sign in.")).toBe(t("errors.serverError"));
   });
 
   it("keeps the other answers as they were", () => {

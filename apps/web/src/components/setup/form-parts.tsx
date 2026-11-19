@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useT } from "@/i18n";
 import { cn } from "cn";
 import { Pill } from "@/components/pill";
 import { Label } from "@/components/ui/label";
@@ -33,8 +34,8 @@ export function StatusPanel({
   live,
   checked,
   onCheckedChange,
-  onLabel = "Live",
-  offLabel = "Off",
+  onLabel,
+  offLabel,
 }: {
   id: string;
   label: string;
@@ -45,6 +46,7 @@ export function StatusPanel({
   onLabel?: string;
   offLabel?: string;
 }) {
+  const t = useT();
   return (
     <div
       className={cn(
@@ -56,7 +58,7 @@ export function StatusPanel({
         <div className="flex flex-wrap items-center gap-2">
           <Label htmlFor={id}>{label}</Label>
           <Pill tone={live ? "success" : "muted"} dot>
-            {live ? onLabel : offLabel}
+            {live ? (onLabel ?? t("setup.status.live")) : (offLabel ?? t("setup.status.off"))}
           </Pill>
         </div>
         <p className="text-sm text-muted-foreground">{description}</p>

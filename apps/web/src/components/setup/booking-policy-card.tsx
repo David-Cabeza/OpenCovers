@@ -1,4 +1,5 @@
 import { errorMessage, isApiError } from "@/lib/error-message";
+import { useT } from "@/i18n";
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -33,6 +34,7 @@ const EMPTY_FORM: BookingPolicyForm = {
 };
 
 export function BookingPolicyCard({ venueId, role }: { venueId: string; role?: Role }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data, isPending, isError, error: loadError, isRefetching, refetch } = useVenueConfig(venueId);
   const [form, setForm] = useState<BookingPolicyForm>(EMPTY_FORM);
@@ -57,13 +59,13 @@ export function BookingPolicyCard({ venueId, role }: { venueId: string; role?: R
       api.setConfig(venueId, policy),
     onSuccess: (config) => {
       queryClient.setQueryData(["config", venueId], config);
-      toast.success("Booking policy saved");
+      toast.success(t("setup.policy.saved"));
     },
     onError: (err) => {
       toast.error(
         isApiError(err, "forbidden")
-          ? "Only an admin can change the booking policy."
-          : errorMessage(err, "Could not save the booking policy."),
+          ? t("setup.policy.forbidden")
+          : errorMessage(err, t("setup.policy.saveFailed")),
       );
     },
   });
@@ -98,78 +100,71 @@ export function BookingPolicyCard({ venueId, role }: { venueId: string; role?: R
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Booking policy</CardTitle>
-        <CardDescription>
-          Limit how far ahead guests can book, how many bookings one guest can hold in a day,
-          and which dates are closed. Changes apply to new bookings only. Existing bookings
-          stay as they are.
-        </CardDescription>
+        <CardTitle>{t("setup.policy.title")}</CardTitle>
+        <CardDescription>{t("setup.policy.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {isPending ? (
           <Skeleton className="h-24 w-full" />
         ) : isError && !data ? (
-          <LoadError compact what="the booking policy" error={loadError} retrying={isRefetching} onRetry={() => void refetch()} />
+          <LoadError compact what={t("setup.policy.loadWhat")} error={loadError} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="max-advance-days">Advance days</Label>
+                <Label htmlFor="max-advance-days">{t("setup.policy.advanceDays")}</Label>
                 <Input
                   id="max-advance-days"
                   type="text"
                   inputMode="numeric"
-                  placeholder="No limit"
+                  placeholder={t("setup.policy.noLimit")}
                   {...field("maxAdvanceDays")}
                   onChange={(e) => setForm({ ...form, maxAdvanceDays: e.target.value })}
                 />
                 {error("maxAdvanceDays")}
                 <p className="text-sm text-muted-foreground">
-                  The furthest day ahead a guest can book, 0 to {MAX_ADVANCE_DAYS_MAX}. Empty
-                  turns the rule off.
+                  {t("setup.policy.advanceHelp", { max: MAX_ADVANCE_DAYS_MAX })}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="max-active-per-guest">Bookings per guest per day</Label>
+                <Label htmlFor="max-active-per-guest">{t("setup.policy.perGuest")}</Label>
                 <Input
                   id="max-active-per-guest"
                   type="text"
                   inputMode="numeric"
-                  placeholder="No limit"
+                  placeholder={t("setup.policy.noLimit")}
                   {...field("maxActivePerGuestPerDay")}
                   onChange={(e) => setForm({ ...form, maxActivePerGuestPerDay: e.target.value })}
                 />
                 {error("maxActivePerGuestPerDay")}
                 <p className="text-sm text-muted-foreground">
-                  Active bookings one guest can hold on the same date, 1 to{" "}
-                  {MAX_ACTIVE_PER_GUEST_MAX}. Empty turns the rule off.
+                  {t("setup.policy.perGuestHelp", { max: MAX_ACTIVE_PER_GUEST_MAX })}
                 </p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="blocked-dates">Blocked dates</Label>
+              <Label htmlFor="blocked-dates">{t("setup.policy.blockedDates")}</Label>
               <Textarea
                 id="blocked-dates"
                 rows={5}
                 className="font-mono"
-                placeholder={"2026-12-25\n2026-12-31..2027-01-02"}
+                placeholder={"2026-12-25\n2026-12-31..2027-01-02"} // i18n-ok
                 {...field("blockedDates")}
                 onChange={(e) => setForm({ ...form, blockedDates: e.target.value })}
               />
               {error("blockedDates")}
               <p className="text-sm text-muted-foreground">
-                One per line: a day as YYYY-MM-DD or a range as YYYY-MM-DD..YYYY-MM-DD, both
-                ends included. The list is saved sorted and merged. Empty clears it.
+                {t("setup.policy.blockedHelp")}
               </p>
             </div>
 
             {canEdit ? (
               <Button onClick={submit} disabled={save.isPending}>
-                {save.isPending ? "Saving…" : "Save booking policy"}
+                {save.isPending ? t("common.saving") : t("setup.policy.save")}
               </Button>
             ) : (
-              <p className="text-sm text-muted-foreground">Only an admin can change this.</p>
+              <p className="text-sm text-muted-foreground">{t("setup.policy.adminOnly")}</p>
             )}
           </>
         )}

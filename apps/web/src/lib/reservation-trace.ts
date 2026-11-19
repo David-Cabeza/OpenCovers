@@ -1,4 +1,6 @@
 import type { PillTone } from "@/components/pill";
+import { t, type MessageKey } from "@/i18n";
+import { dateTime } from "@/lib/date";
 
 export type TraceSource = "widget" | "staff" | "api";
 
@@ -21,7 +23,8 @@ export interface ReservationTraceDto {
 /** One line of the trace as the panel shows it. */
 export interface TraceEntry {
   id: string;
-  label: string;
+  /** The event type as the API sends it; the label is read with `eventLabel` when shown, so it follows the language. */
+  type: string;
   tone: PillTone;
   version: number;
   occurredAt: string;
@@ -30,40 +33,48 @@ export interface TraceEntry {
 
 export interface Trace {
   source: TraceSource;
-  sourceLabel: string;
-  actorLabel: string;
+  actor: string;
   entries: TraceEntry[];
 }
 
-const EVENT_TYPES: Record<string, { label: string; tone: PillTone }> = {
-  created: { label: "Booked", tone: "info" },
-  modified: { label: "Changed", tone: "muted" },
-  seated: { label: "Seated", tone: "success" },
-  attended: { label: "Attended", tone: "muted" },
-  no_show: { label: "Marked no-show", tone: "warning" },
-  cancelled: { label: "Cancelled", tone: "danger" },
-  erased: { label: "Personal data erased", tone: "muted" },
+const EVENT_TYPES: Record<string, { key: MessageKey; tone: PillTone }> = {
+  created: { key: "reservation.trace.event.created", tone: "info" },
+  modified: { key: "reservation.trace.event.modified", tone: "muted" },
+  seated: { key: "common.status.seated", tone: "success" },
+  attended: { key: "common.status.attended", tone: "muted" },
+  no_show: { key: "reservation.trace.event.no_show", tone: "warning" },
+  cancelled: { key: "common.status.cancelled", tone: "danger" },
+  erased: { key: "reservation.trace.event.erased", tone: "muted" },
 };
 
-const SOURCES: Record<TraceSource, string> = {
-  widget: "Online booking widget",
-  staff: "Staff app",
-  api: "API or MCP",
+const SOURCES: Record<TraceSource, MessageKey> = {
+  widget: "reservation.trace.source.widget",
+  staff: "reservation.trace.source.staff",
+  api: "reservation.trace.source.api",
 };
 
 /** A type this app does not know yet still shows, under its own name. */
 export function eventLabel(type: string): { label: string; tone: PillTone } {
-  return EVENT_TYPES[type] ?? { label: type, tone: "muted" };
+  const known = EVENT_TYPES[type];
+  return known ? { label: t(known.key), tone: known.tone } : { label: type, tone: "muted" };
+}
+
+export function sourceLabel(source: TraceSource): string {
+  return SOURCES[source] ? t(SOURCES[source]) : source;
+}
+
+export function actorLabel(trace: Pick<Trace, "source" | "actor">): string {
+  return trace.source === "widget" ? t("reservation.trace.guestViaWidget") : trace.actor;
 }
 
 export function toTrace(dto: ReservationTraceDto): Trace {
   return {
     source: dto.source,
-    sourceLabel: SOURCES[dto.source] ?? dto.source,
-    actorLabel: dto.source === "widget" ? "A guest, through the widget" : dto.actor,
+    actor: dto.actor,
     entries: dto.entries.map((e) => ({
       id: e.eventId,
-      ...eventLabel(e.type),
+      type: e.type,
+      tone: eventLabel(e.type).tone,
       version: e.version,
       occurredAt: e.occurredAt,
       idempotencyKey: e.idempotencyKey,
@@ -72,7 +83,7 @@ export function toTrace(dto: ReservationTraceDto): Trace {
 }
 
 export function traceTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
+  return dateTime(iso, {
     day: "numeric",
     month: "short",
     hour: "2-digit",

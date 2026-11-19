@@ -13,21 +13,23 @@ import {
 } from "@/components/ui/dialog";
 import { api, type Member, type Role } from "@/lib/api";
 import { errorMessage } from "@/lib/error-message";
+import { useT } from "@/i18n";
 
 const ROLES: Role[] = ["read", "write", "admin"];
 
 export function RoleSelect({ venueId, member }: { venueId: string; member: Member }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const change = useMutation({
     mutationFn: (role: Role) => api.changeMemberRole(venueId, member.userId, role),
-    onSuccess: () => toast.success("Role updated"),
-    onError: (err) => toast.error(errorMessage(err, "Could not change the role.")),
+    onSuccess: () => toast.success(t("team.role.updated")),
+    onError: (err) => toast.error(errorMessage(err, t("team.role.failed"))),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["members", venueId] }),
   });
 
   return (
     <select
-      aria-label={`Role of ${member.email}`}
+      aria-label={t("team.role.of", { email: member.email })}
       value={member.role}
       disabled={change.isPending}
       onChange={(e) => change.mutate(e.target.value as Role)}
@@ -35,7 +37,7 @@ export function RoleSelect({ venueId, member }: { venueId: string; member: Membe
     >
       {ROLES.map((r) => (
         <option key={r} value={r}>
-          {r}
+          {t(`common.role.${r}`)}
         </option>
       ))}
     </select>
@@ -43,13 +45,14 @@ export function RoleSelect({ venueId, member }: { venueId: string; member: Membe
 }
 
 export function MakeCreatorButton({ member }: { member: Member }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const { data } = useQuery({ queryKey: ["account"], queryFn: () => api.getAccount() });
   const transfer = useMutation({
     mutationFn: () => api.transferCreator(member.userId),
-    onSuccess: () => toast.success(`${member.email} can now create venues`),
-    onError: (err) => toast.error(errorMessage(err, "Could not transfer venue creation.")),
+    onSuccess: () => toast.success(t("team.creator.done", { email: member.email })),
+    onError: (err) => toast.error(errorMessage(err, t("team.creator.failed"))),
     onSettled: () => {
       setOpen(false);
       void queryClient.invalidateQueries({ queryKey: ["account"] });
@@ -64,8 +67,8 @@ export function MakeCreatorButton({ member }: { member: Member }) {
       <Button
         variant="ghost"
         size="icon"
-        aria-label={`Make ${member.email} the venue creator`}
-        title="Make venue creator"
+        aria-label={t("team.creator.aria", { email: member.email })}
+        title={t("team.creator.title")}
         onClick={() => setOpen(true)}
       >
         <CrownIcon className="size-4" />
@@ -73,19 +76,17 @@ export function MakeCreatorButton({ member }: { member: Member }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Make venue creator</DialogTitle>
+            <DialogTitle>{t("team.creator.title")}</DialogTitle>
             <DialogDescription>
-              {member.email} will be the only account that can create venues on this
-              instance, and you will lose that right. You keep access to your venues. Only
-              they can hand it back.
+              {t("team.creator.description", { email: member.email })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button disabled={transfer.isPending} onClick={() => transfer.mutate()}>
-              Make creator
+              {t("team.creator.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

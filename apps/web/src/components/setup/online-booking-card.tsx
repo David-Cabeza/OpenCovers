@@ -27,6 +27,7 @@ import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useT, type MessageKey } from "@/i18n";
 import { useOnlineBooking } from "@/hooks/use-online-booking";
 import { useServices } from "@/hooks/use-services";
 import { useVenues } from "@/hooks/use-venues";
@@ -62,17 +63,29 @@ type NumberKey =
   | "selfServiceCutoffMinutes"
   | "maxOpenBookingsPerContact";
 
-const COLOR_LABELS: Record<ColorKey, string> = {
-  primary: "Buttons",
-  onPrimary: "Button text",
-  background: "Background",
-  surface: "Panels",
-  text: "Text",
-  muted: "Secondary text",
-  border: "Borders",
+const COLOR_LABELS: Record<ColorKey, MessageKey> = {
+  primary: "onlinebooking.color.primary",
+  onPrimary: "onlinebooking.color.onPrimary",
+  background: "onlinebooking.color.background",
+  surface: "onlinebooking.color.surface",
+  text: "onlinebooking.color.text",
+  muted: "onlinebooking.color.muted",
+  border: "onlinebooking.color.border",
 };
 
-const FONT_LABELS: Record<Font, string> = { system: "System", serif: "Serif", rounded: "Rounded" };
+const FONT_LABELS: Record<Font, MessageKey> = {
+  system: "onlinebooking.font.system",
+  serif: "onlinebooking.font.serif",
+  rounded: "onlinebooking.font.rounded",
+};
+
+/** A translated sentence with `{name}` spots filled by elements (the `<code>` words that stay as they are). */
+function withCode(text: string, parts: Record<string, string>) {
+  return text.split(/(\{\w+\})/).map((piece, i) => {
+    const name = /^\{(\w+)\}$/.exec(piece)?.[1];
+    return name && name in parts ? <code key={i}>{parts[name]}</code> : piece;
+  });
+}
 
 /**
  * A small likeness of the booking page. The staff app's CSP loads no image from other sites, so a valid logo
@@ -83,7 +96,7 @@ function ThemePreview({
   colors,
   radiusText,
   font,
-  label = "Preview of the booking page",
+  label,
 }: {
   theme: ThemeForm;
   colors?: ThemeForm["colors"];
@@ -93,27 +106,28 @@ function ThemePreview({
   font?: Font;
   label?: string;
 }) {
+  const t = useT();
   const c = colors ?? theme.colors;
   const radius = `${Math.min(24, Math.max(0, Number(radiusText?.trim() ? radiusText : theme.radius) || 0))}px`;
   return (
     <div
-      aria-label={label}
+      aria-label={label ?? t("onlinebooking.preview.label")}
       role="img"
       className="space-y-3 border p-4 text-sm"
       style={{ background: c.background, color: c.text, fontFamily: FONT_STACKS[font ?? theme.font], borderColor: c.border, borderRadius: radius }}
     >
       {isLogoUrl(theme.logoUrl.trim()) && (
         <div className="flex h-8 w-20 items-center justify-center border border-dashed text-xs" style={{ borderColor: c.border, color: c.muted }}>
-          Logo
+          {t("onlinebooking.preview.logo")}
         </div>
       )}
-      <p className="text-base font-semibold">Book a table</p>
-      <p style={{ color: c.muted }}>Pick a day and a time.</p>
+      <p className="text-base font-semibold">{t("onlinebooking.preview.title")}</p>
+      <p style={{ color: c.muted }}>{t("onlinebooking.preview.pick")}</p>
       <div className="border px-3 py-2" style={{ background: c.surface, borderColor: c.border, borderRadius: radius }}>
-        20:00 · 2 people
+        {t("onlinebooking.preview.sample", { count: 2 })}
       </div>
       <div className="px-3 py-2 text-center font-medium" style={{ background: c.primary, color: c.onPrimary, borderRadius: radius }}>
-        Book
+        {t("onlinebooking.preview.book")}
       </div>
     </div>
   );
@@ -150,16 +164,17 @@ function Chip({
   );
 }
 
-async function copyText(text: string, done: string) {
+async function copyText(text: string, done: string, failed: string) {
   try {
     await navigator.clipboard.writeText(text);
     toast.success(done);
   } catch {
-    toast.error("Could not copy. Select the text and copy it by hand.");
+    toast.error(failed);
   }
 }
 
 export function OnlineBookingCard({ venueId }: { venueId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data, isPending, isError, error: loadError, isRefetching, refetch } = useOnlineBooking(venueId);
   const { data: serviceData } = useServices(venueId);
@@ -195,7 +210,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
     onSuccess: ({ warnings, ...settings }) => {
       queryClient.setQueryData(["online-booking", venueId], settings);
       setIncomplete(false);
-      toast.success("Online booking saved");
+      toast.success(t("onlinebooking.saved"));
       const low = warnings.find((w) => w.code === "low_contrast" && w.palette !== "dark");
       setLowContrast(low ? (low.ratio ?? 0) : null);
       const lowDark = warnings.find((w) => w.code === "low_contrast" && w.palette === "dark");
@@ -210,8 +225,8 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
       }
       toast.error(
         isApiError(err, "forbidden")
-          ? "Only an admin can change online booking."
-          : errorMessage(err, "Could not save online booking."),
+          ? t("onlinebooking.forbidden")
+          : errorMessage(err, t("onlinebooking.saveFailed")),
       );
     },
   });
@@ -221,14 +236,14 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
     onSuccess: (settings) => {
       queryClient.setQueryData(["online-booking", venueId], settings);
       setConfirmRotate(false);
-      toast.success("New booking key created. The old key no longer works.");
+      toast.success(t("onlinebooking.rotated"));
     },
     onError: (err) => {
       setConfirmRotate(false);
       toast.error(
         isApiError(err, "forbidden")
-          ? "Only an admin can rotate the booking key."
-          : errorMessage(err, "Could not rotate the booking key."),
+          ? t("onlinebooking.rotateForbidden")
+          : errorMessage(err, t("onlinebooking.rotateFailed")),
       );
     },
   });
@@ -245,7 +260,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
     setLowContrast(null);
     setLowContrastDark(null);
     if (Object.keys(result.update).length === 0) {
-      toast.success("Nothing to save");
+      toast.success(t("onlinebooking.nothingToSave"));
       return;
     }
     save.mutate(result.update);
@@ -295,13 +310,11 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
       (form === null || s.days.some((d) => form.weekdays.includes(d))),
   );
   const missing: string[] = [];
-  if (venueName !== undefined && venueName.trim() === "") missing.push("The venue needs a name.");
-  if (services.length === 0) missing.push("Add at least one service under Services below.");
+  if (venueName !== undefined && venueName.trim() === "") missing.push(t("onlinebooking.missing.name"));
+  if (services.length === 0) missing.push(t("onlinebooking.missing.services"));
   else if (!bookable)
-    missing.push(
-      "At least one ticked service has to open on at least one ticked day. Check the days each service runs on.",
-    );
-  if (missing.length === 0) missing.push("Check the venue name and the services bookable online.");
+    missing.push(t("onlinebooking.missing.bookable"));
+  if (missing.length === 0) missing.push(t("onlinebooking.missing.generic"));
   const key = data?.bookingKey ?? null;
   const hostOk = widgetOrigin(host) !== null;
   const snippet = key ? embedSnippet(host, key, followDark) : "";
@@ -310,15 +323,12 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Online booking</CardTitle>
-        <CardDescription>
-          Let guests book through a page of their own or an embed on your website. Online rules
-          never relax your venue rules: the stricter of the two applies.
-        </CardDescription>
+        <CardTitle>{t("onlinebooking.title")}</CardTitle>
+        <CardDescription>{t("onlinebooking.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {isError && !data ? (
-          <LoadError compact what="online booking" error={loadError} retrying={isRefetching} onRetry={() => void refetch()} />
+          <LoadError compact what={t("onlinebooking.loadWhat")} error={loadError} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : isPending || !form || !data ? (
           <Skeleton className="h-24 w-full" />
         ) : (
@@ -331,15 +341,13 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
             >
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Label htmlFor="ob-enabled">Accept online bookings</Label>
+                  <Label htmlFor="ob-enabled">{t("onlinebooking.enabled.label")}</Label>
                   <Pill tone={data.enabled ? "success" : "muted"} dot>
-                    {data.enabled ? "Live" : "Off"}
+                    {data.enabled ? t("onlinebooking.live") : t("onlinebooking.off")}
                   </Pill>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Needs the venue name and at least one service bookable online. While it is off,
-                  the booking address answers as if it did not exist. Bookings already made keep
-                  their links.
+                  {t("onlinebooking.enabled.help")}
                 </p>
               </div>
               <Switch
@@ -354,7 +362,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                 role="alert"
                 className="rounded-md border border-destructive/50 p-3 text-sm text-destructive"
               >
-                <p>Online booking cannot be turned on yet. Nothing was saved.</p>
+                <p>{t("onlinebooking.incomplete")}</p>
                 <ul className="list-disc pl-5">
                   {missing.map((m) => (
                     <li key={m}>{m}</li>
@@ -363,11 +371,11 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
               </div>
             )}
 
-            <Group title="What guests can book" description="Services and days open to online bookings.">
+            <Group title={t("onlinebooking.what.title")} description={t("onlinebooking.what.description")}>
               <fieldset className="space-y-2">
-                <legend className="text-sm font-medium">Services bookable online</legend>
+                <legend className="text-sm font-medium">{t("onlinebooking.services.legend")}</legend>
                 {serviceNames.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No services yet.</p>
+                  <p className="text-sm text-muted-foreground">{t("onlinebooking.services.none")}</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {serviceNames.map((name) => (
@@ -385,7 +393,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
               </fieldset>
 
               <fieldset className="space-y-2">
-                <legend className="text-sm font-medium">Days bookable online</legend>
+                <legend className="text-sm font-medium">{t("onlinebooking.days.legend")}</legend>
                 <div className="flex flex-wrap gap-2">
                   {WEEKDAYS.map((d) => (
                     <Chip
@@ -401,40 +409,40 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
               </fieldset>
             </Group>
 
-            <Group title="Party size and timing" description="Limits for the bookings guests make by themselves.">
+            <Group title={t("onlinebooking.party.title")} description={t("onlinebooking.party.description")}>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="ob-min">Smallest party</Label>
+                  <Label htmlFor="ob-min">{t("onlinebooking.minParty")}</Label>
                   <Input id="ob-min" {...num("minPartySize")} />
                   {error("minPartySize")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ob-max">Largest party</Label>
+                  <Label htmlFor="ob-max">{t("onlinebooking.maxParty")}</Label>
                   <Input id="ob-max" {...num("maxPartySize")} />
                   {error("maxPartySize")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ob-lead">Lead time (minutes)</Label>
+                  <Label htmlFor="ob-lead">{t("onlinebooking.lead")}</Label>
                   <Input id="ob-lead" {...num("leadTimeMinutes")} />
                   {error("leadTimeMinutes")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ob-advance">Booking horizon (days)</Label>
-                  <Input id="ob-advance" placeholder="Same as the venue, or 365" {...num("maxAdvanceDays")} />
+                  <Label htmlFor="ob-advance">{t("onlinebooking.horizon")}</Label>
+                  <Input id="ob-advance" placeholder={t("onlinebooking.horizon.placeholder")} {...num("maxAdvanceDays")} />
                   {error("maxAdvanceDays")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ob-cutoff">Guest can change until (minutes before)</Label>
+                  <Label htmlFor="ob-cutoff">{t("onlinebooking.cutoff")}</Label>
                   <Input id="ob-cutoff" {...num("selfServiceCutoffMinutes")} />
                   {error("selfServiceCutoffMinutes")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ob-open">Open online bookings per contact</Label>
-                  <Input id="ob-open" placeholder="No limit" {...num("maxOpenBookingsPerContact")} />
+                  <Label htmlFor="ob-open">{t("onlinebooking.open")}</Label>
+                  <Input id="ob-open" placeholder={t("onlinebooking.open.placeholder")} {...num("maxOpenBookingsPerContact")} />
                   {error("maxOpenBookingsPerContact")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ob-locale">Language</Label>
+                  <Label htmlFor="ob-locale">{t("common.language")}</Label>
                   <select
                     id="ob-locale"
                     value={form.locale}
@@ -451,13 +459,13 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
               </div>
             </Group>
 
-            <Group title="Privacy notice" description="The notice guests can read before they book.">
+            <Group title={t("onlinebooking.privacy.title")} description={t("onlinebooking.privacy.description")}>
               <div className="space-y-2">
-                <Label htmlFor="ob-privacy-url">Privacy notice address</Label>
+                <Label htmlFor="ob-privacy-url">{t("onlinebooking.privacy.label")}</Label>
                 <Input
                   id="ob-privacy-url"
                   inputMode="url"
-                  placeholder="https://example.com/privacy"
+                  placeholder="https://example.com/privacy" // i18n-ok
                   value={form.privacyNoticeUrl}
                   aria-invalid={errors.privacyNoticeUrl ? true : undefined}
                   aria-describedby={
@@ -467,19 +475,18 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                 />
                 {error("privacyNoticeUrl")}
                 <p id="ob-privacy-url-help" className="text-sm text-muted-foreground">
-                  Optional. Your own privacy notice: an https address with no spaces. You write and host
-                  it. OpenCovers writes no legal text. Leave it empty to show no link.
+                  {t("onlinebooking.privacy.help")}
                 </p>
               </div>
             </Group>
 
-            <Group title="Embedding" description="Where the booking page may appear.">
+            <Group title={t("onlinebooking.embedding.title")} description={t("onlinebooking.embedding.description")}>
               <div className="space-y-2">
-                <Label htmlFor="ob-origins">Websites that may embed the page</Label>
+                <Label htmlFor="ob-origins">{t("onlinebooking.origins.label")}</Label>
                 <Textarea
                   id="ob-origins"
                   rows={3}
-                  placeholder="https://example.com"
+                  placeholder="https://example.com" // i18n-ok
                   value={form.allowedOrigins}
                   aria-invalid={errors.allowedOrigins ? true : undefined}
                   aria-describedby={errors.allowedOrigins ? "ob-allowedOrigins-error" : undefined}
@@ -487,14 +494,13 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                 />
                 {error("allowedOrigins")}
                 <p className="text-sm text-muted-foreground">
-                  One address per line, up to 10, as https://host. Empty means the page works only
-                  on its own address.
+                  {t("onlinebooking.origins.help")}
                 </p>
               </div>
             </Group>
 
             <fieldset className="space-y-4">
-              <legend className="font-display text-lg">Look of the booking page</legend>
+              <legend className="font-display text-lg">{t("onlinebooking.look.legend")}</legend>
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
@@ -508,7 +514,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                           className="h-8 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent"
                         />
                         <Label htmlFor={`ob-color-${k}`} className="font-normal">
-                          {COLOR_LABELS[k]}
+                          {t(COLOR_LABELS[k])}
                         </Label>
                       </div>
                     ))}
@@ -517,11 +523,9 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                   <div className="space-y-3 rounded-lg border p-3">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <Label htmlFor="ob-dark-palette">Choose a look for dark mode</Label>
+                        <Label htmlFor="ob-dark-palette">{t("onlinebooking.dark.label")}</Label>
                         <p className="text-sm text-muted-foreground">
-                          Off: a visitor in dark mode sees the standard dark look if you kept the
-                          default colors above, and your colors above otherwise. On: they see the
-                          colors, corner radius and font below.
+                          {t("onlinebooking.dark.help")}
                         </p>
                       </div>
                       <Switch
@@ -549,7 +553,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                                 className="h-8 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent"
                               />
                               <Label htmlFor={`ob-dark-color-${k}`} className="font-normal">
-                                Dark: {COLOR_LABELS[k].toLowerCase()}
+                                {t("onlinebooking.dark.color", { color: t(COLOR_LABELS[k]).toLowerCase() })}
                               </Label>
                             </div>
                           ))}
@@ -557,11 +561,11 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                         {error("themeDarkColors")}
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="ob-dark-radius">Corner radius in dark mode (px)</Label>
+                            <Label htmlFor="ob-dark-radius">{t("onlinebooking.dark.radius")}</Label>
                             <Input
                               id="ob-dark-radius"
                               inputMode="numeric"
-                              placeholder="Same as light"
+                              placeholder={t("onlinebooking.sameAsLight")}
                               value={form.theme.darkRadius}
                               aria-invalid={errors.themeDarkRadius ? true : undefined}
                               aria-describedby={errors.themeDarkRadius ? "ob-themeDarkRadius-error" : undefined}
@@ -570,17 +574,17 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                             {error("themeDarkRadius")}
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="ob-dark-font">Font in dark mode</Label>
+                            <Label htmlFor="ob-dark-font">{t("onlinebooking.dark.font")}</Label>
                             <select
                               id="ob-dark-font"
                               value={form.theme.darkFont}
                               onChange={(e) => setTheme({ darkFont: e.target.value as Font | "" })}
                               className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
                             >
-                              <option value="">Same as light</option>
+                              <option value="">{t("onlinebooking.sameAsLight")}</option>
                               {FONTS.map((f) => (
                                 <option key={f} value={f}>
-                                  {FONT_LABELS[f]}
+                                  {t(FONT_LABELS[f])}
                                 </option>
                               ))}
                             </select>
@@ -591,7 +595,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="ob-radius">Corner radius (px)</Label>
+                      <Label htmlFor="ob-radius">{t("onlinebooking.radius")}</Label>
                       <Input
                         id="ob-radius"
                         inputMode="numeric"
@@ -603,7 +607,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                       {error("themeRadius")}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ob-font">Font</Label>
+                      <Label htmlFor="ob-font">{t("onlinebooking.font")}</Label>
                       <select
                         id="ob-font"
                         value={form.theme.font}
@@ -612,17 +616,17 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                       >
                         {FONTS.map((f) => (
                           <option key={f} value={f}>
-                            {FONT_LABELS[f]}
+                            {t(FONT_LABELS[f])}
                           </option>
                         ))}
                       </select>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="ob-logo">Logo address</Label>
+                    <Label htmlFor="ob-logo">{t("onlinebooking.logo.label")}</Label>
                     <Input
                       id="ob-logo"
-                      placeholder="https://example.com/logo.png"
+                      placeholder="https://example.com/logo.png" // i18n-ok
                       value={form.theme.logoUrl}
                       aria-invalid={errors.themeLogoUrl ? true : undefined}
                       aria-describedby={errors.themeLogoUrl ? "ob-themeLogoUrl-error" : undefined}
@@ -630,8 +634,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     />
                     {error("themeLogoUrl")}
                     <p className="text-sm text-muted-foreground">
-                      Optional. An https address of an image. Each guest's browser loads it from that
-                      address, without telling it which page asked.
+                      {t("onlinebooking.logo.help")}
                     </p>
                   </div>
                   <Button
@@ -640,7 +643,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     size="sm"
                     onClick={() => setForm({ ...form, theme: defaultThemeForm() })}
                   >
-                    Reset look to defaults
+                    {t("onlinebooking.resetLook")}
                   </Button>
                 </div>
                 <div className="space-y-3 sm:sticky sm:top-36 sm:self-start">
@@ -651,7 +654,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                       colors={form.theme.darkColors}
                       radiusText={form.theme.darkRadius}
                       font={form.theme.darkFont || undefined}
-                      label="Preview of the booking page in dark mode"
+                      label={t("onlinebooking.preview.darkLabel")}
                     />
                   )}
                 </div>
@@ -661,9 +664,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                   role="alert"
                   className="rounded-md border border-amber-500/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100"
                 >
-                  Saved, but the text color has a contrast of {lowContrast}:1 against the background.
-                  WCAG AA asks for at least 4.5:1, so some guests may find the booking page hard to
-                  read. Pick a darker text or a lighter background, or the other way round.
+                  {t("onlinebooking.contrast.light", { ratio: lowContrast })}
                 </div>
               )}
               {lowContrastDark !== null && (
@@ -671,38 +672,36 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                   role="alert"
                   className="rounded-md border border-amber-500/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100"
                 >
-                  Saved, but the dark text color has a contrast of {lowContrastDark}:1 against the dark
-                  background. WCAG AA asks for at least 4.5:1, so some guests may find the booking
-                  page hard to read in dark mode.
+                  {t("onlinebooking.contrast.dark", { ratio: lowContrastDark })}
                 </div>
               )}
             </fieldset>
 
 
             <div className="space-y-4 border-t pt-6">
-              <h3 className="font-display text-lg">Booking page and embed code</h3>
+              <h3 className="font-display text-lg">{t("onlinebooking.embed.title")}</h3>
               {key ? (
                 <div className="space-y-2">
-                  <Label htmlFor="ob-key">Public booking key</Label>
+                  <Label htmlFor="ob-key">{t("onlinebooking.key.label")}</Label>
                   <div className="flex gap-2">
                     <Input id="ob-key" readOnly value={key} className="font-mono" />
                     <Button
                       type="button"
                       variant="outline"
                       size="icon"
-                      aria-label="Copy key"
-                      onClick={() => void copyText(key, "Key copied")}
+                      aria-label={t("onlinebooking.key.copyAria")}
+                      onClick={() => void copyText(key, t("onlinebooking.key.copied"), t("onlinebooking.copyFailed"))}
                     >
                       <CopyIcon className="size-4" />
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    The key is public. It names your venue and is not a password.
+                    {t("onlinebooking.key.help")}
                   </p>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  The key is created the first time you turn online booking on.
+                  {t("onlinebooking.key.none")}
                 </p>
               )}
 
@@ -712,13 +711,13 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                   variant="outline"
                   onClick={() => setConfirmRotate(true)}
                 >
-                  Rotate key
+                  {t("onlinebooking.rotateKey")}
                 </Button>
               </div>
 
               {data.enabled && key && (
                 <div className="space-y-2">
-                  <Label htmlFor="ob-host">Address of the booking page</Label>
+                  <Label htmlFor="ob-host">{t("onlinebooking.host.label")}</Label>
                   <Input
                     id="ob-host"
                     value={host}
@@ -726,29 +725,25 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     className="font-mono"
                   />
                   <p className="text-sm text-muted-foreground">
-                    Defaults to the address you are using now. Replace it with the public address
-                    where your OpenCovers installation is served. The page path is{" "}
-                    <code>/w/{key}</code>.
+                    {withCode(t("onlinebooking.host.help"), { path: `/w/${key}` })}
                   </p>
                   {!hostOk && (
                     <p className="text-sm text-destructive" role="alert">
-                      Enter the address as https://host, with no path.
+                      {t("onlinebooking.host.invalid")}
                     </p>
                   )}
 
                   <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
                     <div>
-                      <Label htmlFor="ob-follow-dark">Follow my visitors&apos; dark mode</Label>
+                      <Label htmlFor="ob-follow-dark">{t("onlinebooking.followDark.label")}</Label>
                       <p className="text-sm text-muted-foreground">
-                        The embedded booking page turns dark for visitors whose device asks for dark
-                        mode. Leave it off if your website is always light. A theme with colors
-                        always stays as you set it.
+                        {t("onlinebooking.followDark.help")}
                       </p>
                     </div>
                     <Switch id="ob-follow-dark" checked={followDark} onCheckedChange={setFollowDark} />
                   </div>
 
-                  <Label htmlFor="ob-script">Embed code with automatic height (recommended)</Label>
+                  <Label htmlFor="ob-script">{t("onlinebooking.script.label")}</Label>
                   <div className="flex gap-2">
                     <Textarea
                       id="ob-script"
@@ -762,20 +757,18 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                       type="button"
                       variant="outline"
                       size="icon"
-                      aria-label="Copy script embed code"
+                      aria-label={t("onlinebooking.script.copyAria")}
                       disabled={!hostOk}
-                      onClick={() => void copyText(script, "Embed code copied")}
+                      onClick={() => void copyText(script, t("onlinebooking.embedCopied"), t("onlinebooking.copyFailed"))}
                     >
                       <CopyIcon className="size-4" />
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Use this where your website lets you paste a script. The booking page takes the
-                    height it needs. If your website sets a Content-Security-Policy, it must allow
-                    the booking page address in <code>script-src</code> and <code>frame-src</code>.
+                    {withCode(t("onlinebooking.script.help"), { script: "script-src", frame: "frame-src" })}
                   </p>
 
-                  <Label htmlFor="ob-snippet">Embed code with a fixed height</Label>
+                  <Label htmlFor="ob-snippet">{t("onlinebooking.snippet.label")}</Label>
                   <div className="flex gap-2">
                     <Textarea
                       id="ob-snippet"
@@ -789,28 +782,26 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                       type="button"
                       variant="outline"
                       size="icon"
-                      aria-label="Copy embed code"
+                      aria-label={t("onlinebooking.snippet.copyAria")}
                       disabled={!hostOk}
-                      onClick={() => void copyText(snippet, "Embed code copied")}
+                      onClick={() => void copyText(snippet, t("onlinebooking.embedCopied"), t("onlinebooking.copyFailed"))}
                     >
                       <CopyIcon className="size-4" />
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Use this when your website builder removes scripts. If your website sets a
-                    Content-Security-Policy, it must allow the booking page address in{" "}
-                    <code>frame-src</code>.
+                    {withCode(t("onlinebooking.snippet.help"), { frame: "frame-src" })}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    The embedding website also has to be listed above.
+                    {t("onlinebooking.snippet.origins")}
                   </p>
                 </div>
               )}
             </div>
 
-            <SaveBar hint="Changes apply to new bookings.">
+            <SaveBar hint={t("onlinebooking.saveHint")}>
               <Button onClick={submit} disabled={save.isPending}>
-                {save.isPending ? "Saving…" : "Save online booking"}
+                {save.isPending ? t("common.saving") : t("onlinebooking.saveButton")}
               </Button>
             </SaveBar>
           </>
@@ -820,23 +811,21 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
       <Dialog open={confirmRotate} onOpenChange={setConfirmRotate}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rotate the booking key?</DialogTitle>
+            <DialogTitle>{t("onlinebooking.rotate.title")}</DialogTitle>
             <DialogDescription>
-              The old key and every widget or link that uses it stop working immediately. There is
-              no grace period. You will have to put the new key on every website that embeds your
-              booking page. Bookings already made keep their links.
+              {t("onlinebooking.rotate.description")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmRotate(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="destructive"
               disabled={rotate.isPending}
               onClick={() => rotate.mutate()}
             >
-              {rotate.isPending ? "Rotating…" : "Rotate key"}
+              {rotate.isPending ? t("onlinebooking.rotating") : t("onlinebooking.rotateKey")}
             </Button>
           </DialogFooter>
         </DialogContent>

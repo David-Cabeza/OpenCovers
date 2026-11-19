@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useTables } from "@/hooks/use-tables";
+import { useT } from "@/i18n";
 import { api, COMMENTARY_MAX } from "@/lib/api";
 
 interface FormValues {
@@ -42,6 +43,7 @@ export function NewReservationDialog({
   open,
   onOpenChange,
 }: NewReservationDialogProps) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data } = useTables(venueId);
   const tables = data?.tables ?? [];
@@ -82,11 +84,11 @@ export function NewReservationDialog({
 
   async function onSubmit(values: FormValues) {
     if (selected.length === 0) {
-      toast.error("Select at least one table.");
+      toast.error(t("reservation.selectTable"));
       return;
     }
     if (values.partySize > totalSeats) {
-      toast.error("The party is larger than the selected tables.");
+      toast.error(t("reservation.partyTooLarge"));
       return;
     }
     try {
@@ -103,10 +105,10 @@ export function NewReservationDialog({
       });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
-      toast.success("Reservation created");
+      toast.success(t("reservation.new.done"));
       onOpenChange(false);
     } catch (err) {
-      toast.error(errorMessage(err, "Could not create the reservation."));
+      toast.error(errorMessage(err, t("reservation.new.failed")));
     }
   }
 
@@ -114,23 +116,23 @@ export function NewReservationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New reservation</DialogTitle>
+          <DialogTitle>{t("reservation.new.title")}</DialogTitle>
           <DialogDescription>
-            {date} at {time}
+            {t("reservation.new.description", { date, time })}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="party-size">Party size</Label>
+            <Label htmlFor="party-size">{t("reservation.partySize")}</Label>
             <Input
               id="party-size"
               type="number"
               min={1}
               {...register("partySize", {
                 valueAsNumber: true,
-                required: "Party size is required.",
-                min: { value: 1, message: "At least one guest." },
+                required: t("reservation.partySizeRequired"),
+                min: { value: 1, message: t("reservation.atLeastOne") },
               })}
             />
             {errors.partySize && (
@@ -139,22 +141,22 @@ export function NewReservationDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Tables</Label>
+            <Label>{t("reservation.tables")}</Label>
             {tables.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                This venue has no tables yet.
+                {t("reservation.noTables")}
               </p>
             ) : (
               <div className="flex flex-wrap gap-2">
-                {tables.map((t) => (
+                {tables.map((tbl) => (
                   <Button
-                    key={t.id}
+                    key={tbl.id}
                     type="button"
-                    variant={selected.includes(t.id) ? "default" : "outline"}
+                    variant={selected.includes(tbl.id) ? "default" : "outline"}
                     size="sm"
-                    onClick={() => toggleTable(t.id)}
+                    onClick={() => toggleTable(tbl.id)}
                   >
-                    {t.name} · {t.seats}
+                    {tbl.name} · {tbl.seats}
                   </Button>
                 ))}
               </div>
@@ -166,44 +168,47 @@ export function NewReservationDialog({
                   : "text-sm text-muted-foreground"
               }
             >
-              {totalSeats} seats selected for {watchedPartySize} guests.
+              {t("reservation.selected", {
+                seats: t("common.seats", { count: totalSeats }),
+                guests: t("common.guests", { count: watchedPartySize }),
+              })}
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="guest-name">Guest name</Label>
-              <Input id="guest-name" placeholder="Jane Doe" {...register("name")} />
+              <Label htmlFor="guest-name">{t("reservation.guestName")}</Label>
+              <Input id="guest-name" placeholder={t("reservation.guestNamePlaceholder")} {...register("name")} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="guest-contact">Contact</Label>
+              <Label htmlFor="guest-contact">{t("reservation.contact")}</Label>
               <Input
                 id="guest-contact"
-                placeholder="jane@example.com"
+                placeholder="jane@example.com" // i18n-ok
                 {...register("contact")}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reservation-commentary">Note</Label>
+            <Label htmlFor="reservation-commentary">{t("reservation.note")}</Label>
             <Textarea
               id="reservation-commentary"
               maxLength={COMMENTARY_MAX}
-              placeholder="Anniversary, bring a cake"
+              placeholder={t("reservation.notePlaceholder")}
               {...register("commentary")}
             />
             <p className="text-sm text-muted-foreground">
-              Up to {COMMENTARY_MAX} characters. Do not enter health data such as allergies.
+              {t("reservation.noteHint", { max: COMMENTARY_MAX })}
             </p>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating…" : "Create reservation"}
+              {isSubmitting ? t("reservation.new.creating") : t("reservation.new.create")}
             </Button>
           </DialogFooter>
         </form>

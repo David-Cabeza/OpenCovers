@@ -42,7 +42,7 @@ export function BrandLogo({
     <span className={cn("inline-flex items-center gap-2 text-primary", className)}>
       <BrandMark className="size-8" />
       {showWordmark && (
-        <span className="font-display text-xl leading-none text-foreground">OpenCovers</span>
+        <span className="font-display text-xl leading-none text-foreground">{"OpenCovers"}</span>
       )}
     </span>
   );

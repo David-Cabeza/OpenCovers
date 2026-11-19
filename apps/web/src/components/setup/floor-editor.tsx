@@ -1,4 +1,5 @@
 import { errorMessage } from "@/lib/error-message";
+import { useT } from "@/i18n";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -24,6 +25,7 @@ import { api } from "@/lib/api";
 import { FLOOR_ITEM_TYPES } from "@/lib/floor-item-types";
 
 export function FloorEditor({ venueId }: { venueId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data: tablesData, isPending, isError, error, isRefetching, refetch } = useTables(venueId);
   const { data: itemsData } = useFloorItems(venueId);
@@ -58,7 +60,7 @@ export function FloorEditor({ venueId }: { venueId: string }) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["floor-items", venueId] });
     },
-    onError: (err) => toast.error(errorMessage(err, "Could not add element.")),
+    onError: (err) => toast.error(errorMessage(err, t("setup.floor.addFailed"))),
   });
 
   const deleteItem = useMutation({
@@ -72,10 +74,8 @@ export function FloorEditor({ venueId }: { venueId: string }) {
     <Card>
       <CardHeader className="flex items-center justify-between gap-4">
         <div>
-          <CardTitle>Floor layout</CardTitle>
-          <CardDescription>
-            Drag tables and room elements to arrange your dining room.
-          </CardDescription>
+          <CardTitle>{t("setup.floor.title")}</CardTitle>
+          <CardDescription>{t("setup.floor.description")}</CardDescription>
         </div>
         <Select
           onValueChange={(type) => {
@@ -83,8 +83,8 @@ export function FloorEditor({ venueId }: { venueId: string }) {
             if (cfg) addItem.mutate({ type, label: cfg.label, width: cfg.width, height: cfg.height });
           }}
         >
-          <SelectTrigger className="w-[180px]" aria-label="Add element">
-            <SelectValue placeholder="Add element" />
+          <SelectTrigger className="w-[180px]" aria-label={t("setup.floor.addElement")}>
+            <SelectValue placeholder={t("setup.floor.addElement")} />
           </SelectTrigger>
           <SelectContent>
             {Object.entries(FLOOR_ITEM_TYPES).map(([type, cfg]) => (
@@ -99,7 +99,7 @@ export function FloorEditor({ venueId }: { venueId: string }) {
         {isPending ? (
           <Skeleton className="h-[480px] w-full" />
         ) : isError && !tablesData ? (
-          <LoadError compact what="the tables" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+          <LoadError compact what={t("setup.tables.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : (
           <FloorCanvas
             tables={tables}

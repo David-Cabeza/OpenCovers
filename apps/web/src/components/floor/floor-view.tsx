@@ -16,9 +16,11 @@ import { MoveDialog } from "@/components/floor/move-dialog";
 import { useFloor } from "@/hooks/use-floor";
 import { useFloorItems } from "@/hooks/use-floor-items";
 import { api, type FloorTable } from "@/lib/api";
+import { useT } from "@/i18n";
 import { nowTime, todayIso } from "@/lib/date";
 
 export function FloorView({ venueId }: { venueId: string }) {
+  const t = useT();
   const nav = useNavigation();
   const [date, setDate] = useState(todayIso());
   const [time, setTime] = useState(nowTime());
@@ -39,12 +41,12 @@ export function FloorView({ venueId }: { venueId: string }) {
     mutationFn: ({ reservationId, targetTableId }: { reservationId: string; targetTableId: string }) =>
       api.modifyReservation(venueId, reservationId, { tables: [targetTableId] }),
     onSuccess: () => {
-      toast.success("Reservation moved");
+      toast.success(t("floor.moved"));
       void queryClient.invalidateQueries({ queryKey: ["floor", venueId] });
       void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       void queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
     },
-    onError: (err) => toast.error(errorMessage(err, "Could not move.")),
+    onError: (err) => toast.error(errorMessage(err, t("floor.moveFailed"))),
     onSettled: () => setMoveFrom(null),
   });
 
@@ -52,22 +54,22 @@ export function FloorView({ venueId }: { venueId: string }) {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl">Floor plan</h1>
+          <h1 className="font-display text-3xl">{t("floor.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Drag a reservation to a free table, or tap a seated table to see it and move it. Tap a free table to seat a walk-in.
+            {t("floor.intro")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Input
             type="date"
-            aria-label="Date"
+            aria-label={t("floor.date")}
             value={date}
             onChange={(e) => setDate(e.target.value)}
             className="w-fit"
           />
           <Input
             type="time"
-            aria-label="Time"
+            aria-label={t("floor.time")}
             value={time}
             onChange={(e) => setTime(e.target.value)}
             className="w-fit"
@@ -79,16 +81,16 @@ export function FloorView({ venueId }: { venueId: string }) {
               setTime(nowTime());
             }}
           >
-            Now
+            {t("floor.now")}
           </Button>
         </div>
       </div>
 
       {tables.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-          <Legend tone="free" label="Free" value={free} />
-          <Legend tone="occupied" label="Occupied" value={occupied} />
-          <span className="text-muted-foreground tabular-nums">{seatedCovers} guests at tables</span>
+          <Legend tone="free" label={t("floor.free")} value={free} />
+          <Legend tone="occupied" label={t("floor.occupied")} value={occupied} />
+          <span className="text-muted-foreground tabular-nums">{t("floor.seatedCovers", { count: seatedCovers })}</span>
           <span className="ml-auto">
             <FloorSkinToggle />
           </span>
@@ -98,16 +100,16 @@ export function FloorView({ venueId }: { venueId: string }) {
       {isPending ? (
         <Skeleton className="h-[480px] w-full" />
       ) : isError && !data ? (
-        <LoadError what="the floor plan" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+        <LoadError what={t("floor.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : tables.length === 0 ? (
         <EmptyState
           icon={ArmchairIcon}
-          title="No tables yet"
-          description="Add tables under Settings, then arrange them on the floor plan."
+          title={t("floor.empty.title")}
+          description={t("floor.empty.description")}
           action={
             nav && canEditSetup(nav.role) ? (
               <Button className="mt-2" onClick={() => nav.goTo("setup", "room")}>
-                Add tables
+                {t("floor.empty.action")}
               </Button>
             ) : undefined
           }

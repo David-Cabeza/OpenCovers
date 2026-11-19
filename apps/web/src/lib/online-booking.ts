@@ -1,3 +1,5 @@
+import { t } from "@/i18n";
+
 export interface OnlineBooking {
   enabled: boolean;
   bookingKey: string | null;
@@ -26,14 +28,15 @@ export type OnlineBookingUpdate = Partial<
 > & { theme?: Theme | null };
 
 export const LOCALES = ["es", "en", "ca", "fr", "de", "it", "pt"] as const;
+// Each language is named in itself, so these stay as they are in every language of the app.
 export const LOCALE_NAMES: Record<(typeof LOCALES)[number], string> = {
-  es: "Español",
-  en: "English",
-  ca: "Català",
-  fr: "Français",
-  de: "Deutsch",
-  it: "Italiano",
-  pt: "Português",
+  es: "Español", // i18n-ok
+  en: "English", // i18n-ok
+  ca: "Català", // i18n-ok
+  fr: "Français", // i18n-ok
+  de: "Deutsch", // i18n-ok
+  it: "Italiano", // i18n-ok
+  pt: "Português", // i18n-ok
 };
 
 export const COLOR_KEYS = ["primary", "onPrimary", "background", "surface", "text", "muted", "border"] as const;
@@ -183,24 +186,24 @@ function parseTheme(form: ThemeForm, errors: FormErrors): Theme | null {
   const logo = form.logoUrl.trim();
   let ok = true;
   if (radius == null) {
-    errors.themeRadius = "Whole number of pixels from 0 to 24.";
+    errors.themeRadius = t("onlinebooking.error.radius");
     ok = false;
   }
   if (form.darkColors && darkRadiusText !== "" && darkRadius === undefined) {
-    errors.themeDarkRadius = "Whole number of pixels from 0 to 24, or empty for the same as light mode.";
+    errors.themeDarkRadius = t("onlinebooking.error.darkRadius");
     ok = false;
   }
   if (logo !== "" && !isLogoUrl(logo)) {
-    errors.themeLogoUrl = "An https address of an image, with no spaces, up to 2048 characters.";
+    errors.themeLogoUrl = t("onlinebooking.error.logoUrl");
     ok = false;
   }
   if (COLOR_KEYS.some((k) => !HEX.test(form.colors[k].toLowerCase()))) {
-    errors.themeColors = "Each color is #rrggbb.";
+    errors.themeColors = t("onlinebooking.error.colors");
     ok = false;
   }
   const dark = form.darkColors;
   if (dark && COLOR_KEYS.some((k) => !HEX.test(dark[k].toLowerCase()))) {
-    errors.themeDarkColors = "Each color is #rrggbb.";
+    errors.themeDarkColors = t("onlinebooking.error.colors");
     ok = false;
   }
   return ok
@@ -291,45 +294,45 @@ export function parseForm(
 
   const min = int(form.minPartySize, 1, 100, false);
   const max = int(form.maxPartySize, 1, 100, false);
-  if (min == null) errors.minPartySize = "Whole number from 1 to 100.";
-  if (max == null) errors.maxPartySize = "Whole number from 1 to 100.";
-  if (min != null && max != null && min > max) errors.maxPartySize = "At least the smallest party.";
+  if (min == null) errors.minPartySize = t("onlinebooking.error.partySize");
+  if (max == null) errors.maxPartySize = t("onlinebooking.error.partySize");
+  if (min != null && max != null && min > max) errors.maxPartySize = t("onlinebooking.error.partyOrder");
   if (min != null && min !== stored.minPartySize) update.minPartySize = min;
   if (max != null && max !== stored.maxPartySize) update.maxPartySize = max;
 
   const lead = int(form.leadTimeMinutes, 0, 10080, false);
-  if (lead == null) errors.leadTimeMinutes = "Whole number of minutes from 0 to 10080.";
+  if (lead == null) errors.leadTimeMinutes = t("onlinebooking.error.minutes");
   else if (lead !== stored.leadTimeMinutes) update.leadTimeMinutes = lead;
 
   const advance = int(form.maxAdvanceDays, 0, 1000, true);
-  if (advance === undefined) errors.maxAdvanceDays = "Leave empty, or a whole number of days from 0 to 1000.";
+  if (advance === undefined) errors.maxAdvanceDays = t("onlinebooking.error.horizon");
   else if (advance !== stored.maxAdvanceDays) update.maxAdvanceDays = advance;
 
   const cutoff = int(form.selfServiceCutoffMinutes, 0, 10080, false);
-  if (cutoff == null) errors.selfServiceCutoffMinutes = "Whole number of minutes from 0 to 10080.";
+  if (cutoff == null) errors.selfServiceCutoffMinutes = t("onlinebooking.error.minutes");
   else if (cutoff !== stored.selfServiceCutoffMinutes) update.selfServiceCutoffMinutes = cutoff;
 
   const open = int(form.maxOpenBookingsPerContact, 1, 20, true);
-  if (open === undefined) errors.maxOpenBookingsPerContact = "Leave empty, or a whole number from 1 to 20.";
+  if (open === undefined) errors.maxOpenBookingsPerContact = t("onlinebooking.error.openPerContact");
   else if (open !== stored.maxOpenBookingsPerContact) update.maxOpenBookingsPerContact = open;
 
   const origins = form.allowedOrigins
     .split(/[\n,]/)
     .map((o) => o.trim().toLowerCase())
     .filter((o) => o !== "");
-  if (origins.length > 10) errors.allowedOrigins = "At most 10 addresses.";
+  if (origins.length > 10) errors.allowedOrigins = t("onlinebooking.error.originsMax");
   else if (origins.some((o) => !ORIGIN.test(o)))
     errors.allowedOrigins =
-      "Each address is https://host or https://host:port, with no path or wildcard, and a host of letters, digits, hyphens and dots.";
+      t("onlinebooking.error.originsFormat");
   else if (!sameSet(origins, stored.allowedOrigins)) update.allowedOrigins = origins;
 
-  if (form.weekdays.length === 0) errors.weekdays = "Pick at least one day.";
+  if (form.weekdays.length === 0) errors.weekdays = t("onlinebooking.error.weekdays");
   else {
     const days = form.weekdays.length === 7 ? null : [...form.weekdays].sort((a, b) => a - b);
     if (!sameSet(days, stored.weekdays)) update.weekdays = days;
   }
 
-  if (form.services !== null && form.services.length === 0) errors.services = "Pick at least one service.";
+  if (form.services !== null && form.services.length === 0) errors.services = t("onlinebooking.error.services");
   else {
     const everyService =
       form.services !== null &&
@@ -343,7 +346,7 @@ export function parseForm(
 
   const notice = form.privacyNoticeUrl.trim();
   if (notice !== "" && !isPrivacyNoticeUrl(notice))
-    errors.privacyNoticeUrl = "An https address with no spaces, up to 2048 characters.";
+    errors.privacyNoticeUrl = t("onlinebooking.error.privacyUrl");
   else if (notice !== (stored.privacyNoticeUrl ?? "")) update.privacyNoticeUrl = notice === "" ? null : notice;
 
   const theme = parseTheme(form.theme, errors);
@@ -355,7 +358,7 @@ export function parseForm(
 
 export function embedSnippet(origin: string, key: string, followDark = false): string {
   const base = origin.trim().replace(/\/+$/, "");
-  return `<iframe src="${base}/w/${key}${followDark ? "?scheme=auto" : ""}" title="Book a table" width="100%" height="640" style="border:0" loading="lazy"></iframe>`;
+  return `<iframe src="${base}/w/${key}${followDark ? "?scheme=auto" : ""}" title="Book a table" width="100%" height="640" style="border:0" loading="lazy"></iframe>`; // i18n-ok
 }
 
 /** The widget address as an origin without a trailing slash, or null when it is not one (http or https, no path). */

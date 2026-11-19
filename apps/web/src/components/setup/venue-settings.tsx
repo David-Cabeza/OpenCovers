@@ -1,4 +1,5 @@
 import { errorMessage, isApiError } from "@/lib/error-message";
+import { useT } from "@/i18n";
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -27,6 +28,7 @@ function parseCeiling(value: string): number | null {
 }
 
 export function VenueSettings({ venueId, role }: { venueId: string; role?: Role }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data, isPending, isError, error, isRefetching, refetch } = useVenueConfig(venueId);
   const [enabled, setEnabled] = useState(false);
@@ -76,15 +78,15 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
       queryClient.setQueryData(["config", venueId], config);
       setResendConfigured(config.resendConfigured);
       setResendApiKey("");
-      toast.success("Settings saved");
+      toast.success(t("setup.venue.saved"));
     },
     onError: (err) => {
       const message =
         err instanceof Error && err.message === "overbooking_ceiling_invalid"
-          ? `The overbooking ceiling must be a whole number from 0 to ${OVERBOOKING_MAX}.`
+          ? t("setup.venue.ceilingInvalid", { max: OVERBOOKING_MAX })
           : isApiError(err, "forbidden")
-            ? "Only an admin can change venue settings."
-            : errorMessage(err, "Could not save the settings.");
+            ? t("setup.venue.forbidden")
+            : errorMessage(err, t("setup.venue.saveFailed"));
       toast.error(message);
     },
   });
@@ -92,86 +94,83 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Venue</CardTitle>
-        <CardDescription>
-          Reservations, notifications, and the booking rules for this venue.
-        </CardDescription>
+        <CardTitle>{t("setup.venue.title")}</CardTitle>
+        <CardDescription>{t("setup.venue.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {isPending ? (
           <Skeleton className="h-24 w-full" />
         ) : isError && !data ? (
-          <LoadError compact what="the venue settings" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+          <LoadError compact what={t("setup.venue.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : (
           <>
-            <Group title="Reservations" description="Whether platforms and agents may book this venue.">
+            <Group title={t("setup.venue.reservations")} description={t("setup.venue.reservationsDescription")}>
               <StatusPanel
                 id="enabled"
-                label="Accepting reservations"
-                description="Turn this on to let platforms and agents book."
+                label={t("setup.venue.accepting")}
+                description={t("setup.venue.acceptingDescription")}
                 live={data?.enabled ?? false}
                 checked={enabled}
                 onCheckedChange={setEnabled}
               />
 
               <div className="space-y-2">
-                <Label htmlFor="notice-address">Notice address</Label>
+                <Label htmlFor="notice-address">{t("setup.venue.noticeAddress")}</Label>
                 <Input
                   id="notice-address"
                   type="email"
-                  placeholder="owner@example.com"
+                  placeholder="owner@example.com" // i18n-ok
                   value={noticeAddress}
                   onChange={(e) => setNoticeAddress(e.target.value)}
                 />
                 <p className="text-sm text-muted-foreground">
-                  Required before enabling. Used for legal and STOP notices.
+                  {t("setup.venue.noticeHelp")}
                 </p>
               </div>
             </Group>
 
-            <Group title="Email" description="Messages sent to guests, from your own Resend account.">
+            <Group title={t("setup.venue.email")} description={t("setup.venue.emailDescription")}>
               <StatusPanel
                 id="notifications"
-                label="Email confirmations"
-                description="Send confirmations, cancellations, and booking notices by email."
+                label={t("setup.venue.confirmations")}
+                description={t("setup.venue.confirmationsDescription")}
                 live={data?.notificationsEnabled ?? false}
                 checked={notificationsEnabled}
                 onCheckedChange={setNotificationsEnabled}
-                onLabel="On"
+                onLabel={t("setup.status.on")}
               />
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="from-email">From address</Label>
+                  <Label htmlFor="from-email">{t("setup.venue.fromAddress")}</Label>
                   <Input
                     id="from-email"
                     type="email"
-                    placeholder="reservas@tu-restaurante.com"
+                    placeholder="reservas@tu-restaurante.com" // i18n-ok
                     value={fromEmail}
                     onChange={(e) => setFromEmail(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="resend-key">Resend API key</Label>
+                  <Label htmlFor="resend-key">{t("setup.venue.resendKey")}</Label>
                   <Input
                     id="resend-key"
                     type="password"
-                    placeholder={resendConfigured ? "•••••• configured" : "re_..."}
+                    placeholder={resendConfigured ? t("setup.venue.resendConfigured") : "re_..."} // i18n-ok
                     value={resendApiKey}
                     onChange={(e) => setResendApiKey(e.target.value)}
                   />
                   <p className="text-sm text-muted-foreground">
-                    Each venue uses its own Resend account. The key is never shown
-                    back; leave blank to keep the current one.
+                    {t("setup.venue.resendHelp")}
                   </p>
                 </div>
               </div>
             </Group>
 
-            <Group title="Booking rules" description="How the engine accepts bookings. Times are in minutes.">
+            <Group title={t("setup.venue.rules")} description={t("setup.venue.rulesDescription")}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="slot-interval">Slot interval</Label>
+                  <Label htmlFor="slot-interval">{t("setup.venue.slotInterval")}</Label>
                   <Input
                     id="slot-interval"
                     type="number"
@@ -181,7 +180,7 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lead-time">Lead time</Label>
+                  <Label htmlFor="lead-time">{t("setup.venue.leadTime")}</Label>
                   <Input
                     id="lead-time"
                     type="number"
@@ -191,7 +190,7 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="last-seating">Last seating offset</Label>
+                  <Label htmlFor="last-seating">{t("setup.venue.lastSeating")}</Label>
                   <Input
                     id="last-seating"
                     type="number"
@@ -203,9 +202,9 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
               </div>
             </Group>
 
-            <Group title="Overbooking" description="Take a few covers beyond what your tables seat, with a hard limit.">
+            <Group title={t("setup.venue.overbooking")} description={t("setup.venue.overbookingDescription")}>
               <div className="space-y-2">
-                <Label htmlFor="overbooking-ceiling">Overbooking ceiling</Label>
+                <Label htmlFor="overbooking-ceiling">{t("setup.venue.ceiling")}</Label>
                 <Input
                   id="overbooking-ceiling"
                   type="number"
@@ -218,16 +217,14 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
                   onChange={(e) => setOverbookingCeiling(e.target.value)}
                 />
                 <p className="text-sm text-muted-foreground">
-                  The most guests the venue accepts without a table at the same time. 0
-                  turns overbooking off. Overbooked guests need a table assigned before
-                  they can be seated. Only an admin can change this.
+                  {t("setup.venue.ceilingHelp")}
                 </p>
               </div>
             </Group>
 
             <SaveBar>
               <Button onClick={() => save.mutate()} disabled={save.isPending}>
-                {save.isPending ? "Saving…" : "Save settings"}
+                {save.isPending ? t("common.saving") : t("setup.venue.save")}
               </Button>
             </SaveBar>
           </>

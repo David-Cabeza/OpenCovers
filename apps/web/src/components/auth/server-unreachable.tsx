@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { CloudOffIcon } from "lucide-react";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n";
 
 const RETRY_MS = 10_000;
 
 /** Shown in place of the sign-in screen when the session could not be read because the server did not answer. */
 export function ServerUnreachable({ onRetry }: { onRetry: () => void }) {
+  const t = useT();
   const [trying, setTrying] = useState(false);
 
   function retry() {
@@ -26,14 +28,13 @@ export function ServerUnreachable({ onRetry }: { onRetry: () => void }) {
         <BrandMark className="mx-auto size-14 text-primary" />
         <div className="space-y-2">
           <CloudOffIcon className="mx-auto size-6 text-muted-foreground" aria-hidden="true" />
-          <h1 className="font-display text-2xl">We can&apos;t reach the server</h1>
+          <h1 className="font-display text-2xl">{t("auth.unreachable.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            OpenCovers could not check your session, so we do not know whether you are signed in. Your data is
-            not affected. Check your connection; we will try again every few seconds.
+            {t("auth.unreachable.description")}
           </p>
         </div>
         <Button onClick={retry} disabled={trying} className="w-full">
-          {trying ? "Trying…" : "Try again"}
+          {trying ? t("common.trying") : t("common.tryAgain")}
         </Button>
       </div>
     </main>

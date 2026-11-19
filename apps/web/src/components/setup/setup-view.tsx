@@ -1,5 +1,6 @@
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { errorMessage } from "@/lib/error-message";
+import { useT, type MessageKey } from "@/i18n";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
@@ -33,32 +34,33 @@ import type { Role } from "@/lib/api";
 
 interface Section {
   id: string;
-  label: string;
-  description: string;
+  label: MessageKey;
+  description: MessageKey;
   adminOnly?: boolean;
 }
 
 const SECTIONS: Section[] = [
-  { id: "venue", label: "General", description: "Name, hours and how bookings are accepted." },
+  { id: "venue", label: "setup.section.venue.label", description: "setup.section.venue.description" },
   {
     id: "online",
-    label: "Online",
-    description: "Your public page and the widget guests use to book.",
+    label: "setup.section.online.label",
+    description: "setup.section.online.description",
     adminOnly: true,
   },
-  { id: "room", label: "Dining room", description: "Tables, the floor plan and your services." },
+  { id: "room", label: "setup.section.room.label", description: "setup.section.room.description" },
   {
     id: "developers",
-    label: "Developers",
-    description: "API keys for integrations and agents.",
+    label: "setup.section.developers.label",
+    description: "setup.section.developers.description",
     adminOnly: true,
   },
 ];
 
 function SectionNav({ sections }: { sections: Section[] }) {
+  const t = useT();
   return (
     <nav
-      aria-label="Settings sections"
+      aria-label={t("setup.nav")}
       className="sticky top-16 z-[5] -mx-4 flex gap-2 overflow-x-auto border-b bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
     >
       {sections.map((section) => (
@@ -73,7 +75,7 @@ function SectionNav({ sections }: { sections: Section[] }) {
             "hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
           )}
         >
-          {section.label}
+          {t(section.label)}
         </button>
       ))}
     </nav>
@@ -87,13 +89,14 @@ function SettingsSection({
   section: Section;
   children: React.ReactNode;
 }) {
+  const t = useT();
   return (
     <section id={`settings-${section.id}`} aria-labelledby={`settings-${section.id}-title`} className="scroll-mt-32 space-y-4">
       <div>
         <h2 id={`settings-${section.id}-title`} className="font-display text-2xl">
-          {section.label}
+          {t(section.label)}
         </h2>
-        <p className="text-sm text-muted-foreground">{section.description}</p>
+        <p className="text-sm text-muted-foreground">{t(section.description)}</p>
       </div>
       <div className="space-y-6">{children}</div>
     </section>
@@ -101,12 +104,13 @@ function SettingsSection({
 }
 
 export function SetupView({ venueId, role }: { venueId: string; role?: Role }) {
+  const t = useT();
   const isAdmin = role === "admin";
   const sections = SECTIONS.filter((s) => !s.adminOnly || isAdmin);
   const section = (id: string) => SECTIONS.find((s) => s.id === id) as Section;
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings" description="Everything that shapes how this venue takes bookings." />
+      <PageHeader title={t("setup.title")} description={t("setup.description")} />
       <SectionNav sections={sections} />
       <div className="space-y-12">
         <SettingsSection section={section("venue")}>
@@ -143,12 +147,13 @@ function RowActions({
   onEdit: () => void;
   onRemove: () => void;
 }) {
+  const t = useT();
   return (
     <div className="flex gap-1">
-      <Button variant="ghost" size="icon" aria-label={`Edit ${label}`} onClick={onEdit}>
+      <Button variant="ghost" size="icon" aria-label={t("setup.row.edit", { name: label })} onClick={onEdit}>
         <PencilIcon className="size-4" />
       </Button>
-      <Button variant="ghost" size="icon" aria-label={`Remove ${label}`} onClick={onRemove}>
+      <Button variant="ghost" size="icon" aria-label={t("setup.row.remove", { name: label })} onClick={onRemove}>
         <Trash2Icon className="size-4" />
       </Button>
     </div>
@@ -156,6 +161,7 @@ function RowActions({
 }
 
 function TablesSection({ venueId }: { venueId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data, isPending, isError, error, isRefetching, refetch } = useTables(venueId);
   const [open, setOpen] = useState(false);
@@ -168,9 +174,9 @@ function TablesSection({ venueId }: { venueId: string }) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tables", venueId] });
       void queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
-      toast.success("Table removed");
+      toast.success(t("setup.tables.removed"));
     },
-    onError: (err) => toast.error(errorMessage(err, "Could not remove.")),
+    onError: (err) => toast.error(errorMessage(err, t("setup.removeFailed"))),
     onSettled: () => setRemoving(null),
   });
 
@@ -178,8 +184,8 @@ function TablesSection({ venueId }: { venueId: string }) {
     <Card>
       <CardHeader className="flex items-center justify-between gap-4">
         <div>
-          <CardTitle>Tables</CardTitle>
-          <CardDescription>Seating for each table and its zone.</CardDescription>
+          <CardTitle>{t("setup.tables.title")}</CardTitle>
+          <CardDescription>{t("setup.tables.description")}</CardDescription>
         </div>
         <Button
           size="sm"
@@ -188,35 +194,35 @@ function TablesSection({ venueId }: { venueId: string }) {
             setOpen(true);
           }}
         >
-          <PlusIcon className="size-4" /> Add table
+          <PlusIcon className="size-4" /> {t("setup.tables.add")}
         </Button>
       </CardHeader>
       <CardContent>
         {isPending ? (
           <Skeleton className="h-24 w-full" />
         ) : isError && !data ? (
-          <LoadError compact what="the tables" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+          <LoadError compact what={t("setup.tables.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : tables.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tables yet.</p>
+          <p className="text-sm text-muted-foreground">{t("setup.tables.empty")}</p>
         ) : (
           <ul className="-my-2 divide-y">
-            {tables.map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-3 py-3">
+            {tables.map((tb) => (
+              <li key={tb.id} className="flex items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
-                  <div className="truncate font-medium">{t.name}</div>
-                  <div className="text-sm text-muted-foreground">{t.zone || "No zone"}</div>
+                  <div className="truncate font-medium">{tb.name}</div>
+                  <div className="text-sm text-muted-foreground">{tb.zone || t("setup.tables.noZone")}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Pill tone="muted">
-                    {t.seats} {t.seats === 1 ? "seat" : "seats"}
+                    {t("common.seats", { count: tb.seats })}
                   </Pill>
                   <RowActions
-                    label={t.name}
+                    label={tb.name}
                     onEdit={() => {
-                      setEditing(t);
+                      setEditing(tb);
                       setOpen(true);
                     }}
-                    onRemove={() => setRemoving(t)}
+                    onRemove={() => setRemoving(tb)}
                   />
                 </div>
               </li>
@@ -226,10 +232,10 @@ function TablesSection({ venueId }: { venueId: string }) {
       </CardContent>
       <ConfirmDialog
         open={removing !== null}
-        title={removing ? `Remove ${removing.name}?` : "Remove table?"}
-        description="It leaves the floor plan and the availability, and this cannot be undone."
-        confirmLabel="Remove table"
-        keepLabel="Keep table"
+        title={removing ? t("setup.tables.confirmTitle", { name: removing.name }) : t("setup.tables.confirmTitleFallback")}
+        description={t("setup.tables.confirmDescription")}
+        confirmLabel={t("setup.tables.confirmLabel")}
+        keepLabel={t("setup.tables.keepLabel")}
         pending={remove.isPending}
         onConfirm={() => removing && remove.mutate(removing.id)}
         onClose={() => setRemoving(null)}
@@ -245,6 +251,7 @@ function TablesSection({ venueId }: { venueId: string }) {
 }
 
 function ServicesSection({ venueId }: { venueId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data, isPending, isError, error, isRefetching, refetch } = useServices(venueId);
   const [open, setOpen] = useState(false);
@@ -257,9 +264,9 @@ function ServicesSection({ venueId }: { venueId: string }) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["services", venueId] });
       void queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
-      toast.success("Service removed");
+      toast.success(t("setup.services.removed"));
     },
-    onError: (err) => toast.error(errorMessage(err, "Could not remove.")),
+    onError: (err) => toast.error(errorMessage(err, t("setup.removeFailed"))),
     onSettled: () => setRemoving(null),
   });
 
@@ -267,8 +274,8 @@ function ServicesSection({ venueId }: { venueId: string }) {
     <Card id="settings-services" className="scroll-mt-32">
       <CardHeader className="flex items-center justify-between gap-4">
         <div>
-          <CardTitle>Services</CardTitle>
-          <CardDescription>Your meal periods and their hours.</CardDescription>
+          <CardTitle>{t("setup.services.title")}</CardTitle>
+          <CardDescription>{t("setup.services.description")}</CardDescription>
         </div>
         <Button
           size="sm"
@@ -277,16 +284,16 @@ function ServicesSection({ venueId }: { venueId: string }) {
             setOpen(true);
           }}
         >
-          <PlusIcon className="size-4" /> Add service
+          <PlusIcon className="size-4" /> {t("setup.services.add")}
         </Button>
       </CardHeader>
       <CardContent>
         {isPending ? (
           <Skeleton className="h-24 w-full" />
         ) : isError && !data ? (
-          <LoadError compact what="the services" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+          <LoadError compact what={t("setup.services.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : services.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No services yet.</p>
+          <p className="text-sm text-muted-foreground">{t("setup.services.empty")}</p>
         ) : (
           <ul className="-my-2 divide-y">
             {services.map((sv) => (
@@ -315,10 +322,10 @@ function ServicesSection({ venueId }: { venueId: string }) {
       </CardContent>
       <ConfirmDialog
         open={removing !== null}
-        title={removing ? `Remove ${removing.name}?` : "Remove service?"}
-        description="Its hours stop applying to availability and bookings, and this cannot be undone."
-        confirmLabel="Remove service"
-        keepLabel="Keep service"
+        title={removing ? t("setup.services.confirmTitle", { name: removing.name }) : t("setup.services.confirmTitleFallback")}
+        description={t("setup.services.confirmDescription")}
+        confirmLabel={t("setup.services.confirmLabel")}
+        keepLabel={t("setup.services.keepLabel")}
         pending={remove.isPending}
         onConfirm={() => removing && remove.mutate(removing.name)}
         onClose={() => setRemoving(null)}

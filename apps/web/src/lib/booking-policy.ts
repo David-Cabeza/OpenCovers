@@ -1,3 +1,5 @@
+import { t } from "@/i18n";
+
 export interface DateRange {
   from: string;
   to: string;
@@ -64,11 +66,11 @@ export function toForm(policy: BookingPolicy): BookingPolicyForm {
   };
 }
 
-function parseLimit(text: string, min: number, max: number, label: string) {
+function parseLimit(text: string, min: number, max: number, errorKey: "setup.policy.errAdvance" | "setup.policy.errPerGuest") {
   const value = text.trim();
   if (value === "") return { value: null as number | null };
   if (!/^\d+$/.test(value) || Number(value) < min || Number(value) > max) {
-    return { error: `${label} must be a whole number from ${min} to ${max}, or empty to turn it off.` };
+    return { error: t(errorKey, { min, max }) };
   }
   return { value: Number(value) };
 }
@@ -81,32 +83,32 @@ function parseBlockedText(text: string): { ranges: DateRange[] } | { error: stri
     .filter((e) => e !== "");
   for (const entry of entries) {
     const parts = entry.split(/\s*(?:\.\.|\s+to\s+)\s*/);
-    if (parts.length > 2) return { error: `"${entry}" is not a date or a range.` };
+    if (parts.length > 2) return { error: t("setup.policy.errNotRange", { entry }) };
     const [from, to = from] = parts;
     if (!isCalendarDate(from) || !isCalendarDate(to)) {
       return {
-        error: `"${entry}" is not a valid date. Use YYYY-MM-DD, or YYYY-MM-DD..YYYY-MM-DD for a range.`,
+        error: t("setup.policy.errBadDate", { entry }),
       };
     }
-    if (from > to) return { error: `"${entry}" ends before it starts.` };
+    if (from > to) return { error: t("setup.policy.errEndsBefore", { entry }) };
     ranges.push({ from, to });
   }
   const merged = mergeRanges(ranges);
   if (merged.length > BLOCKED_DATES_MAX || entries.length > BLOCKED_DATES_MAX) {
-    return { error: `At most ${BLOCKED_DATES_MAX} blocked dates or ranges.` };
+    return { error: t("setup.policy.errTooMany", { max: BLOCKED_DATES_MAX }) };
   }
   return { ranges: merged };
 }
 
 export function parseForm(form: BookingPolicyForm): ParseResult {
   const errors: FormErrors = {};
-  const advance = parseLimit(form.maxAdvanceDays, 0, MAX_ADVANCE_DAYS_MAX, "Advance days");
+  const advance = parseLimit(form.maxAdvanceDays, 0, MAX_ADVANCE_DAYS_MAX, "setup.policy.errAdvance");
   if ("error" in advance) errors.maxAdvanceDays = advance.error;
   const perGuest = parseLimit(
     form.maxActivePerGuestPerDay,
     1,
     MAX_ACTIVE_PER_GUEST_MAX,
-    "Bookings per guest per day",
+    "setup.policy.errPerGuest",
   );
   if ("error" in perGuest) errors.maxActivePerGuestPerDay = perGuest.error;
   const blocked = parseBlockedText(form.blockedDates);

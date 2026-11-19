@@ -6,7 +6,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useT } from "@/i18n";
 import type { FloorTable } from "@/lib/api";
+import { guestsText } from "./guests-text";
 
 /**
  * Move a seated reservation to a free table without dragging, which does not work on a touch screen.
@@ -26,39 +28,46 @@ export function MoveDialog({
   onMove: (reservationId: string, targetTableId: string) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const party = source?.partySize ?? 0;
   const targets = tables
-    .filter((t) => !t.occupied && t.id !== source?.id)
-    .sort((a, b) => Number(a.seats < party) - Number(b.seats < party) || a.seats - b.seats);
+    .filter((x) => !x.occupied && x.id !== source?.id)
+    .sort((a, b) => Number(a.seats < party) - Number(b.seats < party) || a.seats - b.seats); // i18n-ok
 
   return (
     <Dialog open={source !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Move {source?.guestName || "reservation"}</DialogTitle>
+          <DialogTitle>
+            {source?.guestName
+              ? t("floor.move.title", { guest: source.guestName })
+              : t("floor.move.titleNoName")}
+          </DialogTitle>
           <DialogDescription>
-            Now at {source?.name}, {party || "?"} {party === 1 ? "guest" : "guests"}. Pick a free table.
+            {t("floor.move.description", { table: source?.name ?? "", guests: guestsText(party || undefined) })}
           </DialogDescription>
         </DialogHeader>
         {targets.length === 0 ? (
-          <p className="text-sm text-muted-foreground">There are no free tables right now.</p>
+          <p className="text-sm text-muted-foreground">{t("floor.move.none")}</p>
         ) : (
           <ul className="-my-1 max-h-[50vh] divide-y overflow-y-auto pr-3">
-            {targets.map((t) => (
-              <li key={t.id}>
+            {targets.map((target) => (
+              <li key={target.id}>
                 <button
                   type="button"
                   disabled={pending || !source?.reservationId}
-                  aria-label={`Move to ${t.name}`}
-                  onClick={() => source?.reservationId && onMove(source.reservationId, t.id)}
+                  aria-label={t("floor.move.to", { table: target.name })}
+                  onClick={() => source?.reservationId && onMove(source.reservationId, target.id)}
                   className="flex w-full items-center justify-between gap-3 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50 disabled:opacity-50"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate font-medium">{t.name}</span>
-                    <span className="block text-sm text-muted-foreground">{t.zone || "No zone"}</span>
+                    <span className="block truncate font-medium">{target.name}</span>
+                    <span className="block text-sm text-muted-foreground">{target.zone || t("floor.move.noZone")}</span>
                   </span>
-                  <Pill tone={t.seats < party ? "warning" : "muted"}>
-                    {t.seats < party ? `${t.seats} seats, too small` : `${t.seats} ${t.seats === 1 ? "seat" : "seats"}`}
+                  <Pill tone={target.seats < party ? "warning" : "muted"}>
+                    {target.seats < party
+                      ? t("floor.move.tooSmall", { count: target.seats })
+                      : t("common.seats", { count: target.seats })}
                   </Pill>
                 </button>
               </li>

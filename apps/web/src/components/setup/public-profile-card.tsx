@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useT } from "@/i18n";
 import { usePublicProfile } from "@/hooks/use-public-profile";
 import { api } from "@/lib/api";
 import { errorMessage, isApiError } from "@/lib/error-message";
@@ -48,6 +49,7 @@ const EMPTY_FORM: PublicProfileForm = {
 type TextKey = Exclude<keyof PublicProfileForm, "publicProfileEnabled">;
 
 export function PublicProfileCard({ venueId }: { venueId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data, isPending, isError, error: loadError, isRefetching, refetch } = usePublicProfile(venueId);
   const [form, setForm] = useState<PublicProfileForm>(EMPTY_FORM);
@@ -67,22 +69,22 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
     onSuccess: (profile) => {
       queryClient.setQueryData(["public-profile", venueId], profile);
       setIncomplete(null);
-      toast.success("Public profile saved");
+      toast.success(t("publicprofile.saved"));
     },
     onError: (err) => {
       if (isApiError(err, "public_profile_incomplete")) {
         const missing = missingForPublishing(form);
         const latLon = (form.latitude.trim() === "") !== (form.longitude.trim() === "");
         const items = [...missing];
-        if (latLon) items.push("both latitude and longitude, or neither");
-        if (items.length === 0) items.push("the venue name");
+        if (latLon) items.push(t("publicprofile.missing.latLon"));
+        if (items.length === 0) items.push(t("publicprofile.missing.venueName"));
         setIncomplete(items);
         return;
       }
       toast.error(
         isApiError(err, "forbidden")
-          ? "Only an admin can change the public profile."
-          : errorMessage(err, "Could not save the public profile."),
+          ? t("publicprofile.forbidden")
+          : errorMessage(err, t("publicprofile.saveFailed")),
       );
     },
   });
@@ -97,7 +99,7 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
     setErrors({});
     setIncomplete(null);
     if (Object.keys(result.update).length === 0) {
-      toast.success("Nothing to save");
+      toast.success(t("publicprofile.nothingToSave"));
       return;
     }
     save.mutate(result.update);
@@ -125,36 +127,33 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
   async function copy() {
     try {
       await navigator.clipboard.writeText(url);
-      toast.success("Address copied");
+      toast.success(t("publicprofile.url.copied"));
     } catch {
-      toast.error("Could not copy. Select the address and copy it by hand.");
+      toast.error(t("publicprofile.url.copyFailed"));
     }
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Public profile</CardTitle>
-        <CardDescription>
-          The details search engines can read about your venue, as schema.org JSON-LD. Nothing is
-          published until you turn it on. The private notice address is never used.
-        </CardDescription>
+        <CardTitle>{t("publicprofile.title")}</CardTitle>
+        <CardDescription>{t("publicprofile.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {isPending ? (
           <Skeleton className="h-24 w-full" />
         ) : isError && !data ? (
-          <LoadError compact what="the public profile" error={loadError} retrying={isRefetching} onRetry={() => void refetch()} />
+          <LoadError compact what={t("publicprofile.loadWhat")} error={loadError} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : (
           <>
             <StatusPanel
               id="pp-enabled"
-              label="Publish the public profile"
-              description="Needs street, city or town and country. The venue name becomes public too."
+              label={t("publicprofile.enabled.label")}
+              description={t("publicprofile.enabled.help")}
               live={data?.publicProfileEnabled ?? false}
               checked={form.publicProfileEnabled}
               onCheckedChange={(v) => setForm({ ...form, publicProfileEnabled: v })}
-              onLabel="Published"
+              onLabel={t("publicprofile.published")}
             />
 
             {incomplete && (
@@ -162,84 +161,96 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
                 role="alert"
                 className="rounded-md border border-destructive/50 p-3 text-sm text-destructive"
               >
-                <p>The profile cannot be published yet. Missing: {incomplete.join(", ")}.</p>
+                <p>{t("publicprofile.incomplete", { items: incomplete.join(", ") })}</p>
               </div>
             )}
 
-            <Group title="Address" description="Where the venue is.">
+            <Group title={t("publicprofile.address.title")} description={t("publicprofile.address.description")}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="pp-street">Street</Label>
-                  <Input id="pp-street" placeholder="Calle Mayor 1" {...text("street")} />
+                  <Label htmlFor="pp-street">{t("publicprofile.label.street")}</Label>
+                  <Input
+                    id="pp-street"
+                    placeholder="Calle Mayor 1" // i18n-ok
+                    {...text("street")}
+                  />
                   {error("street")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pp-locality">City or town</Label>
-                  <Input id="pp-locality" placeholder="Madrid" {...text("locality")} />
+                  <Label htmlFor="pp-locality">{t("publicprofile.label.locality")}</Label>
+                  <Input
+                    id="pp-locality"
+                    placeholder="Madrid" // i18n-ok
+                    {...text("locality")}
+                  />
                   {error("locality")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pp-postal">Postal code</Label>
+                  <Label htmlFor="pp-postal">{t("publicprofile.label.postalCode")}</Label>
                   <Input id="pp-postal" placeholder="28013" {...text("postalCode")} />
                   {error("postalCode")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pp-region">Region</Label>
-                  <Input id="pp-region" placeholder="Madrid" {...text("region")} />
+                  <Label htmlFor="pp-region">{t("publicprofile.label.region")}</Label>
+                  <Input
+                    id="pp-region"
+                    placeholder="Madrid" // i18n-ok
+                    {...text("region")}
+                  />
                   {error("region")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pp-country">Country</Label>
+                  <Label htmlFor="pp-country">{t("publicprofile.label.country")}</Label>
                   <Input id="pp-country" placeholder="ES" maxLength={2} {...text("country")} />
                   {error("country")}
                   <p className="text-sm text-muted-foreground">
-                    2-letter ISO code in capitals, for example ES.
+                    {t("publicprofile.country.help")}
                   </p>
                 </div>
               </div>
             </Group>
 
-            <Group title="Contact and details" description="How guests reach you and what you serve.">
+            <Group title={t("publicprofile.contact.title")} description={t("publicprofile.contact.description")}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="pp-phone">Phone</Label>
+                  <Label htmlFor="pp-phone">{t("publicprofile.label.phone")}</Label>
                   <Input id="pp-phone" type="tel" placeholder="+34 910 000 000" {...text("phone")} />
                   {error("phone")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pp-cuisine">Cuisine</Label>
-                  <Input id="pp-cuisine" placeholder="Spanish" {...text("cuisine")} />
+                  <Label htmlFor="pp-cuisine">{t("publicprofile.label.cuisine")}</Label>
+                  <Input id="pp-cuisine" placeholder={t("publicprofile.cuisine.placeholder")} {...text("cuisine")} />
                   {error("cuisine")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pp-website">Website</Label>
+                  <Label htmlFor="pp-website">{t("publicprofile.label.website")}</Label>
                   <Input
                     id="pp-website"
                     type="url"
-                    placeholder="https://example.com/"
+                    placeholder="https://example.com/" // i18n-ok
                     {...text("websiteUrl")}
                   />
                   {error("websiteUrl")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pp-booking">Booking link</Label>
+                  <Label htmlFor="pp-booking">{t("publicprofile.label.booking")}</Label>
                   <Input
                     id="pp-booking"
                     type="url"
-                    placeholder="https://example.com/reservas"
+                    placeholder="https://example.com/reservas" // i18n-ok
                     {...text("bookingUrl")}
                   />
                   {error("bookingUrl")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pp-price">Price range</Label>
+                  <Label htmlFor="pp-price">{t("publicprofile.label.price")}</Label>
                   <select
                     id="pp-price"
                     value={form.priceRange}
                     onChange={(e) => setForm({ ...form, priceRange: e.target.value })}
                     className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
                   >
-                    <option value="">Not shown</option>
+                    <option value="">{t("publicprofile.price.none")}</option>
                     {PRICE_RANGES.map((p) => (
                       <option key={p} value={p}>
                         {p}
@@ -250,10 +261,10 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
               </div>
             </Group>
 
-            <Group title="Location" description="Optional. Give both coordinates or neither.">
+            <Group title={t("publicprofile.location.title")} description={t("publicprofile.location.description")}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="pp-lat">Latitude</Label>
+                  <Label htmlFor="pp-lat">{t("publicprofile.label.latitude")}</Label>
                   <Input
                     id="pp-lat"
                     type="text"
@@ -264,7 +275,7 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
                   {error("latitude")}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pp-lon">Longitude</Label>
+                  <Label htmlFor="pp-lon">{t("publicprofile.label.longitude")}</Label>
                   <Input
                     id="pp-lon"
                     type="text"
@@ -277,43 +288,38 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
               </div>
             </Group>
             <p className="text-sm text-muted-foreground">
-              Empty a field and save to clear it. Coordinates are optional, but give both or
-              neither.
+              {t("publicprofile.clearHelp")}
             </p>
 
             <SaveBar>
               <Button onClick={submit} disabled={save.isPending}>
-                {save.isPending ? "Saving…" : "Save public profile"}
+                {save.isPending ? t("common.saving") : t("publicprofile.saveButton")}
               </Button>
             </SaveBar>
 
             <div className="space-y-3 border-t pt-6">
-              <h3 className="font-display text-lg">Preview</h3>
+              <h3 className="font-display text-lg">{t("publicprofile.preview.title")}</h3>
               <div className="space-y-2">
-                <Label htmlFor="pp-url">Public JSON-LD address</Label>
+                <Label htmlFor="pp-url">{t("publicprofile.url.label")}</Label>
                 <div className="flex gap-2">
                   <Input id="pp-url" readOnly value={url} className="font-mono" />
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    aria-label="Copy address"
+                    aria-label={t("publicprofile.url.copyAria")}
                     onClick={() => void copy()}
                   >
                     <CopyIcon className="size-4" />
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Add this document to the HTML of your own site. It answers only while the profile
-                  is published.
+                  {t("publicprofile.url.help")}
                 </p>
               </div>
               <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>The venue name becomes public when the profile is published.</li>
-                <li>
-                  Opening hours come from your services and the days they run, so keep the days
-                  of each service up to date.
-                </li>
+                <li>{t("publicprofile.note.name")}</li>
+                <li>{t("publicprofile.note.hours")}</li>
               </ul>
             </div>
           </>

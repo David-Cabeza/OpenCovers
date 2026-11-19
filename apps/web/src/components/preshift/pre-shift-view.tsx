@@ -16,28 +16,26 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stat } from "@/components/stat";
-import { CONSENT_OPTIONS } from "@/components/reservation/consent-select";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useServices } from "@/hooks/use-services";
 import { useTables } from "@/hooks/use-tables";
 import { useWaitlist } from "@/hooks/use-waitlist";
-import type { Consent, Reconfirmation, WaitlistEntry } from "@/lib/api";
+import { useT, type MessageKey } from "@/i18n";
+import type { Reconfirmation, WaitlistEntry } from "@/lib/api";
 import { longDate, todayIso } from "@/lib/date";
 import { buildPreShift, LARGE_PARTY_MIN, totalCovers, type PreShiftRow } from "@/lib/pre-shift";
 
 const ALL_SERVICES = "all";
 
-const consentLabel = (consent: Consent | undefined) =>
-  CONSENT_OPTIONS.find((o) => o.value === (consent ?? "unknown"))?.label ?? "Not asked";
-
-const RECONFIRMATION: Record<Exclude<Reconfirmation, "none">, { label: string; tone: PillTone }> = {
-  requested: { label: "Reconfirmation requested", tone: "info" },
-  confirmed: { label: "Reconfirmed", tone: "success" },
-  declined: { label: "Declined", tone: "danger" },
-  no_answer: { label: "No answer", tone: "warning" },
+const RECONFIRMATION: Record<Exclude<Reconfirmation, "none">, { labelKey: MessageKey; tone: PillTone }> = {
+  requested: { labelKey: "preshift.reconfirmation.requested", tone: "info" },
+  confirmed: { labelKey: "preshift.reconfirmation.confirmed", tone: "success" },
+  declined: { labelKey: "preshift.reconfirmation.declined", tone: "danger" },
+  no_answer: { labelKey: "preshift.reconfirmation.noAnswer", tone: "warning" },
 };
 
 export function PreShiftView({ venueId }: { venueId: string }) {
+  const t = useT();
   const [date, setDate] = useState(todayIso());
   const [service, setService] = useState(ALL_SERVICES);
   const agenda = useAgenda(venueId, date);
@@ -57,7 +55,7 @@ export function PreShiftView({ venueId }: { venueId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Pre-shift"
+        title={t("preshift.title")}
         description={
           <>
             <span className="first-letter:uppercase print:hidden">{longDate(date)}</span>
@@ -65,17 +63,17 @@ export function PreShiftView({ venueId }: { venueId: string }) {
               {longDate(date)}
               {service !== ALL_SERVICES && ` · ${service}`}
             </span>
-            <span className="print:hidden"> · Who is coming and what they need, before service.</span>
+            <span className="print:hidden"> · {t("preshift.subtitle")}</span>
           </>
         }
         actions={
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Select value={service} onValueChange={setService}>
-              <SelectTrigger className="w-[160px]" aria-label="Service">
+              <SelectTrigger className="w-[160px]" aria-label={t("preshift.service")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_SERVICES}>All services</SelectItem>
+                <SelectItem value={ALL_SERVICES}>{t("preshift.allServices")}</SelectItem>
                 {(services.data?.services ?? []).map((s) => (
                   <SelectItem key={s.name} value={s.name}>
                     {s.name}
@@ -86,7 +84,7 @@ export function PreShiftView({ venueId }: { venueId: string }) {
             <DayNav date={date} onChange={setDate} />
             <Button variant="outline" onClick={() => window.print()}>
               <PrinterIcon />
-              Print
+              {t("preshift.print")}
             </Button>
           </div>
         }
@@ -103,7 +101,7 @@ export function PreShiftView({ venueId }: { venueId: string }) {
         </div>
       ) : agenda.isError && !agenda.data ? (
         <LoadError
-          what="the pre-shift list"
+          what={t("preshift.loadWhat")}
           error={agenda.error}
           retrying={agenda.isRefetching}
           onRetry={() => void agenda.refetch()}
@@ -111,24 +109,25 @@ export function PreShiftView({ venueId }: { venueId: string }) {
       ) : rows.length === 0 ? (
         <EmptyState
           icon={ClipboardListIcon}
-          title="Nobody expected"
-          description="No upcoming reservations for this day and service."
+          title={t("preshift.empty.title")}
+          description={t("preshift.empty.description")}
         />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 print:hidden">
-            <Stat label="Reservations" value={rows.length} />
-            <Stat label="Covers" value={totalCovers(rows)} />
+            <Stat label={t("preshift.stat.reservations")} value={rows.length} />
+            <Stat label={t("preshift.stat.covers")} value={totalCovers(rows)} />
             <Stat
-              label={`Large parties (${LARGE_PARTY_MIN}+)`}
+              label={t("preshift.stat.large", { min: LARGE_PARTY_MIN })}
               value={largeCount}
               tone={largeCount > 0 ? "warning" : "default"}
             />
-            <Stat label="With notes" value={noteCount} />
+            <Stat label={t("preshift.stat.notes")} value={noteCount} />
           </div>
           <p className="hidden text-sm print:block">
-            {rows.length} reservations · {totalCovers(rows)} covers
-            {largeCount > 0 && ` · ${largeCount} large (${LARGE_PARTY_MIN}+)`}
+            {t("preshift.reservations", { count: rows.length })} ·{" "}
+            {t("preshift.covers", { count: totalCovers(rows) })}
+            {largeCount > 0 && ` · ${t("preshift.largeCount", { count: largeCount, min: LARGE_PARTY_MIN })}`}
           </p>
 
           <ul className="divide-y overflow-hidden rounded-xl border bg-card print:rounded-none print:border-x-0">
@@ -145,6 +144,7 @@ export function PreShiftView({ venueId }: { venueId: string }) {
 }
 
 function PreShiftRowView({ row }: { row: PreShiftRow }) {
+  const t = useT();
   const { reservation, tableNames, large, commentary } = row;
   return (
     <li
@@ -165,12 +165,12 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
         <div>
           {large ? (
             <Pill tone="warning" className="tabular-nums">
-              {reservation.partySize} large
+              {t("preshift.large", { count: reservation.partySize })}
             </Pill>
           ) : (
             <span className="text-sm tabular-nums">
-              <span className="sr-only">Party of </span>
-              {reservation.partySize}
+              <span className="sr-only">{t("common.partyOf", { count: reservation.partySize })}</span>
+              <span aria-hidden="true">{reservation.partySize}</span>
             </span>
           )}
         </div>
@@ -178,13 +178,13 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
           {tableNames.length > 0 ? (
             tableNames.join(", ")
           ) : (
-            <Pill tone="danger">Unassigned</Pill>
+            <Pill tone="danger">{t("preshift.unassigned")}</Pill>
           )}
         </div>
         <div className="flex min-w-0 flex-col gap-2 md:basis-auto">
           <div className="flex flex-wrap items-center gap-2">
             <Pill tone={reservation.guest.consent === "granted" ? "success" : "muted"}>
-              {consentLabel(reservation.guest.consent)}
+              {t(`common.consent.${reservation.guest.consent ?? "unknown"}`)}
             </Pill>
             <span data-slot="reconfirmation">
               <ReconfirmationPill value={reservation.reconfirmation} />
@@ -192,8 +192,8 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
             {reservation.rating ? (
               <span className="inline-flex items-center gap-1 text-sm tabular-nums">
                 <StarIcon className="size-3.5" aria-hidden="true" />
-                <span className="sr-only">Rating </span>
-                {reservation.rating}
+                <span className="sr-only">{t("preshift.rating", { rating: reservation.rating })}</span>
+                <span aria-hidden="true">{reservation.rating}</span>
               </span>
             ) : null}
           </div>
@@ -213,22 +213,24 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
 }
 
 export function ReconfirmationPill({ value }: { value: Reconfirmation | undefined }) {
+  const t = useT();
   if (!value || value === "none") return null;
   const r = RECONFIRMATION[value];
-  return <Pill tone={r.tone}>{r.label}</Pill>;
+  return <Pill tone={r.tone}>{t(r.labelKey)}</Pill>;
 }
 
 function WaitlistPending({ entries }: { entries: WaitlistEntry[] }) {
+  const t = useT();
   if (entries.length === 0) return null;
   return (
     <section className="space-y-2">
-      <h2 className="px-1 font-display text-lg">Waitlist now ({entries.length})</h2>
+      <h2 className="px-1 font-display text-lg">{t("preshift.waitlistNow", { count: entries.length })}</h2>
       <ul className="divide-y overflow-hidden rounded-xl border bg-card text-sm print:rounded-none print:border-x-0">
         {entries.map((e) => (
           <li key={e.id} className="flex items-center justify-between gap-4 px-4 py-2.5">
             <span className="font-medium">{e.guestName || "—"}</span>
             <span className="text-muted-foreground">
-              Party of {e.partySize}
+              {t("common.partyOf", { count: e.partySize })}
               {e.zone && ` · ${e.zone}`}
             </span>
           </li>
