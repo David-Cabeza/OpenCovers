@@ -233,7 +233,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit): Promise<T> { // i18n-ok
   const res = await fetch(path, {
     credentials: "same-origin",
     ...init,

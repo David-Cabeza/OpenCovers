@@ -12,6 +12,7 @@ import {
 } from "./contact";
 import { recordMembershipAudit } from "./membership-audit";
 import type { Db } from "./memberships";
+import { sandboxBlocklistMax } from "../demo/limits";
 
 export const BLOCKLIST_REASONS = ["no_show", "late_cancellation", "conduct", "other"] as const;
 export type BlocklistReason = (typeof BLOCKLIST_REASONS)[number];
@@ -293,11 +294,13 @@ export async function addToBlocklist(
   actorUserId: string,
   subject: BlocklistSubject,
   reason: BlocklistReason | null,
-  max = BLOCKLIST_MAX_ENTRIES,
+  requestedMax = BLOCKLIST_MAX_ENTRIES,
 ): Promise<AddResult> {
   return db.transaction(async (tx) => {
     const venue = await venueOf(tx, venueId);
     if (!venue) return { ok: false, code: "venue_not_found" } as const;
+    // A sandbox holds fewer entries than a real venue (ADR-0022). The venue lock below keeps the count exact.
+    const max = Math.min(requestedMax, (await sandboxBlocklistMax(tx, venueId)) ?? requestedMax);
     const resolved = await resolveSubject(tx, venue, subject);
     if (!resolved.ok) return resolved;
 

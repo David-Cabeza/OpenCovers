@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePacing } from "@/hooks/use-pacing";
 import type { PacingSlot } from "@/lib/api";
+import { useT } from "@/i18n";
 import { longDate, todayIso } from "@/lib/date";
 import {
   HIGH_FROM,
@@ -28,6 +29,7 @@ const LEVEL: Record<PacingLevel, { bar: string; text: string; swatch: string }> 
 };
 
 export function PacingView({ venueId }: { venueId: string }) {
+  const t = useT();
   const nav = useNavigation();
   const [date, setDate] = useState(todayIso());
   const { data, isPending, isError, error, isRefetching, refetch } = usePacing(venueId, date);
@@ -37,11 +39,10 @@ export function PacingView({ venueId }: { venueId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Pacing"
+        title={t("pacing.title")}
         description={
           <>
-            <span className="first-letter:uppercase">{longDate(date)}</span> · Covers booked versus
-            capacity, per time slot.
+            <span className="first-letter:uppercase">{longDate(date)}</span> · {t("pacing.subtitle")}
           </>
         }
         actions={<DayNav date={date} onChange={setDate} />}
@@ -50,16 +51,16 @@ export function PacingView({ venueId }: { venueId: string }) {
       {isPending ? (
         <Skeleton className="h-64 w-full" />
       ) : isError && !data ? (
-        <LoadError what="pacing" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+        <LoadError what={t("pacing.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : pacing.length === 0 ? (
         <EmptyState
           icon={GaugeIcon}
-          title="No services configured"
-          description="Add services under Settings to see covers versus capacity."
+          title={t("pacing.empty.title")}
+          description={t("pacing.empty.description")}
           action={
             nav && canEditSetup(nav.role) ? (
               <Button className="mt-2" onClick={() => nav.goTo("setup", "services")}>
-                Add services
+                {t("pacing.empty.action")}
               </Button>
             ) : undefined
           }
@@ -73,7 +74,9 @@ export function PacingView({ venueId }: { venueId: string }) {
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-1">
                   <h2 className="font-display text-lg first-letter:uppercase">{service.service}</h2>
                   <span className="text-sm text-muted-foreground tabular-nums">
-                    {peak ? `Peak ${peak.covers}/${peak.capacity} at ${peak.time}` : "Nothing booked yet"}
+                    {peak
+                      ? t("pacing.peak", { covers: peak.covers, capacity: peak.capacity, time: peak.time })
+                      : t("pacing.nothingBooked")}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-x-6 gap-y-5 rounded-xl border bg-card p-4">
@@ -93,9 +96,13 @@ export function PacingView({ venueId }: { venueId: string }) {
             );
           })}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-sm text-muted-foreground">
-            <Legend level="low" label="Low" hint={`under ${MEDIUM_FROM * 100}%`} />
-            <Legend level="medium" label="Medium" hint={`${MEDIUM_FROM * 100}–${HIGH_FROM * 100 - 1}%`} />
-            <Legend level="high" label="High" hint={`${HIGH_FROM * 100}% or more`} />
+            <Legend level="low" label={t("pacing.level.low")} hint={t("pacing.hint.low", { percent: MEDIUM_FROM * 100 })} />
+            <Legend
+              level="medium"
+              label={t("pacing.level.medium")}
+              hint={t("pacing.hint.medium", { from: MEDIUM_FROM * 100, to: HIGH_FROM * 100 - 1 })}
+            />
+            <Legend level="high" label={t("pacing.level.high")} hint={t("pacing.hint.high", { percent: HIGH_FROM * 100 })} />
           </div>
         </>
       )}
@@ -115,13 +122,14 @@ function groupByHour(slots: PacingSlot[]): PacingSlot[][] {
 }
 
 function SlotColumn({ slot }: { slot: PacingSlot }) {
+  const t = useT();
   const level = pacingLevel(slot);
   const ratio = Math.min(pacingRatio(slot), 1);
   const style = LEVEL[level];
   return (
     <div
       className="flex flex-col items-center gap-1.5"
-      title={`${slot.time} — ${slot.covers}/${slot.capacity} covers`}
+      title={t("pacing.slotTitle", { time: slot.time, covers: slot.covers, capacity: slot.capacity })}
     >
       <div className="flex h-20 w-full items-end overflow-hidden rounded-md bg-muted/60">
         {slot.covers > 0 && (

@@ -1,4 +1,6 @@
 import { Hono, type MiddlewareHandler } from "hono";
+import { and, eq } from "drizzle-orm";
+import { account as authAccounts } from "./db/schema";
 import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client";
 import {
@@ -79,6 +81,10 @@ import { canResend, parseResendEmail, resendLinks } from "./lib/link-resend";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import { demoMode } from "./demo/settings";
 import { demoStatus } from "./demo/status";
+import { magicLinkChallenges } from "./demo/magic-link-challenge";
+import { DemoLimitError } from "./demo/limits";
+import { parseConsent, recordConsent } from "./demo/leads";
+import { normalizeEmail } from "./demo/normalize";
 import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/signup";
 import { changeMemberRole, listMembers, removeMember } from "./lib/members";
 import {
@@ -195,6 +201,50 @@ app.get("/api/demo/status", async (c) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   c.header("Cache-Control", "no-store");
   return c.json(await demoStatus(db, session?.user.id ?? null));
+});
+
+// The hosted demo's own routes (ADR-0022, decision 11), outside docs/contract. They answer 404 unless DEMO_MODE=1.
+app.use("/api/demo/*", staffOriginGuard(trustedOrigins));
+
+// ADR-0022, decision 8(a): the proof-of-work challenge a demo magic link needs. Outside the contract, public, rate
+// limited per IP (lib/rate-limit.ts). Issuing says nothing about the address, so it does not touch the accounts.
+// A body with no usable address (missing, oversized, not JSON, whitespace, a list) is a 400.
+app.post("/api/demo/magic-link-challenge", async (c) => {
+  if (!demoMode()) return c.notFound();
+  const length = Number(c.req.header("content-length") ?? Number.NaN);
+  if (!(length > 0 && length <= 4096)) return error(c, "invalid_request");
+  const body = (await c.req.json().catch(() => null)) as { email?: unknown } | null;
+  const email = body?.email;
+  if (typeof email !== "string" || normalizeEmail(email) === null) return error(c, "invalid_request");
+  c.header("Cache-Control", "no-store");
+  return c.json(magicLinkChallenges().issue(email));
+});
+
+// The one way a lead is recorded (audit F7 and F8): the signed-in account says, for its own verified address, that it
+// agrees to be contacted. Nobody can consent for another inbox, because the address is read from the session.
+app.post("/api/demo/consent", async (c) => {
+  if (!demoMode()) return c.json({ code: "not_found" }, 404);
+  const account = await sessionUser(c);
+  if (!account) return error(c, "unauthorized");
+  const consent = parseConsent(await c.req.json().catch(() => null));
+  if (!consent) return error(c, "invalid_request");
+  if (account.emailVerified !== true) return error(c, "forbidden");
+  const [google] = await db
+    .select({ id: authAccounts.id })
+    .from(authAccounts)
+    .where(and(eq(authAccounts.userId, account.id), eq(authAccounts.providerId, "google")))
+    .limit(1);
+  await recordConsent(db, { email: account.email, source: google ? "google" : "magic-link", consent });
+  return c.body(null, 204);
+});
+
+// A sandbox hit one of its caps. A code outside the contract, and only a demo instance can emit it.
+app.onError((err, c) => {
+  if (err instanceof DemoLimitError) {
+    return c.json({ code: "demo_limit_reached", message: "demo_limit_reached", kind: err.kind, retryable: false }, 409);
+  }
+  console.error(err);
+  return c.text("Internal Server Error", 500);
 });
 
 // Public and unauthenticated by design (ADR-0012). It must stay above the

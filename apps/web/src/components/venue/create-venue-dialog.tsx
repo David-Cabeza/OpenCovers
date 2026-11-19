@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { useT } from "@/i18n";
 import { browserTimeZone, TIMEZONES } from "@/lib/timezones";
 
 interface CreateVenueValues {
@@ -30,7 +31,8 @@ interface CreateVenueValues {
   timezone: string;
 }
 
-export function CreateVenueDialog({ triggerLabel = "New venue" }: { triggerLabel?: string }) {
+export function CreateVenueDialog({ triggerLabel }: { triggerLabel?: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const {
@@ -57,31 +59,31 @@ export function CreateVenueDialog({ triggerLabel = "New venue" }: { triggerLabel
       await queryClient.invalidateQueries({ queryKey: ["venues"] });
       reset({ name: "", timezone: defaultTz });
       setOpen(false);
-      toast.success("Venue created");
+      toast.success(t("venue.create.created"));
     } catch (err) {
-      toast.error(errorMessage(err, "Could not create the venue."));
+      toast.error(errorMessage(err, t("venue.create.failed")));
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>{triggerLabel}</Button>
+        <Button>{triggerLabel ?? t("venue.create.trigger")}</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create a venue</DialogTitle>
+          <DialogTitle>{t("venue.create.title")}</DialogTitle>
           <DialogDescription>
-            Add your restaurant to start taking reservations.
+            {t("venue.create.description")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="venue-name">Name</Label>
+            <Label htmlFor="venue-name">{t("venue.create.name")}</Label>
             <Input
               id="venue-name"
-              placeholder="Casa Lola"
-              {...register("name", { required: "Name is required." })}
+              placeholder="Casa Lola" // i18n-ok
+              {...register("name", { required: t("venue.create.nameRequired") })}
             />
             {errors.name && (
               <p className="text-sm text-destructive">{errors.name.message}</p>
@@ -89,14 +91,14 @@ export function CreateVenueDialog({ triggerLabel = "New venue" }: { triggerLabel
           </div>
 
           <div className="space-y-2">
-            <Label>Timezone</Label>
+            <Label>{t("venue.create.timezone")}</Label>
             <Controller
               name="timezone"
               control={control}
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a timezone" />
+                    <SelectValue placeholder={t("venue.create.timezonePlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     {options.map((tz) => (
@@ -112,10 +114,10 @@ export function CreateVenueDialog({ triggerLabel = "New venue" }: { triggerLabel
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating…" : "Create venue"}
+              {isSubmitting ? t("venue.create.submitting") : t("venue.create.submit")}
             </Button>
           </DialogFooter>
         </form>

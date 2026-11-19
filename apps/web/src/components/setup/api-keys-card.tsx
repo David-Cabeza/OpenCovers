@@ -1,4 +1,5 @@
 import { errorMessage } from "@/lib/error-message";
+import { useT } from "@/i18n";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
@@ -20,8 +21,10 @@ import { api, type ApiKey, type Role } from "@/lib/api";
 import { CreateKeyDialog } from "./create-key-dialog";
 
 const ROLE_TONE: Record<Role, PillTone> = { admin: "warning", write: "info", read: "muted" };
+const ROLE_KEY = { admin: "common.role.admin", write: "common.role.write", read: "common.role.read" } as const;
 
 export function ApiKeysCard({ venueId }: { venueId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data, isPending, isError, error, isRefetching, refetch } = useVenueKeys(venueId);
   const [open, setOpen] = useState(false);
@@ -32,9 +35,9 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
     mutationFn: (hash: string) => api.revokeVenueKey(venueId, hash),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["keys", venueId] });
-      toast.success("Key revoked");
+      toast.success(t("setup.keys.revoked"));
     },
-    onError: (err) => toast.error(errorMessage(err, "Could not revoke.")),
+    onError: (err) => toast.error(errorMessage(err, t("setup.keys.revokeFailed"))),
     onSettled: () => setRevoking(null),
   });
 
@@ -42,23 +45,21 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
     <Card>
       <CardHeader className="flex items-center justify-between gap-4">
         <div>
-          <CardTitle>API keys</CardTitle>
-          <CardDescription>
-            Keys for platforms and AI agents to access this venue.
-          </CardDescription>
+          <CardTitle>{t("setup.keys.title")}</CardTitle>
+          <CardDescription>{t("setup.keys.description")}</CardDescription>
         </div>
         <Button size="sm" onClick={() => setOpen(true)}>
-          <PlusIcon className="size-4" /> New key
+          <PlusIcon className="size-4" /> {t("setup.keys.new")}
         </Button>
       </CardHeader>
       <CardContent>
         {isPending ? (
           <Skeleton className="h-24 w-full" />
         ) : isError && !data ? (
-          <LoadError compact what="the API keys" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+          <LoadError compact what={t("setup.keys.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : keys.length === 0 ? (
           <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
-            <KeyRoundIcon className="size-4" /> No keys yet.
+            <KeyRoundIcon className="size-4" /> {t("setup.keys.empty")}
           </div>
         ) : (
           <ul className="-my-2 divide-y">
@@ -74,11 +75,11 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
                   <span className="truncate font-medium">{k.principal}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Pill tone={ROLE_TONE[k.role] ?? "muted"}>{k.role}</Pill>
+                  <Pill tone={ROLE_TONE[k.role] ?? "muted"}>{ROLE_KEY[k.role] ? t(ROLE_KEY[k.role]) : k.role}</Pill>
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label={`Revoke key for ${k.principal}`}
+                    aria-label={t("setup.keys.revokeLabel", { name: k.principal })}
                     onClick={() => setRevoking(k)}
                   >
                     <Trash2Icon className="size-4" />
@@ -91,10 +92,10 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
       </CardContent>
       <ConfirmDialog
         open={revoking !== null}
-        title={revoking ? `Revoke the key for ${revoking.principal}?` : "Revoke key?"}
-        description="Anything that uses this key stops working at once, and the key cannot be restored."
-        confirmLabel="Revoke key"
-        keepLabel="Keep key"
+        title={revoking ? t("setup.keys.confirmTitle", { name: revoking.principal }) : t("setup.keys.confirmTitleFallback")}
+        description={t("setup.keys.confirmDescription")}
+        confirmLabel={t("setup.keys.confirmLabel")}
+        keepLabel={t("setup.keys.keepLabel")}
         pending={revoke.isPending}
         onConfirm={() => revoking && revoke.mutate(revoking.hash)}
         onClose={() => setRevoking(null)}

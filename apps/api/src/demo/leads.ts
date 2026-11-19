@@ -1,112 +1,107 @@
-// Demo leads (ADR-0022, decision 7). A lead is an address a visitor proved they own. The consent claim travels with
-// the sign-in request, and is applied only once the address is verified: for a magic link, when the link is opened;
-// for Google, which verifies the address itself, when the session starts. No HTTP route reads this table.
-import { createHash } from "node:crypto";
-import { and, eq, like, lt, sql } from "drizzle-orm";
-import { demoLeads, verification } from "../db/schema";
+// Demo leads (ADR-0022, decision 7). A row exists only for a visitor who ticked the consent box, and it is written
+// by `POST /api/demo/consent` from a signed-in session, for the verified address of that account (amendment of
+// 2026-11-20). Nothing else writes this table. No HTTP route reads it.
+import { and, eq, isNull, lt, sql } from "drizzle-orm";
+import { demoLeads } from "../db/schema";
+import { LOCALES } from "../lib/online-booking";
 import type { Db } from "../lib/venue";
-import { CONSENT_HEADER, LOCALE_HEADER } from "./settings";
+import { CONSENT_TEXT_VERSION, LEAD_RETENTION_MONTHS } from "./settings";
 
 export type LeadSource = "magic-link" | "google";
 
-export interface LeadClaim {
-  /** The version of the consent text the form showed. Null when the box was not ticked. */
-  consentVersion: string | null;
+export const NAME_MAX = 120;
+
+export interface ConsentInput {
+  version: string;
   locale: string;
   name: string | null;
 }
 
-const VERSION = /^[A-Za-z0-9._-]{1,32}$/;
-const LOCALE = /^[a-z]{2}(-[A-Za-z]{2})?$/;
-const CLAIM_PREFIX = "demo-lead:";
-const CLAIM_TTL_MS = 60 * 60_000;
-
-/** Reads the claim from a sign-in request's headers. Anything malformed counts as "no consent" and "en". */
-export function claimFromHeaders(headers: Headers | undefined, name?: string | null): LeadClaim {
-  const version = headers?.get(CONSENT_HEADER)?.trim() ?? "";
-  const explicit = headers?.get(LOCALE_HEADER)?.trim() ?? "";
-  const accept = headers?.get("accept-language")?.split(",")[0]?.split(";")[0]?.trim() ?? "";
-  const locale = [explicit, accept].find((l) => LOCALE.test(l)) ?? "en";
-  const cleanName = name?.trim().slice(0, 120);
-  return {
-    consentVersion: VERSION.test(version) ? version : null,
-    locale: locale.toLowerCase(),
-    name: cleanName ? cleanName : null,
-  };
-}
-
-const claimKey = (token: string) => `${CLAIM_PREFIX}${createHash("sha256").update(token).digest("hex")}`;
-
-/** Parks a claim next to a magic link token, in the `verification` table Better Auth already cleans. */
-export async function stashClaim(db: Db, token: string, claim: LeadClaim): Promise<void> {
-  await db.insert(verification).values({
-    id: crypto.randomUUID(),
-    identifier: claimKey(token),
-    value: JSON.stringify(claim),
-    expiresAt: new Date(Date.now() + CLAIM_TTL_MS),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-}
-
-/** Returns and removes the claim parked for `token`, if any. */
-export async function takeClaim(db: Db, token: string): Promise<LeadClaim | null> {
-  const rows = await db.delete(verification).where(eq(verification.identifier, claimKey(token))).returning();
-  const row = rows[0];
-  if (!row) return null;
-  try {
-    return JSON.parse(row.value) as LeadClaim;
-  } catch {
-    return null;
+/** Strict validation of the consent request body. Null when anything is off. */
+export function parseConsent(body: unknown): ConsentInput | null {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return null;
+  const { version, locale, name, ...rest } = body as Record<string, unknown>;
+  if (Object.keys(rest).length > 0) return null;
+  if (version !== CONSENT_TEXT_VERSION) return null;
+  if (typeof locale !== "string" || !(LOCALES as readonly string[]).includes(locale)) return null;
+  let clean: string | null = null;
+  if (name !== undefined && name !== null) {
+    if (typeof name !== "string") return null;
+    const trimmed = name.normalize("NFKC").trim();
+    // eslint-disable-next-line no-control-regex
+    if (trimmed.length > NAME_MAX || /[\u0000-\u001f\u007f-\u009f]/.test(trimmed)) return null;
+    clean = trimmed === "" ? null : trimmed;
   }
-}
-
-/** Drops parked claims whose link was never opened. */
-export async function dropStaleClaims(db: Db, now: Date = new Date()): Promise<number> {
-  const rows = await db
-    .delete(verification)
-    .where(and(like(verification.identifier, `${CLAIM_PREFIX}%`), lt(verification.expiresAt, now)))
-    .returning({ id: verification.id });
-  return rows.length;
+  return { version, locale, name: clean };
 }
 
 /**
- * Records a verified sign-in. A repeat sign-in refreshes `last_seen_at`. Consent is only ever added here, never
- * removed: unticking the box on a later sign-in is not a withdrawal, which is a separate request to the operator.
+ * Records the consent of a signed-in account for its own verified address. A repeat refreshes `last_seen_at` and, if
+ * the lead had withdrawn, a new consent clears the withdrawal.
  */
-export async function recordLead(
+export async function recordConsent(
   db: Db,
-  input: { email: string; source: LeadSource; claim: LeadClaim | null },
+  input: { email: string; source: LeadSource; consent: ConsentInput },
 ): Promise<void> {
   const email = input.email.trim().toLowerCase();
-  const claim = input.claim;
-  const consent = claim?.consentVersion ?? null;
+  const { consent } = input;
   await db
     .insert(demoLeads)
     .values({
       email,
-      name: claim?.name ?? null,
+      name: consent.name,
       source: input.source,
-      locale: claim?.locale ?? "en",
-      contactConsent: consent !== null,
-      consentTextVersion: consent,
+      locale: consent.locale,
+      contactConsent: true,
+      consentTextVersion: consent.version,
     })
     .onConflictDoUpdate({
       target: demoLeads.email,
       set: {
         lastSeenAt: sql`now()`,
-        name: sql`coalesce(${demoLeads.name}, ${claim?.name ?? null})`,
-        ...(consent !== null ? { contactConsent: true, consentTextVersion: consent } : {}),
+        name: sql`coalesce(${consent.name}, ${demoLeads.name})`,
+        locale: consent.locale,
+        contactConsent: true,
+        consentTextVersion: consent.version,
+        withdrawnAt: null,
       },
     });
 }
 
-/** Consented leads as CSV (header included), oldest first. The one way leads leave the database. */
+/** A consented lead signed in again: keeps its 12 months running. Does nothing for a visitor who never consented. */
+export async function touchLead(db: Db, email: string): Promise<void> {
+  await db
+    .update(demoLeads)
+    .set({ lastSeenAt: sql`now()` })
+    .where(eq(demoLeads.email, email.trim().toLowerCase()));
+}
+
+/** Deletes consented leads whose last sign-in is older than the retention, and any row without consent. */
+export async function dropLeadsPastRetention(db: Db, now: Date = new Date()): Promise<number> {
+  const cutoff = new Date(now);
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - LEAD_RETENTION_MONTHS);
+  const rows = await db
+    .delete(demoLeads)
+    .where(sql`${demoLeads.contactConsent} = false OR ${lt(demoLeads.lastSeenAt, cutoff)}`)
+    .returning({ email: demoLeads.email });
+  return rows.length;
+}
+
+/** Erasure of one address (`pnpm demo:leads --erase <email>`). Returns how many rows were deleted. */
+export async function eraseLead(db: Db, email: string): Promise<number> {
+  const rows = await db
+    .delete(demoLeads)
+    .where(eq(demoLeads.email, email.trim().normalize("NFKC").toLowerCase()))
+    .returning({ email: demoLeads.email });
+  return rows.length;
+}
+
+/** Consented, not withdrawn leads as CSV (header included), oldest first. The one way leads leave the database. */
 export async function consentedLeadsCsv(db: Db): Promise<string> {
   const rows = await db
     .select()
     .from(demoLeads)
-    .where(eq(demoLeads.contactConsent, true))
+    .where(and(eq(demoLeads.contactConsent, true), isNull(demoLeads.withdrawnAt)))
     .orderBy(demoLeads.createdAt);
   const cell = (value: string | null) => {
     const text = value ?? "";

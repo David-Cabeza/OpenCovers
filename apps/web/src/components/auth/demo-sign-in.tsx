@@ -4,20 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
-import {
-  DEMO_CONSENT_TEXT,
-  DEMO_PRIVACY_URL,
-  demoSignInHeaders,
-} from "@/lib/demo";
+import { useT, currentLocale, type Translate } from "@/i18n";
+import { DEMO_PRIVACY_URL, DemoRequestError, rememberConsent, solvedChallengeHeaders } from "@/lib/demo";
 import { authErrorMessage } from "@/lib/error-message";
-import { isServerUnreachable, SERVER_UNREACHABLE } from "@/lib/server-status";
+import { isServerUnreachable } from "@/lib/server-status";
 
 /** One magic link per address per minute (ADR-0022, decision 8). */
 const RESEND_WINDOW_S = 60;
 
-const FALLBACK = "Could not send the link. Try again.";
-
 export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
+  const t = useT();
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -35,25 +31,35 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
     setBusy(true);
     setError(null);
     let retryAfter = 0;
+    const fallback = t("demo.signIn.failed");
     try {
+      // A challenge is single use and lives 5 minutes, so every send, a resend included, asks for a new one.
+      const challengeHeaders = await solvedChallengeHeaders(address);
+      rememberConsent(consent);
       const { error: failure } = await authClient.signIn.magicLink(
         { email: address, callbackURL: `${window.location.origin}/` },
         {
-          headers: demoSignInHeaders(consent),
+          // The magic-link mail is written in the language of Accept-Language, so it follows the selected language.
+          headers: { ...challengeHeaders, "Accept-Language": currentLocale() },
           onError: (ctx: { response: Response }) => {
             retryAfter = Number(ctx.response.headers.get("retry-after")) || 0;
           },
         },
       );
       if (failure) {
-        setError(authErrorMessage(failure, FALLBACK));
+        setError(authErrorMessage(failure, fallback));
         if (failure.status === 429) setWait(retryAfter || RESEND_WINDOW_S);
         return;
       }
       setSentTo(address);
       setWait(RESEND_WINDOW_S);
     } catch (err) {
-      setError(isServerUnreachable(err) ? SERVER_UNREACHABLE : FALLBACK);
+      if (err instanceof DemoRequestError) {
+        setError(authErrorMessage(err, fallback));
+        if (err.status === 429) setWait(err.retryAfter || RESEND_WINDOW_S);
+      } else {
+        setError(isServerUnreachable(err) ? t("errors.serverUnreachable") : fallback);
+      }
     } finally {
       setBusy(false);
     }
@@ -63,13 +69,14 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
     setBusy(true);
     setError(null);
     try {
-      const { error: failure } = await authClient.signIn.social(
-        { provider: "google", callbackURL: `${window.location.origin}/` },
-        { headers: demoSignInHeaders(consent) },
-      );
-      if (failure) setError(authErrorMessage(failure, "Could not start Google sign-in."));
+      rememberConsent(consent);
+      const { error: failure } = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: `${window.location.origin}/`,
+      });
+      if (failure) setError(authErrorMessage(failure, t("demo.google.failed")));
     } catch (err) {
-      setError(isServerUnreachable(err) ? SERVER_UNREACHABLE : "Could not start Google sign-in.");
+      setError(isServerUnreachable(err) ? t("errors.serverUnreachable") : t("demo.google.failed"));
     } finally {
       setBusy(false);
     }
@@ -86,11 +93,8 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
       <div className="space-y-4 pt-2" role="status">
         <MailCheckIcon className="size-6 text-primary" aria-hidden="true" />
         <div className="space-y-1">
-          <h2 className="font-medium">Check your email</h2>
-          <p className="text-sm text-muted-foreground">
-            We sent a sign-in link to <strong className="text-foreground">{sentTo}</strong>. It expires in 5
-            minutes. If it does not arrive, check your spam folder.
-          </p>
+          <h2 className="font-medium">{t("demo.sent.title")}</h2>
+          <p className="text-sm text-muted-foreground">{t("demo.sent.body", { email: sentTo })}</p>
         </div>
         {error && (
           <p role="alert" className="text-sm text-destructive">
@@ -99,7 +103,7 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
         )}
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" disabled={busy || wait > 0} onClick={() => void send(sentTo)}>
-            {wait > 0 ? `Send again in ${wait}s` : "Send the link again"}
+            {wait > 0 ? t("demo.sent.resendIn", { seconds: wait }) : t("demo.sent.resend")}
           </Button>
           <Button
             type="button"
@@ -109,7 +113,7 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
               setError(null);
             }}
           >
-            Use another email
+            {t("demo.sent.another")}
           </Button>
         </div>
       </div>
@@ -120,19 +124,19 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
     <div className="space-y-4">
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <div className="space-y-2">
-          <Label htmlFor="demo-email">Email</Label>
+          <Label htmlFor="demo-email">{t("auth.field.email")}</Label>
           <Input
             id="demo-email"
             type="email"
             autoComplete="email"
-            placeholder="you@example.com"
+            placeholder="you@example.com" // i18n-ok
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
         </div>
 
-        <Consent checked={consent} onChange={setConsent} />
+        <Consent checked={consent} onChange={setConsent} t={t} />
 
         {error && (
           <p role="alert" className="text-sm text-destructive">
@@ -141,15 +145,15 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
         )}
 
         <Button type="submit" className="w-full" disabled={busy || wait > 0 || email.trim() === ""}>
-          {busy ? "Sending…" : wait > 0 ? `Try again in ${wait}s` : "Email me a sign-in link"}
+          {busy ? t("demo.signIn.preparing") : wait > 0 ? t("demo.signIn.tryAgainIn", { seconds: wait }) : t("demo.signIn.submit")}
         </Button>
       </form>
 
       {googleEnabled && (
         <>
-          <p className="text-center text-xs text-muted-foreground">or</p>
+          <p className="text-center text-xs text-muted-foreground">{t("demo.signIn.or")}</p>
           <Button type="button" variant="outline" className="w-full" disabled={busy} onClick={() => void google()}>
-            Continue with Google
+            {t("demo.google")}
           </Button>
         </>
       )}
@@ -157,7 +161,7 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
   );
 }
 
-function Consent({ checked, onChange }: { checked: boolean; onChange: (next: boolean) => void }) {
+function Consent({ checked, onChange, t }: { checked: boolean; onChange: (next: boolean) => void; t: Translate }) {
   return (
     <div className="space-y-1">
       <label className="flex items-start gap-2 text-sm">
@@ -167,12 +171,12 @@ function Consent({ checked, onChange }: { checked: boolean; onChange: (next: boo
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
         />
-        <span>{DEMO_CONSENT_TEXT}</span>
+        <span>{t("demo.consent.text")}</span>
       </label>
       <p className="pl-6 text-xs text-muted-foreground">
-        Optional. The demo works the same either way.{" "}
+        {t("demo.consent.optional")}{" "}
         <a href={DEMO_PRIVACY_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-          Privacy notice
+          {t("demo.consent.privacy")}
         </a>
         .
       </p>

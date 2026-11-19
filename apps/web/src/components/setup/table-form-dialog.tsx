@@ -1,4 +1,5 @@
 import { errorMessage } from "@/lib/error-message";
+import { useT } from "@/i18n";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -37,6 +38,7 @@ export function TableFormDialog({
   onOpenChange,
   initial,
 }: TableFormDialogProps) {
+  const t = useT();
   const queryClient = useQueryClient();
   const editing = Boolean(initial);
 
@@ -70,10 +72,10 @@ export function TableFormDialog({
       });
       await queryClient.invalidateQueries({ queryKey: ["tables", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
-      toast.success(editing ? "Table updated" : "Table added");
+      toast.success(editing ? t("setup.table.updated") : t("setup.table.added"));
       onOpenChange(false);
     } catch (err) {
-      toast.error(errorMessage(err, "Could not save the table."));
+      toast.error(errorMessage(err, t("setup.table.saveFailed")));
     }
   }
 
@@ -81,34 +83,32 @@ export function TableFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit table" : "Add table"}</DialogTitle>
+          <DialogTitle>{editing ? t("setup.table.editTitle") : t("setup.table.addTitle")}</DialogTitle>
           <DialogDescription>
-            {editing
-              ? "Update the table's name, seats, and zone."
-              : "Add a table to your venue's floor plan."}
+            {editing ? t("setup.table.editDescription") : t("setup.table.addDescription")}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="table-id">ID</Label>
+              <Label htmlFor="table-id">{t("setup.table.id")}</Label>
               <Input
                 id="table-id"
-                placeholder="t1"
+                placeholder="t1" // i18n-ok
                 disabled={editing}
-                {...register("id", { required: "ID is required." })}
+                {...register("id", { required: t("setup.table.idRequired") })}
               />
               {errors.id && (
                 <p className="text-sm text-destructive">{errors.id.message}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="table-name">Name</Label>
+              <Label htmlFor="table-name">{t("setup.form.name")}</Label>
               <Input
                 id="table-name"
-                placeholder="Table 1"
-                {...register("name", { required: "Name is required." })}
+                placeholder={t("setup.table.namePlaceholder")}
+                {...register("name", { required: t("setup.form.nameRequired") })}
               />
               {errors.name && (
                 <p className="text-sm text-destructive">{errors.name.message}</p>
@@ -118,15 +118,15 @@ export function TableFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="table-seats">Seats</Label>
+              <Label htmlFor="table-seats">{t("setup.table.seats")}</Label>
               <Input
                 id="table-seats"
                 type="number"
                 min={1}
                 {...register("seats", {
-                  required: "Seats is required.",
+                  required: t("setup.table.seatsRequired"),
                   valueAsNumber: true,
-                  min: { value: 1, message: "At least one seat." },
+                  min: { value: 1, message: t("setup.table.seatsMin") },
                 })}
               />
               {errors.seats && (
@@ -134,32 +134,32 @@ export function TableFormDialog({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="table-shape">Shape</Label>
+              <Label htmlFor="table-shape">{t("setup.table.shape")}</Label>
               <select
                 id="table-shape"
                 {...register("shape")}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <option value="round">Round</option>
-                <option value="oval">Oval</option>
-                <option value="square">Square</option>
-                <option value="rectangle">Rectangle</option>
-                <option value="long">Long</option>
+                <option value="round">{t("setup.table.shape.round")}</option>
+                <option value="oval">{t("setup.table.shape.oval")}</option>
+                <option value="square">{t("setup.table.shape.square")}</option>
+                <option value="rectangle">{t("setup.table.shape.rectangle")}</option>
+                <option value="long">{t("setup.table.shape.long")}</option>
               </select>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="table-zone">Zone</Label>
-            <Input id="table-zone" placeholder="Main / Terrace" {...register("zone")} />
+            <Label htmlFor="table-zone">{t("setup.table.zone")}</Label>
+            <Input id="table-zone" placeholder={t("setup.table.zonePlaceholder")} {...register("zone")} />
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving…" : editing ? "Save changes" : "Add table"}
+              {isSubmitting ? t("common.saving") : editing ? t("setup.form.saveChanges") : t("setup.tables.add")}
             </Button>
           </DialogFooter>
         </form>

@@ -19,17 +19,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { api, type AuditAction, type Member } from "@/lib/api";
+import { dateTime } from "@/lib/date";
 import { errorMessage } from "@/lib/error-message";
+import { useT, type MessageKey } from "@/i18n";
 
-const ACTION_LABELS: Record<AuditAction, string> = {
-  invited: "Invitation created",
-  invite_revoked: "Invitation revoked",
-  redeemed: "Invitation redeemed",
-  member_removed: "Member removed",
-  role_changed: "Role changed",
-  creator_transferred: "Venue creator transferred",
-  guest_blocked: "Guest blocked",
-  guest_unblocked: "Guest unblocked",
+const ACTION_KEYS: Record<AuditAction, MessageKey> = {
+  invited: "team.audit.action.invited",
+  invite_revoked: "team.audit.action.invite_revoked",
+  redeemed: "team.audit.action.redeemed",
+  member_removed: "team.audit.action.member_removed",
+  role_changed: "team.audit.action.role_changed",
+  creator_transferred: "team.audit.action.creator_transferred",
+  guest_blocked: "team.audit.action.guest_blocked",
+  guest_unblocked: "team.audit.action.guest_unblocked",
 };
 
 const ACTION_TONE: Record<AuditAction, PillTone> = {
@@ -48,13 +50,14 @@ function shortId(id: string): string {
 }
 
 function Person({ id, members }: { id: string | null; members: Map<string, Member> }) {
-  if (!id) return <span className="text-muted-foreground">None</span>;
+  const t = useT();
+  if (!id) return <span className="text-muted-foreground">{t("team.audit.none")}</span>;
   const member = members.get(id);
   if (member) return <>{member.name}</>;
   return (
     <span>
       <code className="text-xs">{shortId(id)}</code>{" "}
-      <span className="text-xs text-muted-foreground">former member</span>
+      <span className="text-xs text-muted-foreground">{t("team.audit.formerMember")}</span>
     </span>
   );
 }
@@ -64,6 +67,7 @@ function Reference({ id }: { id: string | null }) {
 }
 
 export function AuditLog({ venueId }: { venueId: string }) {
+  const t = useT();
   const membersQuery = useQuery({
     queryKey: ["members", venueId],
     queryFn: () => api.listMembers(venueId),
@@ -80,10 +84,9 @@ export function AuditLog({ venueId }: { venueId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Audit log</CardTitle>
+        <CardTitle>{t("team.audit.title")}</CardTitle>
         <CardDescription>
-          Who invited, who joined, who was removed, role changes, creator transfers and blocklist changes, newest first. The log
-          keeps ids only, so people who have left show as a shortened id.
+          {t("team.audit.description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -91,23 +94,23 @@ export function AuditLog({ venueId }: { venueId: string }) {
           <Skeleton className="h-24 w-full" />
         ) : audit.isError && entries.length === 0 ? (
           <div role="alert" className="flex items-center gap-3 py-2 text-sm text-destructive">
-            {errorMessage(audit.error, "Could not load the audit log.")}
+            {errorMessage(audit.error, t("team.audit.loadFailed"))}
             <Button variant="outline" size="sm" onClick={() => void audit.refetch()}>
-              Try again
+              {t("common.tryAgain")}
             </Button>
           </div>
         ) : entries.length === 0 ? (
-          <div className="py-2 text-sm text-muted-foreground">No changes recorded yet.</div>
+          <div className="py-2 text-sm text-muted-foreground">{t("team.audit.empty")}</div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Action</TableHead>
-                <TableHead>By</TableHead>
-                <TableHead>Person</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Reference</TableHead>
-                <TableHead>When</TableHead>
+                <TableHead>{t("team.audit.col.action")}</TableHead>
+                <TableHead>{t("team.audit.col.by")}</TableHead>
+                <TableHead>{t("team.audit.col.person")}</TableHead>
+                <TableHead>{t("team.audit.col.role")}</TableHead>
+                <TableHead>{t("team.audit.col.reference")}</TableHead>
+                <TableHead>{t("team.audit.col.when")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -115,7 +118,7 @@ export function AuditLog({ venueId }: { venueId: string }) {
                 <TableRow key={e.id}>
                   <TableCell>
                     <Pill tone={ACTION_TONE[e.action] ?? "muted"} dot>
-                      {ACTION_LABELS[e.action] ?? e.action}
+                      {ACTION_KEYS[e.action] ? t(ACTION_KEYS[e.action]) : e.action}
                     </Pill>
                   </TableCell>
                   <TableCell>
@@ -125,12 +128,12 @@ export function AuditLog({ venueId }: { venueId: string }) {
                     <Person id={e.targetUserId} members={members} />
                   </TableCell>
                   <TableCell>
-                    {e.role ? <Badge variant="secondary">{e.role}</Badge> : null}
+                    {e.role ? <Badge variant="secondary">{t(`common.role.${e.role}` as MessageKey)}</Badge> : null}
                   </TableCell>
                   <TableCell>
                     <Reference id={e.invitationId ?? e.blocklistEntryId} />
                   </TableCell>
-                  <TableCell>{new Date(e.occurredAt).toLocaleString()}</TableCell>
+                  <TableCell>{dateTime(e.occurredAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -138,7 +141,7 @@ export function AuditLog({ venueId }: { venueId: string }) {
         )}
         {audit.isError && entries.length > 0 && (
           <div role="alert" className="text-sm text-destructive">
-            {errorMessage(audit.error, "Could not load more entries.")}
+            {errorMessage(audit.error, t("team.audit.loadMoreFailed"))}
           </div>
         )}
         {audit.hasNextPage && (
@@ -148,7 +151,7 @@ export function AuditLog({ venueId }: { venueId: string }) {
             disabled={audit.isFetchingNextPage}
             onClick={() => void audit.fetchNextPage()}
           >
-            Load more
+            {t("team.audit.loadMore")}
           </Button>
         )}
       </CardContent>

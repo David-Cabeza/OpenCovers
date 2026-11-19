@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api";
-import { authErrorMessage, errorMessage, MESSAGES } from "./error-message";
+import { CATALOG } from "@/i18n/catalog";
+import { t } from "@/i18n";
+import { authErrorMessage, errorMessage } from "./error-message";
 
 // The documented vocabulary lives in docs/contract/errors.md as "- `code`: ..." bullets.
 const errorsDoc = readFileSync(resolve(__dirname, "../../../../docs/contract/errors.md"), "utf8");
@@ -22,7 +24,10 @@ describe("errorMessage", () => {
   });
 
   it("only maps codes the contract documents", () => {
-    for (const code of Object.keys(MESSAGES)) expect(documented).toContain(code);
+    const mapped = Object.keys(CATALOG.en)
+      .filter((key) => key.startsWith("errors.api."))
+      .map((key) => key.slice("errors.api.".length));
+    for (const code of mapped) expect(documented).toContain(code);
   });
 
   it("shows a retry-later message for any 429", () => {
@@ -40,7 +45,7 @@ describe("errorMessage", () => {
 describe("authErrorMessage", () => {
   it("maps rate limiting and invitation errors, else falls back", () => {
     expect(authErrorMessage({ status: 429 }, "f")).toMatch(/try again/i);
-    expect(authErrorMessage({ code: "INVALID_INVITATION" }, "f")).toBe(MESSAGES.invalid_invitation);
+    expect(authErrorMessage({ code: "INVALID_INVITATION" }, "f")).toBe(t("errors.api.invalid_invitation"));
     expect(authErrorMessage({ status: 401, message: "Invalid email or password" }, "f")).toBe(
       "Invalid email or password",
     );

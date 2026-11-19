@@ -1,6 +1,7 @@
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { Context, MiddlewareHandler } from "hono";
 import { isIP } from "node:net";
+import { normalizeEmail } from "../demo/normalize";
 import { ERRORS, errorBody } from "./errors";
 
 export const RULE_NAMES = [
@@ -14,6 +15,9 @@ export const RULE_NAMES = [
   "self_service",
   "public_days",
   "magic_link",
+  "magic_link_day",
+  "magic_link_ip",
+  "demo_challenge",
 ] as const;
 export type RuleName = (typeof RULE_NAMES)[number];
 
@@ -34,8 +38,12 @@ export const DEFAULT_RULES: Rules = {
   public_venue: { max: 100, windowMs: 60 * 60_000 },
   self_service: { max: 60, windowMs: 15 * 60_000 },
   public_days: { max: 60, windowMs: 15 * 60_000 },
-  // Demo mode only (ADR-0022): one magic link per address per minute, on top of `auth`.
+  // Demo mode only (ADR-0022, decision 8a): a magic link is limited to 1 per address per minute, 5 per address per
+  // day and 10 per IP per hour, on top of `auth`. `demo_challenge` caps how often one IP asks for a challenge.
   magic_link: { max: 1, windowMs: 60_000 },
+  magic_link_day: { max: 5, windowMs: 24 * 3_600_000 },
+  magic_link_ip: { max: 10, windowMs: 3_600_000 },
+  demo_challenge: { max: 60, windowMs: 3_600_000 },
 };
 
 export interface RateLimitConfig {
@@ -61,6 +69,9 @@ const RULE_ENV: Record<RuleName, string> = {
   self_service: "RATE_LIMIT_PUBLIC_SELF_SERVICE",
   public_days: "RATE_LIMIT_PUBLIC_DAYS",
   magic_link: "RATE_LIMIT_MAGIC_LINK",
+  magic_link_day: "RATE_LIMIT_MAGIC_LINK_DAY",
+  magic_link_ip: "RATE_LIMIT_MAGIC_LINK_IP",
+  demo_challenge: "RATE_LIMIT_DEMO_CHALLENGE",
 };
 
 const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
@@ -69,7 +80,15 @@ export const INVITATION_HEADER = "x-invitation-token";
 const DEFAULT_MAX_KEYS = 10_000;
 // A rule whose charge is returned when the route answers one of these statuses: the request never reached a
 // booking, so a malformed body or an unknown key costs the address budget and not the venue's.
-const REFUNDED_ON: Partial<Record<RuleName, ReadonlySet<number>>> = { public_venue: new Set([400, 404]) };
+const REFUNDED_ON: Partial<Record<RuleName, ReadonlySet<number>>> = {
+  public_venue: new Set([400, 404]),
+  // A magic link refused for its challenge, a disposable address, a bad body or a full demo sent nothing, so it must
+  // not spend the address's budget: anyone could otherwise lock a victim out of their own sign-in by posting junk.
+  magic_link: new Set([400, 403, 404, 429]),
+  magic_link_day: new Set([400, 403, 404, 429]),
+  magic_link_ip: new Set([400, 403, 404, 429]),
+};
+const MAGIC_LINK_RULES: RuleName[] = ["auth", "magic_link", "magic_link_day", "magic_link_ip"];
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 type Env = Record<string, string | undefined>;
@@ -152,8 +171,9 @@ export function rulesFor(method: string, rawPath: string, hasInvitationToken: bo
     if (path.startsWith("/api/auth/sign-up")) {
       return hasInvitationToken ? ["signup", "invitation"] : ["signup"];
     }
-    return path === "/api/auth/sign-in/magic-link" ? ["auth", "magic_link"] : ["auth"];
+    return path === "/api/auth/sign-in/magic-link" ? MAGIC_LINK_RULES : ["auth"];
   }
+  if (path === "/api/demo/magic-link-challenge") return ["demo_challenge"];
   return [];
 }
 
@@ -188,13 +208,17 @@ function socketAddress(c: Context): string | undefined {
   }
 }
 
-/** The address a magic link is asked for, lower case, or null when the body is missing, large or not JSON. */
+/**
+ * The normalized address (demo/normalize.ts) a magic link is asked for, or null when the body is missing, larger than
+ * 4 KB, not JSON, or names no usable address. The caller answers 400 for null: a request the limiter cannot key on the
+ * address must not fall back to the client address, because that is how one inbox got mail from 7 spellings.
+ */
 async function magicLinkAddress(c: Context): Promise<string | null> {
   const length = Number(c.req.header("content-length") ?? Number.NaN);
   if (!(length > 0 && length <= 4096)) return null;
   try {
     const body = (await c.req.raw.clone().json()) as { email?: unknown };
-    return typeof body.email === "string" && body.email.length <= 254 ? body.email.trim().toLowerCase() : null;
+    return normalizeEmail(body.email);
   } catch {
     return null;
   }
@@ -297,9 +321,12 @@ export function createRateLimiter(config: RateLimitConfig, options: RateLimitOpt
     if (names.length === 0) return next();
     const client = clientOf(c);
     const address = names.includes("magic_link") ? await magicLinkAddress(c) : null;
+    if (names.includes("magic_link") && address === null) {
+      return c.json({ ...errorBody("invalid_request"), message: "invalid_request" }, ERRORS.invalid_request.status);
+    }
     const subjectOf = (name: RuleName) => {
       if (name === "public_venue") return `venue:${bookingKeyOf(c.req.path)}`;
-      if (name === "magic_link" && address !== null) return `mail:${address}`;
+      if (name === "magic_link" || name === "magic_link_day") return `mail:${address}`;
       return client;
     };
     const { retryAfter, charges } = consume(names, subjectOf, now());

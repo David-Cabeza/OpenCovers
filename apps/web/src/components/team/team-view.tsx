@@ -27,7 +27,9 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type Invitation, type InvitationStatus, type Member } from "@/lib/api";
+import { dateTime } from "@/lib/date";
 import { errorMessage } from "@/lib/error-message";
+import { t, useT } from "@/i18n";
 import { AuditLog } from "./audit-log";
 import { InviteDialog } from "./invite-dialog";
 import { MakeCreatorButton, RoleSelect } from "./member-actions";
@@ -41,10 +43,11 @@ const STATUS_TONE: Record<InvitationStatus, PillTone> = {
 };
 
 function invitationDate(i: Invitation): string {
-  const when = (iso: string) => new Date(iso).toLocaleString();
-  if (i.status === "redeemed" && i.redeemedAt) return `Redeemed ${when(i.redeemedAt)}`;
-  if (i.status === "revoked" && i.revokedAt) return `Revoked ${when(i.revokedAt)}`;
-  return `${i.status === "pending" ? "Expires" : "Expired"} ${when(i.expiresAt)}`;
+  if (i.status === "redeemed" && i.redeemedAt) return t("team.invitations.date.redeemed", { when: dateTime(i.redeemedAt) });
+  if (i.status === "revoked" && i.revokedAt) return t("team.invitations.date.revoked", { when: dateTime(i.revokedAt) });
+  return t(i.status === "pending" ? "team.invitations.date.expires" : "team.invitations.date.expired", {
+    when: dateTime(i.expiresAt),
+  });
 }
 
 function initials(name: string): string {
@@ -60,6 +63,7 @@ function initials(name: string): string {
 }
 
 export function TeamView({ venueId }: { venueId: string }) {
+  const t = useT();
   const [inviteOpen, setInviteOpen] = useState(false);
   const members = useQuery({
     queryKey: ["members", venueId],
@@ -75,20 +79,20 @@ export function TeamView({ venueId }: { venueId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Team"
-        description="Who can use this venue, and what changed. Only admins see this page."
+        title={t("team.title")}
+        description={t("team.description")}
         actions={
           <Button onClick={() => setInviteOpen(true)}>
-            <PlusIcon className="size-4" /> Invite
+            <PlusIcon className="size-4" /> {t("team.invite")}
           </Button>
         }
       />
       {members.data && (
         <div className="grid grid-cols-3 gap-3">
-          <Stat label="People" value={list.length} />
-          <Stat label="Admins" value={list.filter((m) => m.role === "admin").length} />
+          <Stat label={t("team.stat.people")} value={list.length} />
+          <Stat label={t("team.stat.admins")} value={list.filter((m) => m.role === "admin").length} />
           <Stat
-            label="Pending invites"
+            label={t("team.stat.pendingInvites")}
             value={pending.length}
             tone={pending.length > 0 ? "warning" : "default"}
           />
@@ -103,6 +107,7 @@ export function TeamView({ venueId }: { venueId: string }) {
 }
 
 function MembersCard({ venueId }: { venueId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data, isPending, isError, error, isRefetching, refetch } = useQuery({
     queryKey: ["members", venueId],
@@ -118,24 +123,24 @@ function MembersCard({ venueId }: { venueId: string }) {
       void queryClient.invalidateQueries({ queryKey: ["audit", venueId] });
       toast.success(removalMessage(res.revoked));
     },
-    onError: (err) => toast.error(errorMessage(err, "Could not remove the member.")),
+    onError: (err) => toast.error(errorMessage(err, t("team.members.removeFailed"))),
     onSettled: () => setTarget(null),
   });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Members</CardTitle>
-        <CardDescription>People with access to this venue.</CardDescription>
+        <CardTitle>{t("team.members.title")}</CardTitle>
+        <CardDescription>{t("team.members.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         {isPending ? (
           <Skeleton className="h-24 w-full" />
         ) : isError && !data ? (
-          <LoadError compact what="the members" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+          <LoadError compact title={t("team.members.loadError")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : members.length === 0 ? (
           <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
-            <UserCogIcon className="size-4" /> No members.
+            <UserCogIcon className="size-4" /> {t("team.members.empty")}
           </div>
         ) : (
           <ul className="-my-2 divide-y">
@@ -162,7 +167,7 @@ function MembersCard({ venueId }: { venueId: string }) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label={`Remove ${m.email}`}
+                      aria-label={t("team.members.removeAria", { email: m.email })}
                       onClick={() => setTarget(m)}
                     >
                       <Trash2Icon className="size-4" />
@@ -177,23 +182,21 @@ function MembersCard({ venueId }: { venueId: string }) {
       <Dialog open={target !== null} onOpenChange={(open) => !open && setTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove member</DialogTitle>
+            <DialogTitle>{t("team.remove.title")}</DialogTitle>
             <DialogDescription>
-              {target?.email} will lose access to this venue on their next request. Their
-              account and other venues are not affected. API keys they created in this venue
-              are revoked, and webhooks they created are flagged for review.
+              {t("team.remove.description", { email: target?.email ?? "" })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTarget(null)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="destructive"
               disabled={remove.isPending}
               onClick={() => target && remove.mutate(target.userId)}
             >
-              Remove
+              {t("common.remove")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -203,6 +206,7 @@ function MembersCard({ venueId }: { venueId: string }) {
 }
 
 function InvitationsCard({ venueId }: { venueId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data, isPending, isError, error, isRefetching, refetch } = useQuery({
     queryKey: ["invitations", venueId],
@@ -215,27 +219,27 @@ function InvitationsCard({ venueId }: { venueId: string }) {
     mutationFn: (id: string) => api.revokeInvitation(venueId, id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["invitations", venueId] });
-      toast.success("Invitation revoked");
+      toast.success(t("team.invitations.revoked"));
     },
-    onError: (err) => toast.error(errorMessage(err, "Could not revoke the invitation.")),
+    onError: (err) => toast.error(errorMessage(err, t("team.invitations.revokeFailed"))),
     onSettled: () => setRevoking(null),
   });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Invitations</CardTitle>
+        <CardTitle>{t("team.invitations.title")}</CardTitle>
         <CardDescription>
-          OpenCovers sends no email, so you pass the token or link on yourself.
+          {t("team.invitations.description")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {isPending ? (
           <Skeleton className="h-24 w-full" />
         ) : isError && !data ? (
-          <LoadError compact what="the invitations" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+          <LoadError compact title={t("team.invitations.loadError")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : invitations.length === 0 ? (
-          <div className="py-2 text-sm text-muted-foreground">No invitations yet.</div>
+          <div className="py-2 text-sm text-muted-foreground">{t("team.invitations.empty")}</div>
         ) : (
           <ul className="-my-2 divide-y">
             {invitations.map((i) => (
@@ -244,19 +248,19 @@ function InvitationsCard({ venueId }: { venueId: string }) {
                 className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3"
               >
                 <div className="min-w-0">
-                  <div className="truncate font-medium">{i.email ?? "Open link"}</div>
+                  <div className="truncate font-medium">{i.email ?? t("team.invitations.openLink")}</div>
                   <div className="text-sm text-muted-foreground">
                     {invitationDate(i)}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{i.role}</Badge>
+                  <Badge variant="secondary">{t(`common.role.${i.role}`)}</Badge>
                   <Pill tone={STATUS_TONE[i.status]} dot>
-                    {i.status}
+                    {t(`team.invitations.status.${i.status}`)}
                   </Pill>
                   {i.status === "pending" && (
                     <Button variant="ghost" size="sm" onClick={() => setRevoking(i)}>
-                      Revoke
+                      {t("team.invitations.revoke")}
                     </Button>
                   )}
                 </div>
@@ -267,10 +271,10 @@ function InvitationsCard({ venueId }: { venueId: string }) {
       </CardContent>
       <ConfirmDialog
         open={revoking !== null}
-        title={`Revoke the invitation for ${revoking?.email ?? "this open link"}?`}
-        description="The link or token you already sent stops working. You can create a new invitation later."
-        confirmLabel="Revoke invitation"
-        keepLabel="Keep invitation"
+        title={revoking?.email ? t("team.revoke.titleEmail", { email: revoking.email }) : t("team.revoke.titleOpen")}
+        description={t("team.revoke.description")}
+        confirmLabel={t("team.revoke.confirm")}
+        keepLabel={t("team.revoke.keep")}
         pending={revoke.isPending}
         onConfirm={() => revoking && revoke.mutate(revoking.id)}
         onClose={() => setRevoking(null)}

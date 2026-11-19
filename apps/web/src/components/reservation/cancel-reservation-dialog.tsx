@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useT } from "@/i18n";
 import type { Reservation } from "@/lib/api";
 
 /** Asks before cancelling, because a cancelled reservation cannot be reopened from the agenda. */
@@ -21,23 +22,33 @@ export function CancelReservationDialog({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   return (
     <Dialog open={reservation !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Cancel this reservation?</DialogTitle>
+          <DialogTitle>{t("reservation.cancel.title")}</DialogTitle>
           <DialogDescription>
             {reservation
-              ? `${reservation.time}, party of ${reservation.partySize} for ${reservation.guest.name || "the guest"}. It frees the tables and cannot be reopened from the agenda.`
+              ? reservation.guest.name
+                ? t("reservation.cancel.description", {
+                    time: reservation.time,
+                    count: reservation.partySize,
+                    name: reservation.guest.name,
+                  })
+                : t("reservation.cancel.descriptionUnnamed", {
+                    time: reservation.time,
+                    count: reservation.partySize,
+                  })
               : null}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
-            Keep reservation
+            {t("reservation.cancel.keep")}
           </Button>
           <Button type="button" variant="destructive" onClick={onConfirm} disabled={pending}>
-            {pending ? "Cancelling…" : "Cancel reservation"}
+            {pending ? t("reservation.cancel.cancelling") : t("reservation.cancel.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

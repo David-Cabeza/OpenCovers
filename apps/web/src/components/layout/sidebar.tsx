@@ -16,6 +16,7 @@ import { Dialog } from "radix-ui";
 import { BrandLogo, BrandMark } from "@/components/brand/brand-mark";
 import { useUiStore } from "@/stores/ui-store";
 import type { Role } from "@/lib/api";
+import { t, useT, type MessageKey } from "@/i18n";
 
 export type ViewId =
   | "agenda"
@@ -29,22 +30,25 @@ export type ViewId =
 
 const NAV: {
   id: ViewId;
-  label: string;
+  labelKey: MessageKey;
   icon: typeof CalendarDaysIcon;
   adminOnly?: boolean;
 }[] = [
-  { id: "agenda", label: "Agenda", icon: CalendarDaysIcon },
-  { id: "preshift", label: "Pre-shift", icon: ClipboardListIcon },
-  { id: "floor", label: "Floor plan", icon: LayoutGridIcon },
-  { id: "availability", label: "Availability", icon: CalendarClockIcon },
-  { id: "waitlist", label: "Waitlist", icon: UsersIcon },
-  { id: "pacing", label: "Pacing", icon: GaugeIcon },
-  { id: "setup", label: "Settings", icon: SettingsIcon },
-  { id: "team", label: "Team", icon: UserCogIcon, adminOnly: true },
+  { id: "agenda", labelKey: "layout.nav.agenda", icon: CalendarDaysIcon },
+  { id: "preshift", labelKey: "layout.nav.preshift", icon: ClipboardListIcon },
+  { id: "floor", labelKey: "layout.nav.floor", icon: LayoutGridIcon },
+  { id: "availability", labelKey: "layout.nav.availability", icon: CalendarClockIcon },
+  { id: "waitlist", labelKey: "layout.nav.waitlist", icon: UsersIcon },
+  { id: "pacing", labelKey: "layout.nav.pacing", icon: GaugeIcon },
+  { id: "setup", labelKey: "layout.nav.setup", icon: SettingsIcon },
+  { id: "team", labelKey: "layout.nav.team", icon: UserCogIcon, adminOnly: true },
 ];
 
 /** The name of a screen, as the sidebar shows it. */
-export const viewLabel = (id: ViewId): string => NAV.find((item) => item.id === id)?.label ?? "";
+export const viewLabel = (id: ViewId): string => {
+  const item = NAV.find((n) => n.id === id);
+  return item ? t(item.labelKey) : "";
+};
 
 function NavList({
   active,
@@ -57,8 +61,9 @@ function NavList({
   role?: Role;
   collapsed?: boolean;
 }) {
+  const t = useT();
   return (
-    <nav aria-label="Main" className="flex-1 space-y-1 overflow-y-auto p-3">
+    <nav aria-label={t("layout.nav.main")} className="flex-1 space-y-1 overflow-y-auto p-3">
       {NAV.filter((item) => !item.adminOnly || role === "admin").map((item) => {
         const isActive = active === item.id;
         return (
@@ -67,7 +72,7 @@ function NavList({
             type="button"
             onClick={() => onSelect(item.id)}
             aria-current={isActive ? "page" : undefined}
-            title={collapsed ? item.label : undefined}
+            title={collapsed ? t(item.labelKey) : undefined}
             className={cn(
               "relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
               collapsed && "justify-center px-0",
@@ -81,7 +86,7 @@ function NavList({
               />
             )}
             <item.icon className="size-[18px] shrink-0" />
-            <span className={cn(collapsed && "sr-only")}>{item.label}</span>
+            <span className={cn(collapsed && "sr-only")}>{t(item.labelKey)}</span>
           </button>
         );
       })}
@@ -99,6 +104,7 @@ export function Sidebar({
   onSelect: (view: ViewId) => void;
   role?: Role;
 }) {
+  const t = useT();
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggle = useUiStore((s) => s.toggleSidebar);
 
@@ -124,7 +130,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={toggle}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? t("layout.nav.expand") : t("layout.nav.collapse")}
           aria-expanded={!collapsed}
           className={cn(
             "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
@@ -136,7 +142,7 @@ export function Sidebar({
           ) : (
             <>
               <PanelLeftCloseIcon className="size-[18px]" />
-              Collapse
+              {t("layout.nav.collapseShort")}
             </>
           )}
         </button>
@@ -159,6 +165,7 @@ export function MobileNav({
   onSelect: (view: ViewId) => void;
   role?: Role;
 }) {
+  const t = useT();
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -172,7 +179,7 @@ export function MobileNav({
               <BrandLogo />
             </Dialog.Title>
             <Dialog.Close
-              aria-label="Close menu"
+              aria-label={t("layout.nav.closeMenu")}
               className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             >
               <XIcon className="size-5" />

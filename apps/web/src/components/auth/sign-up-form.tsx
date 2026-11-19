@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
-import { isServerUnreachable, SERVER_UNREACHABLE } from "@/lib/server-status";
+import { t, useT } from "@/i18n";
+import { isServerUnreachable } from "@/lib/server-status";
 
 interface SignUpValues {
   name: string;
@@ -20,6 +21,7 @@ export function SignUpForm({
   invitationToken?: string;
   onSuccess?: () => void;
 }) {
+  const t = useT();
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -39,12 +41,12 @@ export function SignUpForm({
       }));
     } catch (err) {
       // The client throws when no answer comes back at all.
-      const message = isServerUnreachable(err) ? SERVER_UNREACHABLE : "Could not create the account.";
+      const message = isServerUnreachable(err) ? t("errors.serverUnreachable") : t("auth.signUp.failed");
       setServerError(message);
       return;
     }
     if (error) {
-      setServerError(authErrorMessage(error, "Could not create the account."));
+      setServerError(authErrorMessage(error, t("auth.signUp.failed")));
       return;
     }
     onSuccess?.();
@@ -53,12 +55,12 @@ export function SignUpForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
       <div className="space-y-2">
-        <Label htmlFor="signup-name">Name</Label>
+        <Label htmlFor="signup-name">{t("auth.field.name")}</Label>
         <Input
           id="signup-name"
           autoComplete="name"
-          placeholder="Jane Doe"
-          {...register("name", { required: "Name is required." })}
+          placeholder={t("auth.signUp.namePlaceholder")}
+          {...register("name", { required: t("auth.error.nameRequired") })}
         />
         {errors.name && (
           <p className="text-sm text-destructive">{errors.name.message}</p>
@@ -66,13 +68,13 @@ export function SignUpForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="signup-email">Email</Label>
+        <Label htmlFor="signup-email">{t("auth.field.email")}</Label>
         <Input
           id="signup-email"
           type="email"
           autoComplete="email"
-          placeholder="you@example.com"
-          {...register("email", { required: "Email is required." })}
+          placeholder="you@example.com" // i18n-ok
+          {...register("email", { required: t("auth.error.emailRequired") })}
         />
         {errors.email && (
           <p className="text-sm text-destructive">{errors.email.message}</p>
@@ -80,17 +82,17 @@ export function SignUpForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="signup-password">Password</Label>
+        <Label htmlFor="signup-password">{t("auth.field.password")}</Label>
         <Input
           id="signup-password"
           type="password"
           autoComplete="new-password"
-          placeholder="Choose a strong password"
+          placeholder={t("auth.signUp.passwordPlaceholder")}
           {...register("password", {
-            required: "Password is required.",
+            required: t("auth.error.passwordRequired"),
             minLength: {
               value: 8,
-              message: "Use at least 8 characters.",
+              message: t("auth.error.passwordMin"),
             },
           })}
         />
@@ -106,7 +108,7 @@ export function SignUpForm({
       )}
 
       <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? "Creating account…" : "Create account"}
+        {isSubmitting ? t("auth.signUp.submitting") : t("auth.signUp.submit")}
       </Button>
     </form>
   );

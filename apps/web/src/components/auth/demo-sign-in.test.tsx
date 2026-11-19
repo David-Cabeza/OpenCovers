@@ -14,15 +14,23 @@ vi.mock("@/lib/auth-client", () => ({
 }));
 
 import { mockApi, renderWithApp, resetApiMocks } from "@/test/mock-api";
+import { useUiStore } from "@/stores/ui-store";
 import { AuthScreen } from "./auth-screen";
 
-function demoOn(googleEnabled = false) {
-  mockApi({ "GET /api/demo/status": { body: { enabled: true, googleEnabled } } });
+const challenge = { nonce: "n0nce", issuedAt: 1, difficulty: 6, signature: "sig" };
+let requests: ReturnType<typeof mockApi>["requests"];
+
+function demoOn(googleEnabled = false, challengeAnswer: { status?: number; body?: unknown } = { body: { challenge, expiresAt: "2026-11-20T10:05:00Z" } }) {
+  requests = mockApi({
+    "GET /api/demo/status": { body: { enabled: true, googleEnabled } },
+    "POST /api/demo/magic-link-challenge": challengeAnswer,
+  }).requests;
 }
 
 beforeEach(() => {
   magicLink.mockReset();
   social.mockReset();
+  window.localStorage.clear();
 });
 afterEach(resetApiMocks);
 
@@ -44,7 +52,7 @@ describe("the sign-in screen on a demo", () => {
     expect(await screen.findByRole("button", { name: "Continue with Google" })).toBeInTheDocument();
   });
 
-  it("sends the language, and no consent header, when the box is not ticked", async () => {
+  it("solves a challenge for the typed address and sends it with the magic-link request", async () => {
     demoOn();
     magicLink.mockResolvedValue({ error: null });
     const user = userEvent.setup();
@@ -54,13 +62,21 @@ describe("the sign-in screen on a demo", () => {
 
     const [body, options] = magicLink.mock.calls[0]!;
     expect(body.email).toBe("ana@example.com");
-    expect(options.headers["X-Demo-Locale"]).toMatch(/^(en|es)$/);
+    const asked = requests.filter((r) => r.path === "/api/demo/magic-link-challenge");
+    expect(asked).toHaveLength(1);
+    expect(asked[0]!.body).toEqual({ email: "ana@example.com" });
+    expect(JSON.parse(options.headers["X-Demo-Challenge"])).toEqual(challenge);
+    // The solution is a counter whose SHA-256 of "n0nce:<counter>" has 6 leading zero bits.
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`n0nce:${options.headers["X-Demo-Solution"]}`)));
+    expect(digest[0]! >> 2).toBe(0);
+    expect(options.headers["Accept-Language"]).toBe("en");
     expect(options.headers).not.toHaveProperty("X-Demo-Consent");
+    expect(window.localStorage.getItem("oc-demo-consent")).toBeNull();
     expect(await screen.findByRole("heading", { name: "Check your email" })).toBeInTheDocument();
-    expect(screen.getByText("ana@example.com")).toBeInTheDocument();
+    expect(screen.getByText(/ana@example\.com/)).toBeInTheDocument();
   });
 
-  it("sends the consent text version only when the box is ticked", async () => {
+  it("remembers the tick for after sign-in, and sends no consent with the request", async () => {
     demoOn();
     magicLink.mockResolvedValue({ error: null });
     const user = userEvent.setup();
@@ -68,10 +84,12 @@ describe("the sign-in screen on a demo", () => {
     await user.type(await screen.findByLabelText("Email"), "ana@example.com");
     await user.click(screen.getByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: "Email me a sign-in link" }));
-    expect(magicLink.mock.calls[0]![1].headers["X-Demo-Consent"]).toBe("demo-consent-v0-placeholder");
+    await screen.findByRole("heading", { name: "Check your email" });
+    expect(magicLink.mock.calls[0]![1].headers).not.toHaveProperty("X-Demo-Consent");
+    expect(JSON.parse(window.localStorage.getItem("oc-demo-consent")!)).toEqual({ version: "v1" });
   });
 
-  it("passes the same headers to Google sign-in", async () => {
+  it("remembers the tick before Google sign-in too", async () => {
     demoOn(true);
     social.mockResolvedValue({ error: null });
     const user = userEvent.setup();
@@ -79,7 +97,53 @@ describe("the sign-in screen on a demo", () => {
     await user.click(await screen.findByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: "Continue with Google" }));
     expect(social.mock.calls[0]![0]).toMatchObject({ provider: "google" });
-    expect(social.mock.calls[0]![1].headers["X-Demo-Consent"]).toBe("demo-consent-v0-placeholder");
+    expect(JSON.parse(window.localStorage.getItem("oc-demo-consent")!)).toEqual({ version: "v1" });
+  });
+
+  it("shows Preparing your link while the challenge is on its way", async () => {
+    demoOn();
+    let release: (v: unknown) => void = () => {};
+    magicLink.mockReturnValue(new Promise((r) => (release = r)));
+    const user = userEvent.setup();
+    renderWithApp(<AuthScreen />);
+    await user.type(await screen.findByLabelText("Email"), "ana@example.com");
+    await user.click(screen.getByRole("button", { name: "Email me a sign-in link" }));
+    expect(await screen.findByRole("button", { name: "Preparing your link…" })).toBeDisabled();
+    release({ error: null });
+    await screen.findByRole("heading", { name: "Check your email" });
+  });
+
+  it("explains a challenge the server refuses", async () => {
+    demoOn();
+    magicLink.mockResolvedValue({ error: { status: 400, code: "CHALLENGE_INVALID", message: "raw" } });
+    const user = userEvent.setup();
+    renderWithApp(<AuthScreen />);
+    await user.type(await screen.findByLabelText("Email"), "ana@example.com");
+    await user.click(screen.getByRole("button", { name: "Email me a sign-in link" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("expired or was already used");
+  });
+
+  it("waits when the challenge request is rate limited, and sends no link", async () => {
+    demoOn(false, { status: 429, body: { code: "rate_limited" } });
+    const user = userEvent.setup();
+    renderWithApp(<AuthScreen />);
+    await user.type(await screen.findByLabelText("Email"), "ana@example.com");
+    await user.click(screen.getByRole("button", { name: "Email me a sign-in link" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too many attempts");
+    expect(screen.getByRole("button", { name: /Try again in \d+s/ })).toBeDisabled();
+    expect(magicLink).not.toHaveBeenCalled();
+  });
+
+  it("speaks Spanish and asks for the mail in Spanish when the app is in Spanish", async () => {
+    useUiStore.setState({ locale: "es" });
+    demoOn();
+    magicLink.mockResolvedValue({ error: null });
+    const user = userEvent.setup();
+    renderWithApp(<AuthScreen />);
+    await user.type(await screen.findByLabelText("Email"), "ana@example.com");
+    await user.click(await screen.findByRole("button", { name: "Envíame un enlace de acceso" }));
+    expect(await screen.findByRole("heading", { name: "Revisa tu email" })).toBeInTheDocument();
+    expect(magicLink.mock.calls[0]![1].headers["Accept-Language"]).toBe("es");
   });
 
   it("says why an address is refused", async () => {
@@ -127,6 +191,9 @@ describe("the sign-in screen on a demo", () => {
       expect(ready).toBeEnabled();
       await user.click(ready);
       await waitFor(() => expect(magicLink).toHaveBeenCalledTimes(2));
+      // A challenge is single use, so the resend asked for its own.
+      expect(requests.filter((r) => r.path === "/api/demo/magic-link-challenge")).toHaveLength(2);
+      expect(magicLink.mock.calls[1]![1].headers["X-Demo-Challenge"]).toBeDefined();
     } finally {
       vi.useRealTimers();
     }

@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CloudOffIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n";
 import { useServerStatus } from "@/stores/server-status";
 
 const RETRY_MS = 15_000;
 
 /** A bar across the top while the server cannot be reached. It asks again by itself, and on request. */
 export function ServerBanner() {
+  const t = useT();
   const down = useServerStatus((s) => s.down);
   const queryClient = useQueryClient();
   const [trying, setTrying] = useState(false);
@@ -35,11 +37,10 @@ export function ServerBanner() {
     >
       <span className="flex items-center gap-2">
         <CloudOffIcon className="size-4 shrink-0" aria-hidden="true" />
-        Can&apos;t reach the server. What you see may be out of date, and changes will not be saved until it
-        comes back. Trying again every few seconds.
+        {t("layout.serverBanner.message")}
       </span>
       <Button type="button" size="sm" variant="outline" disabled={trying} onClick={() => void retry()}>
-        {trying ? "Trying…" : "Try again"}
+        {trying ? t("common.trying") : t("common.tryAgain")}
       </Button>
     </div>
   );

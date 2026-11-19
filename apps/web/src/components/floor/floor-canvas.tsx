@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
 import { RotateCwIcon } from "lucide-react";
 import { cn } from "cn";
+import { useT } from "@/i18n";
 import { useUiStore } from "@/stores/ui-store";
 import { FloorTableCard } from "./floor-table-card";
 import { FloorItemShape } from "./floor-item-shape";
+import { guestsText } from "./guests-text";
 import { FLOOR_SKINS } from "./skins";
 
 export interface CanvasTable {
@@ -141,6 +143,7 @@ export function FloorCanvas({
   ) => void;
   onDeleteItem?: (itemId: string) => void;
 }) {
+  const tr = useT();
   const skin = FLOOR_SKINS[useUiStore((s) => s.floorSkin)];
   const canvasRef = useRef<HTMLDivElement>(null);
   const [posOverrides, setPosOverrides] = useState<Record<string, { x: number; y: number }>>({});
@@ -270,7 +273,7 @@ export function FloorCanvas({
                 <>
                   <button
                     type="button"
-                    aria-label="Rotate"
+                    aria-label={tr("floor.rotate")}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => rotate(item.id, rotation, "item")}
                     className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm hover:bg-accent"
@@ -279,7 +282,7 @@ export function FloorCanvas({
                   </button>
                   <button
                     type="button"
-                    aria-label="Delete"
+                    aria-label={tr("common.delete")}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => onDeleteItem?.(item.id)}
                     className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm hover:bg-destructive hover:text-white"
@@ -287,7 +290,7 @@ export function FloorCanvas({
                     ×
                   </button>
                   <div
-                    title="Resize"
+                    title={tr("floor.resize")}
                     onPointerDown={(e) => startResize(e, item)}
                     onPointerMove={onResizeMove}
                     onPointerUp={onResizeUp}
@@ -322,7 +325,11 @@ export function FloorCanvas({
                 seatable
                   ? undefined
                   : mode === "view"
-                    ? `${t.name}: ${t.guestName || "reserved"}, ${t.partySize ?? "?"} guests`
+                    ? tr("floor.table.occupiedLabel", {
+                        name: t.name,
+                        guest: t.guestName || tr("floor.table.reserved"),
+                        guests: guestsText(t.partySize),
+                      })
                     : undefined
               }
               onKeyDown={
@@ -423,7 +430,7 @@ export function FloorCanvas({
                           {t.guestName || "—"}
                         </span>
                         <span className="text-[10px] leading-tight">
-                          {t.partySize ?? "?"} pax
+                          {tr("floor.table.pax", { party: t.partySize ?? "?" })}
                         </span>
                       </>
                     ) : (
@@ -433,7 +440,7 @@ export function FloorCanvas({
                         </span>
                         {seatable && (
                           <span className="sr-only">
-                            , {t.seats} {t.seats === 1 ? "seat" : "seats"}, seat a walk-in
+                            {tr("floor.table.seatable", { seats: tr("common.seats", { count: t.seats }) })}
                           </span>
                         )}
                       </>
@@ -444,7 +451,7 @@ export function FloorCanvas({
               {mode === "edit" && (
                 <button
                   type="button"
-                  aria-label="Rotate"
+                  aria-label={tr("floor.rotate")}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => rotate(t.id, rotation, "table")}
                   className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm hover:bg-accent"

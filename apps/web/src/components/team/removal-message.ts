@@ -1,18 +1,12 @@
+import { t } from "@/i18n";
 import type { RemovedMember } from "@/lib/api";
 
-function count(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`;
-}
-
 export function removalMessage(revoked: RemovedMember["revoked"] | undefined): string {
-  if (!revoked) return "Member removed";
+  if (!revoked) return t("team.removal.simple");
   const parts = [
-    revoked.keys > 0 && `${count(revoked.keys, "API key", "API keys")} revoked`,
-    revoked.sessions > 0 && `${count(revoked.sessions, "session", "sessions")} ended`,
-    revoked.webhooksFlagged > 0 &&
-      `${count(revoked.webhooksFlagged, "webhook", "webhooks")} flagged for review`,
+    revoked.keys > 0 && t("team.removal.keys", { count: revoked.keys }),
+    revoked.sessions > 0 && t("team.removal.sessions", { count: revoked.sessions }),
+    revoked.webhooksFlagged > 0 && t("team.removal.webhooks", { count: revoked.webhooksFlagged }),
   ].filter(Boolean);
-  return parts.length
-    ? `Member removed. ${parts.join(", ")}.`
-    : "Member removed. Nothing else to revoke.";
+  return parts.length ? t("team.removal.withParts", { parts: parts.join(", ") }) : t("team.removal.nothing");
 }

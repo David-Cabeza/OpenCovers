@@ -1,13 +1,19 @@
-import { and, eq, like, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import app from "../src/app";
 import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
-import { demoSandboxes, user, venueOnlineBooking, verification } from "../src/db/schema";
+import { demoSandboxes, user, venueOnlineBooking } from "../src/db/schema";
 import { createAuth } from "../src/lib/auth";
+import { CHALLENGE_HEADER, magicLinkChallenges, SOLUTION_HEADER } from "../src/demo/magic-link-challenge";
+import { solve } from "../src/lib/public-challenge";
 import { demoSettings, SANDBOX_TTL_DAYS } from "../src/demo/settings";
 
-const demoAuth = createAuth(demoSettings({ DEMO_MODE: "1" }));
+// The link token is stored hashed (audit F13), so the test reads it from the mail it would have sent.
+const sent: { to: string; text: string }[] = [];
+const demoAuth = createAuth(demoSettings({ DEMO_MODE: "1" }), {
+  sendMail: async (to, _subject, text) => void sent.push({ to, text }),
+});
 
 beforeAll(async () => {
   await migrateDb();
@@ -27,14 +33,14 @@ let n = 0;
 const freshEmail = () => `status-${++n}-${Math.random().toString(36).slice(2, 8)}@example.com`;
 
 async function signIn(email: string): Promise<string> {
-  await demoAuth.api.signInMagicLink({ body: { email }, headers: new Headers() });
-  const [row] = await db
-    .select({ token: verification.identifier })
-    .from(verification)
-    .where(and(sql`${verification.value}::jsonb ->> 'email' = ${email}`, like(verification.identifier, "magic-link:%")))
-    .limit(1);
+  // A magic link needs a solved challenge for the address (ADR-0022, decision 8a).
+  const { challenge } = magicLinkChallenges().issue(email);
+  const headers = new Headers({ [CHALLENGE_HEADER]: JSON.stringify(challenge), [SOLUTION_HEADER]: solve(challenge) });
+  await demoAuth.api.signInMagicLink({ body: { email }, headers });
+  const mail = sent.filter((m) => m.to === email).pop()!;
+  const token = new URL(mail.text.match(/https?:\/\/\S+/)![0]).searchParams.get("token")!;
   const res = await demoAuth.api.magicLinkVerify({
-    query: { token: row!.token.replace(/^magic-link:/, "") },
+    query: { token },
     headers: new Headers(),
     asResponse: true,
   });

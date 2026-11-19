@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
-import { isServerUnreachable, SERVER_UNREACHABLE } from "@/lib/server-status";
+import { t, useT } from "@/i18n";
+import { isServerUnreachable } from "@/lib/server-status";
 
 interface SignInValues {
   email: string;
@@ -13,6 +14,7 @@ interface SignInValues {
 }
 
 export function SignInForm() {
+  const t = useT();
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -25,24 +27,24 @@ export function SignInForm() {
     try {
       const { error } = await authClient.signIn.email(values);
       if (error) {
-        setServerError(authErrorMessage(error, "Could not sign in."));
+        setServerError(authErrorMessage(error, t("auth.signIn.failed")));
       }
     } catch (err) {
       // The client throws when no answer comes back at all.
-      setServerError(isServerUnreachable(err) ? SERVER_UNREACHABLE : "Could not sign in.");
+      setServerError(isServerUnreachable(err) ? t("errors.serverUnreachable") : t("auth.signIn.failed"));
     }
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
       <div className="space-y-2">
-        <Label htmlFor="signin-email">Email</Label>
+        <Label htmlFor="signin-email">{t("auth.field.email")}</Label>
         <Input
           id="signin-email"
           type="email"
           autoComplete="email"
-          placeholder="you@example.com"
-          {...register("email", { required: "Email is required." })}
+          placeholder="you@example.com" // i18n-ok
+          {...register("email", { required: t("auth.error.emailRequired") })}
         />
         {errors.email && (
           <p className="text-sm text-destructive">{errors.email.message}</p>
@@ -50,12 +52,12 @@ export function SignInForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="signin-password">Password</Label>
+        <Label htmlFor="signin-password">{t("auth.field.password")}</Label>
         <Input
           id="signin-password"
           type="password"
           autoComplete="current-password"
-          {...register("password", { required: "Password is required." })}
+          {...register("password", { required: t("auth.error.passwordRequired") })}
         />
         {errors.password && (
           <p className="text-sm text-destructive">{errors.password.message}</p>
@@ -69,7 +71,7 @@ export function SignInForm() {
       )}
 
       <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? "Signing in…" : "Sign in"}
+        {isSubmitting ? t("auth.signIn.submitting") : t("auth.signIn.submit")}
       </Button>
     </form>
   );

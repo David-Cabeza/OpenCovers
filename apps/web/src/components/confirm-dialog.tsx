@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useT } from "@/i18n";
 
 /** Asks before an action that cannot be undone. Closing it, by button, Escape or outside click, does nothing. */
 export function ConfirmDialog({
@@ -14,7 +15,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
-  keepLabel = "Keep",
+  keepLabel,
   pending = false,
   onConfirm,
   onClose,
@@ -28,6 +29,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
@@ -37,7 +39,7 @@ export function ConfirmDialog({
         </DialogHeader>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
-            {keepLabel}
+            {keepLabel ?? t("layout.confirm.keep")}
           </Button>
           <Button type="button" variant="destructive" onClick={onConfirm} disabled={pending}>
             {confirmLabel}

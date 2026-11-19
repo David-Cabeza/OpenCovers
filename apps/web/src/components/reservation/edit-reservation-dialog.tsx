@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConsentSelect } from "@/components/reservation/consent-select";
+import { useT } from "@/i18n";
 import { api, COMMENTARY_MAX, type Consent, type Reservation } from "@/lib/api";
 
 interface EditValues {
@@ -49,6 +50,7 @@ export function EditReservationDialog({
   reservation: Reservation | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const {
     handleSubmit,
@@ -71,10 +73,10 @@ export function EditReservationDialog({
         commentary: values.commentary.trim(),
       });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
-      toast.success("Reservation updated");
+      toast.success(t("reservation.edit.done"));
       onOpenChange(false);
     } catch (err) {
-      toast.error(errorMessage(err, "Could not update the reservation."));
+      toast.error(errorMessage(err, t("reservation.edit.failed")));
     }
   }
 
@@ -82,17 +84,17 @@ export function EditReservationDialog({
     <Dialog open={reservation !== null} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Consent, rating and note</DialogTitle>
+          <DialogTitle>{t("reservation.edit.title")}</DialogTitle>
           <DialogDescription>
             {reservation?.guest.name
-              ? `Update the details recorded for ${reservation.guest.name}.`
-              : "Update the details recorded for this reservation."}
+              ? t("reservation.edit.description", { name: reservation.guest.name })
+              : t("reservation.edit.descriptionUnnamed")}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="edit-consent">Contact consent</Label>
+            <Label htmlFor="edit-consent">{t("reservation.contactConsent")}</Label>
             <Controller
               name="consent"
               control={control}
@@ -103,7 +105,7 @@ export function EditReservationDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Rating</Label>
+            <Label>{t("reservation.edit.rating")}</Label>
             <Controller
               name="rating"
               control={control}
@@ -113,7 +115,7 @@ export function EditReservationDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NO_RATING}>No rating</SelectItem>
+                    <SelectItem value={NO_RATING}>{t("reservation.edit.noRating")}</SelectItem>
                     {[1, 2, 3, 4, 5].map((n) => (
                       <SelectItem key={n} value={String(n)}>
                         {n}
@@ -126,24 +128,24 @@ export function EditReservationDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-commentary">Note</Label>
+            <Label htmlFor="edit-commentary">{t("reservation.note")}</Label>
             <Textarea
               id="edit-commentary"
               maxLength={COMMENTARY_MAX}
-              placeholder="Anniversary, bring a cake"
+              placeholder={t("reservation.notePlaceholder")}
               {...register("commentary")}
             />
             <p className="text-sm text-muted-foreground">
-              Up to {COMMENTARY_MAX} characters. Do not enter health data such as allergies.
+              {t("reservation.noteHint", { max: COMMENTARY_MAX })}
             </p>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving…" : "Save"}
+              {isSubmitting ? t("common.saving") : t("common.save")}
             </Button>
           </DialogFooter>
         </form>

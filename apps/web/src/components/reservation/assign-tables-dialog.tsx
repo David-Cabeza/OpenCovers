@@ -13,6 +13,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useTables } from "@/hooks/use-tables";
 import { api, type Reservation } from "@/lib/api";
+import { useT } from "@/i18n";
 import { errorMessage } from "@/lib/error-message";
 
 export function AssignTablesDialog({
@@ -24,6 +25,7 @@ export function AssignTablesDialog({
   reservation: Reservation | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data } = useTables(venueId);
   const tables = data?.tables ?? [];
@@ -54,11 +56,11 @@ export function AssignTablesDialog({
   async function onSave() {
     if (!reservation) return;
     if (selected.length === 0) {
-      toast.error("Select at least one table.");
+      toast.error(t("reservation.selectTable"));
       return;
     }
     if (tooSmall) {
-      toast.error("The party is larger than the selected tables.");
+      toast.error(t("reservation.partyTooLarge"));
       return;
     }
     setSaving(true);
@@ -66,10 +68,10 @@ export function AssignTablesDialog({
       await api.modifyReservation(venueId, reservation.id, { tables: selected });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
-      toast.success("Tables assigned");
+      toast.success(t("reservation.assign.done"));
       onOpenChange(false);
     } catch (err) {
-      toast.error(errorMessage(err, "Could not assign the tables."));
+      toast.error(errorMessage(err, t("reservation.assign.failed")));
     } finally {
       setSaving(false);
     }
@@ -79,47 +81,54 @@ export function AssignTablesDialog({
     <Dialog open={reservation !== null} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Assign tables</DialogTitle>
+          <DialogTitle>{t("reservation.assign.title")}</DialogTitle>
           <DialogDescription>
             {reservation
-              ? `${reservation.time}, party of ${reservation.partySize}${
-                  reservation.guest.name ? ` for ${reservation.guest.name}` : ""
-                }.`
+              ? reservation.guest.name
+                ? t("reservation.assign.summaryNamed", {
+                    time: reservation.time,
+                    count: reservation.partySize,
+                    name: reservation.guest.name,
+                  })
+                : t("reservation.assign.summary", { time: reservation.time, count: reservation.partySize })
               : ""}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
-          <Label>Tables</Label>
+          <Label>{t("reservation.tables")}</Label>
           {tables.length === 0 ? (
-            <p className="text-sm text-muted-foreground">This venue has no tables yet.</p>
+            <p className="text-sm text-muted-foreground">{t("reservation.noTables")}</p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {tables.map((t) => (
+              {tables.map((tbl) => (
                 <Button
-                  key={t.id}
+                  key={tbl.id}
                   type="button"
-                  variant={selected.includes(t.id) ? "default" : "outline"}
+                  variant={selected.includes(tbl.id) ? "default" : "outline"}
                   size="sm"
-                  aria-pressed={selected.includes(t.id)}
-                  onClick={() => toggleTable(t.id)}
+                  aria-pressed={selected.includes(tbl.id)}
+                  onClick={() => toggleTable(tbl.id)}
                 >
-                  {t.name} · {t.seats}
+                  {tbl.name} · {tbl.seats}
                 </Button>
               ))}
             </div>
           )}
           <p className={tooSmall ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
-            {totalSeats} seats selected for {partySize} guests.
+            {t("reservation.selected", {
+              seats: t("common.seats", { count: totalSeats }),
+              guests: t("common.guests", { count: partySize }),
+            })}
           </p>
         </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="button" disabled={saving} onClick={() => void onSave()}>
-            {saving ? "Saving…" : "Save tables"}
+            {saving ? t("common.saving") : t("reservation.assign.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,6 +1,6 @@
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 import { reservations, sentEmails, venues } from "../db/schema";
-import { mayEmail } from "../demo/limits";
+import { mailIdentity, mayEmail } from "../demo/limits";
 import { normalizeContact } from "./contact";
 import { buildLinkEmail, canSendEmail, sendEmail, type LinkLine } from "./mailer";
 import type { PublicVenue } from "./public-booking";
@@ -101,7 +101,8 @@ export async function resendLinks(db: Db, { venue, settings }: PublicVenue, emai
     if (!mail) return;
     if (!(await mayEmail(db, venue.id, mail.to))) return;
     const { subject, text } = buildLinkEmail(mail.lines);
-    await sendEmail(venue.resendApiKey ?? "", venue.fromEmail, mail.to, subject, text);
+    const identity = await mailIdentity(db, venue.id, venue);
+    await sendEmail(identity.apiKey, identity.from, mail.to, subject, text);
   } catch (err) {
     // The message only: a provider's answer could quote the email, and the email holds tokens.
     console.error("notification self_service_link failed:", err instanceof Error ? err.message.split(":")[0] : "unknown");
