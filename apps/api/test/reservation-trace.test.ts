@@ -162,9 +162,10 @@ describe("C65 each entry's persisted origin", () => {
     expect((await write(venueId, `/reservations/${id}/modify`, { Cookie: cookie }, "o-modify", { partySize: 3 })).status).toBe(200);
     const link = await write(venueId, `/reservations/${id}/self-service-link`, { Cookie: cookie }, "o-link", {});
     const { selfServiceToken } = await link.json();
+    const guestKey = crypto.randomUUID();
     const cancelled = await app.request("/v1/public/self-service/cancel", {
       method: "POST",
-      headers: { "X-Self-Service-Token": selfServiceToken, "Idempotency-Key": crypto.randomUUID() },
+      headers: { "X-Self-Service-Token": selfServiceToken, "Idempotency-Key": guestKey },
     });
     expect(cancelled.status).toBe(200);
 
@@ -178,6 +179,8 @@ describe("C65 each entry's persisted origin", () => {
     expect(rows[0][2]).toMatch(/^key_[0-9a-f]{12}$/);
     expect(rows[1][2]).toBe("Marta Chef");
     expect(rows[2][2]).toBeNull();
+    // The guest's key shows as the guest sent it, without the engine's `public:` prefix, on a booking a key made.
+    expect(body.entries.map((e: any) => e.idempotencyKey)).toEqual(["o-create", "o-modify", guestKey]);
     const text = JSON.stringify(body);
     expect(text).not.toContain("trace-origin@example.com");
     expect(text).not.toContain("ana-o@example.com");

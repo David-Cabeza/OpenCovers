@@ -96,10 +96,10 @@ export async function getReservationTrace(
     rows.filter((e) => e.channel === "staff" && e.actor).map((e) => e.actor as string),
   );
   // The public channel stores its client's key under a `public:` prefix, so the trace shows the key the client sent.
-  const shown = (key: string) => (source === "widget" ? key.replace(/^public:/, "") : key);
-  const keyOf = (type: string, version: number) => {
+  // A guest's cancel of a booking an API key made is public too, so the prefix goes by the entry, not the booking.
+  const keyOf = (type: string, version: number, viaWidget: boolean) => {
     const found = keys.find((k) => k.kind === KEY_KIND[type] && k.version === version);
-    return found ? shown(found.key) : null;
+    return found ? (viaWidget ? found.key.replace(/^public:/, "") : found.key) : null;
   };
 
   return {
@@ -111,7 +111,7 @@ export async function getReservationTrace(
       type: e.type,
       version: e.version,
       occurredAt: e.occurredAt.toISOString(),
-      idempotencyKey: keyOf(e.type, e.version),
+      idempotencyKey: keyOf(e.type, e.version, e.channel === "widget" || (e.channel === null && source === "widget")),
       channel: (e.channel as EventChannel | null) ?? (e.type === "created" ? source : null),
       actor: e.channel === "staff" ? (e.actor ? (names.get(e.actor) ?? null) : null) : e.channel ? e.actor : null,
       recorded: e.channel !== null,
