@@ -19,4 +19,10 @@ export const FLOOR_ITEM_TYPES: Record<string, FloorItemTypeConfig> = {
   rug: { label: "Rug", width: 120, height: 80 },
   "large-plant": { label: "Large plant", width: 64, height: 64 },
   umbrella: { label: "Umbrella", width: 96, height: 96 },
+  host: { label: "Host stand", width: 56, height: 40 },
+  banquette: { label: "Banquette", width: 160, height: 36 },
+  planter: { label: "Planter", width: 120, height: 28 },
+  fireplace: { label: "Fireplace", width: 72, height: 44 },
+  "wine-rack": { label: "Wine rack", width: 96, height: 24 },
+  restroom: { label: "Restroom", width: 40, height: 40 },
 };
