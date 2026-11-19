@@ -1,10 +1,13 @@
-import { and, count, eq, like, sql } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.hoisted(() => {
   process.env.PUBLIC_CHALLENGE_SECRET = "test-secret-for-the-public-form-challenge";
   process.env.PUBLIC_POW_DIFFICULTY = "4";
+  // The operator's own sender. A sandbox always mails with it (audit F12).
+  process.env.RESEND_API_KEY = "re_operator";
+  process.env.RESEND_FROM_EMAIL = "operator@opencovers.test";
 });
 
 import app from "../src/app";
@@ -20,13 +23,13 @@ import {
   user,
   venueMemberships,
   venues,
-  verification,
   webhookEndpoints,
 } from "../src/db/schema";
 import { createAuth, requireVerifiedGoogleEmail } from "../src/lib/auth";
 import { cleanupExpiredSandboxes } from "../src/demo/cleanup";
 import { isDisposableEmail } from "../src/demo/disposable";
-import { consentedLeadsCsv } from "../src/demo/leads";
+import { consentedLeadsCsv, recordConsent } from "../src/demo/leads";
+import { issueSignInChallenge } from "../src/demo/sign-in-challenge";
 import { provisionSandbox } from "../src/demo/provision";
 import { purgeVenue, VENUE_TABLES_IN_DELETE_ORDER } from "../src/demo/purge";
 import { demoSettings } from "../src/demo/settings";
@@ -38,7 +41,12 @@ import { createReservation } from "../src/lib/reservations";
 import { setConfig } from "../src/lib/venue";
 
 const DEMO_ENV = { DEMO_MODE: "1" };
-const demoAuth = createAuth(demoSettings(DEMO_ENV));
+const sent: { to: string; text: string }[] = [];
+const demoAuth = createAuth(demoSettings(DEMO_ENV), {
+  sendMail: async (to, _subject, text) => {
+    sent.push({ to, text });
+  },
+});
 const challengeConfig = challengeConfigFromEnv();
 
 beforeAll(async () => {
@@ -46,7 +54,10 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  sent.length = 0;
   vi.stubEnv("DEMO_MODE", "1");
+  // No test mails anyone: a stray send would otherwise reach the network.
+  vi.stubGlobal("fetch", async () => new Response("{}", { status: 200 }));
   await db.execute(
     sql`TRUNCATE TABLE demo_lead, demo_sandbox, account, session, verification, "user", venue_memberships, sent_emails, waitlist, events, tombstones, idempotency_keys, table_allocations, reservations, guests, guest_audit, self_service_links, grants, api_keys, services, tables, floor_items, webhook_endpoints, venue_online_booking, venues RESTART IDENTITY CASCADE`,
   );
@@ -60,19 +71,22 @@ afterEach(() => {
 let n = 0;
 const freshEmail = () => `visitor-${++n}-${Math.random().toString(36).slice(2, 8)}@example.com`;
 
+/** The headers a sign-in form sends: a challenge old enough to pass the minimum fill time, and its solution. */
+function signInHeaders(extra: Record<string, string> = {}) {
+  const challenge = issueSignInChallenge(Date.now() - 10_000);
+  return new Headers({
+    "x-demo-challenge": JSON.stringify(challenge),
+    "x-demo-solution": solve(challenge),
+    ...extra,
+  });
+}
+
 /** Signs in with a magic link the way a visitor does: ask for it, then open it. Returns the account and its cookie. */
 async function signInWithMagicLink(email: string, headers: Record<string, string> = {}) {
-  await demoAuth.api.signInMagicLink({ body: { email }, headers: new Headers(headers) });
-  const [row] = await db
-    .select({ token: verification.identifier })
-    .from(verification)
-    .where(and(sql`${verification.value}::jsonb ->> 'email' = ${email}`, like(verification.identifier, "magic-link:%")))
-    .limit(1);
-  const res = await demoAuth.api.magicLinkVerify({
-    query: { token: row!.token.replace(/^magic-link:/, "") },
-    headers: new Headers(),
-    asResponse: true,
-  });
+  await demoAuth.api.signInMagicLink({ body: { email }, headers: signInHeaders(headers) });
+  const mail = sent.filter((m) => m.to === email).pop()!;
+  const token = new URL(mail.text.match(/https?:\/\/\S+/)![0]).searchParams.get("token")!;
+  const res = await demoAuth.api.magicLinkVerify({ query: { token }, headers: new Headers(), asResponse: true });
   const cookie = res.headers
     .getSetCookie()
     .map((c) => c.split(";")[0])
@@ -255,9 +269,9 @@ describe("sign-in", () => {
     expect(isDisposableEmail("someone@sub.Mailinator.com")).toBe(true);
     expect(isDisposableEmail("someone@gmail.com")).toBe(false);
     await expect(
-      demoAuth.api.signInMagicLink({ body: { email: "ghost@mailinator.com" }, headers: new Headers() }),
+      demoAuth.api.signInMagicLink({ body: { email: "ghost@mailinator.com" }, headers: signInHeaders() }),
     ).rejects.toMatchObject({ body: { code: "DISPOSABLE_EMAIL" } });
-    expect((await db.select().from(verification)).length).toBe(0);
+    expect(sent).toEqual([]);
     expect((await db.select().from(user)).length).toBe(0);
   });
 
@@ -274,7 +288,7 @@ describe("sign-in", () => {
         body,
       });
     };
-    expect(rulesFor("POST", "/api/auth/sign-in/magic-link", false)).toEqual(["auth", "magic_link"]);
+    expect(rulesFor("POST", "/api/auth/sign-in/magic-link", false)).toEqual(["auth", "magic_link", "magic_link_day", "magic_link_ip"]);
     expect((await ask("a@example.com")).status).toBe(200);
     expect((await ask(" A@Example.com ")).status).toBe(429);
     expect((await ask("b@example.com")).status).toBe(200);
@@ -286,7 +300,7 @@ describe("sign-in", () => {
     expect(requireVerifiedGoogleEmail({ email_verified: true })).toEqual({});
   });
 
-  it("starts Google sign-in with a claim cookie that carries the consent across the redirect", async () => {
+  it("starts Google sign-in without any claim cookie or consent header handling", async () => {
     const google = createAuth(
       demoSettings({ ...DEMO_ENV, GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" }),
     );
@@ -298,54 +312,27 @@ describe("sign-in", () => {
       }),
     );
     expect(res.status).toBe(200);
-    const cookie = res.headers.getSetCookie().find((c) => c.startsWith("oc_demo_claim="));
-    expect(cookie).toBeDefined();
-    const claim = JSON.parse(Buffer.from(cookie!.split(";")[0]!.split("=")[1]!, "base64url").toString());
-    expect(claim).toMatchObject({ consentVersion: "v1", locale: "es" });
+    expect(res.headers.getSetCookie().some((c) => c.startsWith("oc_demo_claim="))).toBe(false);
   });
 });
 
 describe("leads", () => {
-  it("records consent from the request and keeps the account either way", async () => {
-    const yes = freshEmail();
-    const no = freshEmail();
-    await signInWithMagicLink(yes, { "x-demo-consent": "2026-11-v1", "x-demo-locale": "es" });
-    await signInWithMagicLink(no);
-    expect(await sandboxOf(yes)).toBeDefined();
-    expect(await sandboxOf(no)).toBeDefined();
-
-    const [a] = await db.select().from(demoLeads).where(eq(demoLeads.email, yes));
-    expect(a).toMatchObject({ source: "magic-link", locale: "es", contactConsent: true, consentTextVersion: "2026-11-v1" });
-    const [b] = await db.select().from(demoLeads).where(eq(demoLeads.email, no));
-    expect(b).toMatchObject({ contactConsent: false, consentTextVersion: null, locale: "en" });
-  });
-
-  it("does not count a consent claim made for an address nobody opened", async () => {
-    const email = freshEmail();
-    await demoAuth.api.signInMagicLink({ body: { email }, headers: new Headers({ "x-demo-consent": "v1" }) });
+  it("a sign-in alone creates no lead", async () => {
+    await signInWithMagicLink(freshEmail(), { "x-demo-consent": "v1" });
     expect((await db.select().from(demoLeads)).length).toBe(0);
-    expect((await db.select().from(user)).length).toBe(0);
   });
 
-  it("ticking the box on a later sign-in adds consent, unticking never removes it", async () => {
-    const email = freshEmail();
-    await signInWithMagicLink(email);
-    await signInWithMagicLink(email, { "x-demo-consent": "v1" });
-    await signInWithMagicLink(email);
-    const [lead] = await db.select().from(demoLeads).where(eq(demoLeads.email, email));
-    expect(lead).toMatchObject({ contactConsent: true, consentTextVersion: "v1" });
-    expect((await db.select().from(demoLeads)).length).toBe(1);
-  });
-
-  it("exports only consented leads as CSV, and no route returns leads", async () => {
-    await signInWithMagicLink("yes@example.com", { "x-demo-consent": "v1" });
-    await signInWithMagicLink("no@example.com");
+  it("exports only consented, not withdrawn leads as CSV, and no route returns leads", async () => {
+    const consent = { version: "v1", locale: "es", name: null };
+    await recordConsent(db, { email: "yes@example.com", source: "magic-link", consent });
+    await recordConsent(db, { email: "gone@example.com", source: "magic-link", consent });
+    await db.update(demoLeads).set({ withdrawnAt: new Date() }).where(eq(demoLeads.email, "gone@example.com"));
     const csv = await consentedLeadsCsv(db);
     const lines = csv.trim().split("\n");
     expect(lines[0]).toBe("email,name,source,locale,created_at,last_seen_at,consent_text_version");
     expect(lines).toHaveLength(2);
     expect(lines[1]).toMatch(/^yes@example\.com,/);
-    expect(app.routes.some((r) => /lead/i.test(r.path))).toBe(false);
+    expect(app.routes.some((r) => /lead/i.test(r.path) && r.method === "GET")).toBe(false);
   });
 
   it("neutralizes spreadsheet formulas in the export", async () => {
@@ -410,7 +397,7 @@ describe("abuse limits", () => {
     const { account } = await signInWithMagicLink(owner);
     const { venueId } = (await sandboxOf(owner))!;
     await setConfig(db, venueId, { resendApiKey: "re_test", fromEmail: "demo@opencovers.test" });
-    const fetched: { to: string[] }[] = [];
+    const fetched: { to: string[]; from: string }[] = [];
     vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
       fetched.push(JSON.parse(init.body));
       return new Response("{}", { status: 200 });
@@ -424,13 +411,16 @@ describe("abuse limits", () => {
     expect(fetched).toEqual([]);
     await notifyReservation(db, venueId, own.id, own.version, "confirmation");
     expect(fetched.map((f) => f.to)).toEqual([[owner]]);
+    // The visitor's own sender and key were ignored: mail goes out with the operator's (audit F12).
+    expect(fetched[0]!.from).toBe("operator@opencovers.test");
     void account;
   });
 });
 
 describe("lifecycle", () => {
   it("deletes expired sandboxes and their accounts, keeps live ones and every lead", async () => {
-    const old = await signInWithMagicLink(freshEmail(), { "x-demo-consent": "v1" });
+    const old = await signInWithMagicLink(freshEmail());
+    await recordConsent(db, { email: old.account.email, source: "magic-link", consent: { version: "v1", locale: "en", name: null } });
     const fresh = await signInWithMagicLink(freshEmail());
     const oldBox = (await sandboxOf(old.account.email))!;
     const freshBox = (await sandboxOf(fresh.account.email))!;
@@ -449,7 +439,7 @@ describe("lifecycle", () => {
       .where(eq(demoSandboxes.userId, justInside.account.id));
 
     const result = await cleanupExpiredSandboxes(db);
-    expect(result).toEqual({ sandboxes: 1, accounts: 1 });
+    expect(result).toMatchObject({ sandboxes: 1, accounts: 1, orphanAccounts: 0, leads: 0 });
 
     expect(await sandboxOf(old.account.email)).toBeUndefined();
     expect((await db.select().from(user).where(eq(user.id, old.account.id))).length).toBe(0);
@@ -464,21 +454,14 @@ describe("lifecycle", () => {
     expect(await sandboxOf(justInside.account.email)).toBeDefined();
     expect((await db.select({ n: count() }).from(reservations).where(eq(reservations.venueId, freshBox.venueId)))[0]!.n).toBeGreaterThan(0);
 
-    // The leads stay, expired or not, with their consent.
+    // The consented lead stays after its account went: it is the one thing that outlives it (12 months).
     const leads = await db.select().from(demoLeads);
-    expect(leads).toHaveLength(3);
-    expect(leads.find((l) => l.email === old.account.email)?.contactConsent).toBe(true);
+    expect(leads).toHaveLength(1);
+    expect(leads[0]!.email).toBe(old.account.email);
 
     // Signing in again after deletion builds a fresh sandbox.
     await signInWithMagicLink(old.account.email);
     expect(await sandboxOf(old.account.email)).toBeDefined();
-  });
-
-  it("drops claims whose link was never opened", async () => {
-    await demoAuth.api.signInMagicLink({ body: { email: freshEmail() }, headers: new Headers({ "x-demo-consent": "v1" }) });
-    await db.execute(sql`UPDATE verification SET expires_at = now() - interval '1 minute'`);
-    await cleanupExpiredSandboxes(db);
-    expect((await db.select({ n: count() }).from(verification).where(like(verification.identifier, "demo-lead:%")))[0]!.n).toBe(0);
   });
 
   it("deletes from every table that holds a venue_id", async () => {
