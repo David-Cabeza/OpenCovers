@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { errorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -158,6 +159,7 @@ function TablesSection({ venueId }: { venueId: string }) {
   const { data, isPending } = useTables(venueId);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TableInfo | null>(null);
+  const [removing, setRemoving] = useState<TableInfo | null>(null);
   const tables = data?.tables ?? [];
 
   const remove = useMutation({
@@ -168,6 +170,7 @@ function TablesSection({ venueId }: { venueId: string }) {
       toast.success("Table removed");
     },
     onError: (err) => toast.error(errorMessage(err, "Could not remove.")),
+    onSettled: () => setRemoving(null),
   });
 
   return (
@@ -210,7 +213,7 @@ function TablesSection({ venueId }: { venueId: string }) {
                       setEditing(t);
                       setOpen(true);
                     }}
-                    onRemove={() => remove.mutate(t.id)}
+                    onRemove={() => setRemoving(t)}
                   />
                 </div>
               </li>
@@ -218,6 +221,16 @@ function TablesSection({ venueId }: { venueId: string }) {
           </ul>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={removing !== null}
+        title={removing ? `Remove ${removing.name}?` : "Remove table?"}
+        description="It leaves the floor plan and the availability, and this cannot be undone."
+        confirmLabel="Remove table"
+        keepLabel="Keep table"
+        pending={remove.isPending}
+        onConfirm={() => removing && remove.mutate(removing.id)}
+        onClose={() => setRemoving(null)}
+      />
       <TableFormDialog
         venueId={venueId}
         open={open}
