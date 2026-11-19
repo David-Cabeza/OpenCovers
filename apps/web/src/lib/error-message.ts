@@ -33,6 +33,8 @@ export function authErrorMessage(
   if (error?.status !== undefined && error.status >= 500) return t("errors.serverError");
   if (error?.code === "INVALID_INVITATION") return t("errors.api.invalid_invitation");
   if (error?.code && has(authKey(error.code))) return t(authKey(error.code));
+  // The demo challenge endpoint answers in the API's own vocabulary (`invalid_request`), not Better Auth's.
+  if (error?.code && has(apiKey(error.code))) return t(apiKey(error.code));
   return error?.message || fallback;
 }
 
