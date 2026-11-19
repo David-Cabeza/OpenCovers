@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AssignTablesDialog } from "@/components/reservation/assign-tables-dialog";
 import { CancelReservationDialog } from "@/components/reservation/cancel-reservation-dialog";
 import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
+import { ReservationTraceDialog } from "@/components/reservation/reservation-trace-dialog";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useAgenda } from "@/hooks/use-agenda";
@@ -71,6 +72,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const [editing, setEditing] = useState<Reservation | null>(null);
   const [assigning, setAssigning] = useState<Reservation | null>(null);
   const [cancelling, setCancelling] = useState<Reservation | null>(null);
+  const [tracing, setTracing] = useState<Reservation | null>(null);
   const queryClient = useQueryClient();
   const { data, isPending } = useAgenda(venueId, date);
   const reservations = data?.reservations ?? [];
@@ -169,6 +171,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
                     onCancel={() => setCancelling(r)}
                     onStatus={(status) => setStatus.mutate({ id: r.id, status })}
                     onEdit={() => setEditing(r)}
+                    onTrace={() => setTracing(r)}
                   />
                 ))}
               </ul>
@@ -198,6 +201,13 @@ export function AgendaView({ venueId }: { venueId: string }) {
           if (!open) setEditing(null);
         }}
       />
+      <ReservationTraceDialog
+        venueId={venueId}
+        reservation={tracing}
+        onOpenChange={(open) => {
+          if (!open) setTracing(null);
+        }}
+      />
     </div>
   );
 }
@@ -209,6 +219,7 @@ function ReservationRow({
   onCancel,
   onStatus,
   onEdit,
+  onTrace,
 }: {
   reservation: Reservation;
   tableNames: Map<string, string>;
@@ -216,6 +227,7 @@ function ReservationRow({
   onCancel: () => void;
   onStatus: (status: string) => void;
   onEdit: () => void;
+  onTrace: () => void;
 }) {
   const actions = rowActions(reservation.status);
   const canEdit = ["booked", "seated", "attended"].includes(reservation.status);
@@ -244,37 +256,36 @@ function ReservationRow({
           )}
         </div>
       </div>
-      {(actions.length > 0 || canEdit || canAssign) && (
-        <div className="md:order-last">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Reservation actions">
-                <MoreHorizontalIcon className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {actions.map((action) => (
-                <DropdownMenuItem
-                  key={action.label}
-                  onSelect={() =>
-                    action.kind === "cancel" ? onCancel() : onStatus(action.status)
-                  }
-                >
-                  {action.label}
-                </DropdownMenuItem>
-              ))}
-              {canAssign && (
-                <DropdownMenuItem onSelect={onAssign}>
-                  {tableIds.length > 0 ? "Change tables" : "Assign tables"}
-                </DropdownMenuItem>
-              )}
-              {canEdit && (
-                <DropdownMenuItem onSelect={onEdit}>Edit consent, rating and note</DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      )}
+      <div className="md:order-last">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Reservation actions">
+              <MoreHorizontalIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {actions.map((action) => (
+              <DropdownMenuItem
+                key={action.label}
+                onSelect={() =>
+                  action.kind === "cancel" ? onCancel() : onStatus(action.status)
+                }
+              >
+                {action.label}
+              </DropdownMenuItem>
+            ))}
+            {canAssign && (
+              <DropdownMenuItem onSelect={onAssign}>
+                {tableIds.length > 0 ? "Change tables" : "Assign tables"}
+              </DropdownMenuItem>
+            )}
+            {canEdit && (
+              <DropdownMenuItem onSelect={onEdit}>Edit consent, rating and note</DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={onTrace}>View trace</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       <div className="col-span-3 col-start-1 flex flex-wrap items-center gap-x-3 gap-y-2 pl-[calc(3.5rem+0.75rem)] md:contents">
         <span className="inline-flex items-center gap-1.5 text-sm tabular-nums text-muted-foreground">
           <UsersIcon className="size-4" aria-hidden="true" />

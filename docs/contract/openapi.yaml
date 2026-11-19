@@ -371,6 +371,33 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/reservations/{reservationId}/trace:
+    get:
+      operationId: reservation.trace
+      summary: Read how one reservation came to exist and what happened to it
+      description: |
+        Needs any role. `source` is the channel that made the booking:
+        `widget` for the public channel, `staff` for a signed-in member and
+        `api` for an API key, the MCP server included. `actor` is the
+        principal the engine recorded as `bookedVia`. Each entry is one event
+        of the reservation from the feed, oldest first, with the
+        `Idempotency-Key` of the write that produced it, or null when the
+        write carried none (erasure). For a public booking it is the key the
+        client sent. It holds no guest
+        data. Events pruned by retention are absent. A reservation of another
+        venue fails with `reservation_not_found`.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/reservationId"
+      responses:
+        "200":
+          description: The trace
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReservationTrace" }
+        default:
+          $ref: "#/components/responses/Error"
+
   /venues/{venueId}/reservations/{reservationId}/modify:
     post:
       operationId: reservation.modify
@@ -3115,6 +3142,39 @@ components:
         occurredAt:
           type: string
           format: date-time
+
+    ReservationTrace:
+      type: object
+      required: [reservationId, source, actor, entries]
+      properties:
+        reservationId: { type: string }
+        source:
+          type: string
+          enum: [widget, staff, api]
+        actor:
+          type: string
+          description: The principal recorded as `bookedVia`.
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/TraceEntry" }
+
+    TraceEntry:
+      type: object
+      required: [eventId, type, version, occurredAt, idempotencyKey]
+      properties:
+        eventId:
+          type: string
+          description: The id of the event in the feed.
+        type:
+          type: string
+          enum: [created, modified, cancelled, seated, attended, no_show, erased]
+        version: { type: integer }
+        occurredAt:
+          type: string
+          format: date-time
+        idempotencyKey:
+          type: string
+          nullable: true
 
     Role:
       type: string
