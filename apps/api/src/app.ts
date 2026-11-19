@@ -80,6 +80,7 @@ import {
 import { canResend, parseResendEmail, resendLinks } from "./lib/link-resend";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import { demoMode } from "./demo/settings";
+import { demoStatus } from "./demo/status";
 import { magicLinkChallenges } from "./demo/magic-link-challenge";
 import { DemoLimitError } from "./demo/limits";
 import { parseConsent, recordConsent } from "./demo/leads";
@@ -193,6 +194,14 @@ app.use("/v1/*", staffOriginGuard(trustedOrigins));
 app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
 
 app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// The staff app asks this before it shows a sign-in form (ADR-0022). Demo off: `enabled: false` and nothing else.
+// Signed in with a sandbox: that session's own sandbox, and no one else's.
+app.get("/api/demo/status", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  c.header("Cache-Control", "no-store");
+  return c.json(await demoStatus(db, session?.user.id ?? null));
+});
 
 // The hosted demo's own routes (ADR-0022, decision 11), outside docs/contract. They answer 404 unless DEMO_MODE=1.
 app.use("/api/demo/*", staffOriginGuard(trustedOrigins));
