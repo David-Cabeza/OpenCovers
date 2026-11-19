@@ -62,20 +62,32 @@ export function describeChallenge(config: ChallengeConfig, env: Env = process.en
   return { line, warnings };
 }
 
-function sign(secret: Buffer, bookingKey: string, nonce: string, issuedAt: string, difficulty: number): string {
+/**
+ * What a challenge is for. The purpose is part of the signed text, so a challenge issued for one purpose never
+ * verifies for another: a magic-link challenge cannot book a table and a booking challenge cannot mail a link.
+ * `subject` is what the challenge is bound to: the booking key, or the normalized address of a magic link.
+ */
+export type ChallengePurpose = "booking" | "magic-link";
+
+function sign(secret: Buffer, purpose: ChallengePurpose, subject: string, nonce: string, issuedAt: string, difficulty: number): string {
   return createHmac("sha256", secret)
-    .update(`v1\n${bookingKey}\n${nonce}\n${issuedAt}\n${difficulty}`)
+    .update(`v2\n${purpose}\n${subject}\n${nonce}\n${issuedAt}\n${difficulty}`)
     .digest("base64url");
 }
 
-export function issueChallenge(config: ChallengeConfig, bookingKey: string, at: number = Date.now()): FormChallenge {
+export function issueChallenge(
+  config: ChallengeConfig,
+  subject: string,
+  at: number = Date.now(),
+  purpose: ChallengePurpose = "booking",
+): FormChallenge {
   const nonce = randomBytes(16).toString("base64url");
   const issuedAt = new Date(at).toISOString();
   return {
     nonce,
     issuedAt,
     difficulty: config.difficulty,
-    signature: sign(config.secret, bookingKey, nonce, issuedAt, config.difficulty),
+    signature: sign(config.secret, purpose, subject, nonce, issuedAt, config.difficulty),
   };
 }
 
@@ -122,8 +134,23 @@ export function isSolution(value: unknown): value is string {
  * keeps its counters. A nonce is bound to the `Idempotency-Key` that first presented it, so a retry of the same
  * submit passes and replays through the create's idempotency, and any other submit with that nonce is refused.
  */
-export function createChallengeVerifier(config: ChallengeConfig, options: { now?: () => number; maxNonces?: number } = {}) {
+export interface VerifierOptions {
+  now?: () => number;
+  maxNonces?: number;
+  purpose?: ChallengePurpose;
+  /** Booking forms wait 3 seconds before they accept a submit. A magic-link form has no use for that wait. */
+  minAgeMs?: number;
+  maxAgeMs?: number;
+  /** A nonce verifies once, whatever the `idempotencyKey`. A booking retries through its idempotency key instead. */
+  singleUse?: boolean;
+}
+
+export function createChallengeVerifier(config: ChallengeConfig, options: VerifierOptions = {}) {
   const now = options.now ?? Date.now;
+  const purpose = options.purpose ?? "booking";
+  const minAge = options.minAgeMs ?? MIN_AGE_MS;
+  const maxAge = options.maxAgeMs ?? MAX_AGE_MS;
+  const singleUse = options.singleUse ?? false;
   const maxNonces = options.maxNonces ?? MAX_NONCES;
   const seen = new Map<string, { idempotencyKey: string; expiresAt: number }>();
 
@@ -140,22 +167,22 @@ export function createChallengeVerifier(config: ChallengeConfig, options: { now?
     }
   }
 
-  function verify(bookingKey: string, challenge: FormChallenge, solution: string, idempotencyKey: string): boolean {
+  function verify(subject: string, challenge: FormChallenge, solution: string, idempotencyKey = ""): boolean {
     const at = now();
     const issued = Date.parse(challenge.issuedAt);
     if (Number.isNaN(issued) || new Date(issued).toISOString() !== challenge.issuedAt) return false;
     const expected = Buffer.from(
-      sign(config.secret, bookingKey, challenge.nonce, challenge.issuedAt, challenge.difficulty),
+      sign(config.secret, purpose, subject, challenge.nonce, challenge.issuedAt, challenge.difficulty),
     );
     const given = Buffer.from(challenge.signature);
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) return false;
     const age = at - issued;
-    if (age < MIN_AGE_MS || age > MAX_AGE_MS) return false;
+    if (age < minAge || age > maxAge) return false;
     if (!solves(challenge.nonce, solution, challenge.difficulty)) return false;
     const used = seen.get(challenge.nonce);
-    if (used && at < used.expiresAt) return used.idempotencyKey === idempotencyKey;
+    if (used && at < used.expiresAt) return !singleUse && used.idempotencyKey === idempotencyKey;
     if (seen.size >= maxNonces) sweep(at);
-    seen.set(challenge.nonce, { idempotencyKey, expiresAt: issued + MAX_AGE_MS });
+    seen.set(challenge.nonce, { idempotencyKey, expiresAt: issued + maxAge });
     return true;
   }
 
