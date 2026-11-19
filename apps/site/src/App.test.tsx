@@ -62,6 +62,42 @@ describe("public site", () => {
   });
 });
 
+describe("hosted demo link", () => {
+  const live = "https://demo.opencovers.dev";
+
+  async function renderWith(url: string) {
+    vi.resetModules();
+    vi.doMock("../demo.json", () => ({ default: { url } }));
+    const { default: Fresh } = await import("./App");
+    return render(<Fresh />);
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ stargazers_count: 42 }))));
+  });
+
+  it("ships off or pointing at the live demo, nothing else", () => {
+    const file = JSON.parse(readFileSync(resolve(process.cwd(), "demo.json"), "utf8"));
+    expect(["", live]).toContain(file.url);
+  });
+
+  it("shows no demo button while the switch is empty", async () => {
+    await renderWith("");
+    expect(screen.queryByRole("link", { name: "Probar la demo" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Empieza ahora" })).toBeInTheDocument();
+  });
+
+  it("shows the Spanish button with the demo URL when the switch is set", async () => {
+    await renderWith(live);
+    expect(screen.getByRole("link", { name: "Probar la demo" })).toHaveAttribute("href", live);
+  });
+
+  it("keeps a marker in the English page for the build to fill", () => {
+    const html = readFileSync(resolve(process.cwd(), "public/en/index.html"), "utf8");
+    expect(html).toContain("<!--demo-link-->");
+  });
+});
+
 describe("custom domain", () => {
   it("keeps CNAME pointing at opencovers.dev", () => {
     const cname = readFileSync(resolve(process.cwd(), "public/CNAME"), "utf8");

@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import demo from "../demo.json";
 import { notPlanned, phases, today, type Phase, type Today } from "./roadmap";
 
 const REPO = "https://github.com/David-Cabeza/OpenCovers";
 const REPO_API = "https://api.github.com/repos/David-Cabeza/OpenCovers";
+// The hosted demo (ADR-0022). Empty hides every demo link. Set `url` in apps/site/demo.json once the demo is live.
+const DEMO_URL: string = demo.url;
 const d = (ms: number) => ({ "--d": `${ms}ms` }) as CSSProperties;
 
 /* ------------------------------------------------------------------ data */
@@ -307,7 +310,8 @@ function Hero() {
           Motor de reservas open source para restaurantes, con API y servidor MCP.
         </p>
         <div className="acts rv" style={d(180)}>
-          <a className="btn accent" href={`${REPO}#quick-start`}>Empieza ahora</a>
+          {DEMO_URL && <a className="btn accent" href={DEMO_URL}>Probar la demo</a>}
+          <a className={DEMO_URL ? "btn" : "btn accent"} href={`${REPO}#quick-start`}>Empieza ahora</a>
           <a className="btn ghost" href={REPO}>Ver en GitHub</a>
         </div>
         <p className="status rv" style={d(260)}>Pre-alfa · Apache-2.0 · 18 herramientas MCP</p>
