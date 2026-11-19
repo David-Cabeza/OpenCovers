@@ -4,6 +4,7 @@ import { LoadError } from "@/components/load-error";
 import { ServerBanner } from "@/components/server-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVenues } from "@/hooks/use-venues";
+import { useT } from "@/i18n";
 import { useUiStore } from "@/stores/ui-store";
 import { AgendaView } from "./agenda/agenda-view";
 import { AvailabilityView } from "./availability/availability-view";
@@ -19,6 +20,7 @@ import { EmptyVenues } from "./venue/empty-venues";
 import { WaitlistView } from "./waitlist/waitlist-view";
 
 export function Dashboard() {
+  const t = useT();
   const { data: session } = authClient.useSession();
   const { data, isPending, isError, error, isRefetching, refetch } = useVenues();
   const venueId = useUiStore((s) => s.venueId);
@@ -55,7 +57,7 @@ export function Dashboard() {
     return () => {
       document.title = "OpenCovers";
     };
-  }, [active, venueName]);
+  }, [active, venueName, t]);
 
   const mainRef = useRef<HTMLElement>(null);
 
@@ -71,7 +73,7 @@ export function Dashboard() {
           }}
           className="sr-only z-50 rounded-md bg-primary text-sm font-medium text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:px-4 focus:py-2 focus:shadow-lg"
         >
-          Skip to content
+          {t("layout.skipToContent")}
         </a>
         <Sidebar active={active} onSelect={setActive} role={role} />
         <MobileNav
@@ -96,7 +98,7 @@ export function Dashboard() {
                 <Skeleton className="h-64 w-full" />
               </div>
             ) : isError && !data ? (
-              <LoadError what="your venues" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+              <LoadError title={t("layout.dashboard.loadVenues")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
             ) : venues.length === 0 ? (
               <EmptyVenues />
             ) : venueId ? (

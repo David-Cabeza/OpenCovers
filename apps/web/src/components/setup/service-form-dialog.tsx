@@ -1,4 +1,5 @@
 import { errorMessage } from "@/lib/error-message";
+import { useT } from "@/i18n";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -36,6 +37,7 @@ export function ServiceFormDialog({
   onOpenChange,
   initial,
 }: ServiceFormDialogProps) {
+  const t = useT();
   const queryClient = useQueryClient();
   const editing = Boolean(initial);
   const [days, setDays] = useState<number[]>(ALL_WEEKDAYS);
@@ -81,10 +83,10 @@ export function ServiceFormDialog({
       });
       await queryClient.invalidateQueries({ queryKey: ["services", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
-      toast.success(editing ? "Service updated" : "Service added");
+      toast.success(editing ? t("setup.service.updated") : t("setup.service.added"));
       onOpenChange(false);
     } catch (err) {
-      toast.error(errorMessage(err, "Could not save the service."));
+      toast.error(errorMessage(err, t("setup.service.saveFailed")));
     }
   }
 
@@ -92,22 +94,20 @@ export function ServiceFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit service" : "Add service"}</DialogTitle>
+          <DialogTitle>{editing ? t("setup.service.editTitle") : t("setup.service.addTitle")}</DialogTitle>
           <DialogDescription>
-            {editing
-              ? "Update the service's hours and days."
-              : "Add a service such as lunch or dinner."}
+            {editing ? t("setup.service.editDescription") : t("setup.service.addDescription")}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="service-name">Name</Label>
+            <Label htmlFor="service-name">{t("setup.form.name")}</Label>
             <Input
               id="service-name"
-              placeholder="dinner"
+              placeholder={t("setup.service.namePlaceholder")}
               disabled={editing}
-              {...register("name", { required: "Name is required." })}
+              {...register("name", { required: t("setup.form.nameRequired") })}
             />
             {errors.name && (
               <p className="text-sm text-destructive">{errors.name.message}</p>
@@ -116,22 +116,22 @@ export function ServiceFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="service-open">Opens</Label>
+              <Label htmlFor="service-open">{t("setup.service.opens")}</Label>
               <Input
                 id="service-open"
                 type="time"
-                {...register("openStart", { required: "Opening time is required." })}
+                {...register("openStart", { required: t("setup.service.openRequired") })}
               />
               {errors.openStart && (
                 <p className="text-sm text-destructive">{errors.openStart.message}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="service-close">Closes</Label>
+              <Label htmlFor="service-close">{t("setup.service.closes")}</Label>
               <Input
                 id="service-close"
                 type="time"
-                {...register("openEnd", { required: "Closing time is required." })}
+                {...register("openEnd", { required: t("setup.service.closeRequired") })}
               />
               {errors.openEnd && (
                 <p className="text-sm text-destructive">{errors.openEnd.message}</p>
@@ -140,7 +140,7 @@ export function ServiceFormDialog({
           </div>
 
           <fieldset className="space-y-2">
-            <legend className="text-sm font-medium">Days</legend>
+            <legend className="text-sm font-medium">{t("setup.service.days")}</legend>
             <div className="flex flex-wrap gap-2">
               {WEEKDAYS.map((d) => (
                 <label
@@ -160,17 +160,17 @@ export function ServiceFormDialog({
             </div>
             {daysError && (
               <p role="alert" className="text-sm text-destructive">
-                Pick at least one day.
+                {t("setup.service.daysRequired")}
               </p>
             )}
           </fieldset>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving…" : editing ? "Save changes" : "Add service"}
+              {isSubmitting ? t("common.saving") : editing ? t("setup.form.saveChanges") : t("setup.services.add")}
             </Button>
           </DialogFooter>
         </form>

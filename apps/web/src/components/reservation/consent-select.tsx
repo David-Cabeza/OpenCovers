@@ -5,12 +5,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { t, useT } from "@/i18n";
 import type { Consent } from "@/lib/api";
 
-export const CONSENT_OPTIONS: { value: Consent; label: string }[] = [
-  { value: "unknown", label: "Not asked" },
-  { value: "granted", label: "Granted" },
-  { value: "denied", label: "Denied" },
+// `label` is a getter, so the text is read when it is shown and follows the language.
+export const CONSENT_OPTIONS: { value: Consent; readonly label: string }[] = [
+  { value: "unknown", get label() { return t("common.consent.unknown"); } },
+  { value: "granted", get label() { return t("common.consent.granted"); } },
+  { value: "denied", get label() { return t("common.consent.denied"); } },
 ];
 
 export function ConsentSelect({
@@ -23,6 +25,7 @@ export function ConsentSelect({
   value: Consent;
   onChange: (value: Consent) => void;
 }) {
+  useT();
   return (
     <Select value={value} onValueChange={(v) => onChange(v as Consent)}>
       <SelectTrigger id={id} className="w-full">

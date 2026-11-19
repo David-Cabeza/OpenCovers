@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAvailability } from "@/hooks/use-availability";
+import { useT } from "@/i18n";
 import { longDate, todayIso } from "@/lib/date";
 import type { AvailabilitySlot } from "@/lib/api";
 import { SlotExplanation } from "@/components/availability/slot-explanation";
 import { NewReservationDialog } from "@/components/reservation/new-reservation-dialog";
 
 export function AvailabilityView({ venueId }: { venueId: string }) {
+  const t = useT();
   const nav = useNavigation();
   const [date, setDate] = useState(todayIso());
   const [partySize, setPartySize] = useState(2);
@@ -27,11 +29,10 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Availability"
+        title={t("availability.title")}
         description={
           <>
-            <span className="first-letter:uppercase">{longDate(date)}</span> · Pick a free time to
-            book a table for {partySize} {partySize === 1 ? "guest" : "guests"}.
+            <span className="first-letter:uppercase">{longDate(date)}</span> · {t("availability.subtitle", { count: partySize })}
           </>
         }
         actions={
@@ -41,7 +42,7 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
               <Button
                 variant="outline"
                 size="icon"
-                aria-label="Fewer guests"
+                aria-label={t("availability.fewerGuests")}
                 disabled={partySize <= 1}
                 onClick={() => setPartySize((n) => Math.max(1, n - 1))}
               >
@@ -53,12 +54,12 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
                 value={partySize}
                 onChange={(e) => setPartySize(Math.max(1, Math.floor(Number(e.target.value)) || 1))}
                 className="w-16 text-center tabular-nums"
-                aria-label="Party size"
+                aria-label={t("availability.partySize")}
               />
               <Button
                 variant="outline"
                 size="icon"
-                aria-label="More guests"
+                aria-label={t("availability.moreGuests")}
                 onClick={() => setPartySize((n) => n + 1)}
               >
                 <PlusIcon />
@@ -71,16 +72,16 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
       {isPending ? (
         <Skeleton className="h-64 w-full" />
       ) : isError && !data ? (
-        <LoadError what="availability" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+        <LoadError what={t("availability.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : services.length === 0 ? (
         <EmptyState
           icon={CalendarXIcon}
-          title="No services configured"
-          description="Add services under Settings to see free tables."
+          title={t("availability.empty.title")}
+          description={t("availability.empty.description")}
           action={
             nav && canEditSetup(nav.role) ? (
               <Button className="mt-2" onClick={() => nav.goTo("setup", "services")}>
-                Add services
+                {t("availability.empty.action")}
               </Button>
             ) : undefined
           }
@@ -128,13 +129,14 @@ function ServiceSlots({
   slots: AvailabilitySlot[];
   onSelect: (time: string) => void;
 }) {
+  const t = useT();
   const free = slots.filter((s) => s.available).length;
   return (
     <section className="space-y-2">
       <div className="flex items-baseline justify-between gap-3 px-1">
         <h2 className="font-display text-lg first-letter:uppercase">{service}</h2>
         <span className="text-sm text-muted-foreground tabular-nums">
-          {free} of {slots.length} free
+          {t("availability.freeOf", { free, total: slots.length })}
         </span>
       </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2 rounded-xl border bg-card p-4">

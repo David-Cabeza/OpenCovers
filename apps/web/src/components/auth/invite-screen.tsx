@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 import { errorMessage } from "@/lib/error-message";
+import { useT } from "@/i18n";
 import { useUiStore } from "@/stores/ui-store";
 import { SignInForm } from "./sign-in-form";
 import { SignUpForm } from "./sign-up-form";
@@ -18,6 +19,7 @@ function Shell({
   description: string;
   children: ReactNode;
 }) {
+  const t = useT();
   return (
     <main className="flex min-h-dvh items-center justify-center p-6">
       <div className="w-full max-w-sm">
@@ -27,7 +29,7 @@ function Shell({
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>You are invited</CardTitle>
+            <CardTitle>{t("auth.invite.title")}</CardTitle>
             <CardDescription>{description}</CardDescription>
           </CardHeader>
           <CardContent>{children}</CardContent>
@@ -39,17 +41,18 @@ function Shell({
 
 /** A signed-out visitor with an invitation: sign up with the token, or sign in and join. */
 export function InviteSignedOut({ token, onDone }: { token: string; onDone: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   function signedUp() {
     void queryClient.invalidateQueries({ queryKey: ["venues"] });
     onDone();
   }
   return (
-    <Shell description="Create your account to join the venue.">
+    <Shell description={t("auth.invite.signedOutDescription")}>
       <Tabs defaultValue="sign-up">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="sign-up">Sign up</TabsTrigger>
-          <TabsTrigger value="sign-in">I have an account</TabsTrigger>
+          <TabsTrigger value="sign-up">{t("auth.tab.signUp")}</TabsTrigger>
+          <TabsTrigger value="sign-in">{t("auth.invite.haveAccount")}</TabsTrigger>
         </TabsList>
         <TabsContent value="sign-up">
           <SignUpForm invitationToken={token} onSuccess={signedUp} />
@@ -64,6 +67,7 @@ export function InviteSignedOut({ token, onDone }: { token: string; onDone: () =
 
 /** A signed-in user with an invitation: one click redeems it. */
 export function InviteJoin({ token, onDone }: { token: string; onDone: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const setVenue = useUiStore((s) => s.setVenue);
   const [pending, setPending] = useState(false);
@@ -76,16 +80,16 @@ export function InviteJoin({ token, onDone }: { token: string; onDone: () => voi
       const { membership } = await api.redeemInvitation(token);
       await queryClient.invalidateQueries({ queryKey: ["venues"] });
       setVenue(membership.venueId);
-      toast.success("You joined the venue.");
+      toast.success(t("auth.invite.joined"));
       onDone();
     } catch (err) {
-      setError(errorMessage(err, "Could not join the venue."));
+      setError(errorMessage(err, t("auth.invite.joinFailed")));
       setPending(false);
     }
   }
 
   return (
-    <Shell description="Join the venue with the account you are signed in with.">
+    <Shell description={t("auth.invite.joinDescription")}>
       <div className="space-y-4">
         {error && (
           <p role="alert" className="text-sm text-destructive">
@@ -93,10 +97,10 @@ export function InviteJoin({ token, onDone }: { token: string; onDone: () => voi
           </p>
         )}
         <Button className="w-full" onClick={join} disabled={pending}>
-          {pending ? "Joining…" : "Join"}
+          {pending ? t("auth.invite.joining") : t("auth.invite.join")}
         </Button>
         <Button variant="ghost" className="w-full" onClick={onDone} disabled={pending}>
-          Not now
+          {t("auth.invite.notNow")}
         </Button>
       </div>
     </Shell>

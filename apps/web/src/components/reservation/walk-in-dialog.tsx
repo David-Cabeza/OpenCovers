@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConsentSelect } from "@/components/reservation/consent-select";
+import { useT } from "@/i18n";
 import { api, type Consent } from "@/lib/api";
 
 interface WalkInValues {
@@ -37,6 +38,7 @@ export function WalkInDialog({
   tableId?: string;
   tableName?: string;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const {
     register,
@@ -64,10 +66,10 @@ export function WalkInDialog({
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["floor", venueId] });
-      toast.success("Guest seated");
+      toast.success(t("reservation.walkIn.done"));
       onOpenChange(false);
     } catch (err) {
-      toast.error(errorMessage(err, "Could not seat the guest."));
+      toast.error(errorMessage(err, t("reservation.walkIn.failed")));
     }
   }
 
@@ -75,25 +77,25 @@ export function WalkInDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{tableName ? `Seat at ${tableName}` : "Walk-in"}</DialogTitle>
+          <DialogTitle>{tableName ? t("reservation.walkIn.titleAtTable", { table: tableName }) : t("reservation.walkIn.title")}</DialogTitle>
           <DialogDescription>
             {tableName
-              ? `Seat a guest who just arrived at ${tableName}.`
-              : "Seat a guest who just arrived. The engine assigns a table."}
+              ? t("reservation.walkIn.descriptionAtTable", { table: tableName })
+              : t("reservation.walkIn.description")}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="walkin-party">Party size</Label>
+            <Label htmlFor="walkin-party">{t("reservation.partySize")}</Label>
             <Input
               id="walkin-party"
               type="number"
               min={1}
               {...register("partySize", {
-                required: "Party size is required.",
+                required: t("reservation.partySizeRequired"),
                 valueAsNumber: true,
-                min: { value: 1, message: "At least one guest." },
+                min: { value: 1, message: t("reservation.atLeastOne") },
               })}
             />
             {errors.partySize && (
@@ -103,17 +105,21 @@ export function WalkInDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="walkin-name">Guest name</Label>
-              <Input id="walkin-name" placeholder="Jane Doe" {...register("name")} />
+              <Label htmlFor="walkin-name">{t("reservation.guestName")}</Label>
+              <Input id="walkin-name" placeholder={t("reservation.guestNamePlaceholder")} {...register("name")} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="walkin-contact">Contact</Label>
-              <Input id="walkin-contact" placeholder="jane@example.com" {...register("contact")} />
+              <Label htmlFor="walkin-contact">{t("reservation.contact")}</Label>
+              <Input
+                id="walkin-contact"
+                placeholder="jane@example.com" // i18n-ok
+                {...register("contact")}
+              />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="walkin-consent">Contact consent</Label>
+            <Label htmlFor="walkin-consent">{t("reservation.contactConsent")}</Label>
             <Controller
               name="consent"
               control={control}
@@ -125,10 +131,10 @@ export function WalkInDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Seating…" : "Seat guest"}
+              {isSubmitting ? t("reservation.walkIn.seating") : t("reservation.walkIn.seat")}
             </Button>
           </DialogFooter>
         </form>

@@ -13,12 +13,14 @@ import { Pill } from "@/components/pill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stat } from "@/components/stat";
 import { useWaitlist } from "@/hooks/use-waitlist";
+import { useT } from "@/i18n";
 import { api, type WaitlistEntry } from "@/lib/api";
 import { elapsed } from "@/lib/date";
 import { guestInitials } from "@/lib/format";
 import { AddWaitlistDialog } from "./add-waitlist-dialog";
 
 export function WaitlistView({ venueId }: { venueId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data, isPending, isError, error, isRefetching, refetch } = useWaitlist(venueId);
   const [addOpen, setAddOpen] = useState(false);
@@ -35,30 +37,30 @@ export function WaitlistView({ venueId }: { venueId: string }) {
   const seat = useMutation({
     mutationFn: (id: string) => api.seatWaitlist(venueId, id),
     onSuccess: () => {
-      toast.success("Guest seated");
+      toast.success(t("waitlist.seated"));
       invalidate();
     },
-    onError: (err) => toast.error(errorMessage(err, "Could not seat.")),
+    onError: (err) => toast.error(errorMessage(err, t("waitlist.seatFailed"))),
   });
 
   const cancel = useMutation({
     mutationFn: (id: string) => api.cancelWaitlist(venueId, id),
     onSuccess: () => {
-      toast.success("Removed from the waitlist");
+      toast.success(t("waitlist.removed"));
       invalidate();
     },
-    onError: (err) => toast.error(errorMessage(err, "Could not remove.")),
+    onError: (err) => toast.error(errorMessage(err, t("waitlist.removeFailed"))),
     onSettled: () => setRemoving(null),
   });
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Waitlist"
-        description="Guests waiting for a table, longest wait first."
+        title={t("waitlist.title")}
+        description={t("waitlist.subtitle")}
         actions={
           <Button onClick={() => setAddOpen(true)}>
-            <PlusIcon /> Add
+            <PlusIcon /> {t("common.add")}
           </Button>
         }
       />
@@ -73,19 +75,19 @@ export function WaitlistView({ venueId }: { venueId: string }) {
           <Skeleton className="h-32 w-full" />
         </div>
       ) : isError && !data ? (
-        <LoadError what="the waitlist" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+        <LoadError what={t("waitlist.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : entries.length === 0 ? (
         <EmptyState
           icon={ArmchairIcon}
-          title="No one is waiting"
-          description="Add a guest when the room is full and a table will open up."
+          title={t("waitlist.empty.title")}
+          description={t("waitlist.empty.description")}
         />
       ) : (
         <>
           <div className="grid grid-cols-3 gap-3">
-            <Stat label="Parties" value={entries.length} />
-            <Stat label="Guests" value={entries.reduce((n, e) => n + e.partySize, 0)} />
-            <Stat label="Longest wait" value={elapsed(entries[0].createdAt)} />
+            <Stat label={t("waitlist.stat.parties")} value={entries.length} />
+            <Stat label={t("waitlist.stat.guests")} value={entries.reduce((n, e) => n + e.partySize, 0)} />
+            <Stat label={t("waitlist.stat.longestWait")} value={elapsed(entries[0].createdAt)} />
           </div>
 
           <ol className="divide-y overflow-hidden rounded-xl border bg-card">
@@ -104,10 +106,16 @@ export function WaitlistView({ venueId }: { venueId: string }) {
 
       <ConfirmDialog
         open={removing !== null}
-        title={removing ? `Remove ${removing.guestName || "this guest"} from the waitlist?` : "Remove from the waitlist?"}
-        description="They lose their place in the queue. Add them again if they come back."
-        confirmLabel="Remove from waitlist"
-        keepLabel="Keep on waitlist"
+        title={
+          removing
+            ? removing.guestName
+              ? t("waitlist.removeTitleNamed", { name: removing.guestName })
+              : t("waitlist.removeTitleGuest")
+            : t("waitlist.removeTitle")
+        }
+        description={t("waitlist.removeDescription")}
+        confirmLabel={t("waitlist.removeConfirm")}
+        keepLabel={t("waitlist.keep")}
         pending={cancel.isPending}
         onConfirm={() => removing && cancel.mutate(removing.id)}
         onClose={() => setRemoving(null)}
@@ -128,13 +136,14 @@ function WaitlistRow({
   onSeat: () => void;
   onRemove: () => void;
 }) {
+  const t = useT();
   return (
     <li
       data-slot="waitlist-row"
       className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-muted/40 md:grid-cols-[2rem_minmax(0,1fr)_4rem_7rem_8rem_auto] md:gap-x-4"
     >
       <span
-        aria-label={`Position ${position}`}
+        aria-label={t("waitlist.position", { position })}
         className="flex size-8 items-center justify-center rounded-full bg-muted font-display text-sm tabular-nums"
       >
         {position}
@@ -152,20 +161,20 @@ function WaitlistRow({
       </div>
       <div className="flex items-center justify-end gap-1 md:order-last">
         <Button variant="outline" size="sm" onClick={onSeat}>
-          Seat
+          {t("waitlist.seat")}
         </Button>
-        <Button variant="ghost" size="icon" aria-label="Remove from the waitlist" onClick={onRemove}>
+        <Button variant="ghost" size="icon" aria-label={t("waitlist.remove")} onClick={onRemove}>
           <Trash2Icon className="size-4" />
         </Button>
       </div>
       <div className="col-span-3 col-start-1 flex flex-wrap items-center gap-x-4 gap-y-2 pl-[calc(2rem+0.75rem)] md:contents">
         <span className="inline-flex items-center gap-1.5 text-sm tabular-nums text-muted-foreground">
           <UsersIcon className="size-4" aria-hidden="true" />
-          <span className="sr-only">Party of </span>
-          {entry.partySize}
+          <span className="sr-only">{t("common.partyOf", { count: entry.partySize })}</span>
+          <span aria-hidden="true">{entry.partySize}</span>
         </span>
         <span className="text-sm text-muted-foreground tabular-nums">
-          Waiting <span className="font-medium text-foreground">{elapsed(entry.createdAt)}</span>
+          {t("waitlist.waiting")} <span className="font-medium text-foreground">{elapsed(entry.createdAt)}</span>
         </span>
         {entry.zone ? (
           <Pill tone="muted">{entry.zone}</Pill>

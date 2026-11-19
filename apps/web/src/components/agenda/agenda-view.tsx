@@ -30,27 +30,28 @@ import { EmptyState } from "@/components/empty-state";
 import { LoadError } from "@/components/load-error";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useTables } from "@/hooks/use-tables";
+import { useT, type MessageKey } from "@/i18n";
 import { api, type Reservation } from "@/lib/api";
 import { longDate, todayIso } from "@/lib/date";
 import { errorMessage, isApiError } from "@/lib/error-message";
 import { guestInitials } from "@/lib/format";
 
 type RowAction =
-  | { kind: "status"; label: string; status: string }
-  | { kind: "cancel"; label: string };
+  | { kind: "status"; labelKey: MessageKey; status: string }
+  | { kind: "cancel"; labelKey: MessageKey };
 
 function rowActions(status: string): RowAction[] {
   switch (status) {
     case "booked":
       return [
-        { kind: "status", label: "Seat", status: "seated" },
-        { kind: "status", label: "No-show", status: "no_show" },
-        { kind: "cancel", label: "Cancel" },
+        { kind: "status", labelKey: "agenda.action.seat", status: "seated" },
+        { kind: "status", labelKey: "common.status.noShow", status: "no_show" },
+        { kind: "cancel", labelKey: "common.cancel" },
       ];
     case "seated":
       return [
-        { kind: "status", label: "Mark attended", status: "attended" },
-        { kind: "cancel", label: "Cancel" },
+        { kind: "status", labelKey: "agenda.action.markAttended", status: "attended" },
+        { kind: "cancel", labelKey: "common.cancel" },
       ];
     default:
       return [];
@@ -68,6 +69,7 @@ function groupByService(reservations: Reservation[]) {
 }
 
 export function AgendaView({ venueId }: { venueId: string }) {
+  const t = useT();
   const [date, setDate] = useState(todayIso());
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [editing, setEditing] = useState<Reservation | null>(null);
@@ -78,7 +80,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const { data, isPending, isError, error, isRefetching, refetch } = useAgenda(venueId, date);
   const reservations = data?.reservations ?? [];
   const { data: tablesData } = useTables(venueId);
-  const tableNames = new Map((tablesData?.tables ?? []).map((t) => [t.id, t.name]));
+  const tableNames = new Map((tablesData?.tables ?? []).map((table) => [table.id, table.name]));
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
@@ -88,10 +90,10 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const cancel = useMutation({
     mutationFn: (id: string) => api.cancelReservation(venueId, id),
     onSuccess: () => {
-      toast.success("Reservation cancelled");
+      toast.success(t("agenda.cancelled"));
       invalidate();
     },
-    onError: (err) => toast.error(errorMessage(err, "Could not cancel.")),
+    onError: (err) => toast.error(errorMessage(err, t("agenda.cancelFailed"))),
     onSettled: () => setCancelling(null),
   });
 
@@ -101,12 +103,12 @@ export function AgendaView({ venueId }: { venueId: string }) {
     onSuccess: () => invalidate(),
     onError: (err, { id }) => {
       if (isApiError(err, "table_required")) {
-        toast.error(errorMessage(err, "Assign a table first."));
+        toast.error(errorMessage(err, t("agenda.assignFirst")));
         const reservation = reservations.find((r) => r.id === id);
         if (reservation) setAssigning(reservation);
         return;
       }
-      toast.error(errorMessage(err, "Could not update."));
+      toast.error(errorMessage(err, t("agenda.updateFailed")));
     },
   });
 
@@ -119,12 +121,12 @@ export function AgendaView({ venueId }: { venueId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Agenda"
+        title={t("agenda.title")}
         description={<span className="first-letter:uppercase">{longDate(date)}</span>}
         actions={
           <>
             <DayNav date={date} onChange={setDate} />
-            <Button onClick={() => setWalkInOpen(true)}>Walk-in</Button>
+            <Button onClick={() => setWalkInOpen(true)}>{t("agenda.walkIn")}</Button>
           </>
         }
       />
@@ -139,29 +141,29 @@ export function AgendaView({ venueId }: { venueId: string }) {
           <Skeleton className="h-64 w-full" />
         </div>
       ) : isError && !data ? (
-        <LoadError what="the agenda" error={error} retrying={isRefetching} onRetry={() => void refetch()} />
+        <LoadError what={t("agenda.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : reservations.length === 0 ? (
         <EmptyState
           icon={CalendarPlusIcon}
-          title="No reservations"
-          description="Nothing booked for this day yet."
+          title={t("agenda.empty.title")}
+          description={t("agenda.empty.description")}
         />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Stat label="Reservations" value={active.length} />
-            <Stat label="Covers" value={active.reduce((n, r) => n + r.partySize, 0)} />
-            <Stat label="Now seated" value={active.filter((r) => r.status === "seated").length} />
-            <Stat label="Needs table" value={needTable} tone={needTable > 0 ? "danger" : "default"} />
+            <Stat label={t("agenda.stat.reservations")} value={active.length} />
+            <Stat label={t("agenda.stat.covers")} value={active.reduce((n, r) => n + r.partySize, 0)} />
+            <Stat label={t("agenda.stat.seated")} value={active.filter((r) => r.status === "seated").length} />
+            <Stat label={t("agenda.stat.needsTable")} value={needTable} tone={needTable > 0 ? "danger" : "default"} />
           </div>
 
           {groups.map((group) => (
             <section key={group.service} className="space-y-2">
               <div className="flex items-baseline justify-between gap-3 px-1">
-                <h2 className="font-display text-lg first-letter:uppercase">{group.service || "Service"}</h2>
+                <h2 className="font-display text-lg first-letter:uppercase">{group.service || t("agenda.service")}</h2>
                 <span className="text-sm text-muted-foreground tabular-nums">
-                  {group.items.length} {group.items.length === 1 ? "booking" : "bookings"} ·{" "}
-                  {group.items.reduce((n, r) => n + r.partySize, 0)} covers
+                  {t("agenda.bookings", { count: group.items.length })} ·{" "}
+                  {t("agenda.covers", { count: group.items.reduce((n, r) => n + r.partySize, 0) })}
                 </span>
               </div>
               <ul className="divide-y overflow-hidden rounded-xl border bg-card">
@@ -232,6 +234,7 @@ function ReservationRow({
   onEdit: () => void;
   onTrace: () => void;
 }) {
+  const t = useT();
   const actions = rowActions(reservation.status);
   const canEdit = ["booked", "seated", "attended"].includes(reservation.status);
   const canAssign = ["booked", "seated"].includes(reservation.status);
@@ -262,45 +265,45 @@ function ReservationRow({
       <div className="md:order-last">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Reservation actions">
+            <Button variant="ghost" size="icon" aria-label={t("agenda.rowActions")}>
               <MoreHorizontalIcon className="size-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {actions.map((action) => (
               <DropdownMenuItem
-                key={action.label}
+                key={action.labelKey}
                 onSelect={() =>
                   action.kind === "cancel" ? onCancel() : onStatus(action.status)
                 }
               >
-                {action.label}
+                {t(action.labelKey)}
               </DropdownMenuItem>
             ))}
             {canAssign && (
               <DropdownMenuItem onSelect={onAssign}>
-                {tableIds.length > 0 ? "Change tables" : "Assign tables"}
+                {tableIds.length > 0 ? t("agenda.changeTables") : t("agenda.assignTables")}
               </DropdownMenuItem>
             )}
             {canEdit && (
-              <DropdownMenuItem onSelect={onEdit}>Edit consent, rating and note</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onEdit}>{t("agenda.editDetails")}</DropdownMenuItem>
             )}
-            <DropdownMenuItem onSelect={onTrace}>View trace</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onTrace}>{t("agenda.viewTrace")}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
       <div className="col-span-3 col-start-1 flex flex-wrap items-center gap-x-3 gap-y-2 pl-[calc(3.5rem+0.75rem)] md:contents">
         <span className="inline-flex items-center gap-1.5 text-sm tabular-nums text-muted-foreground">
           <UsersIcon className="size-4" aria-hidden="true" />
-          <span className="sr-only">Party of </span>
-          {reservation.partySize}
+          <span className="sr-only">{t("common.partyOf", { count: reservation.partySize })}</span>
+          <span aria-hidden="true">{reservation.partySize}</span>
         </span>
         <span className="text-sm">
           {tableIds.length > 0 ? (
             tableIds.map((id) => tableNames.get(id) ?? id).join(", ")
           ) : canAssign ? (
             <Badge variant="outline" className="border-transparent bg-danger-soft text-destructive">
-              Unassigned
+              {t("agenda.unassigned")}
             </Badge>
           ) : (
             <span className="text-muted-foreground">-</span>

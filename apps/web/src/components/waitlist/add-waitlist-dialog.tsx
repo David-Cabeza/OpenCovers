@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useT } from "@/i18n";
 import { api } from "@/lib/api";
 
 interface AddWaitlistValues {
@@ -31,6 +32,7 @@ export function AddWaitlistDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const {
     register,
@@ -53,10 +55,10 @@ export function AddWaitlistDialog({
         },
       });
       await queryClient.invalidateQueries({ queryKey: ["waitlist", venueId] });
-      toast.success("Added to the waitlist");
+      toast.success(t("waitlist.add.added"));
       onOpenChange(false);
     } catch (err) {
-      toast.error(errorMessage(err, "Could not add to the waitlist."));
+      toast.error(errorMessage(err, t("waitlist.add.failed")));
     }
   }
 
@@ -64,23 +66,23 @@ export function AddWaitlistDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add to waitlist</DialogTitle>
+          <DialogTitle>{t("waitlist.add.title")}</DialogTitle>
           <DialogDescription>
-            Hold a table for a guest until one frees up.
+            {t("waitlist.add.description")}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="wl-party">Party size</Label>
+            <Label htmlFor="wl-party">{t("waitlist.add.partySize")}</Label>
             <Input
               id="wl-party"
               type="number"
               min={1}
               {...register("partySize", {
-                required: "Party size is required.",
+                required: t("waitlist.add.partySizeRequired"),
                 valueAsNumber: true,
-                min: { value: 1, message: "At least one guest." },
+                min: { value: 1, message: t("waitlist.add.partySizeMin") },
               })}
             />
             {errors.partySize && (
@@ -90,21 +92,25 @@ export function AddWaitlistDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="wl-name">Guest name</Label>
-              <Input id="wl-name" placeholder="Jane Doe" {...register("name")} />
+              <Label htmlFor="wl-name">{t("waitlist.add.name")}</Label>
+              <Input id="wl-name" placeholder={t("waitlist.add.namePlaceholder")} {...register("name")} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="wl-contact">Contact</Label>
-              <Input id="wl-contact" placeholder="jane@example.com" {...register("contact")} />
+              <Label htmlFor="wl-contact">{t("waitlist.add.contact")}</Label>
+              <Input
+                id="wl-contact"
+                placeholder="jane@example.com" // i18n-ok
+                {...register("contact")}
+              />
             </div>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Adding…" : "Add to waitlist"}
+              {isSubmitting ? t("waitlist.add.adding") : t("waitlist.add.title")}
             </Button>
           </DialogFooter>
         </form>

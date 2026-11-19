@@ -1,4 +1,5 @@
 import { errorMessage } from "@/lib/error-message";
+import { useT } from "@/i18n";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckIcon, CopyIcon } from "lucide-react";
@@ -31,6 +32,7 @@ export function CreateKeyDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [generated, setGenerated] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -61,51 +63,49 @@ export function CreateKeyDialog({
       await queryClient.invalidateQueries({ queryKey: ["keys", venueId] });
       setGenerated(key);
     } catch (err) {
-      toast.error(errorMessage(err, "Could not create the key."));
+      toast.error(errorMessage(err, t("setup.keys.createFailed")));
     }
   }
 
   async function copy() {
     await navigator.clipboard.writeText(generated as string);
     setCopied(true);
-    toast.success("Key copied");
+    toast.success(t("setup.keys.copied"));
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New API key</DialogTitle>
-          <DialogDescription>
-            Create a key for a platform or an AI agent to use.
-          </DialogDescription>
+          <DialogTitle>{t("setup.keys.dialogTitle")}</DialogTitle>
+          <DialogDescription>{t("setup.keys.dialogDescription")}</DialogDescription>
         </DialogHeader>
 
         {generated ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Copy this key now. It will not be shown again.
+              {t("setup.keys.copyNow")}
             </p>
             <div className="flex items-start gap-2">
               <code className="flex-1 break-all rounded-md bg-muted px-3 py-2 text-sm">
                 {generated}
               </code>
-              <Button variant="outline" size="icon" aria-label="Copy key" onClick={copy}>
+              <Button variant="outline" size="icon" aria-label={t("setup.keys.copyLabel")} onClick={copy}>
                 {copied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
               </Button>
             </div>
             <DialogFooter>
-              <Button onClick={() => onOpenChange(false)}>Done</Button>
+              <Button onClick={() => onOpenChange(false)}>{t("common.done")}</Button>
             </DialogFooter>
           </div>
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="key-principal">Principal</Label>
+              <Label htmlFor="key-principal">{t("setup.keys.principal")}</Label>
               <Input
                 id="key-principal"
-                placeholder="my-agent"
-                {...register("principal", { required: "Principal is required." })}
+                placeholder="my-agent" // i18n-ok
+                {...register("principal", { required: t("setup.keys.principalRequired") })}
               />
               {errors.principal && (
                 <p className="text-sm text-destructive">{errors.principal.message}</p>
@@ -113,26 +113,26 @@ export function CreateKeyDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="key-role">Role</Label>
+              <Label htmlFor="key-role">{t("setup.keys.role")}</Label>
               <select
                 id="key-role"
                 {...register("role")}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <option value="read">Read</option>
-                <option value="write">Write</option>
+                <option value="read">{t("setup.keys.roleRead")}</option>
+                <option value="write">{t("setup.keys.roleWrite")}</option>
               </select>
               <p className="text-sm text-muted-foreground">
-                Read keys can only query. Write keys can create and modify reservations.
+                {t("setup.keys.roleHelp")}
               </p>
             </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating…" : "Create key"}
+                {isSubmitting ? t("setup.keys.creating") : t("setup.keys.create")}
               </Button>
             </DialogFooter>
           </form>

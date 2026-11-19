@@ -1,6 +1,36 @@
 import { defineMessages } from "../define";
 
 export default defineMessages({
-  en: {},
-  es: {},
+  en: {
+    "venue.create.trigger": "New venue",
+    "venue.create.title": "Create a venue",
+    "venue.create.description": "Add your restaurant to start taking reservations.",
+    "venue.create.name": "Name",
+    "venue.create.nameRequired": "Name is required.",
+    "venue.create.timezone": "Timezone",
+    "venue.create.timezonePlaceholder": "Select a timezone",
+    "venue.create.submit": "Create venue",
+    "venue.create.submitting": "Creating…",
+    "venue.create.created": "Venue created",
+    "venue.create.failed": "Could not create the venue.",
+    "venue.empty.title": "No venues yet",
+    "venue.empty.description": "Create your first venue to start taking reservations.",
+    "venue.empty.cta": "Create your first venue",
+  },
+  es: {
+    "venue.create.trigger": "Nuevo local",
+    "venue.create.title": "Crear un local",
+    "venue.create.description": "Añade tu restaurante para empezar a recibir reservas.",
+    "venue.create.name": "Nombre",
+    "venue.create.nameRequired": "El nombre es obligatorio.",
+    "venue.create.timezone": "Zona horaria",
+    "venue.create.timezonePlaceholder": "Elige una zona horaria",
+    "venue.create.submit": "Crear local",
+    "venue.create.submitting": "Creando…",
+    "venue.create.created": "Local creado",
+    "venue.create.failed": "No se pudo crear el local.",
+    "venue.empty.title": "Aún no tienes locales",
+    "venue.empty.description": "Crea tu primer local para empezar a recibir reservas.",
+    "venue.empty.cta": "Crear tu primer local",
+  },
 });

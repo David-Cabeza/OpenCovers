@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { MessageKey } from "@/i18n";
 
 // A floor skin decides how the plan is drawn: the floor, the shadows under tables, chairs and room
 // elements, and the light. It never changes where anything is or what it means.
@@ -7,8 +8,9 @@ export type FloorSkinId = "plano" | "ambiente";
 
 export interface FloorSkin {
   id: FloorSkinId;
-  label: string;
-  description: string;
+  /** Catalog keys: the registry is read once, the text is read where it is shown. */
+  labelKey: MessageKey;
+  descriptionKey: MessageKey;
   /** Background for the stage. Editing always keeps the dot grid, so snapping stays easy to see. */
   floor: (mode: "view" | "edit") => CSSProperties;
   tableShadow: string;
@@ -24,8 +26,8 @@ const DOT_GRID: CSSProperties = {
 export const FLOOR_SKINS: Record<FloorSkinId, FloorSkin> = {
   plano: {
     id: "plano",
-    label: "Plan",
-    description: "Clean plan with a light tile grid",
+    labelKey: "floor.skin.plano.label",
+    descriptionKey: "floor.skin.plano.description",
     floor: (mode) =>
       mode === "edit"
         ? DOT_GRID
@@ -40,8 +42,8 @@ export const FLOOR_SKINS: Record<FloorSkinId, FloorSkin> = {
   },
   ambiente: {
     id: "ambiente",
-    label: "Ambiance",
-    description: "Large stone tiles, deeper shadows and a soft glow",
+    labelKey: "floor.skin.ambiente.label",
+    descriptionKey: "floor.skin.ambiente.description",
     floor: (mode) =>
       mode === "edit"
         ? { ...DOT_GRID, ...GLOW }

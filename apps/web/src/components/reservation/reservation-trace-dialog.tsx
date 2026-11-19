@@ -9,8 +9,9 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useReservationTrace } from "@/hooks/use-reservation-trace";
+import { useT } from "@/i18n";
 import { errorMessage } from "@/lib/error-message";
-import { traceTime } from "@/lib/reservation-trace";
+import { actorLabel, eventLabel, sourceLabel, traceTime } from "@/lib/reservation-trace";
 import type { Reservation } from "@/lib/api";
 
 export function ReservationTraceDialog({
@@ -22,6 +23,7 @@ export function ReservationTraceDialog({
   reservation: Reservation | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT();
   const { data, isPending, isError, error, refetch } = useReservationTrace(
     venueId,
     reservation?.id ?? null,
@@ -31,50 +33,50 @@ export function ReservationTraceDialog({
     <Dialog open={reservation !== null} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Reservation trace</DialogTitle>
+          <DialogTitle>{t("reservation.trace.title")}</DialogTitle>
           <DialogDescription>
             {reservation?.guest.name
-              ? `How the booking for ${reservation.guest.name} was made and what happened to it.`
-              : "How this booking was made and what happened to it."}
+              ? t("reservation.trace.descriptionNamed", { name: reservation.guest.name })
+              : t("reservation.trace.description")}
           </DialogDescription>
         </DialogHeader>
 
         {isPending ? (
-          <div className="space-y-3" role="status" aria-label="Loading the trace">
+          <div className="space-y-3" role="status" aria-label={t("reservation.trace.loading")}>
             <Skeleton className="h-14 w-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
           </div>
         ) : isError ? (
           <div role="alert" className="space-y-3 rounded-lg border border-destructive/30 p-4 text-sm">
-            <p>{errorMessage(error, "Could not load the trace.")}</p>
+            <p>{errorMessage(error, t("reservation.trace.failed"))}</p>
             <Button variant="outline" size="sm" onClick={() => void refetch()}>
-              Try again
+              {t("common.tryAgain")}
             </Button>
           </div>
         ) : (
           <div className="space-y-4">
             <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 rounded-lg bg-muted/50 p-3 text-sm">
-              <dt className="text-muted-foreground">Came from</dt>
-              <dd className="font-medium">{data.sourceLabel}</dd>
-              <dt className="text-muted-foreground">Made by</dt>
-              <dd className="min-w-0 truncate font-medium">{data.actorLabel}</dd>
+              <dt className="text-muted-foreground">{t("reservation.trace.cameFrom")}</dt>
+              <dd className="font-medium">{sourceLabel(data.source)}</dd>
+              <dt className="text-muted-foreground">{t("reservation.trace.madeBy")}</dt>
+              <dd className="min-w-0 truncate font-medium">{actorLabel(data)}</dd>
             </dl>
 
             {data.entries.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No events are kept for this booking. They are removed after the retention period.
+                {t("reservation.trace.empty")}
               </p>
             ) : (
-              <ol aria-label="Events" className="space-y-3">
+              <ol aria-label={t("reservation.trace.events")} className="space-y-3">
                 {data.entries.map((entry) => (
                   <li key={entry.id} className="space-y-1 border-l-2 pl-3">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <Pill tone={entry.tone} dot>
-                        {entry.label}
+                        {eventLabel(entry.type).label}
                       </Pill>
                       <span className="text-xs tabular-nums text-muted-foreground">
-                        Version {entry.version}
+                        {t("reservation.trace.version", { version: entry.version })}
                       </span>
                       <time
                         dateTime={entry.occurredAt}
@@ -85,7 +87,7 @@ export function ReservationTraceDialog({
                     </div>
                     {entry.idempotencyKey && (
                       <p className="truncate text-xs text-muted-foreground">
-                        Idempotency key{" "}
+                        {t("reservation.trace.idempotencyKey")}{" "}
                         <code className="font-mono text-foreground">{entry.idempotencyKey}</code>
                       </p>
                     )}

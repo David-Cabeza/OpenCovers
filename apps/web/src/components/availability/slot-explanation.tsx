@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useT } from "@/i18n";
 import { api } from "@/lib/api";
 
 /**
@@ -22,6 +23,7 @@ export function SlotExplanation({
   partySize: number;
   onPickNearest: (time: string) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const { data, isPending, isError } = useQuery({
     queryKey: ["availability-explain", venueId, date, time, partySize],
@@ -46,15 +48,15 @@ export function SlotExplanation({
           {time}
         </Button>
       </PopoverAnchor>
-      <PopoverContent aria-label={`Why ${time} is not available`} className="space-y-2">
-        <p className="text-sm font-medium">Why {time} is not available</p>
+      <PopoverContent aria-label={t("availability.why", { time })} className="space-y-2">
+        <p className="text-sm font-medium">{t("availability.why", { time })}</p>
         {isPending ? (
           <div className="space-y-2">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-2/3" />
           </div>
         ) : isError ? (
-          <p className="text-sm text-destructive">Could not load the explanation.</p>
+          <p className="text-sm text-destructive">{t("availability.explainFailed")}</p>
         ) : (
           <>
             <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
@@ -64,21 +66,21 @@ export function SlotExplanation({
             </ul>
             {data.nearest.length > 0 && (
               <div className="space-y-1.5 pt-1">
-                <p className="text-xs font-medium text-muted-foreground">Nearest free times</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("availability.nearest")}</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {data.nearest.map((t) => (
+                  {data.nearest.map((nearest) => (
                     <Button
-                      key={t}
+                      key={nearest}
                       type="button"
                       size="sm"
                       variant="outline"
                       className="tabular-nums"
                       onClick={() => {
                         setOpen(false);
-                        onPickNearest(t);
+                        onPickNearest(nearest);
                       }}
                     >
-                      {t}
+                      {nearest}
                     </Button>
                   ))}
                 </div>

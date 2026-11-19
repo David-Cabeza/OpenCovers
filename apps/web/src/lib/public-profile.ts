@@ -1,5 +1,6 @@
 // Mirrors the API's rules for PUT /v1/venues/{id}/public-profile
 // (apps/api/src/lib/public-profile.ts, ADR-0012).
+import { t } from "@/i18n";
 
 export interface PublicProfile {
   publicProfileEnabled: boolean;
@@ -50,13 +51,6 @@ const TEXT_LIMITS = {
   region: 100,
   cuisine: 100,
 } as const;
-const TEXT_LABELS = {
-  street: "Street",
-  locality: "City or town",
-  postalCode: "Postal code",
-  region: "Region",
-  cuisine: "Cuisine",
-} as const;
 const PHONE = /^\+?[0-9 ()./-]{5,30}$/;
 const MAX_URL = 2048;
 
@@ -93,10 +87,10 @@ function httpsHref(value: string): string | null {
 }
 
 function coordinate(raw: string, limit: number): number | null | undefined {
-  const t = raw.trim();
-  if (t === "") return null;
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return undefined;
-  const n = Number(t);
+  const value = raw.trim();
+  if (value === "") return null;
+  if (!/^-?\d+(\.\d+)?$/.test(value)) return undefined;
+  const n = Number(value);
   return Math.abs(n) <= limit ? n : undefined;
 }
 
@@ -108,35 +102,38 @@ export function parseForm(form: PublicProfileForm, initial: PublicProfile): Pars
   next.publicProfileEnabled = form.publicProfileEnabled;
 
   for (const key of Object.keys(TEXT_LIMITS) as (keyof typeof TEXT_LIMITS)[]) {
-    const t = form[key].trim();
-    if (t.length > TEXT_LIMITS[key]) {
-      errors[key] = `${TEXT_LABELS[key]} can be at most ${TEXT_LIMITS[key]} characters.`;
+    const value = form[key].trim();
+    if (value.length > TEXT_LIMITS[key]) {
+      errors[key] = t("publicprofile.error.tooLong", {
+        label: t(`publicprofile.label.${key}`),
+        max: TEXT_LIMITS[key],
+      });
     } else {
-      next[key] = t === "" ? null : t;
+      next[key] = value === "" ? null : value;
     }
   }
 
   const country = form.country.trim();
   if (country === "") next.country = null;
   else if (!/^[A-Z]{2}$/.test(country)) {
-    errors.country = "Use a 2-letter upper-case country code, for example ES.";
+    errors.country = t("publicprofile.error.country");
   } else next.country = country;
 
   const phone = form.phone.trim();
   if (phone === "") next.phone = null;
   else if (!PHONE.test(phone)) {
-    errors.phone = "Use 5 to 30 digits, spaces or + ( ) . / -, for example +34 910 000 000.";
+    errors.phone = t("publicprofile.error.phone");
   } else next.phone = phone;
 
   for (const key of ["websiteUrl", "bookingUrl"] as const) {
-    const t = form[key].trim();
-    if (t === "") next[key] = null;
+    const value = form[key].trim();
+    if (value === "") next[key] = null;
     else {
-      const href = httpsHref(t);
+      const href = httpsHref(value);
       if (href) next[key] = href;
       else {
         errors[key] =
-          "Use an https address without a user name or password, for example https://example.com/.";
+          t("publicprofile.error.url");
       }
     }
   }
@@ -144,17 +141,17 @@ export function parseForm(form: PublicProfileForm, initial: PublicProfile): Pars
   if (form.priceRange === "") next.priceRange = null;
   else if ((PRICE_RANGES as readonly string[]).includes(form.priceRange)) {
     next.priceRange = form.priceRange;
-  } else errors.priceRange = "Pick $, $$, $$$ or $$$$.";
+  } else errors.priceRange = t("publicprofile.error.priceRange");
 
   const lat = coordinate(form.latitude, 90);
   const lon = coordinate(form.longitude, 180);
-  if (lat === undefined) errors.latitude = "Latitude must be a number from -90 to 90.";
+  if (lat === undefined) errors.latitude = t("publicprofile.error.latitude");
   else next.latitude = lat;
-  if (lon === undefined) errors.longitude = "Longitude must be a number from -180 to 180.";
+  if (lon === undefined) errors.longitude = t("publicprofile.error.longitude");
   else next.longitude = lon;
   if (lat !== undefined && lon !== undefined && (lat === null) !== (lon === null)) {
     errors[lat === null ? "latitude" : "longitude"] =
-      "Give both latitude and longitude, or neither.";
+      t("publicprofile.error.bothCoordinates");
   }
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
@@ -169,9 +166,9 @@ export function parseForm(form: PublicProfileForm, initial: PublicProfile): Pars
 /** What the API needs before the profile can be enabled, judged from the form values. */
 export function missingForPublishing(form: PublicProfileForm): string[] {
   const missing: string[] = [];
-  if (form.street.trim() === "") missing.push("street");
-  if (form.locality.trim() === "") missing.push("city or town");
-  if (form.country.trim() === "") missing.push("country");
+  if (form.street.trim() === "") missing.push(t("publicprofile.missing.street"));
+  if (form.locality.trim() === "") missing.push(t("publicprofile.missing.locality"));
+  if (form.country.trim() === "") missing.push(t("publicprofile.missing.country"));
   return missing;
 }
 
