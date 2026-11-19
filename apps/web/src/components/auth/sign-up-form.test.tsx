@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpForm } from "./sign-up-form";
 
@@ -45,4 +46,16 @@ describe("SignUpForm and a server that does not answer", () => {
     await fill(user);
     await vi.waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
   });
+
+  it("shows a refused sign-up once, as an alert, and not also as a toast", async () => {
+    const toastError = vi.spyOn(toast, "error");
+    client.answer = () => Promise.resolve({ error: { status: 400, message: "User already exists" } });
+    const user = userEvent.setup();
+    render(<SignUpForm />);
+    await fill(user);
+    expect(await screen.findByRole("alert")).toHaveTextContent("User already exists");
+    expect(toastError).not.toHaveBeenCalled();
+    toastError.mockRestore();
+  });
 });
+

@@ -10,7 +10,7 @@ import { dateAfterPartyChange, nextFreeDay, pageBounds, startFor, STRIP_DAYS, vi
 import { createSubmitter, createTicketSource } from "./submit";
 import { noticeHref, watchTheme } from "./theme";
 import { Field, inputClass, primaryButton, secondaryButton, Section, VenueHeader } from "./ui";
-import { checkDetails, type DetailErrors } from "./validate";
+import { checkDetails, withoutError, type DetailErrors } from "./validate";
 
 type Phase =
   | { kind: "loading" }
@@ -418,7 +418,10 @@ function BookingForm(props: {
             required
             maxLength={100}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              setErrors((current) => withoutError(current, "name"));
+            }}
             aria-invalid={errors.name ? true : undefined}
             aria-describedby={errors.name ? `${ids}-name-error` : undefined}
             className={inputClass}
@@ -439,7 +442,10 @@ function BookingForm(props: {
             required
             maxLength={254}
             value={contact}
-            onChange={(e) => setContact(e.target.value)}
+            onChange={(e) => {
+              setContact(e.target.value);
+              setErrors((current) => withoutError(current, "contact"));
+            }}
             aria-invalid={errors.contact ? true : undefined}
             aria-describedby={`${ids}-contact-hint${errors.contact ? ` ${ids}-contact-error` : ""}`}
             className={inputClass}
