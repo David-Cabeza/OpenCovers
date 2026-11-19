@@ -43,6 +43,9 @@ const NAV: {
   { id: "team", label: "Team", icon: UserCogIcon, adminOnly: true },
 ];
 
+/** The name of a screen, as the sidebar shows it. */
+export const viewLabel = (id: ViewId): string => NAV.find((item) => item.id === id)?.label ?? "";
+
 function NavList({
   active,
   onSelect,

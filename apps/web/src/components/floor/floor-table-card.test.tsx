@@ -96,7 +96,7 @@ describe("FloorTableCard", () => {
 
   it("shows nothing for a free table and keeps the walk-in button", async () => {
     const { api, user } = setup([table()]);
-    const free = await screen.findByRole("button", { name: "Seat a walk-in at Table 1" });
+    const free = await screen.findByRole("button", { name: "Table 1, 2 seats, seat a walk-in" });
     await user.hover(free);
     await new Promise((r) => setTimeout(r, 400));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

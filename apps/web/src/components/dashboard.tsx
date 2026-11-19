@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { ServerBanner } from "@/components/server-banner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,7 +7,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { AgendaView } from "./agenda/agenda-view";
 import { AvailabilityView } from "./availability/availability-view";
 import { FloorView } from "./floor/floor-view";
-import { MobileNav, Sidebar, type ViewId } from "./layout/sidebar";
+import { MobileNav, Sidebar, viewLabel, type ViewId } from "./layout/sidebar";
 import { Topbar } from "./layout/topbar";
 import { PacingView } from "./pacing/pacing-view";
 import { PreShiftView } from "./preshift/pre-shift-view";
@@ -36,8 +36,30 @@ export function Dashboard() {
     }
   }, [venues, venueId, setVenue]);
 
+  // The tab says which screen and which venue it is, and a screen reader hears it when the page changes.
+  const venueName = venues.find((v) => v.id === venueId)?.name;
+  useEffect(() => {
+    document.title = [viewLabel(active), venueName, "OpenCovers"].filter(Boolean).join(" · ");
+    return () => {
+      document.title = "OpenCovers";
+    };
+  }, [active, venueName]);
+
+  const mainRef = useRef<HTMLElement>(null);
+
   return (
     <div className="flex min-h-dvh">
+      <a
+        href="#main-content"
+        onClick={(e) => {
+          // A link to a fragment would change the address, which the invitation link also uses.
+          e.preventDefault();
+          mainRef.current?.focus();
+        }}
+        className="sr-only z-50 rounded-md bg-primary text-sm font-medium text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:px-4 focus:py-2 focus:shadow-lg"
+      >
+        Skip to content
+      </a>
       <Sidebar active={active} onSelect={setActive} role={role} />
       <MobileNav
         open={navOpen}
@@ -49,7 +71,12 @@ export function Dashboard() {
       <div className="flex min-w-0 flex-1 flex-col">
         <ServerBanner />
         <Topbar email={session?.user.email} onMenu={() => setNavOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 print:p-0">
+        <main
+          ref={mainRef}
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 p-4 outline-none sm:p-6 lg:p-8 print:p-0"
+        >
           {isPending ? (
             <div className="space-y-4">
               <Skeleton className="h-9 w-56" />

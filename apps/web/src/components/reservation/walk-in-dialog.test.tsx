@@ -31,6 +31,11 @@ describe("WalkInDialog", () => {
     expect(await screen.findByText("Guest seated")).toBeInTheDocument();
   });
 
+  it("names the consent select by its label, so a screen reader does not meet an unnamed button", () => {
+    setup();
+    expect(screen.getByRole("combobox", { name: "Contact consent" })).toBeInTheDocument();
+  });
+
   it("sends the party size, guest details and consent the host entered", async () => {
     const { api, user } = setup();
 
