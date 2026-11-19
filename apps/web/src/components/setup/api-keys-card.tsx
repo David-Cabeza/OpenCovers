@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pill, type PillTone } from "@/components/pill";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVenueKeys } from "@/hooks/use-venue-keys";
-import { api, type Role } from "@/lib/api";
+import { api, type ApiKey, type Role } from "@/lib/api";
 import { CreateKeyDialog } from "./create-key-dialog";
 
 const ROLE_TONE: Record<Role, PillTone> = { admin: "warning", write: "info", read: "muted" };
@@ -23,6 +24,7 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
   const { data, isPending } = useVenueKeys(venueId);
   const [open, setOpen] = useState(false);
+  const [revoking, setRevoking] = useState<ApiKey | null>(null);
   const keys = data?.keys ?? [];
 
   const revoke = useMutation({
@@ -32,6 +34,7 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
       toast.success("Key revoked");
     },
     onError: (err) => toast.error(errorMessage(err, "Could not revoke.")),
+    onSettled: () => setRevoking(null),
   });
 
   return (
@@ -73,7 +76,7 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
                     variant="ghost"
                     size="icon"
                     aria-label={`Revoke key for ${k.principal}`}
-                    onClick={() => revoke.mutate(k.hash)}
+                    onClick={() => setRevoking(k)}
                   >
                     <Trash2Icon className="size-4" />
                   </Button>
@@ -83,6 +86,16 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
           </ul>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={revoking !== null}
+        title={revoking ? `Revoke the key for ${revoking.principal}?` : "Revoke key?"}
+        description="Anything that uses this key stops working at once, and the key cannot be restored."
+        confirmLabel="Revoke key"
+        keepLabel="Keep key"
+        pending={revoke.isPending}
+        onConfirm={() => revoking && revoke.mutate(revoking.hash)}
+        onClose={() => setRevoking(null)}
+      />
       <CreateKeyDialog venueId={venueId} open={open} onOpenChange={setOpen} />
     </Card>
   );

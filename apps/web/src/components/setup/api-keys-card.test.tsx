@@ -29,8 +29,21 @@ describe("ApiKeysCard", () => {
     });
     renderWithApp(<ApiKeysCard venueId="v1" />);
     await user.click(await screen.findByRole("button", { name: "Revoke key for reporting" }));
+    expect(api.calls("DELETE", "/v1/venues/v1/keys")).toHaveLength(0);
+    await user.click(await screen.findByRole("button", { name: "Revoke key" }));
     await waitFor(() => expect(api.calls("DELETE", "/v1/venues/v1/keys")).toHaveLength(1));
     expect(api.calls("DELETE", "/v1/venues/v1/keys")[0].body).toEqual({ hash: "h2" });
+  });
+
+  it("keeps the key when the confirmation is declined", async () => {
+    const user = userEvent.setup();
+    const api = mockApi({ "GET /v1/venues/v1/keys": { body: { keys: KEYS } } });
+    renderWithApp(<ApiKeysCard venueId="v1" />);
+    await user.click(await screen.findByRole("button", { name: "Revoke key for reporting" }));
+    expect(await screen.findByRole("heading", { name: "Revoke the key for reporting?" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Keep key" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(api.calls("DELETE", "/v1/venues/v1/keys")).toHaveLength(0);
   });
 
   it("says when there are no keys", async () => {

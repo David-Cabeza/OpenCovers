@@ -71,9 +71,22 @@ describe("SetupView", () => {
     const api = setup();
     renderWithApp(<SetupView venueId="v1" role="write" />);
     await user.click(await screen.findByRole("button", { name: "Remove Mesa 1" }));
+    expect(api.calls("DELETE", "/v1/venues/v1/tables/t1")).toHaveLength(0);
+    await user.click(await screen.findByRole("button", { name: "Remove table" }));
     await waitFor(() => expect(api.calls("DELETE", "/v1/venues/v1/tables/t1")).toHaveLength(1));
     await user.click(screen.getByRole("button", { name: "Remove dinner" }));
     await waitFor(() => expect(api.calls("DELETE", "/v1/venues/v1/services/dinner")).toHaveLength(1));
+  });
+
+  it("keeps the table when the confirmation is declined", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<SetupView venueId="v1" role="write" />);
+    await user.click(await screen.findByRole("button", { name: "Remove Mesa 1" }));
+    expect(await screen.findByRole("heading", { name: "Remove Mesa 1?" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Keep table" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(api.calls("DELETE", "/v1/venues/v1/tables/t1")).toHaveLength(0);
   });
 
   it("opens the edit dialog from a table row", async () => {
