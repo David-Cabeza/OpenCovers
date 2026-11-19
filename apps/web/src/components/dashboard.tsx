@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { ServerBanner } from "@/components/server-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVenues } from "@/hooks/use-venues";
 import { useUiStore } from "@/stores/ui-store";
@@ -46,6 +47,7 @@ export function Dashboard() {
         role={role}
       />
       <div className="flex min-w-0 flex-1 flex-col">
+        <ServerBanner />
         <Topbar email={session?.user.email} onMenu={() => setNavOpen(true)} />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 print:p-0">
           {isPending ? (

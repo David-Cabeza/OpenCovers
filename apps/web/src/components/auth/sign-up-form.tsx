@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { isServerUnreachable, SERVER_UNREACHABLE } from "@/lib/server-status";
 
 interface SignUpValues {
   name: string;
@@ -29,12 +30,21 @@ export function SignUpForm({
 
   async function onSubmit(values: SignUpValues) {
     setServerError(null);
-    const { error } = await authClient.signUp.email({
-      ...values,
-      ...(invitationToken
-        ? { fetchOptions: { headers: { "X-Invitation-Token": invitationToken } } }
-        : {}),
-    });
+    let error: Awaited<ReturnType<typeof authClient.signUp.email>>["error"];
+    try {
+      ({ error } = await authClient.signUp.email({
+        ...values,
+        ...(invitationToken
+          ? { fetchOptions: { headers: { "X-Invitation-Token": invitationToken } } }
+          : {}),
+      }));
+    } catch (err) {
+      // The client throws when no answer comes back at all.
+      const message = isServerUnreachable(err) ? SERVER_UNREACHABLE : "Could not create the account.";
+      setServerError(message);
+      toast.error(message);
+      return;
+    }
     if (error) {
       setServerError(authErrorMessage(error, "Could not create the account."));
       toast.error(authErrorMessage(error, "Could not create the account."));

@@ -44,6 +44,7 @@ describe("authErrorMessage", () => {
     expect(authErrorMessage({ status: 401, message: "Invalid email or password" }, "f")).toBe(
       "Invalid email or password",
     );
-    expect(authErrorMessage({ status: 500 }, "f")).toBe("f");
+    expect(authErrorMessage({ status: 400 }, "f")).toBe("f");
+    expect(authErrorMessage({ status: 500 }, "f")).toMatch(/not responding/i);
   });
 });

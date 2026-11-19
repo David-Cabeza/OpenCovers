@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/api";
+import { SERVER_ERROR } from "@/lib/server-status";
 
 // One friendly message per documented API error code (docs/contract/errors.md).
 // Short, plain, and with a next step where one helps.
@@ -92,6 +93,7 @@ export function authErrorMessage(
   fallback: string,
 ): string {
   if (error?.status === 429) return RATE_LIMITED;
+  if (error?.status !== undefined && error.status >= 500) return SERVER_ERROR;
   if (error?.code === "INVALID_INVITATION") return MESSAGES.invalid_invitation as string;
   return error?.message || fallback;
 }

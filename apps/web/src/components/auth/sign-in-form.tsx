@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { isServerUnreachable, SERVER_UNREACHABLE } from "@/lib/server-status";
 
 interface SignInValues {
   email: string;
@@ -22,10 +23,17 @@ export function SignInForm() {
 
   async function onSubmit(values: SignInValues) {
     setServerError(null);
-    const { error } = await authClient.signIn.email(values);
-    if (error) {
-      setServerError(authErrorMessage(error, "Could not sign in."));
-      toast.error(authErrorMessage(error, "Could not sign in."));
+    try {
+      const { error } = await authClient.signIn.email(values);
+      if (error) {
+        setServerError(authErrorMessage(error, "Could not sign in."));
+        toast.error(authErrorMessage(error, "Could not sign in."));
+      }
+    } catch (err) {
+      // The client throws when no answer comes back at all.
+      const message = isServerUnreachable(err) ? SERVER_UNREACHABLE : "Could not sign in.";
+      setServerError(message);
+      toast.error(message);
     }
   }
 
