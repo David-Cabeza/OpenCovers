@@ -14,6 +14,6 @@ export default defineConfig({
   worker: { format: "es" },
   test: {
     environment: "node",
-    include: ["test/**/*.test.ts"],
+    include: ["test/**/*.test.{ts,tsx}"],
   },
 });
