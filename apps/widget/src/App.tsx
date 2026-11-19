@@ -1,8 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { selfServiceUrl, type Created, type Failure, type PublicApi, type PublicConfig } from "./api";
-import { addDays, formatDate, isoWeekday, todayLocal } from "./dates";
+import { addDays, formatDate, formatDay, isoWeekday, todayLocal } from "./dates";
 import { explain, type Explanation } from "./errors";
 import { LostLink } from "./LostLink";
+import { findFreeDays, LOOKAHEAD_DAYS, type FreeDay } from "./nearby";
 import type { Translate } from "./messages";
 import { solveInBackground } from "./pow";
 import { createSubmitter, createTicketSource } from "./submit";
@@ -22,6 +23,8 @@ type Times =
   | { kind: "loading" }
   | { kind: "loaded"; times: string[]; reason: "past_date" | "beyond_horizon" | null }
   | { kind: "failed"; failure: Failure };
+
+type Nearby = { kind: "loading" } | { kind: "done"; days: FreeDay[] };
 
 type Sending = null | { kind: "checking" } | { kind: "sending" };
 
@@ -88,7 +91,12 @@ function BookingForm(props: {
   const [date, setDate] = useState("");
   const [party, setParty] = useState<number | "more">(Math.min(Math.max(2, config.minPartySize), config.maxPartySize));
   const [time, setTime] = useState("");
-  const [times, setTimes] = useState<Times>({ kind: "pick-date" });
+  // Until the first bookable day is found there is no date, and the times area says it is loading.
+  const [starting, setStarting] = useState(true);
+  const [times, setTimes] = useState<Times>({ kind: "loading" });
+  const [nearby, setNearby] = useState<Nearby>({ kind: "loading" });
+  // The day and party the first search already found empty, so the nearby search does not repeat its requests.
+  const knownEmpty = useRef<string | null>(null);
   const [reload, setReload] = useState(0);
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -123,10 +131,29 @@ function BookingForm(props: {
     });
   }, [api, config]);
 
+  useEffect(() => {
+    let live = true;
+    const first = Math.min(Math.max(2, config.minPartySize), config.maxPartySize);
+    void findFreeDays({ api, weekdays: config.weekdays, party: first, from: today, last: maxDate, want: 1, live: () => live }).then(
+      (days) => {
+        if (!live) return;
+        if (days.length === 0) knownEmpty.current = `${today}|${first}`;
+        // A guest who already picked a date keeps it.
+        setDate((current) => current || (days[0]?.date ?? today));
+        setStarting(false);
+      },
+    );
+    return () => {
+      live = false;
+    };
+    // Once per form: `today` and `maxDate` come from the same render as `config`.
+  }, [api, config]);
+
   // Runs again on every return to the times step, so slots that went stale while the guest filled in the
   // details (taken, or inside the lead time by now) are never listed again.
   useEffect(() => {
     if (step !== "choose") return;
+    if (!date && starting) return setTimes({ kind: "loading" });
     if (!date || party === "more") return setTimes({ kind: "pick-date" });
     if (!config.weekdays.includes(isoWeekday(date))) return setTimes({ kind: "closed" });
     let live = true;
@@ -138,7 +165,33 @@ function BookingForm(props: {
     return () => {
       live = false;
     };
-  }, [api, config, date, party, reload, step]);
+  }, [api, config, date, party, reload, step, starting]);
+
+  const noFreeDay =
+    party !== "more" && (times.kind === "closed" || (times.kind === "loaded" && times.times.length === 0 && !times.reason));
+  useEffect(() => {
+    if (step !== "choose" || !noFreeDay) return;
+    if (knownEmpty.current === `${date}|${party}`) {
+      knownEmpty.current = null;
+      return setNearby({ kind: "done", days: [] });
+    }
+    let live = true;
+    setNearby({ kind: "loading" });
+    void findFreeDays({
+      api,
+      weekdays: config.weekdays,
+      party,
+      from: addDays(date, 1),
+      last: maxDate,
+      want: 3,
+      live: () => live,
+    }).then((days) => {
+      if (live) setNearby({ kind: "done", days });
+    });
+    return () => {
+      live = false;
+    };
+  }, [api, config, date, party, noFreeDay, step, maxDate]);
 
   const partyLabel = (n: number) => (n === 1 ? t("field.partyOptionOne") : t("field.partyOption", { n }));
   const noticeText = (e: Explanation) =>
@@ -252,6 +305,17 @@ function BookingForm(props: {
                 }}
                 explain={(failure) => noticeText(explain(failure))}
               />
+              {noFreeDay && (
+                <NearbyDays
+                  nearby={nearby}
+                  t={t}
+                  locale={locale}
+                  onPick={(day) => {
+                    setDate(day);
+                    setTime("");
+                  }}
+                />
+              )}
               {errors.time && (
                 <p id={`${ids}-time-error`} className="text-danger">
                   {t(errors.time)}
@@ -407,6 +471,24 @@ export function TimeList(props: {
           </span>
         </label>
       ))}
+    </div>
+  );
+}
+
+export function NearbyDays(props: { nearby: Nearby; t: Translate; locale: string; onPick(date: string): void }) {
+  const { nearby, t, locale } = props;
+  if (nearby.kind === "loading") return <p role="status">{t("nearby.loading")}</p>;
+  if (nearby.days.length === 0) return <p role="status">{t("nearby.none", { n: LOOKAHEAD_DAYS })}</p>;
+  return (
+    <div role="status" className="space-y-2">
+      <p className="text-muted">{t("nearby.title")}</p>
+      <div className="flex flex-wrap gap-2">
+        {nearby.days.map((day) => (
+          <button key={day.date} type="button" className={secondaryButton} onClick={() => props.onPick(day.date)}>
+            {t("nearby.option", { date: formatDay(day.date, locale), time: day.times[0] })}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
