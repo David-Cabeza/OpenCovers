@@ -1,4 +1,6 @@
 import { Hono, type MiddlewareHandler } from "hono";
+import { and, eq } from "drizzle-orm";
+import { account as authAccounts } from "./db/schema";
 import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client";
 import {
@@ -78,6 +80,9 @@ import {
 import { canResend, parseResendEmail, resendLinks } from "./lib/link-resend";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import { demoMode } from "./demo/settings";
+import { DemoLimitError } from "./demo/limits";
+import { parseConsent, recordConsent } from "./demo/leads";
+import { issueSignInChallenge } from "./demo/sign-in-challenge";
 import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/signup";
 import { changeMemberRole, listMembers, removeMember } from "./lib/members";
 import {
@@ -187,6 +192,43 @@ app.use("/v1/*", staffOriginGuard(trustedOrigins));
 app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
 
 app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// The hosted demo's own routes (ADR-0022, decision 11), outside docs/contract. Both answer 404 unless DEMO_MODE=1.
+app.use("/api/demo/*", staffOriginGuard(trustedOrigins));
+
+// A challenge for the magic link form: send it back in X-Demo-Challenge with the proof of work in X-Demo-Solution.
+app.get("/api/demo/challenge", (c) => {
+  if (!demoMode()) return c.json({ code: "not_found" }, 404);
+  c.header("Cache-Control", "no-store");
+  return c.json(issueSignInChallenge());
+});
+
+// The one way a lead is recorded (audit F7 and F8): the signed-in account says, for its own verified address, that it
+// agrees to be contacted. Nobody can consent for another inbox, because the address is read from the session.
+app.post("/api/demo/consent", async (c) => {
+  if (!demoMode()) return c.json({ code: "not_found" }, 404);
+  const account = await sessionUser(c);
+  if (!account) return error(c, "unauthorized");
+  const consent = parseConsent(await c.req.json().catch(() => null));
+  if (!consent) return error(c, "invalid_request");
+  if (account.emailVerified !== true) return error(c, "forbidden");
+  const [google] = await db
+    .select({ id: authAccounts.id })
+    .from(authAccounts)
+    .where(and(eq(authAccounts.userId, account.id), eq(authAccounts.providerId, "google")))
+    .limit(1);
+  await recordConsent(db, { email: account.email, source: google ? "google" : "magic-link", consent });
+  return c.body(null, 204);
+});
+
+// A sandbox hit one of its caps. A code outside the contract, and only a demo instance can emit it.
+app.onError((err, c) => {
+  if (err instanceof DemoLimitError) {
+    return c.json({ code: "demo_limit_reached", message: "demo_limit_reached", kind: err.kind, retryable: false }, 409);
+  }
+  console.error(err);
+  return c.text("Internal Server Error", 500);
+});
 
 // Public and unauthenticated by design (ADR-0012). It must stay above the
 // venue auth middleware below. GET is not rate limited (ADR-0007).
