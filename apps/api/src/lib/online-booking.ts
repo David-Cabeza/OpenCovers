@@ -46,6 +46,8 @@ export interface OnlineBooking {
   askConsent: boolean;
   locale: string;
   theme: Theme;
+  /** The venue's own privacy notice, as stored, or null. OpenCovers writes no legal text (ADR-0021, section 5). */
+  privacyNoticeUrl: string | null;
 }
 
 export interface Warning {
@@ -81,6 +83,7 @@ function defaults(): OnlineBooking {
     askConsent: false,
     locale: "es",
     theme: {},
+    privacyNoticeUrl: null,
   };
 }
 
@@ -102,6 +105,7 @@ function viewOf(r: Row | undefined): OnlineBooking {
     askConsent: r.askConsent,
     locale: r.locale,
     theme: r.theme as Theme,
+    privacyNoticeUrl: r.privacyNoticeUrl,
   };
 }
 
@@ -124,6 +128,23 @@ export function normalizeOrigin(v: unknown): string | null {
     return new URL(origin).origin === origin ? origin : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * True for an `https` URL with a host, no credentials, no whitespace or control character, up to 2048 characters. The
+ * scheme may be in any case (`HTTPS://` reads as `https`), and the value is stored as sent.
+ */
+export function isPrivacyNoticeUrl(v: unknown): v is string {
+  if (typeof v !== "string" || v.length > MAX_LOGO_URL || /[\s\x00-\x1f\x7f]/.test(v)) return false;
+  if (!/^https:\/\//i.test(v)) return false;
+  const authority = v.slice(8).split(/[/?#]/, 1)[0]!;
+  if (authority === "" || authority.includes("@")) return false;
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" && u.hostname !== "" && u.username === "" && u.password === "";
+  } catch {
+    return false;
   }
 }
 
@@ -234,6 +255,11 @@ export function parseOnlineBookingInput(body: unknown): OnlineBookingInput | nul
       if (!t) return null;
       out.theme = t;
     }
+  }
+  if (body.privacyNoticeUrl !== undefined) {
+    if (body.privacyNoticeUrl === null) out.privacyNoticeUrl = null;
+    else if (isPrivacyNoticeUrl(body.privacyNoticeUrl)) out.privacyNoticeUrl = body.privacyNoticeUrl;
+    else return null;
   }
   return out;
 }

@@ -1,0 +1,2 @@
+ALTER TABLE "venue_online_booking" ADD COLUMN "privacy_notice_url" text;--> statement-breakpoint
+ALTER TABLE "venue_online_booking" ADD CONSTRAINT "venue_online_booking_privacy_url" CHECK ("venue_online_booking"."privacy_notice_url" IS NULL OR ("venue_online_booking"."privacy_notice_url" ~* '^https://[^/?#@[:space:][:cntrl:]]' AND "venue_online_booking"."privacy_notice_url" !~ '[[:space:][:cntrl:]]' AND char_length("venue_online_booking"."privacy_notice_url") <= 2048));

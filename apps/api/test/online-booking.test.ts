@@ -75,6 +75,7 @@ describe("online booking settings", () => {
         askConsent: false,
         locale: "es",
         theme: {},
+        privacyNoticeUrl: null,
       });
     }
     expect(await db.select().from(venueOnlineBooking)).toHaveLength(0);
@@ -111,6 +112,7 @@ describe("online booking settings", () => {
       confirmationMode: "auto",
       askConsent: true,
       locale: "en",
+      privacyNoticeUrl: "https://www.example.com/privacy",
       theme: {
         colors: { primary: "#1f6f5c", onPrimary: "#ffffff", background: "#ffffff", surface: "#f7f7f7", text: "#111111", muted: "#666666", border: "#dddddd" },
         radius: 12,
@@ -132,6 +134,7 @@ describe("online booking settings", () => {
       weekdays: null,
       maxAdvanceDays: null,
       maxOpenBookingsPerContact: null,
+      privacyNoticeUrl: null,
       theme: null,
     });
     expect(res.status).toBe(200);
@@ -141,6 +144,7 @@ describe("online booking settings", () => {
       weekdays: null,
       maxAdvanceDays: null,
       maxOpenBookingsPerContact: null,
+      privacyNoticeUrl: null,
       theme: {},
     });
     await put("oa", "oa-admin", { maxOpenBookingsPerContact: 2, maxPartySize: 8, minPartySize: 1 });

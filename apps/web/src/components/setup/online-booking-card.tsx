@@ -448,6 +448,28 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
               </div>
             </Group>
 
+            <Group title="Privacy notice" description="The notice guests can read before they book.">
+              <div className="space-y-2">
+                <Label htmlFor="ob-privacy-url">Privacy notice address</Label>
+                <Input
+                  id="ob-privacy-url"
+                  inputMode="url"
+                  placeholder="https://example.com/privacy"
+                  value={form.privacyNoticeUrl}
+                  aria-invalid={errors.privacyNoticeUrl ? true : undefined}
+                  aria-describedby={
+                    errors.privacyNoticeUrl ? "ob-privacy-url-help ob-privacyNoticeUrl-error" : "ob-privacy-url-help"
+                  }
+                  onChange={(e) => setForm({ ...form, privacyNoticeUrl: e.target.value })}
+                />
+                {error("privacyNoticeUrl")}
+                <p id="ob-privacy-url-help" className="text-sm text-muted-foreground">
+                  Optional. Your own privacy notice: an https address with no spaces. You write and host
+                  it. OpenCovers writes no legal text. Leave it empty to show no link.
+                </p>
+              </div>
+            </Group>
+
             <Group title="Embedding" description="Where the booking page may appear.">
               <div className="space-y-2">
                 <Label htmlFor="ob-origins">Websites that may embed the page</Label>
