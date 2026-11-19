@@ -42,3 +42,8 @@ export function formatInstant(iso: string, locale: string): string {
     minute: "2-digit",
   }).format(new Date(iso));
 }
+
+/** The weekday as one letter (or the locale's narrowest form), for a chip. */
+export function formatWeekdayLetter(date: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { weekday: "narrow", timeZone: "UTC" }).format(asUtc(date));
+}

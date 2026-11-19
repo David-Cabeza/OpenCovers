@@ -28,6 +28,21 @@ export interface PublicConfig {
   linkResend: boolean;
 }
 
+/** The status of one date of the days route (C63). `selected` is a widget state, not an API status. */
+export type DayStatus = "available" | "full" | "closed" | "outside_window";
+
+export interface PublicDay {
+  date: string;
+  status: DayStatus;
+  firstTime: string | null;
+}
+
+export interface PublicDays {
+  from: string;
+  partySize: number;
+  days: PublicDay[];
+}
+
 /** The guest view (`PublicReservation`), the answer of the create and of every self-service route. */
 export interface PublicReservation {
   venue: PublicVenue;
@@ -111,6 +126,11 @@ export function publicApi(bookingKey: string, fetcher: Fetch = (input, init) => 
       call<{ times: string[]; reason?: "past_date" | "beyond_horizon" | null }>(
         fetcher,
         `${base}/availability?${new URLSearchParams({ date, partySize: String(partySize) })}`,
+      ),
+    days: (from: string, days: number, partySize: number) =>
+      call<PublicDays>(
+        fetcher,
+        `${base}/days?${new URLSearchParams({ from, days: String(days), partySize: String(partySize) })}`,
       ),
     create: (idempotencyKey: string, fields: BookingFields, challenge: FormChallenge, solution: string) =>
       call<Created>(fetcher, `${base}/reservations`, {
