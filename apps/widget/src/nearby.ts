@@ -34,9 +34,12 @@ export async function findFreeDays(options: {
     if (weekdays.includes(isoWeekday(day))) candidates.push(day);
   }
   const found: FreeDay[] = [];
-  for (let i = 0; i < candidates.length && found.length < want; i += BATCH) {
+  // A search for one day starts with a single request, because the first bookable day is usually the first
+  // candidate, and a widget view should not cost more requests than it needs.
+  let size = want === 1 ? 1 : BATCH;
+  for (let i = 0; i < candidates.length && found.length < want; i += size, size = BATCH) {
     if (!live()) return found;
-    const batch = candidates.slice(i, i + BATCH);
+    const batch = candidates.slice(i, i + size);
     const answers = await Promise.all(batch.map((day) => api.availability(day, party)));
     answers.forEach((answer, n) => {
       const times = answer.ok ? answer.value.times : [];

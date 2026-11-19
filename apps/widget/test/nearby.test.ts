@@ -26,7 +26,14 @@ describe("finding free days", () => {
     const { api, asked } = fakeApi({ "2026-11-20": ["20:00", "20:30"], "2026-11-21": ["13:00"] });
     const days = await findFreeDays({ api, weekdays: ALL_DAYS, party: 2, from: "2026-11-18", want: 1 });
     expect(days).toEqual([{ date: "2026-11-20", times: ["20:00", "20:30"] }]);
-    expect(asked).toEqual(["2026-11-18", "2026-11-19", "2026-11-20"]);
+    expect(asked.slice(0, 3)).toEqual(["2026-11-18", "2026-11-19", "2026-11-20"]);
+  });
+
+  it("asks for a single day first, so a venue with a free first day costs one request", async () => {
+    const { api, asked } = fakeApi({ "2026-11-18": ["20:00"] });
+    const days = await findFreeDays({ api, weekdays: ALL_DAYS, party: 2, from: "2026-11-18", want: 1 });
+    expect(days.map((d) => d.date)).toEqual(["2026-11-18"]);
+    expect(asked).toEqual(["2026-11-18"]);
   });
 
   it("returns up to three nearby days in date order, even when a batch answers more", async () => {
