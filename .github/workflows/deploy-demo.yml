@@ -1,0 +1,114 @@
+name: deploy-demo
+
+# Redeploys the hosted demo (ADR-0022, decision 10) on every change that reaches it. Nothing runs until the owner
+# sets the DEMO_SSH_HOST secret on the `demo` environment: without it every step is skipped and the run is green.
+# CI already runs typecheck and tests on the same commit, so this workflow does not repeat them.
+# Setup and runbook: docs/deploy.md#hosted-demo.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/api/**
+      - apps/web/**
+      - apps/widget/**
+      - packages/**
+      - db/**
+      - pnpm-lock.yaml
+      - compose.demo.yaml
+      - .github/workflows/deploy-demo.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time. A newer push waits for the running one instead of cancelling it half way.
+concurrency:
+  group: deploy-demo
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: demo
+    env:
+      DEMO_SSH_HOST: ${{ secrets.DEMO_SSH_HOST }}
+      DEMO_SSH_USER: ${{ secrets.DEMO_SSH_USER }}
+      DEMO_SSH_KEY: ${{ secrets.DEMO_SSH_KEY }}
+      DEMO_SSH_PORT: ${{ secrets.DEMO_SSH_PORT }}
+      DEMO_SSH_KNOWN_HOSTS: ${{ secrets.DEMO_SSH_KNOWN_HOSTS }}
+      # Repository variables, optional. The directory is relative to the SSH user's home.
+      DEMO_DIR: ${{ vars.DEMO_DIR || 'opencovers' }}
+      DEMO_URL: ${{ vars.DEMO_URL || 'https://demo.opencovers.dev' }}
+    steps:
+      - name: Check the demo is configured
+        id: cfg
+        run: |
+          if [ -z "$DEMO_SSH_HOST" ]; then
+            echo "DEMO_SSH_HOST is not set on the demo environment. Skipping the deploy."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          elif [ -z "$DEMO_SSH_USER" ] || [ -z "$DEMO_SSH_KEY" ]; then
+            echo "::error::DEMO_SSH_HOST is set but DEMO_SSH_USER or DEMO_SSH_KEY is missing."
+            exit 1
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare SSH
+        if: steps.cfg.outputs.go == 'true'
+        run: |
+          install -d -m 700 ~/.ssh
+          (umask 077 && printf '%s\n' "$DEMO_SSH_KEY" > ~/.ssh/demo_key)
+          port="${DEMO_SSH_PORT:-22}"
+          if [ -n "$DEMO_SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$DEMO_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "::warning::DEMO_SSH_KNOWN_HOSTS is not set. Trusting the host key on first contact. Set it to pin the key."
+            ssh-keyscan -p "$port" -H -- "$DEMO_SSH_HOST" > ~/.ssh/known_hosts 2>/dev/null
+          fi
+          [ -s ~/.ssh/known_hosts ] || { echo "::error::Could not read the server's SSH host key."; exit 1; }
+
+      - name: Pull this commit and rebuild the stack
+        if: steps.cfg.outputs.go == 'true'
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          ssh -i ~/.ssh/demo_key -p "${DEMO_SSH_PORT:-22}" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$DEMO_SSH_USER@$DEMO_SSH_HOST" bash -s -- "$SHA" "$DEMO_DIR" <<'REMOTE'
+          set -euo pipefail
+          sha=$1
+          dir=$2
+          cd "$dir"
+          test -f .env.demo || { echo ".env.demo is missing in $PWD"; exit 1; }
+          git fetch --quiet origin main
+          git checkout --quiet --force --detach "$sha"
+          dc="docker compose --env-file .env.demo -f compose.demo.yaml"
+          $dc up -d --build --wait --remove-orphans
+          # The API image also migrates at start. This run is idempotent and shows the result in the log.
+          $dc exec -T api pnpm db:migrate
+          $dc ps
+          docker image prune -f >/dev/null
+          REMOTE
+
+      - name: Health check
+        if: steps.cfg.outputs.go == 'true'
+        run: |
+          retry=(--retry 10 --retry-delay 6 --retry-all-errors --max-time 20)
+          echo "web"
+          curl -fsS "${retry[@]}" -o /dev/null "$DEMO_URL/"
+          echo "api"
+          curl -fsS "${retry[@]}" "$DEMO_URL/health"
+          echo
+          echo "demo mode on (a server without DEMO_MODE=1 answers enabled:false and fails this check)"
+          body=$(curl -fsS "${retry[@]}" "$DEMO_URL/api/demo/status")
+          echo "$body"
+          case "$body" in
+            *'"enabled":true'*) ;;
+            *) echo "::error::$DEMO_URL/api/demo/status did not report enabled:true"; exit 1 ;;
+          esac
+
+      - name: Remove the SSH key
+        if: always() && steps.cfg.outputs.go == 'true'
+        run: rm -f ~/.ssh/demo_key

@@ -234,7 +234,110 @@ pnpm demo:leads               # print consented, not withdrawn visitors, as CSV
 pnpm demo:leads --erase EMAIL # delete one address's lead row (an erasure request)
 ```
 
-`demo:cleanup` deletes sandboxes whose owner last signed in over 14 days ago, with their accounts, one transaction per sandbox, so a failure is retried by the next run. It also deletes accounts with no sandbox that are older than 14 days with no recent session (a refused or failed first sign-in), and consented leads 12 months after `last_seen_at`. It never keeps a lead row without consent. It never deletes a venue that has no `demo_sandbox` row, nor an account that is a member of such a venue, and it refuses to run unless `DEMO_MODE=1` and the database passes the startup guard. Schedule it daily. Both commands also run inside the API container with `pnpm --filter @opencovers/api demo:cleanup`. The hosted demo's compose file, deploy workflow and staff app screens are separate work.
+`demo:cleanup` deletes sandboxes whose owner last signed in over 14 days ago, with their accounts, one transaction per sandbox, so a failure is retried by the next run. It also deletes accounts with no sandbox that are older than 14 days with no recent session (a refused or failed first sign-in), and consented leads 12 months after `last_seen_at`. It never keeps a lead row without consent. It never deletes a venue that has no `demo_sandbox` row, nor an account that is a member of such a venue, and it refuses to run unless `DEMO_MODE=1` and the database passes the startup guard. Schedule it daily; `compose.demo.yaml` does (see the runbook below). Both commands also run inside the API container with `pnpm --filter @opencovers/api demo:cleanup`.
+
+### Runbook: put the demo online
+
+The repository ships the pieces. The project's own demo is `demo.opencovers.dev`, with the booking widget at `book.demo.opencovers.dev`, on one VPS with Docker. These are defaults. Change them in `.env.demo` and in the repository variables below.
+
+| File | What it is |
+| --- | --- |
+| `compose.demo.yaml` | The stack: `db`, `api` (`DEMO_MODE=1`, `NODE_ENV=production`, `SIGNUP=closed`), `cleanup` and `web` (Caddy plus the staff app build). Project name `opencovers-demo`, so its volumes are `opencovers-demo_pgdata` and `opencovers-demo_caddy_data`, never those of `compose.prod.yaml`. |
+| `.env.demo.example` | Every variable, with comments. Copy it to `.env.demo` on the server. `.env.demo` is git-ignored. |
+| `apps/web/Caddyfile` | The same Caddyfile as production. The staff host serves the app, `/api`, `/v1` and `/health`, and answers 404 on `/w/*` and `/r`. The widget host serves only `/w/*`, `/r`, `/favicon.ico` and `/v1/public/*`. |
+| `.github/workflows/deploy-demo.yml` | Redeploys the demo over SSH on every push to `main` that touches the API, web, widget, database, lockfile or the compose file. |
+| `apps/site/demo.json` | The site's "Probar la demo" and "Try the demo" button. Empty means no button. |
+
+**1. DNS.** Two records at your DNS provider, both pointing at the server (`A`, plus `AAAA` if it has IPv6): `demo.opencovers.dev` and `book.demo.opencovers.dev`. Caddy gets the TLS certificates from Let's Encrypt on the first request, so the records must resolve and ports 80 and 443 must be open before you start the stack. Open no other port. Never publish the `api` port.
+
+**2. Resend.** Add a sending domain in Resend (the project suggests `opencovers.dev`), publish the DKIM, SPF and return-path records it lists, and wait for it to verify. Create an API key with sending access. `RESEND_FROM_EMAIL` must be an address on that domain, such as `OpenCovers <demo@opencovers.dev>`. The API refuses to start in production demo mode without both values, and so does `pnpm demo:cleanup`.
+
+**3. Google sign-in (optional).** In Google Cloud, create an OAuth client of type Web application and a consent screen. Add the authorized redirect URI `https://demo.opencovers.dev/api/auth/callback/google`. Put the client ID and secret in `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Set both or neither. The consent screen needs the privacy policy link and, before it leaves testing mode, Google's own verification.
+
+**4. The server.** Any VPS with Docker Engine and the Compose plugin. 2 vCPU and 2 GB of RAM are a reasonable start for the default caps (a guess, not measured). Create a user for the deploy, let it use Docker, and clone the repository once:
+
+```sh
+git clone https://github.com/David-Cabeza/OpenCovers.git opencovers   # in the deploy user's home
+cd opencovers
+cp .env.demo.example .env.demo
+chmod 600 .env.demo
+openssl rand -base64 32   # BETTER_AUTH_SECRET
+openssl rand -base64 32   # BLOCKLIST_KEY, a different value
+openssl rand -hex 16      # POSTGRES_PASSWORD, letters and digits only
+```
+
+Paste the three values into `.env.demo` and fill the Resend (and Google) values.
+
+**5. First deploy.** By hand, to see it work before the workflow does it for you:
+
+```sh
+docker compose --env-file .env.demo -f compose.demo.yaml up -d --build --wait
+curl -fsS https://demo.opencovers.dev/health
+```
+
+The API migrates the database when it starts. Never point `.env.demo` at a database that holds real data: the startup guard refuses a database that has venues the demo did not create.
+
+**6. Deploys on every push to `main`.** In the repository settings, create an environment named `demo` and add these secrets to it:
+
+| Secret | Value |
+| --- | --- |
+| `DEMO_SSH_HOST` | The server's address. While it is empty the workflow skips every step and the run is green. |
+| `DEMO_SSH_USER` | The deploy user. |
+| `DEMO_SSH_KEY` | A private key (ed25519) whose public half is in the user's `authorized_keys`. Use a key made for this, with no other access. |
+| `DEMO_SSH_PORT` | Optional. Default 22. |
+| `DEMO_SSH_KNOWN_HOSTS` | Optional but recommended: the output of `ssh-keyscan -p PORT HOST`, taken from a network you trust. Without it the workflow trusts the host key it sees on first contact, and warns. |
+
+Optional repository variables: `DEMO_DIR` (the clone's path under the user's home, default `opencovers`) and `DEMO_URL` (default `https://demo.opencovers.dev`). A deploy fetches `main`, checks out the pushed commit, runs `docker compose ... up -d --build --wait --remove-orphans` and `pnpm db:migrate`, then checks the staff app, `/health` and the demo's challenge route (it answers only under `DEMO_MODE=1`) from the runner. Deploys never overlap. Run one by hand from Actions, `deploy-demo`, Run workflow. Add a required reviewer to the `demo` environment if you want a pause before each deploy.
+
+**7. Read the leads.** On the server, in the clone (`$dc` stands for this Compose command in the steps that follow):
+
+```sh
+dc="docker compose --env-file .env.demo -f compose.demo.yaml"
+$dc exec -T api pnpm --silent demo:leads > leads.csv
+$dc exec -T api pnpm --silent demo:leads --erase visitor@example.com
+```
+
+The CSV has `email,name,source,locale,created_at,last_seen_at,consent_text_version`, only for visitors who ticked the contact box and have not withdrawn. Handle it as personal data: keep it off shared drives and delete it when you are done. The `--erase` form answers an erasure request.
+
+**8. Housekeeping.** The `cleanup` service runs `pnpm demo:cleanup` when the stack starts and every 24 hours after. To run it now: `$dc exec -T api pnpm demo:cleanup`. Its log is `$dc logs cleanup`.
+
+**9. Reset the demo.** This deletes every sandbox, account and lead. Export the leads first if you want them.
+
+```sh
+$dc down -v
+$dc up -d --build --wait
+```
+
+`down -v` removes only this project's volumes. To drop sandboxes and keep the leads, there is no shortcut: let `demo:cleanup` age the sandboxes out.
+
+**10. Take the demo down.** Set `url` in `apps/site/demo.json` back to `""` and merge, so the site stops linking to it. Then on the server `$dc down` stops it and keeps the data, and `$dc down -v` deletes the data too. To stop automatic deploys, remove `DEMO_SSH_HOST` from the `demo` environment.
+
+**Backups.** The stack does not back up the database. A demo can be rebuilt and sandboxes expire in 14 days. The exception is the leads: export them (step 7) on a schedule you choose. A `pg_dump` cron on the host is the next step if you want more.
+
+**What the repository checks do not cover.** A real deploy to a server, Let's Encrypt, Resend delivery and Google sign-in need your accounts. The repository checks cover the compose file, the Caddy host rules (`STAFF_HOST=demo.opencovers.dev WIDGET_HOST=book.demo.opencovers.dev bash scripts/check-caddy-widget.sh`) and the workflow's syntax.
+
+#### Privacy notice wording for the demo
+
+`apps/site/public/privacidad.html` does not mention the demo yet, and the demo stores visitor data. Before opening the demo, add wording like this and have it reviewed. It is a draft, not legal advice.
+
+> **Demo alojada.** Si pruebas la demo en demo.opencovers.dev guardamos tu dirección de correo (o la que verifica Google) para crear tu restaurante de prueba y enviarte el enlace de acceso. Tu restaurante de prueba y tu cuenta se borran tras 14 días sin acceso. Si marcas la casilla de contacto, guardamos además tu correo, tu nombre si lo das, el idioma y la fecha, para escribirte sobre OpenCovers, durante un máximo de 12 meses desde tu último acceso. Puedes retirar el consentimiento o pedir el borrado escribiendo a [contacto].
+>
+> **Hosted demo.** If you try the demo at demo.opencovers.dev we store your email address (or the one Google verifies) to create your sandbox restaurant and send you the sign-in link. The sandbox and your account are deleted after 14 days without sign-in. If you tick the contact box we also keep your email, your name if you give one, the language and the date, to write to you about OpenCovers, for at most 12 months after your last sign-in. You can withdraw consent or ask for erasure by writing to [contact].
+
+Resend (email) and Google (sign-in) process that data, so the privacy page should name them. The consent text version is `v1` (`CONSENT_TEXT_VERSION` in `apps/api/src/demo/settings.ts`). A new wording needs a new version, which the sign-in form and `POST /api/demo/consent` must send together.
+
+#### Launch checklist
+
+- [ ] Legal review of the consent text (`v1`) and of the privacy notice above, including the legal basis for storing leads and for sending news, and who the controller is. Do not open the demo to the public before this.
+- [ ] `privacidad.html` carries the demo wording, with a real contact address.
+- [ ] DNS records resolve, and ports 80 and 443 are open on the server and nothing else.
+- [ ] Resend domain verified, and a test magic link reaches a real inbox (check spam too).
+- [ ] Google client created, its redirect URI added, and a test sign-in works (or both Google variables left empty).
+- [ ] The sign-in screens (the staff app's demo UI) are on `main`, so the demo has a way in.
+- [ ] `https://demo.opencovers.dev/health` answers, and a new visitor reaches a sandbox whose `/w/{bookingKey}` page opens on `book.demo.opencovers.dev`.
+- [ ] The caps (`DEMO_MAX_SANDBOXES`, `DEMO_MAX_NEW_PER_DAY`) fit the server and your email plan.
+- [ ] `DEMO_SSH_*` secrets set on the `demo` environment, and one manual run of `deploy-demo` is green.
+- [ ] Last: set `url` in `apps/site/demo.json` to `https://demo.opencovers.dev` and merge. Ship the button only once the demo is live. The site then links to it from the Spanish hero, the English page and `llms.txt`.
 
 ## Public site
 
