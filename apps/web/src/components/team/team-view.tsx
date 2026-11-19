@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, Trash2Icon, UserCogIcon } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PageHeader } from "@/components/layout/page-header";
 import { Pill, type PillTone } from "@/components/pill";
 import { Stat } from "@/components/stat";
@@ -205,6 +206,7 @@ function InvitationsCard({ venueId }: { venueId: string }) {
     queryFn: () => api.listInvitations(venueId),
   });
   const invitations = data?.invitations ?? [];
+  const [revoking, setRevoking] = useState<Invitation | null>(null);
 
   const revoke = useMutation({
     mutationFn: (id: string) => api.revokeInvitation(venueId, id),
@@ -213,6 +215,7 @@ function InvitationsCard({ venueId }: { venueId: string }) {
       toast.success("Invitation revoked");
     },
     onError: (err) => toast.error(errorMessage(err, "Could not revoke the invitation.")),
+    onSettled: () => setRevoking(null),
   });
 
   return (
@@ -247,7 +250,7 @@ function InvitationsCard({ venueId }: { venueId: string }) {
                     {i.status}
                   </Pill>
                   {i.status === "pending" && (
-                    <Button variant="ghost" size="sm" onClick={() => revoke.mutate(i.id)}>
+                    <Button variant="ghost" size="sm" onClick={() => setRevoking(i)}>
                       Revoke
                     </Button>
                   )}
@@ -257,6 +260,16 @@ function InvitationsCard({ venueId }: { venueId: string }) {
           </ul>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={revoking !== null}
+        title={`Revoke the invitation for ${revoking?.email ?? "this open link"}?`}
+        description="The link or token you already sent stops working. You can create a new invitation later."
+        confirmLabel="Revoke invitation"
+        keepLabel="Keep invitation"
+        pending={revoke.isPending}
+        onConfirm={() => revoking && revoke.mutate(revoking.id)}
+        onClose={() => setRevoking(null)}
+      />
     </Card>
   );
 }
