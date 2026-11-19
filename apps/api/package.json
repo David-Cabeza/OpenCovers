@@ -10,7 +10,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=../../.env src/db/run-migrate.ts",
     "db:seed-demo": "tsx --env-file-if-exists=../../.env src/db/seed-demo.ts",
-    "demo:seed": "tsx src/demo/seed-demo-venue.ts"
+    "demo:seed": "tsx src/demo/seed-demo-venue.ts",
+    "demo:cleanup": "tsx --env-file-if-exists=../../.env src/demo/cleanup-cli.ts",
+    "demo:leads": "tsx --env-file-if-exists=../../.env src/demo/leads-cli.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.8",

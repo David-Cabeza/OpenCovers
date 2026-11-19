@@ -1,5 +1,7 @@
 // Full demo venue for screenshots and videos. Local use only. Built through the public HTTP API
-// of a running API (`pnpm dev`), so it exercises the same paths a real client does.
+// of a running API (`pnpm dev`), so it exercises the same paths a real client does. What it builds comes from
+// ./template.ts, the same definition `provisionSandbox` uses for the hosted demo (ADR-0022); only the second
+// team member, the API keys and the printed MCP config are specific to this script.
 //
 //   pnpm demo:seed
 //   ALLDAY=1 pnpm demo:seed      # one service 09:00-23:45, so walk-ins and the waitlist work at any hour
@@ -14,6 +16,7 @@
 // OWNER_NAME, MEMBER_EMAIL, MEMBER_PASSWORD. The default passwords is a local-development value that is public in the
 // source. Every guest is invented and uses an example.com address.
 import { randomUUID } from "node:crypto";
+import { DEMO_TEMPLATE, planReservations, settle, templateServices, timeInTz } from "./template";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const EMAIL = process.env.EMAIL ?? "demo@opencovers.test";
@@ -22,9 +25,9 @@ const OWNER_NAME = process.env.OWNER_NAME ?? "Marta Quiroga";
 const MEMBER_NAME = "Andres Roca";
 const MEMBER_EMAIL = process.env.MEMBER_EMAIL ?? "andres.roca@example.com";
 const MEMBER_PASSWORD = process.env.MEMBER_PASSWORD ?? "demo-member-123";
-const PENDING_INVITE_EMAIL = "sala@example.com";
-const VENUE_NAME = "La Taberna del Faro";
-const TZ = "Europe/Madrid";
+const PENDING_INVITE_EMAIL = DEMO_TEMPLATE.pendingInvitation.email;
+const VENUE_NAME = DEMO_TEMPLATE.venue.name;
+const TZ = DEMO_TEMPLATE.venue.timezone;
 const ALLDAY = process.env.ALLDAY === "1";
 
 if (process.env.NODE_ENV === "production") {
@@ -76,12 +79,7 @@ function soft(r: Reply, what: string): Json | null {
   return r.status < 400 ? (r.json ?? {}) : null;
 }
 
-const dateInTz = (offsetDays: number) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(
-    new Date(Date.now() + offsetDays * 864e5),
-  );
-const nowHHMM = () =>
-  new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+const nowHHMM = () => timeInTz(TZ);
 
 try {
   await fetch(BASE + "/health");
@@ -103,7 +101,7 @@ if ((mine.venues ?? []).some((v: Json) => v.name === VENUE_NAME)) {
   console.error(`Venue "${VENUE_NAME}" already exists for ${EMAIL}. Use a fresh database or another EMAIL.`);
   process.exit(1);
 }
-const VENUE = must(await api("POST", "/v1/venues", { body: { name: VENUE_NAME, timezone: TZ } }), "create venue").venue.id as string;
+const VENUE = must(await api("POST", "/v1/venues", { body: DEMO_TEMPLATE.venue }), "create venue").venue.id as string;
 const V = `/v1/venues/${VENUE}`;
 console.log(`venue ${VENUE} created`);
 
@@ -129,139 +127,69 @@ if (memberReply.status !== 200) {
     "redeem the invitation as the second member",
   );
 }
-must(await api("POST", `${V}/invitations`, { body: { role: "read", email: PENDING_INVITE_EMAIL } }), "pending invitation");
+must(await api("POST", `${V}/invitations`, { body: DEMO_TEMPLATE.pendingInvitation }), "pending invitation");
 console.log(`team: ${MEMBER_NAME} (write) joined, invitation for ${PENDING_INVITE_EMAIL} (read) pending`);
 
-const services = ALLDAY
-  ? [{ name: "Todo el dia", openStart: "09:00", openEnd: "23:45", minPartySize: 1, maxPartySize: 12 }]
-  : [
-      { name: "Comidas", openStart: "13:00", openEnd: "16:30", minPartySize: 1, maxPartySize: 10 },
-      { name: "Cenas", openStart: "20:00", openEnd: "23:30", minPartySize: 1, maxPartySize: 12 },
-    ];
-for (const s of services) must(await api("POST", `${V}/services`, { body: s }), `service ${s.name}`);
+for (const s of templateServices(DEMO_TEMPLATE, ALLDAY)) must(await api("POST", `${V}/services`, { body: s }), `service ${s.name}`);
 
-const tables: [string, string, number, string, string, number, number][] = [
-  ["1", "Mesa 1", 2, "Sala", "square", 60, 60],
-  ["2", "Mesa 2", 2, "Sala", "square", 200, 60],
-  ["3", "Mesa 3", 4, "Sala", "round", 340, 60],
-  ["4", "Mesa 4", 4, "Sala", "round", 480, 60],
-  ["5", "Mesa 5", 4, "Sala", "round", 60, 200],
-  ["6", "Mesa 6", 6, "Sala", "rect", 200, 200],
-  ["7", "Mesa 7", 6, "Sala", "rect", 360, 200],
-  ["8", "Mesa 8", 8, "Sala", "rect", 60, 340],
-  ["T1", "Terraza 1", 2, "Terraza", "square", 700, 60],
-  ["T2", "Terraza 2", 2, "Terraza", "square", 700, 200],
-  ["T3", "Terraza 3", 4, "Terraza", "round", 840, 60],
-  ["T4", "Terraza 4", 4, "Terraza", "round", 840, 200],
-];
-for (const [id, name, seats, zone, shape, x, y] of tables) {
-  must(await api("POST", `${V}/tables`, { body: { id, name, seats, zone, shape } }), `table ${name}`);
-  must(await api("PATCH", `${V}/tables/${id}`, { body: { x, y, rotation: 0 } }), `layout ${name}`);
+for (const t of DEMO_TEMPLATE.tables) {
+  must(
+    await api("POST", `${V}/tables`, { body: { id: t.id, name: t.name, seats: t.seats, zone: t.zone, shape: t.shape } }),
+    `table ${t.name}`,
+  );
+  must(await api("PATCH", `${V}/tables/${t.id}`, { body: { x: t.x, y: t.y, rotation: 0 } }), `layout ${t.name}`);
 }
-for (const item of [
-  { type: "bar", label: "Barra", posX: 300, posY: 360, width: 260, height: 48 },
-  { type: "kitchen", label: "Cocina", posX: 620, posY: 340, width: 160, height: 100 },
-  { type: "entrance", label: "Entrada", posX: 20, posY: 440, width: 100, height: 24 },
-  { type: "plant", label: "", posX: 540, posY: 200, width: 40, height: 40 },
-]) {
+for (const item of DEMO_TEMPLATE.floorItems) {
   soft(await api("POST", `${V}/floor-items`, { body: item }), `floor item ${item.type}`);
 }
 
-must(
-  await api("PUT", `${V}/config`, { body: { maxAdvanceDays: 90, maxActivePerGuestPerDay: 3, overbookingCeiling: 0 } }),
-  "booking policy",
-);
-soft(
-  await api("PUT", `${V}/public-profile`, {
-    body: {
-      publicProfileEnabled: true,
-      street: "Calle del Faro 7",
-      locality: "Madrid",
-      postalCode: "28012",
-      region: "Madrid",
-      country: "ES",
-      cuisine: "Cocina mediterranea de mercado",
-      phone: "+34 910 555 010",
-    },
-  }),
-  "public profile",
-);
+must(await api("PUT", `${V}/config`, { body: DEMO_TEMPLATE.config }), "booking policy");
+soft(await api("PUT", `${V}/public-profile`, { body: DEMO_TEMPLATE.publicProfile }), "public profile");
 const onlineBooking = soft(
   await api("PUT", `${V}/online-booking`, {
-    body: {
-      enabled: true,
-      allowedOrigins: ["https://tabernadelfaro.example"],
-      askConsent: true,
-      minPartySize: 1,
-      maxPartySize: 8,
-      leadTimeMinutes: 0,
-      maxAdvanceDays: 60,
-      selfServiceCutoffMinutes: 120,
-      locale: "es",
-    },
+    body: { ...DEMO_TEMPLATE.onlineBooking, allowedOrigins: ["https://tabernadelfaro.example"] },
   }),
   "online booking",
 );
 
-const guests = [
-  ["Lucia Prado", "lucia.prado"], ["Pablo Serrano", "pablo.serrano"], ["Irene Molina", "irene.molina"],
-  ["Hector Gil", "hector.gil"], ["Carmen Ortiz", "carmen.ortiz"], ["Diego Ferrer", "diego.ferrer"],
-  ["Noelia Vidal", "noelia.vidal"], ["Raul Campos", "raul.campos"], ["Paula Iglesias", "paula.iglesias"],
-  ["Adrian Mora", "adrian.mora"], ["Sara Beltran", "sara.beltran"], ["Javier Roldan", "javier.roldan"],
-  ["Marina Cuesta", "marina.cuesta"], ["Oscar Pena", "oscar.pena"], ["Elena Santos", "elena.santos"],
-  ["Tomas Aguilar", "tomas.aguilar"], ["Alba Ruiz", "alba.ruiz"], ["Victor Lara", "victor.lara"],
-] as const;
-const slots = ["13:00", "13:30", "14:00", "14:30", "15:00", "20:00", "20:30", "21:00", "21:30", "22:00"];
-const parties = [2, 2, 4, 3, 2, 6, 4, 2, 5, 2, 8, 4];
 const created: { id: string; time: string; partySize: number; day: number }[] = [];
-let g = 0;
-for (let day = 0; day <= 3; day += 1) {
-  const date = dateInTz(day);
-  for (let i = 0; i < slots.length; i += 1) {
-    if ((i + day) % 2 === 1 && day > 0) continue;
-    const [name, local] = guests[g % guests.length]!;
-    const partySize = parties[g % parties.length]!;
-    g += 1;
-    const out = soft(
-      await api("POST", `${V}/reservations`, {
-        key: true,
-        body: {
-          date,
-          time: slots[i],
-          partySize,
-          guest: { name, contact: `${local}@example.com`, consent: "granted" },
-          commentary: i === 3 ? "Cumpleanos, una vela en el postre" : "",
-        },
-      }),
-      `reservation ${date} ${slots[i]}`,
-    );
-    if (out) created.push({ id: out.id, time: out.time, partySize: out.partySize, day });
-  }
+for (const p of planReservations(DEMO_TEMPLATE)) {
+  const out = soft(
+    await api("POST", `${V}/reservations`, {
+      key: true,
+      body: {
+        date: p.date,
+        time: p.time,
+        partySize: p.partySize,
+        guest: { name: p.guestName, contact: p.contact, consent: "granted" },
+        commentary: p.commentary,
+      },
+    }),
+    `reservation ${p.date} ${p.time}`,
+  );
+  if (out) created.push({ id: out.id, time: out.time, partySize: out.partySize, day: p.day });
 }
 
-const now = nowHHMM();
-for (const [n, res] of created.filter((x) => x.day === 0 && x.time < now).entries()) {
-  const path = `${V}/reservations/${res.id}`;
-  if (n % 5 === 4) soft(await api("POST", `${path}/status`, { key: true, body: { status: "no_show" } }), "no_show");
-  else if (n % 5 === 3) soft(await api("POST", `${path}/cancel`, { key: true }), "cancel");
-  else {
-    soft(await api("POST", `${path}/status`, { key: true, body: { status: "seated" } }), "seated");
-    if (n % 2 === 0) soft(await api("POST", `${path}/status`, { key: true, body: { status: "attended" } }), "attended");
-  }
-}
-const future = created.find((x) => x.day === 1);
-if (future) {
-  soft(await api("POST", `${V}/reservations/${future.id}/modify`, { key: true, body: { partySize: future.partySize + 1 } }), "modify");
+for (const s of settle(created, nowHHMM())) {
+  const path = `${V}/reservations/${created[s.index]!.id}`;
+  if (s.action === "cancel") soft(await api("POST", `${path}/cancel`, { key: true }), "cancel");
+  else if (s.action === "modify") soft(await api("POST", `${path}/modify`, { key: true, body: { partySize: s.partySize } }), "modify");
+  else soft(await api("POST", `${path}/status`, { key: true, body: { status: s.action } }), s.action);
 }
 
-for (const [name, local, partySize] of [
-  ["Familia Herrero", "herrero.familia", 5],
-  ["Cristina Nieto", "cristina.nieto", 2],
-] as const) {
-  soft(await api("POST", `${V}/waitlist`, { body: { partySize, guest: { name, contact: `${local}@example.com` } } }), "waitlist add");
+for (const w of DEMO_TEMPLATE.waitlist) {
+  soft(
+    await api("POST", `${V}/waitlist`, {
+      body: { partySize: w.partySize, guest: { name: w.name, contact: `${w.local}@example.com` } },
+    }),
+    "waitlist add",
+  );
 }
 soft(
-  await api("POST", `${V}/reservations/walk-in`, { key: true, body: { partySize: 2, guest: { name: "Mesa de barra" } } }),
+  await api("POST", `${V}/reservations/walk-in`, {
+    key: true,
+    body: { partySize: DEMO_TEMPLATE.walkIn.partySize, guest: { name: DEMO_TEMPLATE.walkIn.name } },
+  }),
   "walk-in (only works while a service is open)",
 );
 

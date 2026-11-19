@@ -48,6 +48,7 @@ The staff app dev server proxies `/api`, `/v1` and `/w` to the API on :3000, so 
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `test:`, `chore:`. One flag (scoped task) per pull request, small diffs, tests with behavior changes.
 - A change to the contract needs `docs/contract/openapi.yaml`, `docs/contract/conformance.md` and `conformance-status.md` updated together.
 - Decisions that change architecture, contract or security go in `docs/adr/` (start from `TEMPLATE.md`).
+- A feature that adds a screen or a setting also adds it to the demo template (`apps/api/src/demo/template.ts`), so the hosted demo shows it (ADR-0022).
 - TypeScript strict, ESM (`"type": "module"`). LF line endings (`.gitattributes`), 2-space indent (`.editorconfig`).
 - Public docs (README, CONTRIBUTING, contract) are in English. The website copy (`apps/site`) is in Spanish, except the English page `/en/` and `llms.txt`.
 

@@ -1,5 +1,6 @@
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 import { reservations, sentEmails, venues } from "../db/schema";
+import { mayEmail } from "../demo/limits";
 import { normalizeContact } from "./contact";
 import { buildLinkEmail, canSendEmail, sendEmail, type LinkLine } from "./mailer";
 import type { PublicVenue } from "./public-booking";
@@ -98,6 +99,7 @@ export async function resendLinks(db: Db, { venue, settings }: PublicVenue, emai
       return lines.length > 0 ? { to, lines } : null;
     });
     if (!mail) return;
+    if (!(await mayEmail(db, venue.id, mail.to))) return;
     const { subject, text } = buildLinkEmail(mail.lines);
     await sendEmail(venue.resendApiKey ?? "", venue.fromEmail, mail.to, subject, text);
   } catch (err) {
