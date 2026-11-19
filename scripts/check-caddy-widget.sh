@@ -5,6 +5,10 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 caddyfile=${CADDYFILE:-$root/apps/web/Caddyfile}
+# The two hosts the check sends in the Host header. The demo stack uses the same Caddyfile with its own hosts:
+#   STAFF_HOST=demo.opencovers.dev WIDGET_HOST=book.demo.opencovers.dev bash scripts/check-caddy-widget.sh
+staff=${STAFF_HOST:-staff.test}
+widget=${WIDGET_HOST:-book.test}
 name="oc-caddy-check-$$"
 cleanup() {
   docker rm -f "$name-api" "$name-caddy" >/dev/null 2>&1 || true
@@ -37,7 +41,7 @@ require("http").createServer((req, res) => {
   });
 }).listen(3000)' >/dev/null
 docker run -d --name "$name-caddy" --network "$name" --network-alias caddy \
-  -e SITE_ADDRESS=http://staff.test -e WIDGET_ADDRESS=http://book.test \
+  -e "SITE_ADDRESS=http://$staff" -e "WIDGET_ADDRESS=http://$widget" \
   -v "$caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine >/dev/null
 sleep 2
 
@@ -70,17 +74,17 @@ check() {
   if [ "$found" = "$want" ]; then echo "ok    $label"; else echo "FAIL  $label"; failures=$((failures + 1)); fi
 }
 
-out=$(get staff.test /w/pk_AAAAAAAAAAAAAAAAAAAAAA)
+out=$(get "$staff" /w/pk_AAAAAAAAAAAAAAAAAAAAAA)
 check "staff /w/*: 404" "HTTP/1.1 404" "$out" yes
 check "staff /w/*: X-Frame-Options DENY" "X-Frame-Options: DENY" "$out" yes
 check "staff /w/*: frame-ancestors 'none'" "Content-Security-Policy: .*frame-ancestors 'none'" "$out" yes
 check "staff /w/*: never reaches the API" "upstream" "$out" no
 
-out=$(get staff.test /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA)
+out=$(get "$staff" /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA)
 check "staff /v1/*: X-Frame-Options DENY" "X-Frame-Options: DENY" "$out" yes
 check "staff /v1/*: frame-ancestors 'none'" "frame-ancestors 'none'" "$out" yes
 
-out=$(get book.test /w/pk_AAAAAAAAAAAAAAAAAAAAAA)
+out=$(get "$widget" /w/pk_AAAAAAAAAAAAAAAAAAAAAA)
 check "widget /w/*: 200 from the API" "upstream" "$out" yes
 check "widget /w/*: no X-Frame-Options" "X-Frame-Options" "$out" no
 check "widget /w/*: the API's frame-ancestors" "frame-ancestors 'self' https://casa.example" "$out" yes
@@ -88,49 +92,49 @@ check "widget /w/*: no frame-ancestors 'none'" "frame-ancestors 'none'" "$out" n
 check "widget /w/*: client X-Forwarded-For replaced" "xff=203.0.113.9" "$out" no
 check "widget: no Server header" "^ *Server:" "$out" no
 
-out=$(get staff.test /w/embed.js)
+out=$(get "$staff" /w/embed.js)
 check "staff /w/embed.js: 404" "HTTP/1.1 404" "$out" yes
 check "staff /w/embed.js: never reaches the API" "upstream" "$out" no
 
-out=$(get book.test /w/embed.js)
+out=$(get "$widget" /w/embed.js)
 check "widget /w/embed.js: 200 from the API" "upstream" "$out" yes
 check "widget /w/embed.js: the API's script type" "Content-Type: text/javascript" "$out" yes
 check "widget /w/embed.js: the API's Cross-Origin-Resource-Policy" "Cross-Origin-Resource-Policy: cross-origin" "$out" yes
 check "widget /w/embed.js: nosniff" "X-Content-Type-Options: nosniff" "$out" yes
 check "widget /w/embed.js: no X-Frame-Options" "X-Frame-Options" "$out" no
 
-out=$(get book.test /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA)
+out=$(get "$widget" /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA)
 check "widget /v1/public/*: 200 from the API" "upstream" "$out" yes
 check "widget /v1/public/*: frame-ancestors 'none'" "Content-Security-Policy: .*frame-ancestors 'none'" "$out" yes
 check "widget /v1/public/*: no X-Frame-Options" "X-Frame-Options" "$out" no
 
-out=$(get staff.test "/r?lang=en")
+out=$(get "$staff" "/r?lang=en")
 check "staff /r: 404" "HTTP/1.1 404" "$out" yes
 check "staff /r: never reaches the API" "upstream" "$out" no
 
-out=$(get book.test "/r?lang=en")
+out=$(get "$widget" "/r?lang=en")
 check "widget /r: 200 from the API" "upstream" "$out" yes
 check "widget /r: the API's frame-ancestors 'none'" "Content-Security-Policy: .*frame-ancestors 'none'" "$out" yes
 check "widget /r: the API's X-Frame-Options DENY" "X-Frame-Options: DENY" "$out" yes
 
-out=$(get book.test /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA/reservations 65536)
+out=$(get "$widget" /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA/reservations 65536)
 check "widget body of 64 KB: reaches the API" "bytes=65536" "$out" yes
 for mode in length chunked; do
-  out=$(get book.test /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA/reservations 65537 "$mode")
+  out=$(get "$widget" /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA/reservations 65537 "$mode")
   check "widget body over 64 KB ($mode): 413" "HTTP/1.1 413" "$out" yes
   check "widget body over 64 KB ($mode): not passed whole to the API" "bytes=65537" "$out" no
 done
 
-out=$(get staff.test /v1/venues 1048576)
+out=$(get "$staff" /v1/venues 1048576)
 check "staff body of 1 MB: reaches the API" "bytes=1048576" "$out" yes
 for mode in length chunked; do
-  out=$(get staff.test /v1/venues 1048577 "$mode")
+  out=$(get "$staff" /v1/venues 1048577 "$mode")
   check "staff body over 1 MB ($mode): 413" "HTTP/1.1 413" "$out" yes
   check "staff body over 1 MB ($mode): not passed whole to the API" "bytes=1048577" "$out" no
 done
 
 for path in / /r/ /api/auth/get-session /v1/venues/x/reservations /index.html; do
-  out=$(get book.test "$path")
+  out=$(get "$widget" "$path")
   check "widget $path: 404, not proxied" "HTTP/1.1 404" "$out" yes
 done
 
