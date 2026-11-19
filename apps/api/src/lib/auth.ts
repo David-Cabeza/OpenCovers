@@ -9,9 +9,9 @@ import { admissionFor, admissionForEmail, DemoRefusal, REFUSALS, type Refusal } 
 import { isDisposableEmail } from "../demo/disposable";
 import { touchLead } from "../demo/leads";
 import { normalizeEmail } from "../demo/normalize";
+import { magicLinkChallenges, type MagicLinkChallenges } from "../demo/magic-link-challenge";
 import { provisionSandbox } from "../demo/provision";
 import { demoSettings, type DemoSettings } from "../demo/settings";
-import { verifySignInChallenge } from "../demo/sign-in-challenge";
 import { deleteSandboxlessAccount } from "../demo/cleanup";
 import {
   INVITATION_TOKEN_HEADER,
@@ -68,14 +68,15 @@ export function requireVerifiedGoogleEmail(profile: { email_verified?: boolean }
   return {};
 }
 
+const CHALLENGE_MESSAGES = {
+  CHALLENGE_REQUIRED: "Solve the sign-in challenge first. Ask POST /api/demo/magic-link-challenge for one.",
+  CHALLENGE_INVALID:
+    "The sign-in challenge is wrong, expired, already used or was issued for another address. Ask for a new one.",
+} as const;
+
 const DISPOSABLE = {
   code: "DISPOSABLE_EMAIL",
   message: "Disposable email addresses are not accepted. Use your own address.",
-} as const;
-
-const CHALLENGE_FAILED = {
-  code: "CHALLENGE_FAILED",
-  message: "The proof of work is missing, wrong, too new, too old or already used. Fetch /api/demo/challenge again.",
 } as const;
 
 function refusal(reason: Refusal): APIError {
@@ -86,6 +87,8 @@ function refusal(reason: Refusal): APIError {
 export interface AuthDeps {
   /** Delivers the magic link mail. Default: Resend through `sendEmail`. A test passes a capture. */
   sendMail?: (to: string, subject: string, text: string) => Promise<void>;
+  /** The magic link challenge issuer and checker. Default: the process-wide one. A test passes one with its own clock. */
+  challenges?: () => MagicLinkChallenges;
 }
 
 /**
@@ -93,6 +96,7 @@ export interface AuthDeps {
  * exactly what it was before the demo existed. Exported as a factory so a test can build the demo variant.
  */
 export function createAuth(settings: DemoSettings, deps: AuthDeps = {}) {
+  const challenges = deps.challenges ?? magicLinkChallenges;
   const demo = settings.enabled;
 
   async function onSession(session: { userId: string }) {
@@ -167,10 +171,12 @@ export function createAuth(settings: DemoSettings, deps: AuthDeps = {}) {
             before: createAuthMiddleware(async (ctx) => {
               if (ctx.path !== "/sign-in/magic-link") return;
               const email = (ctx.body as { email?: unknown } | undefined)?.email;
-              // The same signed challenge and proof of work as the public booking form, then the address checks.
-              if (!verifySignInChallenge(ctx.headers ?? undefined)) throw new APIError("BAD_REQUEST", CHALLENGE_FAILED);
+              // A body with no usable address never reaches the limits or the mailer (audit F3c).
               if (typeof email !== "string" || normalizeEmail(email) === null) throw refusal("invalid_address");
               if (isDisposableEmail(email)) throw new APIError("BAD_REQUEST", DISPOSABLE);
+              // ADR-0022, decision 8(a). The answer never depends on whether the address has an account.
+              const challenge = challenges().check(email, ctx.headers ?? undefined);
+              if (challenge) throw new APIError("BAD_REQUEST", { code: challenge, message: CHALLENGE_MESSAGES[challenge] });
               const refused = await admissionForEmail(db, email);
               if (refused) throw refusal(refused);
             }),

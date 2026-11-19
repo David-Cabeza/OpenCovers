@@ -91,6 +91,7 @@ describe("rateLimitConfigFromEnv", () => {
       magic_link: { max: 1, windowMs: 60_000 },
       magic_link_day: { max: 5, windowMs: 24 * 60 * 60_000 },
       magic_link_ip: { max: 10, windowMs: 60 * 60_000 },
+      demo_challenge: { max: 60, windowMs: 60 * 60_000 },
     });
   });
 

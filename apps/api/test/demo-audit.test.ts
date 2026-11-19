@@ -34,7 +34,7 @@ import { normalizeEmail } from "../src/demo/normalize";
 import { provisionSandbox } from "../src/demo/provision";
 import { purgeVenue } from "../src/demo/purge";
 import { demoSettings, poolSettings, sandboxLimits } from "../src/demo/settings";
-import { issueSignInChallenge } from "../src/demo/sign-in-challenge";
+import { CHALLENGE_HEADER, SOLUTION_HEADER, magicLinkChallenges } from "../src/demo/magic-link-challenge";
 import { DEMO_TEMPLATE, dateInTz } from "../src/demo/template";
 import { blocklistKeys } from "../src/lib/blocklist";
 import { addToBlocklist } from "../src/lib/blocklist";
@@ -82,17 +82,18 @@ async function makeUser(email = freshEmail()) {
   return { id, email };
 }
 
-function signInHeaders(extra: Record<string, string> = {}) {
-  const challenge = issueSignInChallenge(Date.now() - 10_000);
+/** The headers a sign-in form sends: a fresh challenge for the address (ADR-0022, decision 8a), solved. */
+function signInHeaders(email: string, extra: Record<string, string> = {}) {
+  const { challenge } = magicLinkChallenges().issue(email);
   return new Headers({
-    "x-demo-challenge": JSON.stringify(challenge),
-    "x-demo-solution": solve(challenge),
+    [CHALLENGE_HEADER]: JSON.stringify(challenge),
+    [SOLUTION_HEADER]: solve(challenge),
     ...extra,
   });
 }
 
 async function signIn(email: string) {
-  await demoAuth.api.signInMagicLink({ body: { email }, headers: signInHeaders() });
+  await demoAuth.api.signInMagicLink({ body: { email }, headers: signInHeaders(email) });
   const mail = sent.filter((m) => m.to === email).pop()!;
   const url = mail.text.match(/https?:\/\/\S+/)![0];
   const token = new URL(url).searchParams.get("token")!;
@@ -347,47 +348,70 @@ describe("F3: magic link abuse", () => {
     for (let i = 0; i < 4; i += 1) expect((await limited.request("/api/auth/sign-in/magic-link", init)).status).toBe(400);
   });
 
-  it("requires the signed challenge and proof of work, once", async () => {
-    const email = freshEmail();
-    await expect(demoAuth.api.signInMagicLink({ body: { email }, headers: new Headers() })).rejects.toMatchObject({
-      body: { code: "CHALLENGE_FAILED" },
+  /** The limiter in front of the real demo auth handler and challenge route, as app.ts composes them. */
+  function front(now: () => number = Date.now) {
+    const host = new Hono();
+    host.use("*", createRateLimiter({ ...rateLimitConfigFromEnv({ RATE_LIMIT: "on", TRUST_PROXY: "true" }), rules: DEFAULT_RULES }, { now }).middleware);
+    host.post("/api/demo/magic-link-challenge", (c) => app.fetch(c.req.raw));
+    host.all("/api/auth/*", (c) => demoAuth.handler(c.req.raw));
+    return host;
+  }
+  function post(host: Hono, path: string, body: string | undefined, headers: Record<string, string> = {}) {
+    return host.request(path, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:5173",
+        "x-forwarded-for": "198.51.100.9",
+        ...(body === undefined ? {} : { "content-length": String(Buffer.byteLength(body)) }),
+        ...headers,
+      },
+      body,
     });
-    const challenge = issueSignInChallenge(Date.now() - 10_000);
-    const good = { "x-demo-challenge": JSON.stringify(challenge), "x-demo-solution": solve(challenge) };
-    // Wrong solution, too new, forged signature.
-    await expect(
-      demoAuth.api.signInMagicLink({ body: { email }, headers: new Headers({ ...good, "x-demo-solution": "99999999" }) }),
-    ).rejects.toMatchObject({ body: { code: "CHALLENGE_FAILED" } });
-    const fresh = issueSignInChallenge();
-    await expect(
-      demoAuth.api.signInMagicLink({
-        body: { email },
-        headers: new Headers({ "x-demo-challenge": JSON.stringify(fresh), "x-demo-solution": solve(fresh) }),
-      }),
-    ).rejects.toMatchObject({ body: { code: "CHALLENGE_FAILED" } });
-    await expect(
-      demoAuth.api.signInMagicLink({
-        body: { email },
-        headers: new Headers({ "x-demo-challenge": JSON.stringify({ ...challenge, signature: "A".repeat(43) }), "x-demo-solution": solve(challenge) }),
-      }),
-    ).rejects.toMatchObject({ body: { code: "CHALLENGE_FAILED" } });
-    expect(sent).toEqual([]);
-    // The good one works once, and a replay of the same challenge does not.
-    await demoAuth.api.signInMagicLink({ body: { email }, headers: new Headers(good) });
+  }
+  const answer = (email: string) => Object.fromEntries(signInHeaders(email).entries());
+
+  it("counts the 7 Gmail spellings as one address, each with a valid challenge: first 200, then 429", async () => {
+    const host = front();
+    const variants = [
+      "victim@gmail.com",
+      "victim+1@gmail.com",
+      "victim+2@gmail.com",
+      "v.ictim@gmail.com",
+      "vi.ctim@gmail.com",
+      "victim@googlemail.com",
+      "VICTIM+3@GMAIL.COM",
+    ];
+    const statuses: number[] = [];
+    for (const email of variants) {
+      // The challenge issued for any spelling is valid for every spelling: they normalize to one subject.
+      statuses.push((await post(host, "/api/auth/sign-in/magic-link", JSON.stringify({ email }), answer(email))).status);
+    }
+    expect(statuses).toEqual([200, 429, 429, 429, 429, 429, 429]);
     expect(sent).toHaveLength(1);
-    await expect(demoAuth.api.signInMagicLink({ body: { email }, headers: new Headers(good) })).rejects.toMatchObject({
-      body: { code: "CHALLENGE_FAILED" },
-    });
   });
 
-  it("serves a challenge at GET /api/demo/challenge in demo mode only", async () => {
-    const res = await app.request("/api/demo/challenge");
+  it("answers 400 to a missing, oversized, non-JSON or unusable body on the link and challenge routes", async () => {
+    const host = front();
+    const email = freshEmail();
+    for (const path of ["/api/auth/sign-in/magic-link", "/api/demo/magic-link-challenge"]) {
+      expect((await post(host, path, undefined)).status).toBe(400);
+      expect((await post(host, path, "not json")).status).toBe(400);
+      expect((await post(host, path, JSON.stringify({ email, pad: "x".repeat(5000) }))).status).toBe(400);
+      expect((await post(host, path, JSON.stringify({ email: "a@example.com,b@example.com" }))).status).toBe(400);
+      expect((await post(host, path, JSON.stringify({}))).status).toBe(400);
+    }
+    expect(sent).toEqual([]);
+  });
+
+  it("issues the challenge for the normalized address, so any spelling of it unlocks the link", async () => {
+    const host = front();
+    const res = await post(host, "/api/demo/magic-link-challenge", JSON.stringify({ email: "Some.One+x@Gmail.com" }));
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { nonce: string; difficulty: number; signature: string; issuedAt: string };
-    expect(body).toMatchObject({ difficulty: 4 });
-    expect(res.headers.get("cache-control")).toBe("no-store");
-    vi.stubEnv("DEMO_MODE", "");
-    expect((await app.request("/api/demo/challenge")).status).toBe(404);
+    const { challenge } = (await res.json()) as { challenge: { nonce: string } };
+    const headers = { [CHALLENGE_HEADER]: JSON.stringify(challenge), [SOLUTION_HEADER]: solve(challenge as never) };
+    const ok = await post(host, "/api/auth/sign-in/magic-link", JSON.stringify({ email: "someone@googlemail.com" }), headers);
+    expect(ok.status).toBe(200);
   });
 });
 
@@ -396,12 +420,12 @@ describe("F4: sandbox farming", () => {
     await signIn("farmer@gmail.com");
     for (const variant of ["farmer+a@gmail.com", "f.armer@gmail.com", "farmer@googlemail.com"]) {
       await expect(
-        demoAuth.api.signInMagicLink({ body: { email: variant }, headers: signInHeaders() }),
+        demoAuth.api.signInMagicLink({ body: { email: variant }, headers: signInHeaders(variant) }),
       ).rejects.toMatchObject({ body: { code: "DEMO_ADDRESS_IN_USE" } });
     }
     expect((await db.select({ n: count() }).from(user))[0]!.n).toBe(1);
     // The returning visitor still gets in with the address they used.
-    await demoAuth.api.signInMagicLink({ body: { email: "farmer@gmail.com" }, headers: signInHeaders() });
+    await demoAuth.api.signInMagicLink({ body: { email: "farmer@gmail.com" }, headers: signInHeaders("farmer@gmail.com") });
   });
 
   it("holds under a race: the unique value stops two accounts of one address", async () => {
@@ -417,7 +441,10 @@ describe("F4: sandbox farming", () => {
     vi.stubEnv("DEMO_MAX_SANDBOXES", "1");
     await signIn(freshEmail());
     await expect(
-      demoAuth.api.signInMagicLink({ body: { email: freshEmail() }, headers: signInHeaders() }),
+      (() => {
+        const email = freshEmail();
+        return demoAuth.api.signInMagicLink({ body: { email }, headers: signInHeaders(email) });
+      })(),
     ).rejects.toMatchObject({ body: { code: "DEMO_FULL" } });
     expect((await db.select({ n: count() }).from(user))[0]!.n).toBe(1);
     // Google takes the same path: the account is refused before it exists.
@@ -590,7 +617,7 @@ describe("F7 and F8: consent is recorded by the signed-in account", () => {
     const victim = freshEmail();
     await demoAuth.api.signInMagicLink({
       body: { email: victim, name: "Evil" } as never,
-      headers: signInHeaders({ "x-demo-consent": "v1", "x-demo-locale": "es" }),
+      headers: signInHeaders(victim, { "x-demo-consent": "v1", "x-demo-locale": "es" }),
     });
     const mail = sent.pop()!;
     const token = new URL(mail.text.match(/https?:\/\/\S+/)![0]).searchParams.get("token")!;
@@ -675,7 +702,8 @@ describe("F11, F12 and F13", () => {
 
     // Without mail configured and without a capture, nothing is printed.
     const quiet = createAuth(demoSettings({ DEMO_MODE: "1" }));
-    await quiet.api.signInMagicLink({ body: { email: freshEmail() }, headers: signInHeaders() });
+    const quietEmail = freshEmail();
+    await quiet.api.signInMagicLink({ body: { email: quietEmail }, headers: signInHeaders(quietEmail) });
     expect(log).not.toHaveBeenCalled();
     expect(warn.mock.calls.flat().join(" ")).not.toMatch(/https?:\/\//);
     log.mockRestore();

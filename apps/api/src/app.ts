@@ -80,9 +80,10 @@ import {
 import { canResend, parseResendEmail, resendLinks } from "./lib/link-resend";
 import { getMembership, listVenuesForUser } from "./lib/memberships";
 import { demoMode } from "./demo/settings";
+import { magicLinkChallenges } from "./demo/magic-link-challenge";
 import { DemoLimitError } from "./demo/limits";
 import { parseConsent, recordConsent } from "./demo/leads";
-import { issueSignInChallenge } from "./demo/sign-in-challenge";
+import { normalizeEmail } from "./demo/normalize";
 import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/signup";
 import { changeMemberRole, listMembers, removeMember } from "./lib/members";
 import {
@@ -193,14 +194,21 @@ app.get("/health", (c) => c.json({ ok: true, service: "opencovers" }));
 
 app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
 
-// The hosted demo's own routes (ADR-0022, decision 11), outside docs/contract. Both answer 404 unless DEMO_MODE=1.
+// The hosted demo's own routes (ADR-0022, decision 11), outside docs/contract. They answer 404 unless DEMO_MODE=1.
 app.use("/api/demo/*", staffOriginGuard(trustedOrigins));
 
-// A challenge for the magic link form: send it back in X-Demo-Challenge with the proof of work in X-Demo-Solution.
-app.get("/api/demo/challenge", (c) => {
-  if (!demoMode()) return c.json({ code: "not_found" }, 404);
+// ADR-0022, decision 8(a): the proof-of-work challenge a demo magic link needs. Outside the contract, public, rate
+// limited per IP (lib/rate-limit.ts). Issuing says nothing about the address, so it does not touch the accounts.
+// A body with no usable address (missing, oversized, not JSON, whitespace, a list) is a 400.
+app.post("/api/demo/magic-link-challenge", async (c) => {
+  if (!demoMode()) return c.notFound();
+  const length = Number(c.req.header("content-length") ?? Number.NaN);
+  if (!(length > 0 && length <= 4096)) return error(c, "invalid_request");
+  const body = (await c.req.json().catch(() => null)) as { email?: unknown } | null;
+  const email = body?.email;
+  if (typeof email !== "string" || normalizeEmail(email) === null) return error(c, "invalid_request");
   c.header("Cache-Control", "no-store");
-  return c.json(issueSignInChallenge());
+  return c.json(magicLinkChallenges().issue(email));
 });
 
 // The one way a lead is recorded (audit F7 and F8): the signed-in account says, for its own verified address, that it

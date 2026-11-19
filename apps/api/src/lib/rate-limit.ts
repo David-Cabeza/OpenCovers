@@ -17,6 +17,7 @@ export const RULE_NAMES = [
   "magic_link",
   "magic_link_day",
   "magic_link_ip",
+  "demo_challenge",
 ] as const;
 export type RuleName = (typeof RULE_NAMES)[number];
 
@@ -37,11 +38,12 @@ export const DEFAULT_RULES: Rules = {
   public_venue: { max: 100, windowMs: 60 * 60_000 },
   self_service: { max: 60, windowMs: 15 * 60_000 },
   public_days: { max: 60, windowMs: 15 * 60_000 },
-  // Demo mode only (ADR-0022, decision 8a), on top of `auth`: per normalized address 1 a minute and 5 a day, per
-  // client address 10 an hour. Counters live in this process's memory, so a redeploy resets them.
+  // Demo mode only (ADR-0022, decision 8a): a magic link is limited to 1 per address per minute, 5 per address per
+  // day and 10 per IP per hour, on top of `auth`. `demo_challenge` caps how often one IP asks for a challenge.
   magic_link: { max: 1, windowMs: 60_000 },
-  magic_link_day: { max: 5, windowMs: 24 * 60 * 60_000 },
-  magic_link_ip: { max: 10, windowMs: 60 * 60_000 },
+  magic_link_day: { max: 5, windowMs: 24 * 3_600_000 },
+  magic_link_ip: { max: 10, windowMs: 3_600_000 },
+  demo_challenge: { max: 60, windowMs: 3_600_000 },
 };
 
 export interface RateLimitConfig {
@@ -69,6 +71,7 @@ const RULE_ENV: Record<RuleName, string> = {
   magic_link: "RATE_LIMIT_MAGIC_LINK",
   magic_link_day: "RATE_LIMIT_MAGIC_LINK_DAY",
   magic_link_ip: "RATE_LIMIT_MAGIC_LINK_IP",
+  demo_challenge: "RATE_LIMIT_DEMO_CHALLENGE",
 };
 
 const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
@@ -77,13 +80,15 @@ export const INVITATION_HEADER = "x-invitation-token";
 const DEFAULT_MAX_KEYS = 10_000;
 // A rule whose charge is returned when the route answers one of these statuses: the request never reached a
 // booking, so a malformed body or an unknown key costs the address budget and not the venue's.
-const REFUNDED_ON: Partial<Record<RuleName, (status: number) => boolean>> = {
-  public_venue: (status) => status === 400 || status === 404,
-  // A magic link that was refused (bad challenge, disposable domain, demo full) sent nothing, so it must not spend
-  // the address's budget: otherwise anyone could lock a victim out by sending junk requests for their address.
-  magic_link: (status) => status >= 400,
-  magic_link_day: (status) => status >= 400,
+const REFUNDED_ON: Partial<Record<RuleName, ReadonlySet<number>>> = {
+  public_venue: new Set([400, 404]),
+  // A magic link refused for its challenge, a disposable address, a bad body or a full demo sent nothing, so it must
+  // not spend the address's budget: anyone could otherwise lock a victim out of their own sign-in by posting junk.
+  magic_link: new Set([400, 403, 404, 429]),
+  magic_link_day: new Set([400, 403, 404, 429]),
+  magic_link_ip: new Set([400, 403, 404, 429]),
 };
+const MAGIC_LINK_RULES: RuleName[] = ["auth", "magic_link", "magic_link_day", "magic_link_ip"];
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 type Env = Record<string, string | undefined>;
@@ -166,8 +171,9 @@ export function rulesFor(method: string, rawPath: string, hasInvitationToken: bo
     if (path.startsWith("/api/auth/sign-up")) {
       return hasInvitationToken ? ["signup", "invitation"] : ["signup"];
     }
-    return path === "/api/auth/sign-in/magic-link" ? ["auth", "magic_link", "magic_link_day", "magic_link_ip"] : ["auth"];
+    return path === "/api/auth/sign-in/magic-link" ? MAGIC_LINK_RULES : ["auth"];
   }
+  if (path === "/api/demo/magic-link-challenge") return ["demo_challenge"];
   return [];
 }
 
@@ -327,7 +333,7 @@ export function createRateLimiter(config: RateLimitConfig, options: RateLimitOpt
     if (retryAfter === 0) {
       await next();
       for (const charge of charges) {
-        if (REFUNDED_ON[charge.name]?.(c.res.status)) refund(charge);
+        if (REFUNDED_ON[charge.name]?.has(c.res.status)) refund(charge);
       }
       return;
     }
