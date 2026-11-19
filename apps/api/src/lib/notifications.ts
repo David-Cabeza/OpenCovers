@@ -2,7 +2,7 @@ import { and, count, eq, gt, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { reservations, sentEmails, venues } from "../db/schema";
 import * as schema from "../db/schema";
-import { mayEmail } from "../demo/limits";
+import { mailIdentity, mayEmail } from "../demo/limits";
 import { buildEmail, sendEmail, type EmailKind } from "./mailer";
 import { formatTime } from "./time";
 
@@ -74,9 +74,10 @@ export async function notifyReservation(
       guestName: reservation.guestName,
       service: reservation.service,
     });
+    const identity = await mailIdentity(db, venueId, venue);
     await sendEmail(
-      venue.resendApiKey ?? "",
-      venue.fromEmail,
+      identity.apiKey,
+      identity.from,
       to,
       subject,
       text,

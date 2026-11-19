@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { services, venueOnlineBooking, venues } from "../db/schema";
 import type { Db, DbTx } from "./venue";
 import { isFrameAncestor } from "./widget-page";
+import { isSandboxVenue } from "../demo/limits";
 
 export const LOCALES = ["es", "en", "ca", "fr", "de", "it", "pt"] as const;
 export const FONTS = ["system", "serif", "rounded"] as const;
@@ -344,8 +345,11 @@ export async function setOnlineBooking(
     const venue = await lockVenue(tx, venueId);
     if (!venue) return { ok: false, code: "venue_not_found" };
     const { theme, ...rest } = input;
-    const merged: OnlineBooking = { ...(await current(tx, venueId)), ...rest };
+    const before = await current(tx, venueId);
+    const merged: OnlineBooking = { ...before, ...rest };
     if (theme !== undefined) merged.theme = theme ?? {};
+    // A sandbox's widget may be embedded on the demo host only: the list was set when it was built (ADR-0022, F11).
+    if (await isSandboxVenue(tx as unknown as Db, venueId)) merged.allowedOrigins = before.allowedOrigins;
     if (merged.minPartySize > merged.maxPartySize) return { ok: false, code: "invalid_request" };
     const rows = await tx
       .select({ name: services.name, days: services.days })
