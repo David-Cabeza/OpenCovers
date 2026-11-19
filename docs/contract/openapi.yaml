@@ -18,7 +18,8 @@ info:
     docs/adr/0007-rate-limiting.md. Every request under `/public/` is also
     limited, `GET` included, by the four rules of
     docs/adr/0017-booking-widget-and-self-service-link.md: `public_read`,
-    `public_booking`, `public_venue` and `self_service`.
+    `public_booking`, `public_venue` and `self_service`, and the days route
+    also by `public_days` of docs/adr/0021-widget-day-status-zones-waitlist.md.
 
     A request body over 16 KB under `/public/`, or over 256 KB elsewhere,
     fails with `invalid_request`. A write made with a staff session
@@ -1914,6 +1915,88 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /public/{bookingKey}/days:
+    get:
+      operationId: public.days
+      summary: Give a status per day for a party size, over up to 14 days
+      description: |
+        Public, with no credentials. Returns one entry per date, ascending,
+        from `from` for `days` dates. Each entry has a `status` and a
+        `firstTime`. They come from the same rules as
+        `public.availability` and the public create, by construction: the
+        route runs the same function as `public.availability` for each date
+        and maps its result. It does not count tables itself. A day status
+        is a snapshot and holds no table, as availability (C3).
+
+        The status of a date is the first that applies:
+        `available` when `public.availability` for that date and party
+        lists at least one time, and `firstTime` is the first of them;
+        `outside_window` when it gives `past_date` or `beyond_horizon`;
+        `closed` when no online service opens on the date's weekday, after
+        the online `services` and `weekdays`, or the date is blocked;
+        `full` otherwise, so the venue serves the date online and
+        no time fits this party. `firstTime` is null except for
+        `available`. A date before today in the venue's time zone, and a
+        date past the effective horizon (C61), is `outside_window` on its
+        own, so a range may mix it with other statuses.
+
+        `from` defaults to today in the venue's time zone. It follows the
+        date rules of C61: a value that is not a real `YYYY-MM-DD` date, or
+        is outside `1900-01-01` to `9998-12-31`, fails with
+        `invalid_request`. `days` defaults to 12, and a value that is not an
+        integer from 1 to 14 fails with `invalid_request`. A missing
+        `partySize`, or one that is not an integer of at least 1, fails with
+        `invalid_request`.
+
+        A `partySize` outside the online party limits fails with
+        `invalid_request`. This differs from `public.availability`, which
+        answers an empty list for such a party (C42). The config already
+        publishes the limits, so the error reveals nothing, and a strip of
+        `full` days would offer a waitlist the guest cannot join. A party
+        inside the online limits that no service takes gets `full` on the
+        dates the venue serves online, as availability gives it no time.
+
+        The answer holds no table id, zone, service name, count of tables,
+        covers or seats, or guest data. It takes no contact, so the
+        per-contact caps and the guest blocklist never change it. An
+        unknown, rotated, malformed or disabled key gives `venue_not_found`
+        as `public.getConfig` does. Limited by `public_read` and
+        `public_days`. Not exposed through MCP. See
+        docs/adr/0021-widget-day-status-zones-waitlist.md.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/bookingKey"
+        - name: from
+          in: query
+          required: false
+          description: The first date. Defaults to today in the venue's time zone.
+          schema: { type: string, format: date }
+        - name: days
+          in: query
+          required: false
+          description: How many dates to answer, from `from`.
+          schema: { type: integer, minimum: 1, maximum: 14, default: 12 }
+        - name: partySize
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: The status of each date
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicDays" }
+        "404":
+          $ref: "#/components/responses/PublicVenueNotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+
   /public/{bookingKey}/reservations:
     post:
       operationId: public.createReservation
@@ -3791,6 +3874,45 @@ components:
           type: [string, "null"]
           enum: [past_date, beyond_horizon, null]
           description: Why `times` is empty, when the date itself is the cause. `null` when `times` is not empty or for any other reason.
+
+    PublicDays:
+      type: object
+      required: [from, partySize, days]
+      description: |
+        The status of each date of a range for one party size. It holds no
+        table id, zone, service name, count or guest data.
+      properties:
+        from:
+          type: string
+          format: date
+          description: The first date. Today in the venue's time zone when the query left it out.
+        partySize: { type: integer }
+        days:
+          type: array
+          description: One entry per date from `from`, ascending, as many as `days` asked.
+          minItems: 1
+          maxItems: 14
+          items: { $ref: "#/components/schemas/PublicDay" }
+
+    PublicDay:
+      type: object
+      required: [date, status, firstTime]
+      properties:
+        date: { type: string, format: date }
+        status:
+          type: string
+          enum: [available, full, closed, outside_window]
+          description: |
+            `available`: availability lists a time for the date. `outside_window`:
+            availability gives `past_date` or `beyond_horizon`. `closed`: no online
+            service opens that day, or the date is blocked. `full`: the venue serves
+            the date online and no time fits the party. The first that applies wins.
+        firstTime:
+          type: string
+          nullable: true
+          pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          example: "20:00"
+          description: The first time availability lists for the date when `status` is `available`, otherwise null.
 
     PublicConsent:
       type: string
