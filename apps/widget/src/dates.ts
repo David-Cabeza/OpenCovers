@@ -26,6 +26,12 @@ export function formatDate(date: string, locale: string): string {
   );
 }
 
+export function formatDay(date: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(
+    asUtc(date),
+  );
+}
+
 /** An instant, such as `changeableUntil`, on the guest's own clock. */
 export function formatInstant(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, {
