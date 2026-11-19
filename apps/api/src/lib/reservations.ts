@@ -1595,20 +1595,19 @@ export async function publicDays(
   rules: OnlineRules,
 ): Promise<{ date: string; status: PublicDayStatus; firstTime: string | null }[]> {
   const view = await publicView(db, venueId, rules);
-  const result: { date: string; status: PublicDayStatus; firstTime: string | null }[] = [];
-  for (const date of dates) {
-    if (!view) {
-      result.push({ date, status: "closed", firstTime: null });
-      continue;
-    }
-    const { times, reason, slots } = await publicDayGrid(db, view, date, partySize);
-    if (times.length > 0) result.push({ date, status: "available", firstTime: times[0]! });
-    else if (reason !== null) result.push({ date, status: "outside_window", firstTime: null });
-    else if (slots.every((s) => s.codes.some((code) => DATE_OR_CLOCK_CODES.has(code)))) {
-      result.push({ date, status: "closed", firstTime: null });
-    } else result.push({ date, status: "full", firstTime: null });
-  }
-  return result;
+  // The dates are independent reads, so they run together: a strip is one round of grids, not twelve in a row.
+  return Promise.all(
+    dates.map(async (date): Promise<{ date: string; status: PublicDayStatus; firstTime: string | null }> => {
+      if (!view) return { date, status: "closed", firstTime: null };
+      const { times, reason, slots } = await publicDayGrid(db, view, date, partySize);
+      if (times.length > 0) return { date, status: "available", firstTime: times[0]! };
+      if (reason !== null) return { date, status: "outside_window", firstTime: null };
+      if (slots.every((s) => s.codes.some((code) => DATE_OR_CLOCK_CODES.has(code)))) {
+        return { date, status: "closed", firstTime: null };
+      }
+      return { date, status: "full", firstTime: null };
+    }),
+  );
 }
 
 export async function explainSlot(
