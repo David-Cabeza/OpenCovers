@@ -92,6 +92,7 @@ import {
   createReservation,
   explainSlot,
   getAvailability,
+  publicDays,
   publicTimes,
   getEvents,
   getEventsWatermark,
@@ -146,7 +147,7 @@ import {
   webhookPolicyFromEnv,
 } from "./lib/webhooks";
 import { ERRORS, errorBody, type ErrorCode } from "./lib/errors";
-import { isCalendarDate, isValidTimeZone } from "./lib/time";
+import { addDays, isCalendarDate, isValidTimeZone, localDateTime } from "./lib/time";
 import {
   addWaitlist,
   cancelWaitlist,
@@ -318,6 +319,28 @@ app.get("/v1/public/:bookingKey/availability", async (c) => {
   const partySize = Number(rawParty);
   const { times, reason } = await publicTimes(db, target.venue.id, date, partySize, rulesOf(target.settings));
   return c.json({ date, partySize, times, reason });
+});
+
+// The status of each date for a party (ADR-0021, C63). One venue lookup, then the availability rules per date.
+app.get("/v1/public/:bookingKey/days", async (c) => {
+  const target = await resolveBookingKey(db, c.req.param("bookingKey"));
+  if (!target) return error(c, "venue_not_found");
+  const rawParty = c.req.query("partySize") ?? "";
+  const rawDays = c.req.query("days");
+  const rawFrom = c.req.query("from");
+  if (!/^[1-9]\d{0,5}$/.test(rawParty)) return error(c, "invalid_request");
+  if (rawDays !== undefined && !/^([1-9]|1[0-4])$/.test(rawDays)) return error(c, "invalid_request");
+  if (rawFrom !== undefined && !isPublicDate(rawFrom)) return error(c, "invalid_request");
+  const partySize = Number(rawParty);
+  const { minPartySize, maxPartySize } = target.settings;
+  if (partySize < minPartySize || partySize > maxPartySize) return error(c, "invalid_request");
+  const from = rawFrom ?? localDateTime(new Date(), target.venue.timezone).date;
+  const dates = Array.from({ length: rawDays === undefined ? 12 : Number(rawDays) }, (_, i) => addDays(from, i));
+  return c.json({
+    from,
+    partySize,
+    days: await publicDays(db, target.venue.id, dates, partySize, rulesOf(target.settings)),
+  });
 });
 
 app.post("/v1/public/:bookingKey/reservations", async (c) => {

@@ -87,6 +87,7 @@ describe("rateLimitConfigFromEnv", () => {
       public_booking: { max: 10, windowMs: 60 * 60_000 },
       public_venue: { max: 100, windowMs: 60 * 60_000 },
       self_service: { max: 60, windowMs: 15 * 60_000 },
+      public_days: { max: 60, windowMs: 15 * 60_000 },
     });
   });
 

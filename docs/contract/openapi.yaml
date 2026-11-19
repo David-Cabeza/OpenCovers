@@ -16,10 +16,10 @@ info:
     calls are the sign-in and sign-up routes under /api/auth, invitation
     redemption and venue creation (`POST /venues`). They are listed in
     docs/adr/0007-rate-limiting.md. Every request under `/public/` is also
-    limited, `GET` included, by the four rules of
-    docs/adr/0017-booking-widget-and-self-service-link.md: `public_read`,
-    `public_booking`, `public_venue` and `self_service`, and the days route
-    also by `public_days` of docs/adr/0021-widget-day-status-zones-waitlist.md.
+    limited, `GET` included, by the five rules of
+    docs/adr/0017-booking-widget-and-self-service-link.md and
+    docs/adr/0021-widget-day-status-zones-waitlist.md: `public_read`,
+    `public_booking`, `public_venue`, `self_service` and `public_days`.
 
     A request body over 16 KB under `/public/`, or over 256 KB elsewhere,
     fails with `invalid_request`. A write made with a staff session
@@ -1933,9 +1933,12 @@ paths:
         lists at least one time, and `firstTime` is the first of them;
         `outside_window` when it gives `past_date` or `beyond_horizon`;
         `closed` when no online service opens on the date's weekday, after
-        the online `services` and `weekdays`, or the date is blocked;
-        `full` otherwise, so the venue serves the date online and
-        no time fits this party. `firstTime` is null except for
+        the online `services` and `weekdays`, or the date is blocked, or
+        every start of the date is already past or inside the lead time,
+        so late evening today is `closed`;
+        `full` otherwise, so the venue serves the date online, a start is
+        still open to the clock, and no time fits this party because of
+        tables, capacity or limits. `firstTime` is null except for
         `available`. A date before today in the venue's time zone, and a
         date past the effective horizon (C61), is `outside_window` on its
         own, so a range may mix it with other statuses.
@@ -3909,8 +3912,10 @@ components:
           description: |
             `available`: availability lists a time for the date. `outside_window`:
             availability gives `past_date` or `beyond_horizon`. `closed`: no online
-            service opens that day, or the date is blocked. `full`: the venue serves
-            the date online and no time fits the party. The first that applies wins.
+            service opens that day, the date is blocked, or every start of the date is
+            already past or inside the lead time. `full`: the venue serves the date
+            online, a start is still open to the clock, and no time fits the party.
+            The first that applies wins.
         firstTime:
           type: string
           nullable: true

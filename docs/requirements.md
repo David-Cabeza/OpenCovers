@@ -352,7 +352,7 @@ Acceptance: conformance case C44. A public create with a key that a staff create
 
 ### REQ-P5 Abuse resistance
 
-Public routes are rate limited per client address, `GET` included, and public creates also per venue, by four rules that extend REQ-C5. A public create carries a honeypot and a signed proof-of-work challenge, and an operator may add a CAPTCHA, and every failed check gets the same answer as a malformed body. One contact may hold only a few open online bookings, and the per-day cap of REQ-C12 applies too. The caps say that a contact is at a cap. That leak is accepted and bounded by the rate limits.
+Public routes are rate limited per client address, `GET` included, and public creates also per venue, by five rules that extend REQ-C5. A public create carries a honeypot and a signed proof-of-work challenge, and an operator may add a CAPTCHA, and every failed check gets the same answer as a malformed body. One contact may hold only a few open online bookings, and the per-day cap of REQ-C12 applies too. The caps say that a contact is at a cap. That leak is accepted and bounded by the rate limits.
 
 Acceptance: conformance cases C45, C46 and C52.
 

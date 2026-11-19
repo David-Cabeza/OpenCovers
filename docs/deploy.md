@@ -166,6 +166,7 @@ The API limits sign-in, sign-up, invitation redemption and venue creation per cl
 | `RATE_LIMIT_PUBLIC_BOOKING` | `10/1h` | Public creates and link resends, per client address. |
 | `RATE_LIMIT_PUBLIC_VENUE` | `100/1h` | The same routes, per booking key, all addresses together. Whoever spends it stops online booking in that venue until the window ends. Staff bookings are untouched. |
 | `RATE_LIMIT_PUBLIC_SELF_SERVICE` | `60/15m` | Every `/v1/public/self-service` request, per client address. |
+| `RATE_LIMIT_PUBLIC_DAYS` | `60/15m` | `GET /v1/public/{bookingKey}/days`, per client address. It also spends `RATE_LIMIT_PUBLIC_READ`. |
 
 A budget is `max/window`, with a window in `s`, `m` or `h`. An unknown value stops the API at startup and names the variable. An empty value means the default.
 
@@ -224,7 +225,7 @@ The API reads these variables regardless of host:
 | `SIGNUP` | no | `open` (default), `first-user` or `closed`. See Sign-up control. |
 | `RATE_LIMIT` | no | `on` or `off`. Default `on` in `compose.prod.yaml`. See Rate limiting. |
 | `TRUST_PROXY` | no | `false` (default) or `true`. See Rate limiting. |
-| `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION`, `RATE_LIMIT_VENUE_CREATION`, `RATE_LIMIT_PUBLIC_READ`, `RATE_LIMIT_PUBLIC_BOOKING`, `RATE_LIMIT_PUBLIC_VENUE`, `RATE_LIMIT_PUBLIC_SELF_SERVICE` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |
+| `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION`, `RATE_LIMIT_VENUE_CREATION`, `RATE_LIMIT_PUBLIC_READ`, `RATE_LIMIT_PUBLIC_BOOKING`, `RATE_LIMIT_PUBLIC_VENUE`, `RATE_LIMIT_PUBLIC_SELF_SERVICE`, `RATE_LIMIT_PUBLIC_DAYS` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |
 | `PUBLIC_POW_DIFFICULTY` | no | Proof-of-work bits for a public booking, 0 to 32. Default `12`. `0` turns the proof of work off and keeps the signed challenge. The API logs the effective difficulty at startup, and a warning when it is `0` with `NODE_ENV=production`. See ADR-0017. |
 | `PUBLIC_CHALLENGE_SECRET` | no | Signs the public form challenge, at least 32 characters. Default: a random key per process, which is enough for one API process. Set it when several serve the widget. With `NODE_ENV=production` and no value, the API logs a warning at startup. |
 | `WIDGET_ADDRESS` | no | The booking widget's host, such as `book.example.com`. Caddy and the API both read it. Unset, a production API serves no widget page. It must not share the staff app's host name. See Booking widget. |
