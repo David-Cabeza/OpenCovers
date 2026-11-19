@@ -3,7 +3,7 @@ import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { applyTheme, FONT_STACKS, logoSrc, themeVars } from "../src/theme";
+import { applyTheme, applyThemeToDocument, FONT_STACKS, isFramed, logoSrc, setsColors, themeVars } from "../src/theme";
 import { Logo, VenueHeader } from "../src/ui";
 
 const css = readFileSync(path.resolve(import.meta.dirname, "../src/styles.css"), "utf8");
@@ -128,5 +128,57 @@ describe("logo", () => {
   it("keeps the venue name as alt when no name is rendered next to the logo", () => {
     const html = renderToStaticMarkup(createElement(Logo, { theme: { logoUrl: "https://example.com/l.png" }, venue: "Casa Alba" }));
     expect(html).toContain('alt="Casa Alba"');
+  });
+});
+
+describe("dark mode", () => {
+  const darkBlock = css.slice(css.indexOf("@media (prefers-color-scheme: dark)"), css.indexOf("@theme inline"));
+
+  it("has dark defaults only for the widget's own pages", () => {
+    expect(darkBlock).toContain(':root[data-scheme="system"]');
+    for (const name of ["primary", "on-primary", "background", "surface", "text", "muted", "border", "danger"]) {
+      expect(darkBlock, name).toContain(`--oc-${name}:`);
+    }
+    expect(darkBlock).toContain("color-scheme: dark");
+  });
+
+  it("counts a theme as setting colors only when it sets a valid color", () => {
+    expect(setsColors(undefined)).toBe(false);
+    expect(setsColors({})).toBe(false);
+    expect(setsColors({ radius: 4, font: "serif", logoUrl: "https://example.com/l.png" })).toBe(false);
+    expect(setsColors({ colors: {} })).toBe(false);
+    expect(setsColors({ colors: { primary: "not a color" } })).toBe(false);
+    expect(setsColors({ colors: { primary: "#aa0000" } })).toBe(true);
+    expect(setsColors({ colors: { background: "#ffffff" } })).toBe(true);
+  });
+
+  it("tells a framed page from a top-level one", () => {
+    const top = {} as Window;
+    expect(isFramed({ self: top, top })).toBe(false);
+    expect(isFramed({ self: {} as Window, top })).toBe(true);
+  });
+
+  function docFor(scheme: string | undefined) {
+    const set: Record<string, string> = {};
+    const dataset: DOMStringMap = scheme ? { scheme } : {};
+    const documentElement = {
+      style: { setProperty: (n: string, v: string | null) => void (set[n] = v ?? "") },
+      dataset,
+    } as unknown as HTMLElement;
+    return { doc: { documentElement } as Pick<Document, "documentElement">, set, dataset };
+  }
+
+  it("keeps following the system when the theme sets no color", () => {
+    const { doc, set, dataset } = docFor("system");
+    applyThemeToDocument({ radius: 4 }, doc);
+    expect(set).toEqual({ "--oc-radius": "4px" });
+    expect(dataset.scheme).toBe("system");
+  });
+
+  it("stops following the system when the theme sets a color", () => {
+    const { doc, set, dataset } = docFor("system");
+    applyThemeToDocument({ colors: { primary: "#aa0000" } }, doc);
+    expect(set).toEqual({ "--oc-primary": "#aa0000" });
+    expect(dataset.scheme).toBeUndefined();
   });
 });

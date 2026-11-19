@@ -3455,6 +3455,10 @@ components:
         HTML, script, a template or a font URL. A key that is absent uses the
         built-in default. Colors read back in lower case. An unknown key or
         an invalid value fails with `invalid_request`.
+        While a theme sets no color, the widget's own pages (not a framed
+        widget) use dark built-in colors for a visitor whose system asks for
+        dark mode. A theme with any color keeps the light built-in ones for
+        the colors it leaves out.
       properties:
         colors:
           type: object

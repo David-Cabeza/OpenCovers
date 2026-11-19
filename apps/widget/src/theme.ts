@@ -43,6 +43,27 @@ export function applyTheme(theme: unknown, style: Pick<CSSStyleDeclaration, "set
   for (const [name, value] of themeVars(theme)) style.setProperty(name, value);
 }
 
+/** True when the theme sets at least one color. The venue then owns its palette, and the widget never swaps it for the dark one. */
+export function setsColors(theme: unknown): boolean {
+  const colorVars: readonly string[] = Object.values(COLOR_VARS);
+  return themeVars(theme).some(([name]) => colorVars.includes(name));
+}
+
+/** True inside an iframe. A page on the venue's own site picks its look, and the visitor's system setting says nothing about it. */
+export function isFramed(win: Pick<Window, "self" | "top">): boolean {
+  return win.self !== win.top;
+}
+
+/**
+ * The widget follows the visitor's light or dark setting only on its own pages (`/w/{key}` and `/r` opened directly),
+ * and only while the venue's theme sets no color. `main.tsx` marks the page at once, so the first paint is already
+ * right, and this removes the mark when the theme turns out to set colors.
+ */
+export function applyThemeToDocument(theme: unknown, doc: Pick<Document, "documentElement">): void {
+  applyTheme(theme, doc.documentElement.style);
+  if (setsColors(theme)) delete doc.documentElement.dataset.scheme;
+}
+
 /** The logo address when it is an `https` URL with a host and no credentials, as the URL parser writes it. */
 export function logoSrc(theme: unknown): string | null {
   if (!isObject(theme) || typeof theme.logoUrl !== "string") return null;
