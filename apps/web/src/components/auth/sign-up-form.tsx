@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
-import { isServerUnreachable, SERVER_UNREACHABLE } from "@/lib/server-status";
+import { t } from "@/i18n";
+import { isServerUnreachable } from "@/lib/server-status";
 
 interface SignUpValues {
   name: string;
@@ -39,7 +40,7 @@ export function SignUpForm({
       }));
     } catch (err) {
       // The client throws when no answer comes back at all.
-      const message = isServerUnreachable(err) ? SERVER_UNREACHABLE : "Could not create the account.";
+      const message = isServerUnreachable(err) ? t("errors.serverUnreachable") : "Could not create the account.";
       setServerError(message);
       return;
     }

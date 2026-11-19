@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
-import { isServerUnreachable, SERVER_UNREACHABLE } from "@/lib/server-status";
+import { t } from "@/i18n";
+import { isServerUnreachable } from "@/lib/server-status";
 
 interface SignInValues {
   email: string;
@@ -29,7 +30,7 @@ export function SignInForm() {
       }
     } catch (err) {
       // The client throws when no answer comes back at all.
-      setServerError(isServerUnreachable(err) ? SERVER_UNREACHABLE : "Could not sign in.");
+      setServerError(isServerUnreachable(err) ? t("errors.serverUnreachable") : "Could not sign in.");
     }
   }
 

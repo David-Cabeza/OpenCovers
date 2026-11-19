@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LanguageSelect } from "@/components/layout/language-select";
 import { SignInForm } from "./sign-in-form";
 import { SignUpForm } from "./sign-up-form";
 
@@ -13,7 +14,10 @@ const COPY = {
 export function AuthScreen() {
   const [tab, setTab] = useState<keyof typeof COPY>("sign-in");
   return (
-    <main className="flex min-h-dvh items-center justify-center p-6">
+    <main className="relative flex min-h-dvh items-center justify-center p-6">
+      <div className="absolute right-4 top-4">
+        <LanguageSelect />
+      </div>
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <BrandMark className="size-14 text-primary" />

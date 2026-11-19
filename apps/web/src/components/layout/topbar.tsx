@@ -18,6 +18,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { useVenues } from "@/hooks/use-venues";
 import { useUiStore } from "@/stores/ui-store";
+import { LanguageSelect } from "./language-select";
 import { ThemeToggle } from "./theme-toggle";
 
 export function Topbar({ email, onMenu }: { email?: string; onMenu?: () => void }) {
@@ -57,6 +58,7 @@ export function Topbar({ email, onMenu }: { email?: string; onMenu?: () => void 
         </div>
 
         <div className="flex items-center gap-3">
+          <LanguageSelect />
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
