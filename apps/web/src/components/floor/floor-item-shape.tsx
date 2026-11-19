@@ -221,6 +221,93 @@ function UmbrellaShape() {
   );
 }
 
+function HostShape() {
+  return (
+    <svg viewBox="0 0 56 40" className="size-full" preserveAspectRatio="none">
+      <rect x="1" y="1" width="54" height="38" rx="5" className={WOOD} {...STROKE} />
+      <rect x="4" y="4" width="48" height="12" rx="3" className="fill-tabletop/45" />
+      <rect x="8" y="22" width="22" height="12" rx="2" className="fill-[oklch(0.3_0.01_250)]" />
+      <rect x="10" y="24" width="18" height="6" rx="1" className="fill-info-soft/70" />
+      <circle cx="42" cy="28" r="5" className="fill-tabletop stroke-wood-edge" {...STROKE} />
+      <circle cx="42" cy="28" r="2" className="fill-wood-edge/60" />
+    </svg>
+  );
+}
+
+function BanquetteShape() {
+  return (
+    <svg viewBox="0 0 160 36" className="size-full" preserveAspectRatio="none">
+      <rect x="2" y="4" width="158" height="32" rx="6" className="fill-black/15" />
+      <rect x="1" y="1" width="158" height="32" rx="6" className="fill-primary/30 stroke-primary/55" {...STROKE} />
+      <rect x="1" y="1" width="158" height="10" rx="5" className="fill-primary/35" />
+      {[40, 80, 120].map((x) => (
+        <line key={x} x1={x} y1="12" x2={x} y2="32" className="stroke-primary/45" vectorEffect="non-scaling-stroke" strokeWidth="1" />
+      ))}
+      {[0, 1, 2, 3].map((i) => (
+        <rect key={i} x={4 + i * 39.5} y="14" width="33" height="16" rx="4" className="fill-white/20" />
+      ))}
+    </svg>
+  );
+}
+
+function PlanterShape() {
+  const blooms = [14, 32, 50, 68, 86, 104];
+  return (
+    <svg viewBox="0 0 120 28" className="size-full" preserveAspectRatio="none">
+      <rect x="1" y="1" width="118" height="26" rx="4" className={WOOD} {...STROKE} />
+      <rect x="5" y="5" width="110" height="18" rx="3" className="fill-black/30" />
+      {blooms.map((x, i) => (
+        <g key={x}>
+          <circle cx={x + 6} cy={i % 2 ? 12 : 16} r="8" className="fill-primary/75" />
+          <circle cx={x + 6} cy={i % 2 ? 12 : 16} r="4" className="fill-primary" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function FireplaceShape() {
+  return (
+    <svg viewBox="0 0 72 44" className="size-full" preserveAspectRatio="none">
+      <rect x="1" y="1" width="70" height="42" rx="3" className={STONE} {...STROKE} />
+      <rect x="10" y="10" width="52" height="26" rx="2" className="fill-[oklch(0.25_0.01_50)]" />
+      <ellipse cx="36" cy="26" rx="20" ry="8" className="fill-warning/45" />
+      <ellipse cx="36" cy="27" rx="11" ry="4.5" className="fill-warning/80" />
+      <rect x="1" y="1" width="70" height="7" rx="3" className="fill-tabletop/35" />
+    </svg>
+  );
+}
+
+function WineRackShape() {
+  const cols = Array.from({ length: 9 }, (_, i) => 8 + i * 10);
+  return (
+    <svg viewBox="0 0 96 24" className="size-full" preserveAspectRatio="none">
+      <rect x="1" y="1" width="94" height="22" rx="2" className={WOOD} {...STROKE} />
+      <line x1="2" y1="12" x2="94" y2="12" className="stroke-wood-edge" vectorEffect="non-scaling-stroke" strokeWidth="1" />
+      {[6, 18].map((cy) =>
+        cols.map((cx) => (
+          <g key={`${cx}-${cy}`}>
+            <circle cx={cx} cy={cy} r="4" className="fill-black/35" />
+            <circle cx={cx} cy={cy} r="2.6" className="fill-destructive/65" />
+          </g>
+        )),
+      )}
+    </svg>
+  );
+}
+
+function RestroomShape() {
+  return (
+    <svg viewBox="0 0 40 40" className="size-full" preserveAspectRatio="xMidYMid meet">
+      <rect x="2" y="3" width="36" height="36" rx="7" className="fill-black/15" />
+      <rect x="2" y="2" width="36" height="36" rx="7" className="fill-info-soft stroke-info/60" {...STROKE} />
+      <text x="20" y="25" textAnchor="middle" fontSize="14" fontWeight="700" className="fill-info" style={{ fontFamily: "inherit" }}>
+        WC
+      </text>
+    </svg>
+  );
+}
+
 function GenericShape() {
   return (
     <svg viewBox="0 0 40 40" className="size-full" preserveAspectRatio="none">
@@ -259,6 +346,18 @@ export function FloorItemShape({ type }: { type: string }) {
       return <LargePlantShape />;
     case "umbrella":
       return <UmbrellaShape />;
+    case "host":
+      return <HostShape />;
+    case "banquette":
+      return <BanquetteShape />;
+    case "planter":
+      return <PlanterShape />;
+    case "fireplace":
+      return <FireplaceShape />;
+    case "wine-rack":
+      return <WineRackShape />;
+    case "restroom":
+      return <RestroomShape />;
     default:
       return <GenericShape />;
   }
