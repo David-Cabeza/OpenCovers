@@ -178,4 +178,4 @@ A security review showed two ways to reset or spend a budget at no cost. One sha
 
 ## Amendment 2026-11-19: public days
 
-`GET /v1/public/{bookingKey}/days` ([ADR-0021](0021-widget-day-status-zones-waitlist.md)) adds a rule, `public_days`, per client address, 60 per 15 minutes by default (`RATE_LIMIT_PUBLIC_DAYS`), counted on top of `public_read` like the other two-rule requests (C52). Contract only until ADR-0021 stage 2.
+`GET /v1/public/{bookingKey}/days` ([ADR-0021](0021-widget-day-status-zones-waitlist.md)) adds a rule, `public_days`, per client address, 60 per 15 minutes by default (`RATE_LIMIT_PUBLIC_DAYS`), counted on top of `public_read` like the other two-rule requests (C52). Built in ADR-0021 stage 2.

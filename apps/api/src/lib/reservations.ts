@@ -1473,6 +1473,8 @@ interface GridSlot {
   date: string;
   time: string;
   available: boolean;
+  /** The codes of the reasons that rule the slot out. Internal: no answer carries them. */
+  codes: string[];
 }
 
 async function gridAvailability(
@@ -1498,7 +1500,12 @@ async function gridAvailability(
       };
       const reasons = await evaluateSlot(db, venue, serviceRows, request);
       if (reasons.some((r) => r.code === "outside_hours")) continue;
-      slots.push({ date: request.date, time: request.time, available: reasons.length === 0 });
+      slots.push({
+        date: request.date,
+        time: request.time,
+        available: reasons.length === 0,
+        codes: reasons.map((r) => r.code),
+      });
     }
     result[service.name] = slots;
   }
@@ -1519,6 +1526,39 @@ export async function getAvailability(db: Db, venueId: string, date: string, par
 
 export type PublicEmptyReason = "past_date" | "beyond_horizon";
 
+type PublicChannelView = { venue: ChannelVenue; serviceRows: ServiceRow[] };
+
+// The one availability computation of the public channel, shared by `publicTimes` and `publicDays`.
+async function publicDayGrid(
+  db: Db,
+  view: PublicChannelView,
+  date: string,
+  partySize: number,
+): Promise<{ times: string[]; reason: PublicEmptyReason | null; slots: GridSlot[] }> {
+  const { venue, serviceRows } = view;
+  const grid = await gridAvailability(db, venue, serviceRows, date, partySize, "");
+  const slots = Object.values(grid)
+    .flat()
+    .filter((s) => s.date === date);
+  const sorted = [...new Set(slots.filter((s) => s.available).map((s) => s.time))].sort();
+  if (sorted.length > 0) return { times: sorted, reason: null, slots };
+  const today = localDateTime(new Date(), venue.timezone).date;
+  if (date < today) return { times: sorted, reason: "past_date", slots };
+  if (venue.maxAdvanceDays !== null && date > addDays(today, venue.maxAdvanceDays)) {
+    return { times: sorted, reason: "beyond_horizon", slots };
+  }
+  return { times: sorted, reason: null, slots };
+}
+
+async function publicView(db: Db, venueId: string, rules: OnlineRules): Promise<PublicChannelView | null> {
+  const stored = await venueOf(db, venueId);
+  if (!stored) return null;
+  return applyChannel(stored, await db.select().from(services).where(eq(services.venueId, venueId)), {
+    kind: "public",
+    rules,
+  });
+}
+
 /**
  * The local times a public create would accept now for this date and party, ascending, each once. When there are
  * none, `reason` says so for a date already gone or past the horizon; any other empty answer has `reason: null`.
@@ -1530,26 +1570,44 @@ export async function publicTimes(
   partySize: number,
   rules: OnlineRules,
 ): Promise<{ times: string[]; reason: PublicEmptyReason | null }> {
-  const stored = await venueOf(db, venueId);
-  if (!stored) return { times: [], reason: null };
-  const { venue, serviceRows } = applyChannel(
-    stored,
-    await db.select().from(services).where(eq(services.venueId, venueId)),
-    { kind: "public", rules },
+  const view = await publicView(db, venueId, rules);
+  if (!view) return { times: [], reason: null };
+  const { times, reason } = await publicDayGrid(db, view, date, partySize);
+  return { times, reason };
+}
+
+export type PublicDayStatus = "available" | "full" | "closed" | "outside_window";
+
+// A start that no table decides: the date is blocked, or the start is past or inside the lead time.
+const DATE_OR_CLOCK_CODES = new Set(["date_blocked", "lead_time_violation"]);
+
+/**
+ * The status of each date for a party (ADR-0021, C63): the first of available, outside_window, closed and full.
+ * It runs the same grid as `publicTimes` per date and maps its result. A served date is `closed` when it has no
+ * slot, or when every slot is ruled out by the date being blocked or by the clock (past or inside the lead
+ * time); it is `full` when some start is left to the clock and the tables, limits or capacity refuse them all.
+ */
+export async function publicDays(
+  db: Db,
+  venueId: string,
+  dates: string[],
+  partySize: number,
+  rules: OnlineRules,
+): Promise<{ date: string; status: PublicDayStatus; firstTime: string | null }[]> {
+  const view = await publicView(db, venueId, rules);
+  // The dates are independent reads, so they run together: a strip is one round of grids, not twelve in a row.
+  return Promise.all(
+    dates.map(async (date): Promise<{ date: string; status: PublicDayStatus; firstTime: string | null }> => {
+      if (!view) return { date, status: "closed", firstTime: null };
+      const { times, reason, slots } = await publicDayGrid(db, view, date, partySize);
+      if (times.length > 0) return { date, status: "available", firstTime: times[0]! };
+      if (reason !== null) return { date, status: "outside_window", firstTime: null };
+      if (slots.every((s) => s.codes.some((code) => DATE_OR_CLOCK_CODES.has(code)))) {
+        return { date, status: "closed", firstTime: null };
+      }
+      return { date, status: "full", firstTime: null };
+    }),
   );
-  const grid = await gridAvailability(db, venue, serviceRows, date, partySize, "");
-  const times = Object.values(grid)
-    .flat()
-    .filter((s) => s.available && s.date === date)
-    .map((s) => s.time);
-  const sorted = [...new Set(times)].sort();
-  if (sorted.length > 0) return { times: sorted, reason: null };
-  const today = localDateTime(new Date(), venue.timezone).date;
-  if (date < today) return { times: sorted, reason: "past_date" };
-  if (venue.maxAdvanceDays !== null && date > addDays(today, venue.maxAdvanceDays)) {
-    return { times: sorted, reason: "beyond_horizon" };
-  }
-  return { times: sorted, reason: null };
 }
 
 export async function explainSlot(

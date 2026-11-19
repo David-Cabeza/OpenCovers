@@ -12,6 +12,7 @@ export const RULE_NAMES = [
   "public_booking",
   "public_venue",
   "self_service",
+  "public_days",
 ] as const;
 export type RuleName = (typeof RULE_NAMES)[number];
 
@@ -31,6 +32,7 @@ export const DEFAULT_RULES: Rules = {
   public_booking: { max: 10, windowMs: 60 * 60_000 },
   public_venue: { max: 100, windowMs: 60 * 60_000 },
   self_service: { max: 60, windowMs: 15 * 60_000 },
+  public_days: { max: 60, windowMs: 15 * 60_000 },
 };
 
 export interface RateLimitConfig {
@@ -54,6 +56,7 @@ const RULE_ENV: Record<RuleName, string> = {
   public_booking: "RATE_LIMIT_PUBLIC_BOOKING",
   public_venue: "RATE_LIMIT_PUBLIC_VENUE",
   self_service: "RATE_LIMIT_PUBLIC_SELF_SERVICE",
+  public_days: "RATE_LIMIT_PUBLIC_DAYS",
 };
 
 const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
@@ -123,7 +126,7 @@ function publicRules(method: string, path: string): RuleName[] {
   const read = method === "GET" || method === "HEAD";
   const rest = path.slice("/v1/public/".length).split("/");
   if (rest[0] === "self-service") return read ? ["public_read", "self_service"] : ["self_service"];
-  if (read) return ["public_read"];
+  if (read) return rest.length === 2 && rest[1] === "days" ? ["public_read", "public_days"] : ["public_read"];
   const tail = rest.slice(1).join("/");
   return method === "POST" && (tail === "reservations" || tail === "self-service/resend")
     ? ["public_booking", "public_venue"]
