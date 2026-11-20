@@ -109,7 +109,7 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
         </div>
         {error && (
           <p role="alert" className="text-sm text-destructive">
-            {error}
+            <LinkedText text={error} />
           </p>
         )}
         <div className="flex flex-wrap gap-2">
@@ -153,7 +153,7 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
 
         {error && (
           <p id="demo-signin-error" role="alert" className="text-sm text-destructive">
-            {error}
+            <LinkedText text={error} />
           </p>
         )}
 
@@ -194,5 +194,20 @@ function Consent({ checked, onChange, t }: { checked: boolean; onChange: (next: 
         .
       </p>
     </div>
+  );
+}
+
+/** The "demo is full" message points to opencovers.dev as plain text; make that a link. */
+function LinkedText({ text }: { text: string }) {
+  const [before, after] = text.split("opencovers.dev");
+  if (after === undefined) return <>{text}</>;
+  return (
+    <>
+      {before}
+      <a href="https://opencovers.dev" className="underline underline-offset-2">
+        opencovers.dev
+      </a>
+      {after}
+    </>
   );
 }

@@ -411,7 +411,7 @@ export function FloorCanvas({
                 "group absolute select-none outline-none",
                 mode === "edit" ? "cursor-move touch-none" : movableInView ? "cursor-grab" : "cursor-pointer",
               )}
-              role={seatable ? "button" : undefined}
+              role={seatable || movableInView ? "button" : undefined}
               tabIndex={seatable || movableInView ? 0 : undefined}
               // A free table is named by its own text, so the name always contains what is drawn on it.
               aria-label={

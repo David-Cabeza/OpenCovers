@@ -265,7 +265,7 @@ function ReservationRow({
       <div className="md:order-last">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label={t("agenda.rowActions")}>
+            <Button variant="ghost" size="icon" aria-label={t("agenda.rowActionsFor", { time: reservation.time, name: reservation.guest.name || t("agenda.rowGuestless") })}>
               <MoreHorizontalIcon className="size-4" />
             </Button>
           </DropdownMenuTrigger>
