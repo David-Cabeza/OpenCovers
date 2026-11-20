@@ -4146,6 +4146,7 @@ components:
         - privacyNoticeUrl
         - publicZones
         - showServiceNames
+        - waitlistEnabled
       properties:
         enabled:
           type: boolean
@@ -4305,9 +4306,7 @@ components:
           default: false
           description: |
             Whether guests can join the public waitlist for a date
-            (ADR-0021, section 3, C68). Off by default. Not yet in this
-            schema's `required` list: the API starts answering it in stage 11,
-            which then adds it there. Setting it to true
+            (ADR-0021, section 3, C68). Off by default. Setting it to true
             fails with `invalid_request` and changes nothing while the
             venue's `notificationsEnabled` is off, because the join sends
             an email. Turning email off later keeps the stored value, and

@@ -65,6 +65,16 @@ import {
 import { challengeConfigFromEnv, createChallengeVerifier, issueChallenge } from "./lib/public-challenge";
 import { findLink, reissueLink, type Link } from "./lib/self-service";
 import {
+  findWaitlistLink,
+  joinableDate,
+  joinWaitlist,
+  leaveWaitlist,
+  parseWaitlistJoin,
+  sendJoinEmail,
+  waitlistGuestView,
+  waitlistOpen,
+} from "./lib/public-waitlist";
+import {
   defaultWidgetDist,
   embedScriptHeaders,
   notFoundHtml,
@@ -72,6 +82,7 @@ import {
   SELF_SERVICE_TITLES,
   selfServiceHeaders,
   servesWidgetOn,
+  WAITLIST_TITLES,
   widgetAssets,
   widgetEmbedScript,
   widgetHeaders,
@@ -363,6 +374,31 @@ app.post("/v1/public/self-service/cancel", async (c) => {
   return c.json(view);
 });
 
+// The public waitlist of ADR-0021, section 3. Like the self-service routes, the entry routes take the waitlist token
+// only, and sit above `/v1/public/:bookingKey`. Every failure of a token reads the same (C74).
+async function waitlistAnswer(c: any, venueId: string, entryId: string) {
+  const target = await publicVenueOf(db, venueId);
+  const view = target && (await waitlistGuestView(db, target, entryId));
+  return view ? c.json(view) : error(c, "self_service_link_invalid");
+}
+
+app.get("/v1/public/waitlist-entry", async (c) => {
+  const link = await findWaitlistLink(db, selfServiceToken(c));
+  if (!link || link.revokedAt) return error(c, "self_service_link_invalid");
+  return waitlistAnswer(c, link.venueId, link.entryId);
+});
+
+app.post("/v1/public/waitlist-entry/leave", async (c) => {
+  const key = c.req.header("Idempotency-Key");
+  if (!isPublicIdempotencyKey(key)) return error(c, "invalid_request");
+  const link = await findWaitlistLink(db, selfServiceToken(c));
+  // A revoked link answers only a repeat of the leave that revoked it (C75).
+  if (!link || (link.revokedAt && link.leaveKey !== storedKey(key))) return error(c, "self_service_link_invalid");
+  const result = await leaveWaitlist(db, link, storedKey(key));
+  if (!result.ok) return error(c, result.code);
+  return waitlistAnswer(c, link.venueId, link.entryId);
+});
+
 app.get("/v1/public/:bookingKey", async (c) => {
   const bookingKey = c.req.param("bookingKey");
   const target = await resolveBookingKey(db, bookingKey);
@@ -479,6 +515,33 @@ app.post("/v1/public/:bookingKey/reservations", async (c) => {
   return c.json({ reservation, selfServiceToken: result.selfServiceToken ?? null });
 });
 
+// The waitlist join (ADR-0021, section 3, C69 to C73). The checks run in the create's order: the key, the body, a
+// replay (which needs no challenge), the challenge, then whether the waitlist and the date take joins. The caps and
+// the blocklist run inside the write. The email goes after the commit and never changes the answer.
+app.post("/v1/public/:bookingKey/waitlist", async (c) => {
+  const bookingKey = c.req.param("bookingKey");
+  const target = await resolveBookingKey(db, bookingKey);
+  if (!target) return error(c, "venue_not_found");
+  const key = c.req.header("Idempotency-Key");
+  if (!isPublicIdempotencyKey(key)) return error(c, "invalid_request");
+  const input = parseWaitlistJoin(await c.req.json().catch(() => null), target);
+  if (!input) return error(c, "invalid_request");
+  const venueId = target.venue.id;
+  const replay = await findKey(db, venueId, storedKey(key));
+  if (!replay) {
+    if (!challenges.verify(bookingKey, input.challenge, input.solution, key)) return error(c, "invalid_request");
+    if (!waitlistOpen(target, linkOrigin) || !(await joinableDate(db, target, input.date, input.partySize))) {
+      return error(c, "waitlist_unavailable");
+    }
+  }
+  const result = await joinWaitlist(db, target, input, storedKey(key));
+  if (!result.ok) return error(c, result.code);
+  if (result.token) void sendJoinEmail(db, target, input, result.token, linkOrigin);
+  const entry = await waitlistGuestView(db, target, result.entryId);
+  if (!entry) return error(c, "invalid_request");
+  return c.json({ entry, waitlistToken: result.token });
+});
+
 // The widget page (ADR-0017 section 1). The API serves it, not Caddy, because `frame-ancestors` is per venue.
 // Not rate limited. An unknown, rotated or disabled key, and a host that is not the widget's, read alike.
 const widgetDist = () => process.env.WIDGET_DIST || defaultWidgetDist();
@@ -547,6 +610,17 @@ app.get("/r", (c) => {
   const query = c.req.query("lang");
   const lang = query && Object.hasOwn(SELF_SERVICE_TITLES, query) ? query : "es";
   return c.body(widgetHtml({ lang, title: SELF_SERVICE_TITLES[lang], assets }), 200, selfServiceHeaders());
+});
+
+// The page of a waitlist leave link (ADR-0021, C74), served as `/r` is: the same build and headers, one page for
+// every entry. The widget reads the token from the fragment (stage 12).
+app.get("/r/waitlist", (c) => {
+  if (!servesWidgetOn(widgetServing, c.req.url)) return widgetNotFound(c);
+  const assets = widgetAssets(widgetDist());
+  if (!assets) return widgetNotBuilt(c);
+  const query = c.req.query("lang");
+  const lang = query && Object.hasOwn(WAITLIST_TITLES, query) ? query : "es";
+  return c.body(widgetHtml({ lang, title: WAITLIST_TITLES[lang], assets }), 200, selfServiceHeaders());
 });
 
 app.use("/v1/venues/:venueId/*", async (c, next) => {
@@ -951,7 +1025,9 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
 
 app.get("/v1/venues/:venueId/waitlist", async (c) => {
   const venueId = c.req.param("venueId");
-  const entries = await listWaitlist(db, venueId);
+  const date = c.req.query("date");
+  if (date !== undefined && !isCalendarDate(date)) return error(c, "invalid_request");
+  const entries = await listWaitlist(db, venueId, date);
   return c.json({ entries });
 });
 

@@ -110,6 +110,17 @@ export const SELF_SERVICE_TITLES: Record<string, string> = {
   pt: "A sua reserva",
 };
 
+/** The title of `/r/waitlist`, the page of a waitlist leave link (ADR-0021). ca to pt wait for native review. */
+export const WAITLIST_TITLES: Record<string, string> = {
+  es: "Tu lista de espera",
+  en: "Your waitlist entry",
+  ca: "La teva llista d'espera",
+  fr: "Votre liste d'attente",
+  de: "Deine Warteliste",
+  it: "La tua lista d'attesa",
+  pt: "A sua lista de espera",
+};
+
 export interface WidgetAssets {
   scripts: string[];
   styles: string[];

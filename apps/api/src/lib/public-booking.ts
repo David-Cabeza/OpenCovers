@@ -40,6 +40,7 @@ export interface PublicVenue {
     | "privacyNoticeUrl"
     | "publicZones"
     | "showServiceNames"
+    | "waitlistEnabled"
   >;
 }
 
@@ -101,7 +102,7 @@ export function publicAddress(venue: VenueRow): string | null {
   return city ? `${street}, ${city}` : street;
 }
 
-function venueView({ venue, settings }: PublicVenue) {
+export function venueView({ venue, settings }: PublicVenue) {
   return {
     name: venue.name,
     locale: settings.locale,
@@ -111,6 +112,10 @@ function venueView({ venue, settings }: PublicVenue) {
   };
 }
 
+/**
+ * `linkResend` is whether the venue can mail a guest a link now (C51). The waitlist is open on top of that only
+ * while its own setting is on (C68), since the join mails the leave link.
+ */
 export async function publicConfig(db: Db, target: PublicVenue, challenge: FormChallenge, linkResend: boolean) {
   const { venue, settings } = target;
   const online = applyChannel(
@@ -133,6 +138,7 @@ export async function publicConfig(db: Db, target: PublicVenue, challenge: FormC
     linkResend,
     privacyNoticeUrl: settings.privacyNoticeUrl,
     zones: await effectivePublicZones(db, venue.id, settings.publicZones),
+    waitlistEnabled: linkResend && settings.waitlistEnabled,
   };
 }
 

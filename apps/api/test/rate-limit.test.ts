@@ -5,6 +5,7 @@ import {
   createRateLimiter,
   describeRateLimit,
   rateLimitConfigFromEnv,
+  rulesFor,
   type RateLimitOptions,
 } from "../src/lib/rate-limit";
 
@@ -538,6 +539,35 @@ describe("public routes (C52)", () => {
     expect((await call(app, "GET", "/v1/public/self-service", { ip: "203.0.113.100" })).status).toBe(429);
     expect((await call(app, "POST", "/v1/public/self-service/cancel", { ip: "203.0.113.100" })).status).toBe(200);
     expect((await call(app, "POST", "/v1/public/self-service/modify", { ip: "203.0.113.100" })).status).toBe(429);
+  });
+
+  it("shares the create's public_booking budget with the waitlist join, and its public_venue budget (C52)", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_PUBLIC_BOOKING: "2/1h" });
+    const JOIN_A = `/v1/public/${KEY_A}/waitlist`;
+    expect(await statuses(3, (i) => call(app, "POST", [CREATE_A, JOIN_A, JOIN_A][i]!, { ip: "203.0.113.120" }))).toEqual([200, 200, 429]);
+    const venue = build({ ...TRUST, RATE_LIMIT_PUBLIC_VENUE: "2/1h" }).app;
+    const out = await statuses(3, (i) => call(venue, "POST", [JOIN_A, CREATE_A, `${JOIN_A}/`][i]!, { ip: `203.0.113.${121 + i}` }));
+    expect(out).toEqual([200, 200, 429]);
+    expect(rulesFor("POST", JOIN_A, false)).toEqual(["public_booking", "public_venue"]);
+  });
+
+  it("gives back a join's public_venue charge on 400 and 404 and keeps it on 409 (C52)", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_PUBLIC_VENUE: "1/1h" });
+    const JOIN_A = `/v1/public/${KEY_A}/waitlist`;
+    for (const [i, status] of ["400", "404", "400"].entries()) {
+      expect((await call(app, "POST", JOIN_A, { ip: `198.51.100.${20 + i}`, headers: { "x-test-status": status } })).status).toBe(Number(status));
+    }
+    expect((await call(app, "POST", JOIN_A, { ip: "198.51.100.30", headers: { "x-test-status": "409" } })).status).toBe(409);
+    expect((await call(app, "POST", JOIN_A, { ip: "198.51.100.31" })).status).toBe(429);
+  });
+
+  it("limits the waitlist entry read and leave with self_service, and the read also with public_read (C52)", async () => {
+    expect(rulesFor("GET", "/v1/public/waitlist-entry", false)).toEqual(["public_read", "self_service"]);
+    expect(rulesFor("POST", "/v1/public/waitlist-entry/leave/", false)).toEqual(["self_service"]);
+    const { app } = build({ ...TRUST, RATE_LIMIT_PUBLIC_SELF_SERVICE: "2/1m", RATE_LIMIT_PUBLIC_READ: "5/1m" });
+    expect((await call(app, "GET", "/v1/public/waitlist-entry", { ip: "203.0.113.130" })).status).toBe(200);
+    expect((await call(app, "POST", "/v1/public/self-service/cancel", { ip: "203.0.113.130" })).status).toBe(200);
+    expect((await call(app, "POST", "/v1/public/waitlist-entry/leave", { ip: "203.0.113.130" })).status).toBe(429);
   });
 
   it("leaves the JSON-LD route, the widget page and staff routes to their own rules", async () => {

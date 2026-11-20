@@ -192,7 +192,7 @@ Each stage is one pull request. A contract stage changes `openapi.yaml`, `confor
 | 8 | API and Setup: the two fields. | 7 | yes |
 | 9 | Widget: summary step, notice link, the unticked-box test. | 8, and 6 for the zone line | yes |
 | 10 | Contract: waitlist join, entry read, leave, `waitlist_unavailable`, the waitlist fields on staff routes and MCP. Done: C68 to C78. | 0 | yes |
-| 11 | API: migration (with `consent_at`), join, the join email, `waitlist_links`, leave, seat rule, retention. | 10 | yes |
+| 11 | API: migration (with `consent_at`), join, the join email, `waitlist_links`, leave, seat rule, retention. Done: migration `0047`, `apps/api/src/lib/public-waitlist.ts`, the MCP `date` filter and the Setup switch; the join email's text is provisional until Q11. | 10 | yes |
 | 12 | Widget: join on a full day with the unticked consent box, `/r/waitlist` page. Staff app: date and source on the waitlist. Waits for the owner to confirm the consent and email wording (Q11). | 11, 3 | yes |
 
 **PR #192.** Merge it as it is. Its behavior stays: open on the first bookable day and offer nearby free days. Stage 3 moves its requests from per-day `/availability` calls to one `/days` call, and removes the per-day loop in `nearby.ts`. Beyond the strip, the calendar pages `/days` on demand. The API serves the widget build from the same image (ADR-0017 stage 5 amendment), so no widget runs against an API without `/days`, and no fallback to per-day calls is kept.

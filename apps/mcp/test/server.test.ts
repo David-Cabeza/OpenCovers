@@ -213,6 +213,27 @@ describe("opencovers MCP server", () => {
   });
 });
 
+describe("waitlist dates (C76)", () => {
+  it("sends waitlist.list's optional date as the query parameter, and nothing without it", async () => {
+    await client.callTool({ name: "waitlist.list", arguments: { venueId: "v" } });
+    expect(sent.at(-1)!.path).toBe("/v1/venues/v/waitlist");
+    await client.callTool({ name: "waitlist.list", arguments: { venueId: "v", date: "2026-12-24" } });
+    expect(sent.at(-1)!.path).toBe("/v1/venues/v/waitlist?date=2026-12-24");
+    const before = sent.length;
+    const bad = await client.callTool({ name: "waitlist.list", arguments: { venueId: "v", date: "24/12/2026" } });
+    expect(bad.isError).toBe(true);
+    expect(sent.length).toBe(before);
+  });
+
+  it("describes the four entry fields and the seat rule", async () => {
+    const { tools } = await client.listTools();
+    const list = tools.find((t) => t.name === "waitlist.list")!;
+    for (const word of ["windowStart", "windowEnd", "source", "date"]) expect(list.description).toContain(word);
+    expect((list.inputSchema as { required?: string[] }).required ?? []).not.toContain("date");
+    expect(tools.find((t) => t.name === "waitlist.seat")!.description).toContain("invalid_transition");
+  });
+});
+
 describe("guest fields", () => {
   const lastGuest = () => (bodies.at(-1) as { guest: Record<string, unknown> }).guest;
   const BOOKING = { venueId: "v", date: "2026-11-12", time: "21:00", partySize: 2 };
