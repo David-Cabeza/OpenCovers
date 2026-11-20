@@ -648,7 +648,10 @@ export const demoSandboxes = pgTable("demo_sandbox", {
 
 // A demo visitor's contact. Deliberately not tied to the account: it outlives the sandbox. No HTTP route reads it.
 export const demoLeads = pgTable("demo_lead", {
+  // The verified address as the visitor signed in with it: where outreach goes.
   email: text("email").primaryKey(),
+  // The same value `demo_sandbox.normalized_email` holds (demo/normalize.ts). One lead per person, however spelled.
+  normalizedEmail: text("normalized_email").notNull().unique(),
   name: text("name"),
   source: text("source").notNull(),
   locale: text("locale").notNull().default("en"),
