@@ -33,6 +33,8 @@ interface EmailContext {
   partySize: number;
   /** The venue's name for the service (dinner, lunch). It is configuration, not guest text. */
   service: string;
+  /** The booking's guest name, typed by the guest. Used by the venue's `notice` only, never in a mail to the guest. */
+  guestName?: string;
   /** The venue the mail is sent on behalf of. Without it the mail is branded OpenCovers. */
   venue?: EmailVenue;
   /** The reservation as the calendar sees it. Without it no calendar entry is built. */
@@ -128,6 +130,16 @@ function subjectLine(
   return message(locale, withVenue, { ...slots, venue: `${venueName.slice(0, keep).trimEnd()}…` });
 }
 
+/** The longest guest name the notice shows. */
+export const MAX_NOTICE_NAME = 80;
+
+/** A guest-typed name as one safe line: control characters and line breaks become spaces, and it is cut. */
+export function noticeName(raw: string | undefined): string {
+  const line = (raw ?? "").replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ").replace(/\s+/g, " ").trim();
+  const chars = [...line];
+  return chars.length > MAX_NOTICE_NAME ? `${chars.slice(0, MAX_NOTICE_NAME - 1).join("").trimEnd()}…` : line;
+}
+
 function brandOf(venue: EmailVenue | undefined): Pick<EmailLayout, "brand" | "accent"> {
   return venue?.name
     ? { brand: { kind: "venue", name: venue.name, ...(venue.logoUrl ? { logoUrl: venue.logoUrl } : {}) }, accent: venue.accent }
@@ -168,6 +180,10 @@ export function buildEmail(
     { label: message(locale, "row.time"), value: c.time },
     { label: message(locale, "row.party"), value: String(c.partySize) },
   ];
+  // Only the venue's own notice names the guest. It goes to staff, who see the name in the agenda; the guest's
+  // mails never carry it. It is plain text in a row, never a link.
+  const guest = kind === "notice" ? noticeName(c.guestName) : "";
+  if (guest) rows.push({ label: message(locale, "row.guest"), value: guest });
   const service = c.service.trim();
   if (service) rows.push({ label: message(locale, "row.service"), value: service });
   if (kind !== "notice") {

@@ -82,6 +82,7 @@ export async function notifyReservation(
         time: formatTime(reservation.startsAt, venue.timezone),
         partySize: reservation.partySize,
         service: reservation.service,
+        ...(kind === "notice" ? { guestName: reservation.guestName } : {}),
         booking: { uid: icsUid(venueId, reservationId), version, startsAt: reservation.startsAt, endsAt: reservation.endsAt },
       },
       locale,

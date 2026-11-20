@@ -11,6 +11,7 @@ const es = {
   "row.time": "Hora",
   "row.party": "Personas",
   "row.service": "Servicio",
+  "row.guest": "A nombre de",
   "row.where": "Dónde",
   "row.phone": "Teléfono",
   "map.open": "Cómo llegar",

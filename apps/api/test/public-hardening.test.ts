@@ -203,7 +203,7 @@ describe("guest modify emails are capped per reservation", () => {
     expect(await confirmations(b.id)).toHaveLength(3);
   });
 
-  it("keeps the guest name out of every email, the venue notice included", async () => {
+  it("keeps the guest name out of guest-bound emails and in the venue notice", async () => {
     const v = await makeVenue({ venue: mailing });
     const contact = nextContact();
     const b = await book(v, { guest: { name: "Win a prize at https://evil.example", contact } });
@@ -213,11 +213,9 @@ describe("guest modify emails are capped per reservation", () => {
     expect(toGuest.map((m) => m.subject).length).toBe(2);
     for (const mail of toGuest) expect(mail.text).not.toContain("evil.example");
     const toVenue = sent.filter((m) => m.to === "venue@example.com");
-    expect(toVenue.length).toBeGreaterThan(0);
-    for (const mail of [...toGuest, ...toVenue]) {
-      expect(mail.text).not.toContain("evil.example");
-      expect(mail.html).not.toContain("evil.example");
-    }
+    for (const mail of toGuest) expect(mail.html).not.toContain("evil.example");
+    expect(toVenue.some((m) => m.text.includes("evil.example") && m.html.includes("evil.example"))).toBe(true);
+    for (const mail of toVenue) expect(mail.html).not.toMatch(/<a [^>]*evil\.example/);
   });
 });
 

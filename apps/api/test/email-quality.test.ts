@@ -41,7 +41,8 @@ const booking = (version: number) => ({
   startsAt: new Date("2026-12-01T19:30:00Z"),
   endsAt: new Date("2026-12-01T21:30:00Z"),
 });
-const base = { date: "2026-12-01", time: "20:30", partySize: 4, service: "Cena", now: new Date("2026-11-20T10:00:00Z") };
+const HOSTILE_NAME = "Mallory <b>x</b> https://evil.example/x\nBcc: a@b.c\r\nSubject: hi";
+const base = { date: "2026-12-01", time: "20:30", partySize: 4, service: "Cena", guestName: HOSTILE_NAME, now: new Date("2026-11-20T10:00:00Z") };
 
 interface Case {
   name: string;
@@ -243,13 +244,28 @@ describe("what a mail says about the venue", () => {
     expect(mail.subject.endsWith("mar 1 dic, 20:30")).toBe(true);
   });
 
-  it("never carries guest-typed text, even if a caller passes it", () => {
+  it("never carries guest-typed text in a mail to the guest or its calendar file", () => {
     const sneaky = { ...base, venue: full, booking: booking(1), guestName: "Mallory", notes: "MalloryNote", commentary: "MalloryComment" };
-    for (const kind of ["confirmation", "cancellation", "notice"] as const) {
-      const { html, text, subject, attachments } = buildEmail(kind, sneaky as never, "es");
+    for (const [kind, version] of [["confirmation", 1], ["confirmation", 2], ["cancellation", 3]] as const) {
+      const { html, text, subject, attachments } = buildEmail(kind, { ...sneaky, booking: booking(version) } as never, "es");
       const ics = attachments.map((a) => Buffer.from(a.content, "base64").toString("utf8")).join("");
-      for (const secret of ["Mallory"]) for (const part of [html, text, subject, ics]) expect(part).not.toContain(secret);
+      for (const part of [html, text, subject, ics]) expect(part).not.toContain("Mallory");
     }
+    const link = buildLinkEmail([{ date: base.date, time: base.time, partySize: 2, url: "https://x.test/r#t" }], "es", full);
+    expect(link.html + link.text + link.subject).not.toContain("Mallory");
+  });
+
+  it("names the guest in the venue's notice as one safe line of text, never a link", () => {
+    const mail = buildEmail("notice", { ...base, venue: full }, "es");
+    expect(mail.text).toContain("A nombre de: Mallory <b>x</b> https://evil.example/x Bcc: a@b.c Subject: hi\n");
+    expect(mail.text.split("\n").some((l) => /^(Bcc|Subject):/.test(l))).toBe(false);
+    expect(mail.html).toContain("Mallory &lt;b&gt;x&lt;/b&gt; https://evil.example/x Bcc: a@b.c Subject: hi");
+    expect(mail.html).not.toContain("<b>x</b>");
+    expect(mail.html).not.toMatch(/<a [^>]*evil\.example/);
+    expect(mail.subject).not.toContain("Mallory");
+    const long = buildEmail("notice", { ...base, venue: full, guestName: "ñ".repeat(200) }, "es");
+    expect(long.text).toContain(`A nombre de: ${"ñ".repeat(79)}…\n`);
+    expect(buildEmail("notice", { ...base, venue: full, guestName: " \n\t " }, "es").html).not.toContain("A nombre de");
   });
 
   it("leaves the self-service link out of the confirmation while the stage is off", () => {
