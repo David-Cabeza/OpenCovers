@@ -147,17 +147,20 @@ export function accentFor(colors?: { primary?: string; onPrimary?: string }, dar
 
 const STYLE = (a: EmailAccent) => `<style>
 :root{color-scheme:light dark;supported-color-schemes:light dark}
-body{margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
-table{border-collapse:collapse}
-img{-ms-interpolation-mode:bicubic}
+body{margin:0;padding:0;width:100%!important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+table,td{border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt}
+img{-ms-interpolation-mode:bicubic;border:0;outline:none;text-decoration:none;display:block}
 a{text-decoration:underline}
+a[x-apple-data-detectors],.x-gmail-data-detectors,.x-gmail-data-detectors *{color:inherit!important;text-decoration:inherit!important;font-size:inherit!important;font-family:inherit!important;font-weight:inherit!important;line-height:inherit!important}
 @media only screen and (max-width:620px){
-.wrap{padding:12px 8px!important}
+.wrap{padding:8px 0!important}
+.card{width:100%!important;max-width:100%!important;border-radius:0!important;border-left-width:0!important;border-right-width:0!important}
+.bar{border-radius:0!important}
 .pad{padding-left:20px!important;padding-right:20px!important}
 .h1{font-size:24px!important;line-height:30px!important}
 .btn-tbl{width:100%!important}
 .btn-cell{display:block!important;width:100%!important}
-.btn-a{display:block!important;text-align:center!important}
+.btn-a{display:block!important;min-height:48px!important;text-align:center!important}
 }
 @media (prefers-color-scheme:dark){
 .c-page{background-color:${DARK.page}!important}
@@ -252,7 +255,7 @@ const PREHEADER_FILL = "&#8199;&zwnj;".repeat(60);
 
 export function renderEmailHtml(layout: EmailLayout): string {
   const a = layout.accent ?? DEFAULT_ACCENT;
-  const preheader = `<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${escapeHtml(layout.preheader)}${PREHEADER_FILL}</div>`;
+  const preheader = `<div style="display:none;font-size:0;line-height:0;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${escapeHtml(layout.preheader)}${PREHEADER_FILL}</div>`;
   const note = layout.footerNote
     ? `<div>${escapeHtml(layout.footerNote)}</div>`
     : "";
@@ -262,6 +265,7 @@ export function renderEmailHtml(layout: EmailLayout): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="x-apple-disable-message-reformatting">
 <meta name="format-detection" content="telephone=no,address=no,email=no,date=no">
 <meta name="color-scheme" content="light dark">
 <meta name="supported-color-schemes" content="light dark">
@@ -273,13 +277,15 @@ ${STYLE(a)}
 ${preheader}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="c-page" bgcolor="${LIGHT.page}" style="background-color:${LIGHT.page};">
 <tr><td class="wrap" align="center" style="padding:24px 12px;">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="c-card" bgcolor="${LIGHT.card}" style="width:100%;max-width:600px;border-collapse:separate;background-color:${LIGHT.card};border:1px solid ${LIGHT.rule};border-radius:12px;">
-<tr><td class="c-bar" height="4" bgcolor="${a.accent}" style="height:4px;line-height:0;font-size:0;background-color:${a.accent};border-radius:12px 12px 0 0;">&nbsp;</td></tr>
+<!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td width="600"><![endif]-->
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="card c-card" bgcolor="${LIGHT.card}" style="width:100%;max-width:600px;border-collapse:separate;background-color:${LIGHT.card};border:1px solid ${LIGHT.rule};border-radius:12px;">
+<tr><td class="bar c-bar" height="4" bgcolor="${a.accent}" style="height:4px;line-height:0;font-size:0;background-color:${a.accent};border-radius:12px 12px 0 0;">&nbsp;</td></tr>
 ${header(layout)}
 <tr><td class="pad c-ink" style="padding:20px 32px 12px 32px;"><h1 class="h1 c-ink" style="margin:0;font-family:${FONT};font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.01em;color:${LIGHT.ink};">${escapeHtml(layout.heading)}</h1></td></tr>
 ${layout.blocks.map((b) => renderBlock(b, a)).join("\n")}
 <tr><td class="pad c-rule c-muted" style="padding:16px 32px 28px 32px;border-top:1px solid ${LIGHT.rule};font-family:${FONT};font-size:13px;line-height:19px;color:${LIGHT.muted};">${note}<div><a class="c-muted" href="${SITE_URL}" style="color:${LIGHT.muted};text-decoration:underline;">${escapeHtml(layout.footer)}</a></div></td></tr>
 </table>
+<!--[if mso]></td></tr></table><![endif]-->
 </td></tr>
 </table>
 </body>

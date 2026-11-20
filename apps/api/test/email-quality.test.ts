@@ -91,6 +91,23 @@ function cases(): Case[] {
 const all = cases();
 const hrefs = (html: string) => [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]!.replace(/&amp;/g, "&"));
 
+/** A small tag reader for the layout's own markup (no parser dependency): every start tag with its attributes. */
+function startTags(html: string): { name: string; attrs: Record<string, string>; end: number }[] {
+  const out: { name: string; attrs: Record<string, string>; end: number }[] = [];
+  const blank = (m: string) => " ".repeat(m.length);
+  const bare = html.replace(/<!--[\s\S]*?-->/g, blank).replace(/<style>[\s\S]*?<\/style>/, blank);
+  for (const m of bare.matchAll(/<([a-z][a-z0-9]*)\b([^>]*)>/gi)) {
+    const attrs: Record<string, string> = {};
+    for (const at of m[2]!.matchAll(/([a-z][a-z0-9:-]*)(?:="([^"]*)")?/gi)) attrs[at[1]!.toLowerCase()] = at[2] ?? "";
+    out.push({ name: m[1]!.toLowerCase(), attrs, end: m.index! + m[0].length });
+  }
+  return out;
+}
+const cssProps = (style: string): Record<string, string> =>
+  Object.fromEntries(style.split(";").filter(Boolean).map((d) => [d.slice(0, d.indexOf(":")).trim(), d.slice(d.indexOf(":") + 1).trim()]));
+const hasClass = (t: { attrs: Record<string, string> }, cls: string) => (t.attrs.class ?? "").split(" ").includes(cls);
+const styleBlock = (html: string) => /<style>([\s\S]*?)<\/style>/.exec(html)![1]!;
+
 describe("email quality bar", () => {
   it("covers every kind in every shipped locale", () => {
     expect(all.length).toBeGreaterThan(20);
@@ -144,6 +161,60 @@ describe("email quality bar", () => {
       expect(visible.length).toBeGreaterThan(15);
       expect(visible.length).toBeLessThanOrEqual(110);
       expect(visible).not.toBe(mail.subject);
+    });
+
+    it("hides the preheader and pads it so the inbox preview ends at its text", () => {
+      const first = startTags(mail.html).find((t) => t.name === "div")!;
+      expect(cssProps(first.attrs.style ?? "")).toMatchObject({
+        display: "none",
+        "max-height": "0",
+        overflow: "hidden",
+        "mso-hide": "all",
+        opacity: "0",
+        "font-size": "0",
+        "line-height": "0",
+      });
+      const inner = mail.html.slice(first.end, mail.html.indexOf("</div>", first.end));
+      const padding = /(?:&#8199;|&zwnj;|&nbsp;|&#847;)+$/.exec(inner)?.[0] ?? "";
+      const count = (padding.match(/&[#a-z0-9]+;/g) ?? []).length;
+      expect(count).toBeGreaterThanOrEqual(100);
+      expect(count).toBeLessThanOrEqual(150);
+    });
+
+    it("keeps the preheader padding out of the plain-text part", () => {
+      expect(mail.text).not.toMatch(/&#8199;|&zwnj;|&nbsp;|&#847;/);
+      expect(mail.text).not.toMatch(/[​-‍  ͏﻿]/);
+    });
+
+    it("has a 620px phone breakpoint that fills the width, drops the radius and keeps buttons full width and tall", () => {
+      const media = /@media only screen and \(max-width:\s*620px\)\{([\s\S]*?)\n\}/.exec(styleBlock(mail.html))?.[1] ?? "";
+      expect(media).not.toBe("");
+      const rule = (sel: string) => new RegExp(`(?:^|\\n)\\.${sel}\\{([^}]*)\\}`).exec(media)?.[1] ?? "";
+      expect(rule("card")).toMatch(/width:100%!important/);
+      expect(rule("card")).toMatch(/border-radius:0!important/);
+      expect(rule("wrap")).toMatch(/padding:\d+px 0!important/);
+      expect(rule("h1")).toMatch(/font-size:2[0-6]px!important/);
+      expect(rule("btn-tbl")).toMatch(/width:100%!important/);
+      expect(rule("btn-a")).toMatch(/min-height:(4[4-9]|[5-9]\d)px!important/);
+      // The classes sit on the elements, and the inline base stays the 600px layout for clients that drop the block.
+      const tags = startTags(mail.html);
+      const card = tags.find((t) => hasClass(t, "card"))!;
+      expect(card.attrs.width).toBe("600");
+      expect(cssProps(card.attrs.style!)["max-width"]).toBe("600px");
+      for (const cls of ["wrap", "h1", "bar"]) expect(tags.some((t) => hasClass(t, cls)), cls).toBe(true);
+    });
+
+    it("carries the client resets: Outlook table spacing, image defaults, text size adjust, DPI and a 600px ghost table", () => {
+      const css = styleBlock(mail.html);
+      expect(css).toMatch(/table,td\{[^}]*border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt/);
+      expect(css).toMatch(/body\{[^}]*-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%/);
+      expect(css).toMatch(/img\{-ms-interpolation-mode:bicubic;border:0;outline:none;text-decoration:none;display:block\}/);
+      expect(css).toMatch(/a\[x-apple-data-detectors\][^{]*\{[^}]*color:inherit!important/);
+      expect(mail.html).toMatch(/<!--\[if mso\]>(?:(?!<!\[endif\]).)*<o:PixelsPerInch>96<\/o:PixelsPerInch>.*?<!\[endif\]-->/s);
+      expect(mail.html).toMatch(/<!--\[if mso\]><table[^>]*width="600"[^>]*><tr><td width="600"><!\[endif\]-->/);
+      expect(mail.html).toContain("<!--[if mso]></td></tr></table><![endif]-->");
+      expect(mail.html).toContain('<meta name="x-apple-disable-message-reformatting">');
+      expect(mail.html).toMatch(/<meta name="format-detection" content="[^"]*telephone=no/);
     });
 
     it("declares language, color schemes, a dark palette, a viewport and a title", () => {
