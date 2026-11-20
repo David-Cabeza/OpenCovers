@@ -17,7 +17,7 @@ export interface TraceEntryDto {
   recorded?: boolean;
 }
 
-/** The top-level `source` and `actor` are deprecated (the booking's creator); the app reads each entry instead. */
+/** One reservation's trace as the API sends it: the booking's id and one entry per event. */
 export interface ReservationTraceDto {
   reservationId: string;
   entries: TraceEntryDto[];

@@ -6,7 +6,8 @@ import type { EventChannel } from "./origin";
 
 type Db = NodePgDatabase<typeof schema>;
 
-export type TraceSource = "widget" | "staff" | "api";
+/** The booking's creator, read from `bookedVia`. Internal: it only derives the channel of a `created` event with no stored origin. */
+type TraceSource = "widget" | "staff" | "api";
 
 export interface TraceEntry {
   eventId: string;
@@ -24,8 +25,6 @@ export interface TraceEntry {
 
 export interface ReservationTrace {
   reservationId: string;
-  source: TraceSource;
-  actor: string;
   entries: TraceEntry[];
 }
 
@@ -104,8 +103,6 @@ export async function getReservationTrace(
 
   return {
     reservationId,
-    source,
-    actor: reservation.bookedVia,
     entries: rows.map((e) => ({
       eventId: String(e.id),
       type: e.type,
