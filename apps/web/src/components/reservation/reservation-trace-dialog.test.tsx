@@ -152,7 +152,7 @@ describe("opening the trace from the agenda", () => {
     renderWithApp(<AgendaView venueId="v1" />);
 
     const row = (await screen.findByText("Jane Doe")).closest("[data-slot=reservation-row]") as HTMLElement;
-    within(row).getByRole("button", { name: "Reservation actions" }).focus();
+    within(row).getByRole("button", { name: /^Actions for the .* reservation, Jane Doe$/ }).focus();
     await user.keyboard("{Enter}");
     await user.click(await screen.findByRole("menuitem", { name: "View trace" }));
 

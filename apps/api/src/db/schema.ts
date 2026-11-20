@@ -202,11 +202,16 @@ export const reservations = pgTable(
     reconfirmationRecordedAt: timestamp("reconfirmation_recorded_at", { withTimezone: true }),
     commentary: text("commentary").notNull().default(""),
     erased: boolean("erased").notNull().default(false),
+    guestLocale: text("guest_locale"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [
+    check(
+      "reservations_guest_locale",
+      sql`${t.guestLocale} IS NULL OR ${t.guestLocale} IN ('es', 'en', 'ca', 'fr', 'de', 'it', 'pt')`,
+    ),
     check("reservations_commentary_length", sql`char_length(${t.commentary}) <= 500`),
     index("idx_reservations_venue_date").on(t.venueId, t.date),
     index("idx_reservations_venue_guest").on(t.venueId, t.guestId),
@@ -324,8 +329,27 @@ export const waitlist = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // ADR-0021, section 3. A null date is the same-day queue staff add to; the public join sets a date, an optional
+    // window of local times, `source` `widget` and the time of the guest's email consent (C69, C70).
+    date: date("date", { mode: "string" }),
+    windowStart: text("window_start"),
+    windowEnd: text("window_end"),
+    source: text("source").notNull().default("staff"),
+    consentAt: timestamp("consent_at", { withTimezone: true }),
   },
-  (t) => [index("idx_waitlist_venue_created").on(t.venueId, t.createdAt)],
+  (t) => [
+    index("idx_waitlist_venue_created").on(t.venueId, t.createdAt),
+    index("idx_waitlist_venue_date").on(t.venueId, t.date),
+    check("waitlist_source", sql`${t.source} IN ('staff', 'widget')`),
+    check(
+      "waitlist_window",
+      sql`(${t.windowStart} IS NULL AND ${t.windowEnd} IS NULL) OR (${t.windowStart} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' AND ${t.windowEnd} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' AND ${t.windowStart} < ${t.windowEnd})`,
+    ),
+    check(
+      "waitlist_widget_entry",
+      sql`${t.source} = 'staff' OR (${t.date} IS NOT NULL AND ${t.consentAt} IS NOT NULL)`,
+    ),
+  ],
 );
 
 export const sentEmails = pgTable(
@@ -576,6 +600,8 @@ export const venueOnlineBooking = pgTable(
     // ADR-0021, section 2: the table zones the widget lets a guest pick, and whether it names the service of a time.
     publicZones: jsonb("public_zones").$type<string[]>().notNull().default([]),
     showServiceNames: boolean("show_service_names").notNull().default(false),
+    // ADR-0021, section 3: whether guests may join the waitlist for a date. Set true only while email is on (C68).
+    waitlistEnabled: boolean("waitlist_enabled").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -637,6 +663,33 @@ export const selfServiceLinks = pgTable(
   ],
 );
 
+// ADR-0021, section 3: the leave link of one public waitlist entry, in a table of its own so that a booking token
+// never names an entry and a waitlist token never names a booking (C74). Only the SHA-256 of the secret is stored.
+// The row goes with its entry, so erasure and retention end the link with the entry (C78).
+export const waitlistLinks = pgTable(
+  "waitlist_links",
+  {
+    id: text("id").primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    entryId: text("entry_id")
+      .notNull()
+      .references(() => waitlist.id, { onDelete: "cascade" }),
+    secretHash: text("secret_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    // The public key of the guest leave that revoked the link, so a repeat of that leave can replay (C75).
+    leaveKey: text("leave_key"),
+  },
+  (t) => [
+    uniqueIndex("uq_waitlist_links_entry").on(t.entryId),
+    check("waitlist_links_hash", sql`${t.secretHash} ~ '^[0-9a-f]{64}$'`),
+    check("waitlist_links_leave_revoked", sql`${t.leaveKey} IS NULL OR ${t.revokedAt} IS NOT NULL`),
+  ],
+);
+
 // Hosted demo (ADR-0022). One sandbox venue per account. `last_sign_in_at` starts the 14-day expiry. The rows
 // vanish with the account or the venue.
 export const demoSandboxes = pgTable("demo_sandbox", {
@@ -670,4 +723,195 @@ export const demoLeads = pgTable("demo_lead", {
   withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
 });
 
-export const betterAuthSchema = { user, session, account, verification };
+
+// Tables of @better-auth/oauth-provider (ADR-0014). The plugin owns their shape;
+// keep them in step with its schema when Better Auth is upgraded.
+export const oauthClient = pgTable(
+  "oauth_client",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id").notNull().unique(),
+    clientSecret: text("client_secret"),
+    clientDiscoveryId: text("client_discovery_id"),
+    disabled: boolean("disabled").default(false),
+    skipConsent: boolean("skip_consent"),
+    enableEndSession: boolean("enable_end_session"),
+    subjectType: text("subject_type"),
+    scopes: text("scopes").array(),
+    clientCredentialsScopes: text("client_credentials_scopes").array().default(sql`'{}'::text[]`),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at"),
+    updatedAt: timestamp("updated_at"),
+    name: text("name"),
+    uri: text("uri"),
+    icon: text("icon"),
+    contacts: text("contacts").array(),
+    tos: text("tos"),
+    policy: text("policy"),
+    softwareId: text("software_id"),
+    softwareVersion: text("software_version"),
+    softwareStatement: text("software_statement"),
+    redirectUris: text("redirect_uris").array().notNull(),
+    postLogoutRedirectUris: text("post_logout_redirect_uris").array(),
+    backchannelLogoutUri: text("backchannel_logout_uri"),
+    backchannelLogoutSessionRequired: boolean("backchannel_logout_session_required"),
+    tokenEndpointAuthMethod: text("token_endpoint_auth_method"),
+    applicationType: text("application_type"),
+    jwks: text("jwks"),
+    jwksUri: text("jwks_uri"),
+    grantTypes: text("grant_types").array(),
+    responseTypes: text("response_types").array(),
+    requirePKCE: boolean("require_pkce"),
+    dpopBoundAccessTokens: boolean("dpop_bound_access_tokens").default(false),
+    referenceId: text("reference_id"),
+    metadata: jsonb("metadata"),
+  },
+  (t) => [
+    index("idx_oauth_client_user").on(t.userId),
+    // ADR-0014: PKCE is required and consent is never skipped, whatever code writes the row.
+    check("oauth_client_require_pkce", sql`${t.requirePKCE} IS NOT FALSE`),
+    check("oauth_client_no_skip_consent", sql`${t.skipConsent} IS NOT TRUE`),
+  ],
+);
+
+export const oauthResource = pgTable("oauth_resource", {
+  id: text("id").primaryKey(),
+  identifier: text("identifier").notNull().unique(),
+  name: text("name").notNull(),
+  accessTokenTtl: integer("access_token_ttl"),
+  refreshTokenTtl: integer("refresh_token_ttl"),
+  signingAlgorithm: text("signing_algorithm"),
+  signingKeyId: text("signing_key_id"),
+  allowedScopes: text("allowed_scopes").array(),
+  customClaims: jsonb("custom_claims"),
+  dpopBoundAccessTokensRequired: boolean("dpop_bound_access_tokens_required").default(false),
+  disabled: boolean("disabled").default(false),
+  createdAt: timestamp("created_at"),
+  updatedAt: timestamp("updated_at"),
+  policyVersion: integer("policy_version").default(1),
+  metadata: jsonb("metadata"),
+});
+
+export const oauthClientResource = pgTable(
+  "oauth_client_resource",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClient.clientId, { onDelete: "cascade" }),
+    resourceId: text("resource_id")
+      .notNull()
+      .references(() => oauthResource.identifier, { onDelete: "cascade" }),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at"),
+  },
+  (t) => [
+    index("idx_oauth_client_resource_client").on(t.clientId),
+    index("idx_oauth_client_resource_resource").on(t.resourceId),
+    uniqueIndex("uq_oauth_client_resource").on(t.clientId, t.resourceId),
+  ],
+);
+
+export const oauthRefreshToken = pgTable(
+  "oauth_refresh_token",
+  {
+    id: text("id").primaryKey(),
+    token: text("token").notNull().unique(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClient.clientId),
+    sessionId: text("session_id").references(() => session.id, { onDelete: "set null" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    referenceId: text("reference_id"),
+    authorizationCodeId: text("authorization_code_id"),
+    resources: text("resources").array(),
+    requestedUserInfoClaims: text("requested_user_info_claims").array(),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at"),
+    revoked: timestamp("revoked"),
+    rotatedAt: timestamp("rotated_at"),
+    rotationReplayResponse: text("rotation_replay_response"),
+    rotationReplayExpiresAt: timestamp("rotation_replay_expires_at"),
+    authTime: timestamp("auth_time"),
+    confirmation: jsonb("confirmation"),
+    scopes: text("scopes").array().notNull(),
+  },
+  (t) => [
+    index("idx_oauth_refresh_token_client").on(t.clientId),
+    index("idx_oauth_refresh_token_session").on(t.sessionId),
+    index("idx_oauth_refresh_token_user").on(t.userId),
+    index("idx_oauth_refresh_token_code").on(t.authorizationCodeId),
+  ],
+);
+
+export const oauthAccessToken = pgTable(
+  "oauth_access_token",
+  {
+    id: text("id").primaryKey(),
+    token: text("token").unique(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClient.clientId),
+    sessionId: text("session_id").references(() => session.id, { onDelete: "set null" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    referenceId: text("reference_id"),
+    authorizationCodeId: text("authorization_code_id"),
+    resources: text("resources").array(),
+    requestedUserInfoClaims: text("requested_user_info_claims").array(),
+    refreshId: text("refresh_id").references(() => oauthRefreshToken.id),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at"),
+    revoked: timestamp("revoked"),
+    confirmation: jsonb("confirmation"),
+    scopes: text("scopes").array().notNull(),
+  },
+  (t) => [
+    index("idx_oauth_access_token_client").on(t.clientId),
+    index("idx_oauth_access_token_session").on(t.sessionId),
+    index("idx_oauth_access_token_user").on(t.userId),
+    index("idx_oauth_access_token_code").on(t.authorizationCodeId),
+    index("idx_oauth_access_token_refresh").on(t.refreshId),
+  ],
+);
+
+export const oauthConsent = pgTable(
+  "oauth_consent",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClient.clientId),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    referenceId: text("reference_id"),
+    resources: text("resources").array(),
+    requestedUserInfoClaims: text("requested_user_info_claims").array(),
+    scopes: text("scopes").array().notNull(),
+    createdAt: timestamp("created_at"),
+    updatedAt: timestamp("updated_at"),
+  },
+  (t) => [
+    index("idx_oauth_consent_client").on(t.clientId),
+    index("idx_oauth_consent_user").on(t.userId),
+  ],
+);
+
+export const oauthClientAssertion = pgTable("oauth_client_assertion", {
+  id: text("id").primaryKey(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+export const betterAuthSchema = {
+  user,
+  session,
+  account,
+  verification,
+  oauthClient,
+  oauthResource,
+  oauthClientResource,
+  oauthRefreshToken,
+  oauthAccessToken,
+  oauthConsent,
+  oauthClientAssertion,
+};

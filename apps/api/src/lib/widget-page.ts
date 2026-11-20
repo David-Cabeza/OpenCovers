@@ -110,6 +110,17 @@ export const SELF_SERVICE_TITLES: Record<string, string> = {
   pt: "A sua reserva",
 };
 
+/** The title of `/r/waitlist`, the page of a waitlist leave link (ADR-0021). ca to pt wait for native review. */
+export const WAITLIST_TITLES: Record<string, string> = {
+  es: "Tu lista de espera",
+  en: "Your waitlist entry",
+  ca: "La teva llista d'espera",
+  fr: "Votre liste d'attente",
+  de: "Deine Warteliste",
+  it: "La tua lista d'attesa",
+  pt: "A sua lista de espera",
+};
+
 export interface WidgetAssets {
   scripts: string[];
   styles: string[];
@@ -210,10 +221,62 @@ export function widgetHtml(opts: { lang: string; title: string; assets: WidgetAs
   );
 }
 
-// One page in both widget locales, so an unknown, rotated and disabled key read the same whatever `lang` says.
-export const NOT_FOUND_HTML =
-  `<!doctype html><html lang="es"><head><meta charset="utf-8">` +
-  `<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">` +
-  `<title>Reservas no disponibles</title></head><body>` +
-  `<p>Las reservas en línea no están disponibles en esta dirección.</p>` +
-  `<p lang="en">Online booking is not available at this address.</p></body></html>`;
+// What the guest reads at an address that holds no booking page, per widget locale. ca, fr, de, it and pt are
+// machine-translated and wait for native review, like the widget catalogs (ADR-0024).
+const NOT_FOUND_TEXT: Record<string, { title: string; body: string }> = {
+  es: {
+    title: "Esta dirección de reservas no existe",
+    body: "No existe o ya no está activa. Reserva desde la web del restaurante o llámalo directamente.",
+  },
+  en: {
+    title: "This booking address does not exist",
+    body: "It does not exist or is no longer active. Book from the restaurant's website or call them directly.",
+  },
+  ca: {
+    title: "Aquesta adreça de reserves no existeix",
+    body: "No existeix o ja no està activa. Reserva des del web del restaurant o truca-hi directament.",
+  },
+  fr: {
+    title: "Cette adresse de réservation n'existe pas",
+    body: "Elle n'existe pas ou n'est plus active. Réservez depuis le site du restaurant ou appelez-le directement.",
+  },
+  de: {
+    title: "Diese Buchungsadresse gibt es nicht",
+    body: "Sie existiert nicht oder ist nicht mehr aktiv. Buche über die Website des Restaurants oder ruf direkt dort an.",
+  },
+  it: {
+    title: "Questo indirizzo di prenotazione non esiste",
+    body: "Non esiste o non è più attivo. Prenota dal sito del ristorante o chiamalo direttamente.",
+  },
+  pt: {
+    title: "Este endereço de reservas não existe",
+    body: "Não existe ou já não está ativo. Reserve no site do restaurante ou ligue diretamente.",
+  },
+};
+
+const NOT_FOUND_STYLE =
+  "body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;" +
+  "box-sizing:border-box;font:16px/1.5 system-ui,-apple-system,sans-serif;color:#1f2933;background:#fff}" +
+  "main{max-width:28rem}h1{font-size:1.25rem;margin:0 0 .5rem}p{margin:0 0 .5rem}.en{color:#52606d;font-size:.9rem}" +
+  "@media(prefers-color-scheme:dark){body{color:#e4e7eb;background:#121417}.en{color:#9aa5b1}}";
+
+/**
+ * The page for an unknown, rotated or disabled key and for a host that is not the widget's. The language comes from
+ * `?lang=` or `Accept-Language`, never from the key, so the three causes still read the same. Without a supported
+ * language it reads Spanish, with an English line below.
+ */
+export function notFoundHtml(lang?: string | null, acceptLanguage?: string | null): string {
+  const wanted = [lang, ...(acceptLanguage?.split(",").map((part) => part.split(";")[0].trim().slice(0, 2)) ?? [])];
+  const chosen = wanted.find((code): code is string => !!code && Object.hasOwn(NOT_FOUND_TEXT, code.toLowerCase()));
+  const code = chosen?.toLowerCase() ?? "es";
+  const text = NOT_FOUND_TEXT[code];
+  const english = chosen ? null : NOT_FOUND_TEXT.en;
+  return (
+    `<!doctype html><html lang="${code}"><head><meta charset="utf-8">` +
+    `<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">` +
+    `<title>${escapeHtml(text.title)}</title><style>${NOT_FOUND_STYLE}</style></head><body><main>` +
+    `<h1>${escapeHtml(text.title)}</h1><p>${escapeHtml(text.body)}</p>` +
+    (english ? `<p class="en" lang="en">${escapeHtml(english.body)}</p>` : "") +
+    `</main></body></html>`
+  );
+}

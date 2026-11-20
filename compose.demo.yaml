@@ -70,6 +70,8 @@ services:
       RATE_LIMIT_PUBLIC_VENUE: ${RATE_LIMIT_PUBLIC_VENUE:-}
       RATE_LIMIT_PUBLIC_SELF_SERVICE: ${RATE_LIMIT_PUBLIC_SELF_SERVICE:-}
       RATE_LIMIT_PUBLIC_DAYS: ${RATE_LIMIT_PUBLIC_DAYS:-}
+      # Remote MCP (ADR-0014). The API refuses to start with MCP_REMOTE=on and DEMO_MODE=1, so the demo keeps it off.
+      MCP_REMOTE: ${MCP_REMOTE:-off}
       PUBLIC_POW_DIFFICULTY: ${PUBLIC_POW_DIFFICULTY:-}
       PUBLIC_CHALLENGE_SECRET: ${PUBLIC_CHALLENGE_SECRET:-}
       # Unset, the API serves no widget page. Set, it serves it only for requests to that host (ADR-0017, Q1).
@@ -109,6 +111,7 @@ services:
       SITE_ADDRESS: ${SITE_ADDRESS:-demo.opencovers.dev}
       # The demo always has a widget host: the sandbox's booking page is half of the story.
       WIDGET_ADDRESS: ${WIDGET_ADDRESS:-book.demo.opencovers.dev}
+      MCP_REMOTE: ${MCP_REMOTE:-off}
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
       interval: 10s

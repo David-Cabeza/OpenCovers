@@ -16,6 +16,7 @@ import { checkDetails, withoutError, type DetailErrors } from "./validate";
 type Phase =
   | { kind: "loading" }
   | { kind: "unavailable" }
+  | { kind: "load-failed" }
   | { kind: "booking"; config: PublicConfig }
   | { kind: "done"; config: PublicConfig; created: Created };
 
@@ -35,6 +36,7 @@ type Sending = null | { kind: "checking" } | { kind: "sending" };
 
 export function App({ api, t, locale }: { api: PublicApi; t: Translate; locale: string }) {
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -44,12 +46,17 @@ export function App({ api, t, locale }: { api: PublicApi; t: Translate; locale: 
         document.title = t("page.title", { venue: result.value.venue.name });
         watchTheme(result.value.venue.theme, window);
         setPhase({ kind: "booking", config: result.value });
-      } else setPhase({ kind: "unavailable" });
+      } else {
+        // Only a venue the engine does not know, or one with online booking off, is "unavailable". A dropped
+        // connection or a server error is transient, so the guest can retry instead of leaving.
+        const gone = result.failure.kind === "error" && result.failure.code === "venue_not_found";
+        setPhase({ kind: gone ? "unavailable" : "load-failed" });
+      }
     });
     return () => {
       live = false;
     };
-  }, [api, t]);
+  }, [api, t, attempt]);
 
   return (
     <main className="mx-auto w-full max-w-md p-4 text-text">
@@ -58,6 +65,21 @@ export function App({ api, t, locale }: { api: PublicApi; t: Translate; locale: 
       {phase.kind === "unavailable" && (
         <Section title={t("unavailable.title")}>
           <p>{t("unavailable.body")}</p>
+        </Section>
+      )}
+      {phase.kind === "load-failed" && (
+        <Section title={t("loadFailed.title")} focus>
+          <p role="alert">{t("loadFailed.body")}</p>
+          <button
+            type="button"
+            className={secondaryButton}
+            onClick={() => {
+              setPhase({ kind: "loading" });
+              setAttempt((n) => n + 1);
+            }}
+          >
+            {t("action.retry")}
+          </button>
         </Section>
       )}
       {phase.kind === "booking" && (
@@ -358,6 +380,7 @@ function BookingForm(props: {
                   setErrors({});
                 }}
                 explain={(failure) => noticeText(explain(failure))}
+                onRetry={() => setReload((n) => n + 1)}
               />
               {freeDay && (
                 <button type="button" className={secondaryButton} onClick={() => pick(freeDay)}>
@@ -469,7 +492,6 @@ function BookingForm(props: {
             ref={contactRef}
             id={`${ids}-contact`}
             type="text"
-            inputMode="email"
             autoComplete="email"
             required
             maxLength={254}
@@ -554,13 +576,25 @@ export function TimeList(props: {
   zone?: string;
   onChange(value: string): void;
   explain(failure: Failure): string;
+  onRetry?(): void;
 }) {
   const { times, t } = props;
   const chosenZone = props.zone ?? "";
   if (times.kind === "pick-date") return <p className="text-muted">{t("times.pickDate")}</p>;
   if (times.kind === "closed") return <p role="status">{t("times.closed")}</p>;
   if (times.kind === "loading") return <p role="status">{t("times.loading")}</p>;
-  if (times.kind === "failed") return <p role="status">{props.explain(times.failure)}</p>;
+  if (times.kind === "failed") {
+    return (
+      <div className="space-y-2">
+        <p role="status">{props.explain(times.failure)}</p>
+        {props.onRetry && (
+          <button type="button" className={secondaryButton} onClick={props.onRetry}>
+            {t("action.retry")}
+          </button>
+        )}
+      </div>
+    );
+  }
   if (times.times.length === 0) {
     if (times.reason === "past_date") return <p role="status">{t("times.pastDate")}</p>;
     if (times.reason === "beyond_horizon") return <p role="status">{t("times.tooFar")}</p>;

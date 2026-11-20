@@ -78,6 +78,7 @@ describe("online booking settings", () => {
         privacyNoticeUrl: null,
         publicZones: [],
         showServiceNames: false,
+        waitlistEnabled: false,
       });
     }
     expect(await db.select().from(venueOnlineBooking)).toHaveLength(0);
@@ -117,6 +118,8 @@ describe("online booking settings", () => {
       privacyNoticeUrl: "https://www.example.com/privacy",
       publicZones: [] as string[],
       showServiceNames: true,
+      // `true` needs the venue's email on (C68), covered in public-waitlist.test.ts.
+      waitlistEnabled: false,
       theme: {
         colors: { primary: "#1f6f5c", onPrimary: "#ffffff", background: "#ffffff", surface: "#f7f7f7", text: "#111111", muted: "#666666", border: "#dddddd" },
         radius: 12,

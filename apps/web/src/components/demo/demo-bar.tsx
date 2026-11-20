@@ -97,7 +97,8 @@ function writeTicked(venueId: string, ticked: StepId[]) {
  */
 function Checklist({ venueId }: { venueId: string }) {
   const t = useT();
-  const [open, setOpen] = useState(true);
+  // Open on a wide screen; on a phone the tour would take half of it, so it starts folded.
+  const [open, setOpen] = useState(() => window.matchMedia?.("(min-width: 640px)").matches ?? true);
   const [ticked, setTicked] = useState<StepId[]>(() => readTicked(venueId));
   const nav = useNavigation();
   useEffect(() => setTicked(readTicked(venueId)), [venueId]);
@@ -143,16 +144,16 @@ function Checklist({ venueId }: { venueId: string }) {
   }
 
   const manual = (id: StepId, openAgenda: boolean) => (
-    <span className="flex gap-2">
+    <span className="flex flex-wrap gap-2">
       {openAgenda && (
-        <Button type="button" size="xs" variant="outline" onClick={() => {
+        <Button type="button" size="xs" variant="outline" className="max-sm:h-9 max-sm:px-3" onClick={() => {
             void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
             nav?.goTo("agenda");
           }}>
           {t("demo.tour.openAgenda")}
         </Button>
       )}
-      <Button type="button" size="xs" variant="ghost" onClick={() => toggle(id)}>
+      <Button type="button" size="xs" variant="ghost" className="max-sm:h-9 max-sm:px-3" onClick={() => toggle(id)}>
         {done[id] ? t("demo.tour.untick") : t("demo.tour.markDone")}
       </Button>
     </span>
@@ -171,7 +172,7 @@ function Checklist({ venueId }: { venueId: string }) {
       <button
         type="button"
         aria-expanded={open}
-        aria-controls="demo-checklist"
+        aria-controls={open ? "demo-checklist" : undefined}
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2 py-1 text-sm font-medium"
       >
@@ -181,7 +182,7 @@ function Checklist({ venueId }: { venueId: string }) {
       {open && (
         <ol id="demo-checklist" className="space-y-1.5 pb-2 pl-6">
           {steps.map((step) => (
-            <li key={step.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <li key={step.id} className="grid grid-cols-[auto_1fr] items-start gap-x-2 gap-y-1 sm:flex sm:flex-wrap sm:items-center sm:gap-x-3">
               {done[step.id] ? (
                 <CheckCircle2Icon className="size-4 text-primary" aria-hidden="true" />
               ) : (
@@ -191,7 +192,7 @@ function Checklist({ venueId }: { venueId: string }) {
                 {step.text}
                 <span className="sr-only">{" "}{done[step.id] ? t("demo.tour.done") : t("demo.tour.notDone")}</span>
               </span>
-              {step.action}
+              {step.action && <span className="col-start-2 sm:col-auto">{step.action}</span>}
             </li>
           ))}
         </ol>

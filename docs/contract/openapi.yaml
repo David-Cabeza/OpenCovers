@@ -34,7 +34,9 @@ info:
     need no credentials, read no cookie or session, and are not exposed
     through MCP. A guest names a venue with its public booking key, which
     is a lookup handle and not a secret, and names one booking with a
-    self-service token in the `X-Self-Service-Token` header. No public
+    self-service token, or one public waitlist entry with a waitlist
+    token, in the `X-Self-Service-Token` header. The two kinds of token
+    never work on each other's routes. No public
     response holds another guest's data, a table id, a zone other than the
     venue's effective public zones (C66), a reservation
     id, a guest id, attribution, a key other than the booking key it was
@@ -489,8 +491,25 @@ paths:
     get:
       operationId: waitlist.list
       summary: List the guests waiting for a table, oldest first
+      description: |
+        Returns the entries in status `waiting`, oldest first. An entry has
+        a `date` when a guest joined through the public waitlist
+        (`public.joinWaitlist`, `source` `widget`), and a null `date` when
+        staff added it, the same-day queue (ADR-0021, section 3, C76).
+
+        Without `date`, the answer is the waiting entries whose `date` is
+        null or today in the venue's time zone, so staff see today's queue
+        as before. With `date`, it is the waiting entries of that date, and
+        when that date is today also the entries with a null `date`, so the
+        answer for today is the same with or without the filter. A `date`
+        that breaks the date rules of C61 fails with `invalid_request`.
       parameters:
         - $ref: "#/components/parameters/venueId"
+        - name: date
+          in: query
+          required: false
+          description: A local date, `YYYY-MM-DD`. Without it, today and the entries with no date.
+          schema: { type: string, format: date }
       responses:
         "200":
           description: The waiting entries
@@ -507,7 +526,11 @@ paths:
         nothing and returns 201 with the current list, even when the body
         differs, as a repeated create returns the original booking. A key
         used before for another kind of write fails with `invalid_request`.
-        Without a key every call adds an entry.
+        Without a key every call adds an entry. An entry added here has a
+        null `date`, null `windowStart` and `windowEnd`, and `source`
+        `staff`: it is the same-day queue. Only the public join makes an
+        entry with a date (C76). A staff add is not checked against the
+        guest blocklist (C57).
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/optionalIdempotencyKey"
@@ -545,6 +568,13 @@ paths:
         returns the same reservation. The key of a seat of another entry, or
         of another kind of write, fails with `invalid_request`. An entry that
         is no longer waiting fails with `invalid_transition`.
+
+        Only an entry whose `date` is null or today in the venue's time zone
+        can be seated. An entry for another date, earlier or later, fails
+        with `invalid_transition` and stays `waiting`, with nothing written.
+        Seating is still a walk-in now (C59, C77). For a future date staff
+        book with the staff create and then remove the entry with
+        `waitlist.cancel`; there is no `booked` status (ADR-0021, Q8).
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/entryId"
@@ -567,7 +597,11 @@ paths:
         changes nothing and returns 200 with the current list. The key of a
         cancel of another entry, or of another kind of write, fails with
         `invalid_request`. Without a key a second cancel fails with
-        `invalid_transition`.
+        `invalid_transition`. A cancel of an entry from the public join
+        (`source` `widget`) does not revoke its leave link: the guest still
+        reads the entry, now `cancelled`, until the link expires, and a
+        guest leave then fails with `invalid_transition` (C75). This is how
+        staff remove an entry after booking the guest (ADR-0021, Q8).
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/entryId"
@@ -929,7 +963,10 @@ paths:
         to any guest merged into it, unlinks them, and deletes those guest
         records. Each erased reservation keeps its date, party size, and
         status, so cover counts survive. It also deletes the venue's waitlist
-        entries whose contact normalizes to one of the guest's keys. Erasing
+        entries whose contact normalizes to one of the guest's keys, the
+        entries of the public waitlist join included, with their stored
+        consent time and their leave links, so those tokens then fail with
+        `self_service_link_invalid` (C78). Erasing
         a guest that was merged into another also erases the reservations
         moved at that merge, which the target still holds.
 
@@ -1790,7 +1827,9 @@ paths:
         other than `auto` (`approval` is reserved until stage 14 of
         ADR-0017). `publicZones` is checked against the venue's tables when
         it is sent; a save that leaves it out does not check it again
-        (C66).
+        (C66). `waitlistEnabled: true` fails with `invalid_request` and
+        changes nothing while the venue's `notificationsEnabled` is off,
+        because a public join sends an email (C68).
 
         Setting `enabled` to true needs a venue name and at least one
         service bookable online, a service named in `services` (any service
@@ -1907,7 +1946,8 @@ paths:
         horizon, whether the consent question is shown, the confirmation
         mode, the venue's privacy notice URL or null, the effective public
         zones when there are two or more (`zones`, otherwise `[]`, C66),
-        and a fresh form challenge. It never holds the venue id, any other address,
+        whether a guest can join the public waitlist (`waitlistEnabled`,
+        C68), and a fresh form challenge. It never holds the venue id, any other address,
         `noticeAddress`, an email, a key other than the booking key in the
         path, or any booking. See
         docs/adr/0021-widget-day-status-zones-waitlist.md, section 5.
@@ -2256,6 +2296,198 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /public/{bookingKey}/waitlist:
+    post:
+      operationId: public.joinWaitlist
+      summary: Join the venue's waitlist for a date as a guest
+      description: |
+        Public, with no credentials. ADR-0021, section 3. It adds one entry
+        to the venue's staff waitlist with `source` `widget`, the `date`, an
+        optional time window, the party size, the name and the email, and
+        returns the entry as the guest sees it with a waitlist token. A
+        waitlist entry books nothing: the join writes no reservation, table
+        allocation, guest record or event, and the guest gets no table until
+        staff book or seat them. There are no automatic offers.
+
+        Minimum data. The body takes `guest.name` (1 to 100 characters
+        after trimming), one `guest.contact` that must normalize to an
+        email (REQ-G2), `emailConsent`, `partySize`, `date`, an optional
+        `window`, an optional `locale`, and the form challenge, solution,
+        `honeypot` and `captchaToken` of the public create. No note, no
+        phone and no marketing field. A contact that is a phone or does not
+        normalize, a missing name, a name over 100 characters, and any field
+        the body does not list fail with `invalid_request`.
+
+        Consent (ADR-0021, Q9). `emailConsent` is required and must be
+        `true`; absent, `false` or any other value fails with
+        `invalid_request` and writes nothing. It covers email about this
+        entry only and is never a marketing consent. The engine stores the
+        time of the consent with the entry. The widget renders the box
+        unticked. Its wording, and the text of the join email, are under
+        the legal review (ADR-0021, Q11) and are not part of this contract.
+
+        What it accepts. `partySize` must be inside the online party limits,
+        otherwise `invalid_request`, as `public.days` answers (C63). The
+        join is open only while `PublicConfig.waitlistEnabled` is true, so
+        with the setting on and the venue's email on, and only for a date
+        whose `public.days` status is `available` or `full`. A date that is
+        `closed` or `outside_window`, the waitlist switched off, and the
+        venue's email off fail with `waitlist_unavailable` (409). The route
+        does not require the day to be `full`, because availability can
+        change between the read and the submit. A malformed date fails with
+        `invalid_request` (C61).
+
+        Caps (ADR-0021, Q7). Constants in v1, not settings: at most 2 open
+        public entries per contact in the venue, at most 1 per contact per
+        date, and at most 50 open public entries per date in the venue. An
+        open public entry is a `waiting` entry with `source` `widget` whose
+        date is today or later. A join over any cap fails with
+        `waitlist_unavailable` and writes nothing, the same answer as a
+        closed date, so the answer does not say which cap was reached
+        (C71).
+
+        Blocklist (ADR-0021, Q10). The guest blocklist of ADR-0018 applies,
+        last, only where the join would otherwise succeed, with
+        `booking_declined` and the body a blocked public create gets (C72).
+
+        Bot protection is the public create's (C45): every failure is
+        `invalid_request`, the same answer as any malformed body.
+
+        Idempotency. The `Idempotency-Key` must be a UUID, stored under the
+        `public:` prefix. A repeat of the key returns the same entry and
+        `waitlistToken: null`, adds nothing, mints no token and sends no
+        email, even when the challenge is spent or older than 30 minutes;
+        the link of the first answer and its email keep working. A key used
+        for a public create, a self-service write or a waitlist leave, and
+        then for a join, fails with `invalid_request`, and so does a join's
+        key sent to those routes (C73).
+
+        Email. On success the engine sends one email to the contact, after
+        the commit, with the leave link `/r/waitlist?lang=<locale>#<token>`
+        on the widget origin. Its language is the body's `locale`, then the
+        venue's online-booking `locale`, then `es`, and the link's `lang` is
+        the body's `locale` or the venue's (ADR-0024, C67). The entry stores
+        no language. A refused join and a repeat send nothing. The email
+        carries no guest name. A failed send leaves the entry and the answer
+        as they are.
+
+        An unknown, rotated, malformed or disabled key gives
+        `venue_not_found` as `public.getConfig` does. Limited by
+        `public_booking` and `public_venue`. Not exposed through MCP.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/bookingKey"
+        - $ref: "#/components/parameters/publicIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PublicWaitlistJoin" }
+      responses:
+        "200":
+          description: The entry as the guest sees it, and its waitlist token
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicWaitlistJoined" }
+        "404":
+          $ref: "#/components/responses/PublicVenueNotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /public/waitlist-entry:
+    get:
+      operationId: public.readWaitlistEntry
+      summary: Read the waitlist entry a waitlist token names
+      description: |
+        Public. The waitlist token in `X-Self-Service-Token` is the only
+        credential, and it names one entry of one venue. No route takes a
+        venue id or an entry id. Returns the guest view of the entry. A
+        read changes nothing.
+
+        A waitlist token is a separate kind from a booking's self-service
+        token, kept in its own store, so a booking token never works here
+        and a waitlist token never works on `/public/self-service`. A
+        missing or malformed token, an unknown link id, a wrong secret, an
+        expired or revoked link, a link whose entry was erased or deleted by
+        retention, and a booking token all fail with `404` and
+        `self_service_link_invalid`, the same body and headers. The link
+        expires at the end of the entry's date in the venue's time zone.
+        Reading works in every status until then, also after staff seat or
+        cancel the entry, and after online booking is turned off or the
+        booking key rotated. Every answer, a failure included, sends
+        `Cache-Control: no-store`. Limited by `public_read` and
+        `self_service`. Not exposed through MCP.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/waitlistToken"
+      responses:
+        "200":
+          description: The entry as the guest sees it
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicWaitlistEntry" }
+        "404":
+          $ref: "#/components/responses/SelfServiceLinkInvalid"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /public/waitlist-entry/leave:
+    post:
+      operationId: public.leaveWaitlist
+      summary: Leave the waitlist entry a waitlist token names
+      description: |
+        Public, with the waitlist token in `X-Self-Service-Token` and a UUID
+        `Idempotency-Key`. It cancels the entry through the staff cancel,
+        so the entry is `cancelled` and leaves the staff list, and in the
+        same transaction it revokes the link. The answer is the cancelled
+        guest view, the last answer the link gives. It emits no event and
+        sends no email.
+
+        It takes no body. The checks run in this order. A missing key or a
+        key that is not a UUID fails with `invalid_request`. A token that
+        does not work fails with `self_service_link_invalid`, as `public.readWaitlistEntry`
+        says. A repeat of the key with the same token returns the stored
+        result although the leave revoked the token, writes nothing, and
+        works until the link would have expired. An entry that is no longer
+        `waiting`, because staff seated or cancelled it, fails with
+        `invalid_transition` and changes nothing. Any other call with a
+        revoked token, a read or a leave with another key, fails with
+        `self_service_link_invalid`. A key used for another kind of write
+        fails with `invalid_request`. Limited by `self_service`. Not exposed
+        through MCP.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/waitlistToken"
+        - $ref: "#/components/parameters/publicIdempotencyKey"
+      responses:
+        "200":
+          description: The cancelled entry as the guest sees it
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicWaitlistEntry" }
+        "404":
+          $ref: "#/components/responses/SelfServiceLinkInvalid"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+
   /public/self-service:
     get:
       operationId: public.readBooking
@@ -2580,6 +2812,47 @@ paths:
             text/html:
               schema: { type: string }
 
+  /r/waitlist:
+    servers:
+      - url: /
+        description: The widget origin (`WIDGET_ADDRESS`), not under `/v1`.
+    get:
+      operationId: widget.waitlistPage
+      summary: The page where a guest reads or leaves one public waitlist entry
+      description: |
+        Not JSON. The guest's leave link is `/r/waitlist#<token>`, with
+        `?lang=<locale>` before the fragment. It is served exactly as
+        `widget.selfServicePage` is: the same widget build, the same headers
+        (`X-Frame-Options: DENY`, `frame-ancestors 'none'`,
+        `Cache-Control: no-store`, `X-Robots-Tag: noindex`,
+        `Referrer-Policy: no-referrer`, `nosniff`), no cookie, not rate
+        limited, the same HTML for every entry whatever query, cookie or
+        header the request carries apart from a supported `lang`, and the
+        `404` of `widget.page` for another host. The page reads the token
+        from the fragment, removes it from the address bar, keeps it in
+        memory and sends it only in `X-Self-Service-Token` to
+        `public.readWaitlistEntry` and `public.leaveWaitlist`. A link that
+        does not work shows one message whatever the reason. Built in
+        ADR-0021 stage 12. Not exposed through MCP.
+      security: []
+      parameters:
+        - name: lang
+          in: query
+          required: false
+          description: A supported widget locale (`es`, `en`, `ca`, `fr`, `de`, `it`, `pt`). Any other value is ignored.
+          schema: { type: string, example: en }
+      responses:
+        "200":
+          description: The waitlist HTML shell, with the headers of `widget.selfServicePage`
+          content:
+            text/html:
+              schema: { type: string }
+        "404":
+          description: A host other than the widget's. The `404` page and headers of `widget.page`.
+          content:
+            text/html:
+              schema: { type: string }
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -2671,6 +2944,22 @@ components:
         carries it in the URL fragment, `/r#<token>`, which the browser
         never sends to a server, and the page sends it in this header. A
         missing or malformed value fails with `self_service_link_invalid`.
+      schema:
+        type: string
+        pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[A-Za-z0-9_-]{43}$"
+    waitlistToken:
+      name: X-Self-Service-Token
+      in: header
+      required: true
+      description: |
+        The waitlist token of one public waitlist entry, in the format of
+        the self-service token, `<linkId>.<secret>`: a random UUID, a dot,
+        and 32 random bytes in base64url without padding. The engine stores
+        only the SHA-256 hash of the secret, in a store apart from booking
+        links, and compares in constant time. The leave link carries it in
+        the URL fragment, `/r/waitlist#<token>`. A booking's self-service
+        token sent here, and a missing or malformed value, fail with
+        `self_service_link_invalid` (C74).
       schema:
         type: string
         pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[A-Za-z0-9_-]{43}$"
@@ -3400,7 +3689,13 @@ components:
 
     WaitlistEntry:
       type: object
-      required: [id, venueId, partySize, zone, guestName, guestContact, status, reservationId, createdAt]
+      description: |
+        One waitlist entry as staff see it. An entry with a null `date` is
+        the same-day queue, as before. An entry with a `date` came from the
+        public join (ADR-0021, section 3, C76). There is no `booked`
+        status: staff book a dated entry with the staff create and then
+        cancel the entry (ADR-0021, Q8).
+      required: [id, venueId, partySize, zone, guestName, guestContact, status, reservationId, createdAt, date, windowStart, windowEnd, source]
       properties:
         id: { type: string }
         venueId: { type: string }
@@ -3411,6 +3706,30 @@ components:
         status: { type: string, enum: [waiting, seated, cancelled] }
         reservationId: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
+        date:
+          type: string
+          format: date
+          nullable: true
+          description: The local date the guest asked for, or null for the same-day queue. Null on every entry staff add.
+        windowStart:
+          type: string
+          nullable: true
+          pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          example: "20:00"
+          description: The start of the guest's time window, a local time, or null when the guest gave none.
+        windowEnd:
+          type: string
+          nullable: true
+          pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          example: "22:00"
+          description: The end of the guest's time window, later than `windowStart`, or null when the guest gave none.
+        source:
+          type: string
+          enum: [staff, widget]
+          description: |
+            `staff` for an entry added with `waitlist.add` (and every entry
+            made before this field), `widget` for one from
+            `public.joinWaitlist`.
 
     WaitlistEntries:
       type: object
@@ -3827,6 +4146,7 @@ components:
         - privacyNoticeUrl
         - publicZones
         - showServiceNames
+        - waitlistEnabled
       properties:
         enabled:
           type: boolean
@@ -3981,6 +4301,19 @@ components:
             `slots[].service`, so the widget can group times by service
             (ADR-0021, Q3). Off, the default, no public answer holds a
             service name (C40).
+        waitlistEnabled:
+          type: boolean
+          default: false
+          description: |
+            Whether guests can join the public waitlist for a date
+            (ADR-0021, section 3, C68). Off by default. Setting it to true
+            fails with `invalid_request` and changes nothing while the
+            venue's `notificationsEnabled` is off, because the join sends
+            an email. Turning email off later keeps the stored value, and
+            the public channel then treats the waitlist as off
+            (`PublicConfig.waitlistEnabled` false). Turning it off stops new
+            joins only: entries already made and their leave links keep
+            working.
 
     OnlineBookingUpdate:
       type: object
@@ -4017,6 +4350,7 @@ components:
         privacyNoticeUrl: { type: string, format: uri, nullable: true, maxLength: 2048 }
         publicZones: { type: array, maxItems: 10, uniqueItems: true, items: { type: string, minLength: 1 } }
         showServiceNames: { type: boolean }
+        waitlistEnabled: { type: boolean }
 
     OnlineBookingSaved:
       allOf:
@@ -4120,6 +4454,7 @@ components:
         - linkResend
         - privacyNoticeUrl
         - zones
+        - waitlistEnabled
       properties:
         venue: { $ref: "#/components/schemas/PublicVenue" }
         minPartySize:
@@ -4174,6 +4509,15 @@ components:
             the venue's order, when there are two or more; otherwise `[]`.
             Only these names may be sent as `zone` to availability and the
             create (C66).
+        waitlistEnabled:
+          type: boolean
+          description: |
+            Whether a guest can join the public waitlist now: the online
+            setting `waitlistEnabled` on, `notificationsEnabled` on, a way to
+            send email, and a widget origin to link to, as `linkResend`
+            requires. While false, `public.joinWaitlist` fails with
+            `waitlist_unavailable` and the widget offers no waitlist. It says
+            nothing about any date or guest (C68).
 
     PublicAvailability:
       type: object
@@ -4442,6 +4786,130 @@ components:
           type: string
           format: date-time
 
+    PublicWaitlistJoin:
+      type: object
+      required: [date, partySize, guest, emailConsent, challenge, solution]
+      additionalProperties: false
+      description: |
+        The body of `public.joinWaitlist`. Any field not listed, a note,
+        `zone`, `time`, `tables` and `guest.consent` included, fails with
+        `invalid_request`. There is no phone, allergy, diet or marketing
+        field (ADR-0021, section 3).
+      properties:
+        date: { type: string, format: date }
+        partySize: { type: integer, minimum: 1 }
+        window:
+          type: object
+          required: [from, to]
+          additionalProperties: false
+          description: |
+            Optional. The local times the guest could come, both on the
+            same date, `from` earlier than `to`. A window with only one end,
+            equal ends, `to` earlier than `from`, or a value that is not
+            `HH:MM` fails with `invalid_request`. It is a preference shown
+            to staff and is not checked against the service hours. Staff
+            read it as `windowStart` and `windowEnd`.
+          properties:
+            from: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "20:00" }
+            to: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "22:00" }
+        guest:
+          type: object
+          required: [name, contact]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 100
+              description: Trimmed, 1 to 100 characters.
+            contact:
+              type: string
+              maxLength: 254
+              description: One email. It must normalize to an email as REQ-G2 says; a phone or anything else fails with `invalid_request`.
+        emailConsent:
+          type: boolean
+          enum: [true]
+          description: |
+            Required, and must be `true`. The guest's consent to receive
+            email about this waitlist entry, and only about it; it is never
+            a marketing consent. The widget renders the box unticked.
+            Absent, `false` or any other value fails with `invalid_request`.
+            The wording shown to the guest is under the legal review
+            (ADR-0021, Q11).
+        locale:
+          type: string
+          enum: [es, en, ca, fr, de, it, pt]
+          example: en
+          description: |
+            Optional (ADR-0024). The language of the join email and of the
+            leave link's `lang`, under the chain of C67. Validated as on the
+            public create. The entry stores no language.
+        honeypot:
+          type: string
+          maxLength: 0
+          description: The hidden form field. Any non-empty value fails with `invalid_request`.
+        challenge: { $ref: "#/components/schemas/FormChallenge" }
+        solution:
+          type: string
+          pattern: "^[0-9]{1,16}$"
+          description: The proof-of-work counter for `challenge`, in decimal.
+        captchaToken:
+          type: string
+          description: Required, and verified, only when the operator sets `PUBLIC_CAPTCHA`.
+
+    PublicWaitlistEntry:
+      type: object
+      description: |
+        The guest view of one public waitlist entry. It holds no entry id,
+        venue id, reservation id, guest id, zone, table, source, guest name
+        or other guest's data, and the contact is masked as in the booking
+        guest view (C48).
+      required: [venue, date, window, partySize, status, guest, linkExpiresAt]
+      properties:
+        venue: { $ref: "#/components/schemas/PublicVenue" }
+        date: { type: string, format: date }
+        window:
+          type: object
+          nullable: true
+          required: [from, to]
+          description: The window the guest gave, or null.
+          properties:
+            from: { type: string, example: "20:00" }
+            to: { type: string, example: "22:00" }
+        partySize: { type: integer }
+        status:
+          type: string
+          enum: [waiting, seated, cancelled]
+          description: |
+            `cancelled` after the guest leaves and after staff remove the
+            entry, which is also what staff do once they have booked the
+            guest (ADR-0021, Q8).
+        guest:
+          type: object
+          required: [contact]
+          properties:
+            contact:
+              type: string
+              description: Masked, `a***@example.com`.
+        linkExpiresAt:
+          type: string
+          format: date-time
+          description: The end of the entry's date in the venue's time zone. From then on the link fails with `self_service_link_invalid`.
+
+    PublicWaitlistJoined:
+      type: object
+      required: [entry, waitlistToken]
+      properties:
+        entry: { $ref: "#/components/schemas/PublicWaitlistEntry" }
+        waitlistToken:
+          type: string
+          nullable: true
+          description: |
+            The token for the guest's leave link, shown once and never
+            stored in clear. Null on a repeat of the join's
+            `Idempotency-Key`, which mints nothing: the link of the first
+            answer and of the join email keeps working.
+
     Error:
       type: object
       required: [code, message, retryable]
@@ -4509,3 +4977,4 @@ components:
         - self_service_link_invalid
         - self_service_closed
         - reservation_changed
+        - waitlist_unavailable

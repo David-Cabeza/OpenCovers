@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
-import { RotateCwIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { MaximizeIcon, MinimizeIcon, RotateCwIcon } from "lucide-react";
 import { cn } from "cn";
+import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n";
 import { useUiStore } from "@/stores/ui-store";
 import { FloorTableCard } from "./floor-table-card";
@@ -35,12 +36,27 @@ export interface CanvasItem {
 
 const NODE = 80;
 const SNAP = 8;
+const MARGIN = 24;
+const MIN_HEIGHT = 480;
+// A plan that needs less shrinking than this to fit the screen is shrunk by default (a tablet). Below it the names
+// would be too small to read, so the plan opens at its real size and scrolls sideways (a phone).
+const AUTO_FIT_MIN = 0.7;
+
+// Edit handles are 20 px discs. Their tap area grows to 44 px, mostly outwards, so it takes little from the table or
+// element underneath and the areas of two handles on a 40 px element meet without overlapping.
+const HANDLE =
+  "absolute -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm before:absolute before:-top-4 before:-bottom-2 before:content-[''] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+const HANDLE_LEFT = "-left-2 z-10 before:-left-4 before:-right-2 hover:bg-accent";
+const HANDLE_RIGHT = "-right-2 before:-left-2 before:-right-4 hover:bg-destructive hover:text-white";
 
 // Faint grain lines for wooden table tops, drawn with the theme's wood edge colour.
 const WOOD_GRAIN =
   "repeating-linear-gradient(90deg, transparent 0 6px, color-mix(in oklab, var(--wood-edge) 25%, transparent) 6px 7px)";
 
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
+
+// Older data and the demo template say "rect" for a rectangular table.
+const shapeOf = (shape: string | undefined) => (shape === "rect" ? "rectangle" : (shape ?? "round"));
 
 function tableSize(shape: string | undefined, seats: number): { w: number; h: number } {
   if (shape === "rectangle") return { w: 64, h: 46 };
@@ -59,6 +75,17 @@ function tableSize(shape: string | undefined, seats: number): { w: number; h: nu
 function labelRoom(size: { w: number; h: number }, rotation: number): number {
   const across = Math.abs(Math.sin((rotation * Math.PI) / 180));
   return Math.min(size.w, across < 0.001 ? size.w : size.h / across) - 6;
+}
+
+/** The width a line of text can take on a table. A round or oval top is narrower away from its middle line. */
+function textRoom(shape: string, size: { w: number; h: number }, rotation: number, lines: number): number {
+  if (shape === "round") {
+    const r = size.w / 2 - 2;
+    const reach = Math.min(lines * 5, r - 4);
+    return Math.floor(2 * Math.sqrt(r * r - reach * reach)) - 2;
+  }
+  if (shape === "oval") return Math.floor(labelRoom(size, rotation) * (lines > 2 ? 0.7 : 0.8));
+  return labelRoom(size, rotation);
 }
 
 const CHAIR_GAP = 8;
@@ -112,8 +139,25 @@ function chairPositions(
   return pts;
 }
 
-type DragTarget = { kind: "table" | "item"; id: string; offsetX: number; offsetY: number };
-type ResizeTarget = { id: string; startX: number; startY: number; startW: number; startH: number };
+// `last` is the latest position or size of the gesture. It is saved from here when the pointer lifts, because the
+// state that draws it can still be one move behind at that moment.
+type DragTarget = {
+  kind: "table" | "item";
+  id: string;
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+  last?: { x: number; y: number };
+};
+type ResizeTarget = {
+  id: string;
+  startX: number;
+  startY: number;
+  startW: number;
+  startH: number;
+  scale: number;
+  last?: { w: number; h: number };
+};
 
 export function FloorCanvas({
   tables,
@@ -150,6 +194,28 @@ export function FloorCanvas({
   const [sizeOverrides, setSizeOverrides] = useState<Record<string, { w: number; h: number }>>({});
   const dragRef = useRef<DragTarget | null>(null);
   const resizeRef = useRef<ResizeTarget | null>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [frameWidth, setFrameWidth] = useState(0);
+  const [zoomChoice, setZoomChoice] = useState<"fit" | "actual" | null>(null);
+  // While something is dragged or resized the scale stays put, so the plan does not shrink or grow under the finger.
+  const [heldScale, setHeldScale] = useState<number | null>(null);
+  const [more, setMore] = useState({ left: false, right: false });
+
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setFrameWidth(frame.clientWidth));
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, []);
+
+  function updateMore() {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const left = frame.scrollLeft > 1;
+    const right = frame.scrollLeft + frame.clientWidth < frame.scrollWidth - 1;
+    setMore((prev) => (prev.left === left && prev.right === right ? prev : { left, right }));
+  }
 
   const posOf = (kind: "table" | "item", id: string, x: number, y: number) =>
     posOverrides[`${kind}:${id}`] ?? { x, y };
@@ -162,9 +228,11 @@ export function FloorCanvas({
     dragRef.current = {
       kind,
       id,
-      offsetX: e.clientX - rect.left - x,
-      offsetY: e.clientY - rect.top - y,
+      offsetX: (e.clientX - rect.left) / scale - x,
+      offsetY: (e.clientY - rect.top) / scale - y,
+      scale,
     };
+    setHeldScale(scale);
     e.currentTarget.setPointerCapture(e.pointerId);
   }
 
@@ -173,48 +241,56 @@ export function FloorCanvas({
     if (!drag) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const x = Math.max(0, snap(e.clientX - rect.left - drag.offsetX));
-    const y = Math.max(0, snap(e.clientY - rect.top - drag.offsetY));
+    const x = Math.max(0, snap((e.clientX - rect.left) / drag.scale - drag.offsetX));
+    const y = Math.max(0, snap((e.clientY - rect.top) / drag.scale - drag.offsetY));
+    drag.last = { x, y };
     setPosOverrides((prev) => ({ ...prev, [`${drag.kind}:${drag.id}`]: { x, y } }));
   }
 
   function onPointerUp() {
     const drag = dragRef.current;
     if (!drag) return;
-    const pos = posOverrides[`${drag.kind}:${drag.id}`];
+    const pos = drag.last;
     if (pos) {
       if (drag.kind === "table") onTableUpdate?.(drag.id, { x: pos.x, y: pos.y });
       else onItemUpdate?.(drag.id, { x: pos.x, y: pos.y });
     }
     dragRef.current = null;
+    setHeldScale(null);
   }
 
   function startResize(e: React.PointerEvent, item: CanvasItem) {
     if (mode !== "edit") return;
+    // The handle sits inside the element, which would otherwise take the same press as the start of a drag.
+    e.stopPropagation();
     resizeRef.current = {
       id: item.id,
       startX: e.clientX,
       startY: e.clientY,
       startW: item.width,
       startH: item.height,
+      scale,
     };
+    setHeldScale(scale);
     e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function onResizeMove(e: React.PointerEvent) {
     const r = resizeRef.current;
     if (!r) return;
-    const w = Math.max(SNAP, snap(r.startW + (e.clientX - r.startX)));
-    const h = Math.max(SNAP, snap(r.startH + (e.clientY - r.startY)));
+    const w = Math.max(SNAP, snap(r.startW + (e.clientX - r.startX) / r.scale));
+    const h = Math.max(SNAP, snap(r.startH + (e.clientY - r.startY) / r.scale));
+    r.last = { w, h };
     setSizeOverrides((prev) => ({ ...prev, [r.id]: { w, h } }));
   }
 
   function onResizeUp() {
     const r = resizeRef.current;
     if (!r) return;
-    const size = sizeOverrides[r.id];
+    const size = r.last;
     if (size) onItemUpdate?.(r.id, { width: size.w, height: size.h });
     resizeRef.current = null;
+    setHeldScale(null);
   }
 
   function rotate(itemId: string, rotation: number, kind: "table" | "item") {
@@ -223,7 +299,8 @@ export function FloorCanvas({
     else onItemUpdate?.(itemId, { rotation: next });
   }
 
-  // The plan uses absolute pixel positions, so on a narrow screen the stage scrolls instead of clipping.
+  // The plan uses absolute pixel positions. When it is wider than the screen it is either shrunk to fit or shown at
+  // its real size and scrolled sideways; the bar under it says which and switches between the two.
   const tableNames = Object.fromEntries(tables.map((t) => [t.id, t.name]));
   const extentX = Math.max(
     ...tables.map((t) => posOf("table", t.id, t.posX, t.posY).x + NODE),
@@ -235,16 +312,28 @@ export function FloorCanvas({
     ...items.map((i) => posOf("item", i.id, i.posX, i.posY).y + sizeOf(i.id, i.width, i.height).h),
     0,
   );
+  const naturalWidth = extentX + MARGIN;
+  const naturalHeight = Math.max(MIN_HEIGHT, extentY + MARGIN);
+  const fit = frameWidth > 0 && naturalWidth > frameWidth ? Math.floor((frameWidth / naturalWidth) * 1000) / 1000 : 1;
+  const zoom = zoomChoice ?? (fit >= AUTO_FIT_MIN ? "fit" : "actual");
+  const scale = heldScale ?? (zoom === "fit" ? fit : 1);
+  const scaled = scale < 1;
+
+  useEffect(updateMore, [frameWidth, naturalWidth, scale]);
 
   return (
-    <div className="overflow-auto rounded-xl border bg-floor">
+    <div className="overflow-hidden rounded-xl border bg-floor">
+      <div className="relative">
+      <div ref={frameRef} data-testid="floor-frame" className="overflow-x-auto overscroll-x-contain" onScroll={updateMore}>
+      <div style={scaled ? { width: naturalWidth * scale, height: naturalHeight * scale, overflow: "hidden" } : undefined}>
       <div
         ref={canvasRef}
         data-testid="floor-canvas"
-        className="relative h-[480px] w-full bg-floor"
+        className={cn("relative bg-floor", scaled ? "origin-top-left" : "w-full")}
         style={{
-          minWidth: extentX + 24,
-          minHeight: extentY + 24,
+          ...(scaled
+            ? { width: naturalWidth, height: naturalHeight, transform: `scale(${scale})` }
+            : { minWidth: naturalWidth, height: naturalHeight }),
           ...skin.floor(mode),
         }}
         onDragOver={(e) => e.preventDefault()}
@@ -276,7 +365,7 @@ export function FloorCanvas({
                     aria-label={tr("floor.rotate")}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => rotate(item.id, rotation, "item")}
-                    className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm hover:bg-accent"
+                    className={cn(HANDLE, HANDLE_LEFT)}
                   >
                     <RotateCwIcon className="size-3" />
                   </button>
@@ -285,7 +374,7 @@ export function FloorCanvas({
                     aria-label={tr("common.delete")}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => onDeleteItem?.(item.id)}
-                    className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm hover:bg-destructive hover:text-white"
+                    className={cn(HANDLE, HANDLE_RIGHT)}
                   >
                     ×
                   </button>
@@ -295,7 +384,7 @@ export function FloorCanvas({
                     onPointerMove={onResizeMove}
                     onPointerUp={onResizeUp}
                     onPointerCancel={onResizeUp}
-                    className="absolute -bottom-1 -right-1 size-3 cursor-nwse-resize rounded-sm border border-foreground/40 bg-card"
+                    className="absolute -bottom-1.5 -right-1.5 size-3.5 cursor-nwse-resize touch-none rounded-sm border border-foreground/40 bg-card shadow-sm before:absolute before:-left-1 before:-top-1 before:-bottom-5 before:-right-5 before:content-['']"
                   />
                 </>
               )}
@@ -305,9 +394,13 @@ export function FloorCanvas({
 
         {tables.map((t) => {
           const pos = posOf("table", t.id, t.posX, t.posY);
-          const shape = t.shape ?? "round";
+          const shape = shapeOf(t.shape);
           const size = tableSize(shape, t.seats);
           const rotation = t.rotation ?? 0;
+          // A long or oval table is shallow: its name gets one line, and the guest and the party size share the next.
+          const shallow = shape === "long" || shape === "oval";
+          const nameLines = t.occupied || shallow ? 1 : 2;
+          const room = textRoom(shape, size, rotation, t.occupied && !shallow && t.guestName ? 3 : 2);
           const movableInView = mode === "view" && t.occupied;
           const seatable = mode === "view" && !t.occupied;
           return (
@@ -315,10 +408,10 @@ export function FloorCanvas({
             <div
               style={{ left: pos.x, top: pos.y, width: NODE, height: NODE }}
               className={cn(
-                "group absolute select-none",
+                "group absolute select-none outline-none",
                 mode === "edit" ? "cursor-move touch-none" : movableInView ? "cursor-grab" : "cursor-pointer",
               )}
-              role={seatable ? "button" : undefined}
+              role={seatable || movableInView ? "button" : undefined}
               tabIndex={seatable || movableInView ? 0 : undefined}
               // A free table is named by its own text, so the name always contains what is drawn on it.
               aria-label={
@@ -394,7 +487,7 @@ export function FloorCanvas({
                 ))}
                 <div
                   className={cn(
-                    "absolute flex flex-col items-center justify-center border-2 text-center transition-colors group-focus-visible:ring-[3px] group-focus-visible:ring-ring/50",
+                    "absolute flex flex-col items-center justify-center border-2 text-center transition-colors group-focus-visible:ring-[3px] group-focus-visible:ring-foreground group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background",
                     skin.tableShadow,
                     shape === "round" ? "rounded-full" : shape === "oval" ? "rounded-[50%]" : "rounded-lg",
                     t.occupied
@@ -417,25 +510,34 @@ export function FloorCanvas({
                     style={{ transform: `rotate(${-rotation}deg)` }}
                   >
                     <span
-                      className={cn("px-1 text-[11px] font-semibold leading-tight", shape === "long" && "block truncate")}
-                      // A long table is narrow, and its name is drawn upright, so turned on its side the name has only
-                      // the table's width to fit in.
-                      style={shape === "long" ? { maxWidth: labelRoom(size, rotation) } : undefined}
+                      // The name is drawn upright, so on a turned table it has only the room a level line has across
+                      // it. A name that does not fit is cut with an ellipsis and stays whole in the tooltip.
+                      title={t.name}
+                      className={cn(
+                        "font-semibold leading-tight",
+                        t.name.length > 12 ? "text-[9px]" : t.name.length > 7 ? "text-[10px]" : "text-[11px]",
+                        nameLines === 1 ? "block truncate" : "line-clamp-2 text-balance break-words",
+                      )}
+                      style={{ maxWidth: room }}
                     >
                       {t.name}
                     </span>
                     {t.occupied ? (
-                      <>
-                        <span className="max-w-[48px] truncate text-[10px] font-medium leading-tight">
-                          {t.guestName || "—"}
-                        </span>
-                        <span className="text-[10px] leading-tight">
+                      <span
+                        className={cn(
+                          "flex max-w-full text-[10px] leading-tight",
+                          shallow ? "items-baseline justify-center gap-1" : "flex-col items-center",
+                        )}
+                        style={{ maxWidth: shallow ? room - 4 : room }}
+                      >
+                        {t.guestName && <span className="max-w-full truncate font-medium">{t.guestName}</span>}
+                        <span className="shrink-0 whitespace-nowrap">
                           {tr("floor.table.pax", { party: t.partySize ?? "?" })}
                         </span>
-                      </>
+                      </span>
                     ) : (
                       <>
-                        <span aria-hidden="true" className="text-[10px] opacity-70">
+                        <span aria-hidden="true" className="text-[10px] font-medium">
                           {t.seats}
                         </span>
                         {seatable && (
@@ -454,7 +556,7 @@ export function FloorCanvas({
                   aria-label={tr("floor.rotate")}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => rotate(t.id, rotation, "table")}
-                  className="absolute -left-2 -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm hover:bg-accent"
+                  className={cn(HANDLE, HANDLE_LEFT)}
                 >
                   <RotateCwIcon className="size-3" />
                 </button>
@@ -464,6 +566,37 @@ export function FloorCanvas({
           );
         })}
       </div>
+      </div>
+      </div>
+      {(["left", "right"] as const).map((side) => (
+        <div
+          key={side}
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute inset-y-0 w-6 from-foreground/15 to-transparent transition-opacity duration-200",
+            side === "left" ? "left-0 bg-gradient-to-r" : "right-0 bg-gradient-to-l",
+            more[side] ? "opacity-100" : "opacity-0",
+          )}
+        />
+      ))}
+      </div>
+      {fit < 1 && (
+        <div className="flex items-center justify-between gap-2 border-t bg-card py-1 pl-3 pr-1 text-xs text-muted-foreground">
+          <span>
+            {zoom === "fit" ? tr("floor.zoom.fitted", { percent: Math.round(fit * 100) }) : tr("floor.zoom.scrollHint")}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="shrink-0 text-foreground"
+            onClick={() => setZoomChoice(zoom === "fit" ? "actual" : "fit")}
+          >
+            {zoom === "fit" ? <MaximizeIcon className="size-4" /> : <MinimizeIcon className="size-4" />}
+            {zoom === "fit" ? tr("floor.zoom.actual") : tr("floor.zoom.fit")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -103,7 +103,7 @@ export function WalkInDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="walkin-name">{t("reservation.guestName")}</Label>
               <Input id="walkin-name" placeholder={t("reservation.guestNamePlaceholder")} {...register("name")} />

@@ -16,7 +16,7 @@ export const phases: Phase[] = [
   {
     n: 11,
     title: "Puertas para el cliente",
-    summary: "Cada local tendrá su propia puerta de entrada, sin pasar por una plataforma. El widget y el enlace de autogestión ya funcionan en local.",
+    summary: "Cada local tendrá su propia puerta de entrada, sin pasar por una plataforma. Una parte del widget y del enlace de autogestión ya está hecha y probada en local.",
     items: [
       "En curso: un widget de reservas para incrustar, sin marca de OpenCovers.",
       "En curso: un enlace para ver, cambiar o cancelar la reserva. Falta enviarlo en el email de confirmación.",
@@ -101,9 +101,9 @@ export const today: Today[] = [
   { area: "Mesas y sala", now: "Zonas, combinaciones, asignación automática y editor visual.", target: "Planos por servicio y estado en vivo.", phase: "10" },
   { area: "Clientes", now: "Una ficha por local, emparejada por email o teléfono, con fusión y lista de bloqueados por API. Aún sin pantalla en la app de sala.", target: "Ficha con historial, notas, alergias y etiquetas.", phase: "10" },
   { area: "Lista de espera", now: "Existe en la app de sala.", target: "Página con QR y aviso de mesa lista.", phase: "11" },
-  { area: "Cara al cliente", now: "En curso: widget de reservas, rutas públicas y enlace para ver, cambiar o cancelar. El local ya pone sus colores, su fuente y su logo en el widget, y un script opcional ajusta la altura del iframe. Aún sin enlace en el email.", target: "Widget, enlace de autogestión y temas.", phase: "11" },
+  { area: "Cara al cliente", now: "En curso: widget de reservas, rutas públicas y enlace para ver, cambiar o cancelar. El widget muestra una franja de días, deja elegir zona y enseña un resumen antes de pedir los datos, en siete idiomas. Lleva los colores, la fuente y el logo del local, y un script opcional ajusta la altura del iframe y le pasa el idioma de la página. Aún sin enlace en el email.", target: "Widget, enlace de autogestión y temas.", phase: "11" },
   { area: "No-shows y pagos", now: "Cambios de estado y estado de reconfirmación.", target: "Depósitos, garantías y reembolsos.", phase: "12" },
-  { area: "Mensajes", now: "Confirmación por email, desactivada por defecto.", target: "Email, SMS y WhatsApp con automatizaciones.", phase: "13" },
+  { area: "Mensajes", now: "Emails de confirmación, cambio, cancelación y reenvío del enlace, con la marca del local y desactivados por defecto. Los tres primeros llevan un archivo de calendario. Por ahora solo en español.", target: "Email, SMS y WhatsApp con automatizaciones.", phase: "13" },
   { area: "Opiniones", now: "Ninguna.", target: "Encuesta tras la visita con consentimiento.", phase: "13" },
   { area: "Integraciones", now: "API, webhooks firmados, feed de eventos y MCP.", target: "Contrato de TPV, adaptadores y kit de conformidad.", phase: "14" },
   { area: "Informes", now: "Una vista de ritmo.", target: "Cubiertos, no-shows, origen y exportaciones.", phase: "15" },

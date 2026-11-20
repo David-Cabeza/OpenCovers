@@ -7,13 +7,13 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 const sent = vi.hoisted(() => {
   process.env.PUBLIC_CHALLENGE_SECRET = "test-secret-for-the-public-hardening";
   process.env.PUBLIC_POW_DIFFICULTY = "0";
-  return [] as { to: string; subject: string; text: string }[];
+  return [] as { to: string; subject: string; text: string; html: string }[];
 });
 
 vi.mock("../src/lib/mailer", async (original) => ({
   ...(await original<typeof import("../src/lib/mailer")>()),
-  sendEmail: async (_key: string, _from: string, to: string, subject: string, text: string) => {
-    sent.push({ to, subject, text });
+  sendEmail: async (_key: string, _from: string, to: string, subject: string, text: string, html = "") => {
+    sent.push({ to, subject, text, html });
   },
 }));
 
@@ -212,7 +212,10 @@ describe("guest modify emails are capped per reservation", () => {
     const toGuest = sent.filter((m) => m.to === contact);
     expect(toGuest.map((m) => m.subject).length).toBe(2);
     for (const mail of toGuest) expect(mail.text).not.toContain("evil.example");
-    expect(sent.some((m) => m.to === "venue@example.com" && m.text.includes("evil.example"))).toBe(true);
+    const toVenue = sent.filter((m) => m.to === "venue@example.com");
+    for (const mail of toGuest) expect(mail.html).not.toContain("evil.example");
+    expect(toVenue.some((m) => m.text.includes("evil.example") && m.html.includes("evil.example"))).toBe(true);
+    for (const mail of toVenue) expect(mail.html).not.toMatch(/<a [^>]*evil\.example/);
   });
 });
 

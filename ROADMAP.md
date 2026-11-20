@@ -1,6 +1,6 @@
 # Roadmap
 
-OpenCovers is pre-alpha. The engine, the staff app, and the MCP server run locally and pass their tests. Nothing is deployed except the public site. This roadmap has two jobs. It records where the project stands, and it lays out the road to the product depth that mature restaurant reservation platforms offer, so contributors can choose a place to work.
+OpenCovers is pre-alpha. The engine, the staff app, and the MCP server run locally and pass their tests. The public site is deployed, and a hosted demo runs at demo.opencovers.dev. The demo redeploys on pushes to `main` and is not yet open to the public, pending legal review. This roadmap has two jobs. It records where the project stands, and it lays out the road to the product depth that mature restaurant reservation platforms offer, so contributors can choose a place to work.
 
 Phases are a sequence, not a promise of dates. There is no Phase 1 or Phase 9. Numbering started at the contract in Phase 2, and the first-venue phase was dropped, so its route is a decision below. Phase 0 is a track that runs alongside the others, listed last under Now. It covers the publication of the repository, which is now public. Each phase has an exit criterion. Flags are the unit of work. Read [CONTRIBUTING.md](CONTRIBUTING.md) to claim one. Sizes (S, M, L) on the items below are first estimates. A maintainer refines them when the flag is opened, and splits any L.
 
@@ -14,9 +14,9 @@ How we built this map. We studied what mature platforms publish about their prod
 | Tables and floor | Zones, combinations, automatic assignment, a visual floor editor. | Saved layouts per service, live table status, sections. | 10 |
 | Guests | A guest record per venue, matched by normalized email or phone, with list, read, and admin merge and unmerge through the API. An admin blocklist on hashed contacts refuses new bookings (ADR-0018). A contact consent, a rating, and a booking note per reservation. No guest screen in the staff app yet. | Notes, allergies, tags, and segments on the profile, and a staff app view. | 10 |
 | Waitlist and walk-ins | Both exist in the staff app. | A QR join page, a notice when the table is ready. | 11 |
-| Guest-facing surfaces | A booking widget framed on the venue's site, public booking routes, and a self-service link to view, change, or cancel a booking, in progress (ADR-0017 stages 2 to 7, 9, 10 and 12). The venue's theme shows in the widget and an optional `embed.js` sizes the iframe. A guest who lost the link can ask for a new one by email when the venue has email on. No confirmation email carries the link yet. | An embeddable booking widget, a self-service change link, themes. | 11 |
+| Guest-facing surfaces | A booking widget framed on the venue's site, public booking routes, and a self-service link to view, change, or cancel a booking, in progress (ADR-0017 stages 2 to 7, 9, 10, 12 and 15). The widget has a day strip, a zone choice, and a summary step (ADR-0021 stages 3, 6 and 9), in seven languages. The venue's theme shows in the widget, and an optional `embed.js` sizes the iframe and passes the host page's language. A guest who lost the link can ask for a new one by email when the venue has email on. No confirmation email carries the link yet. | An embeddable booking widget, a self-service change link, themes. | 11 |
 | No-shows and payments | Status transitions and a reconfirmation status on each reservation. | Deposits, card guarantees, no-show fees, refund windows, automatic reconfirmation messages. | 12 |
-| Messaging | Email confirmations through Resend, off by default. | Pluggable email, SMS, and WhatsApp, automations on the event feed, STOP handling. | 13 |
+| Messaging | Branded confirmation, change, cancellation, and lost-link emails through Resend, off by default. The first three carry a calendar file. The text follows the guest's booking language, then the venue's, and only the `es` catalog ships (ADR-0024). See the [guest email lifecycle](#guest-email-lifecycle). | Pluggable email, SMS, and WhatsApp, automations on the event feed, STOP handling. | 13 |
 | Reviews | None. | A post-visit survey gated by consent, routing to a review link. | 13 |
 | Integrations | An API, signed webhooks, an event feed, an MCP server. Roles `read`, `write`, and `admin` apply to keys and to staff sessions. | A documented POS contract with adapters, importers, calendar feeds, a conformance kit. | 14 |
 | Reporting | A pacing view. | Covers, no-show rate, source mix, lead time, exports. | 15 |
@@ -81,21 +81,22 @@ Status: partly built, blocked on legal review.
 
 - Done: restaurant notice address, erasure with counts and hashes, tombstones, an hourly retention job, email confirmations, and contact consent per reservation.
 - Pending: legal review of the email text, the consent basis, and retention periods.
-- Pending: guest reminders and STOP handling.
+- Pending: guest reminders and STOP handling, planned in Phase 13.
 
 Exit criterion: the legal review is complete and the conformance cases still pass.
 
 ### Phase 8: Deployment
 
-Status: next.
+Status: every item below is done.
 
 - Done: `compose.prod.yaml` brings up PostgreSQL, the API, and the staff app behind Caddy with one command. It was checked end to end over HTTP, including a booking and a rejected overlap.
-- Pending: automatic HTTPS on a real domain. [S]
+- Done: automatic HTTPS on a real domain. Caddy gets a certificate when `SITE_ADDRESS` and `WIDGET_ADDRESS` name a domain, as [docs/deploy.md](docs/deploy.md) describes.
 - Done: a click-through of the staff screens in a browser. All six screens load, and a walk-in seats a guest against the migrated database.
 - Done: consent at walk-in and an edit dialog for consent and rating in the staff app. Rating and consent can be set on an attended visit.
 - Done: the React warning about an inline script, fixed by dropping the theme library.
 - Done: a hardening guide for self-hosters, in [docs/hardening.md](docs/hardening.md).
 - Done: automated tests for the staff app and the public site, run with Vitest.
+- Done: a hosted demo with one sandbox per visitor ([ADR-0022](docs/adr/0022-hosted-demo-sandbox.md)). `compose.demo.yaml` runs the same Docker images and Caddyfile at demo.opencovers.dev, with HTTPS from Caddy, and `.github/workflows/deploy-demo.yml` redeploys it on pushes to `main`. It is not yet open to the public, pending legal review.
 
 Exit criterion: the staff app signs in and books a table against an API running from the Docker image.
 
@@ -150,18 +151,19 @@ Exit criterion: a host sees who is coming and what they need, and a platform can
 
 ### Phase 11: Guest-facing surfaces
 
-This phase gives venues their own door, so a guest can book without a platform or an agent. The widget and the self-service link are partly built and tested locally (ADR-0017 stages 2 to 7, 9, 10 and 12).
+This phase gives venues their own door, so a guest can book without a platform or an agent. The widget and the self-service link are partly built and tested locally (ADR-0017 stages 2 to 7, 9, 10, 12 and 15).
 
-- An embeddable booking widget with no OpenCovers branding. Design accepted in [ADR-0017](docs/adr/0017-booking-widget-and-self-service-link.md): an iframe from a separate widget origin (required in production), public routes under `/v1/public/`, and a staged plan. The contract is written (stage 1: `openapi.yaml`, the five new error codes, cases C39 to C55, REQ-P1 to REQ-P8). Built: the admin settings and the booking key with its rotation (stage 2), the public config, availability and create (stage 3), the widget app and its framed page at `/w/{bookingKey}` (stage 5), the Online booking card in Setup (stage 7), the theme tokens in the widget and in Setup (stage 9), and the optional `embed.js` that sizes the iframe to the widget (stage 10). Pending: the email stage, the consent question, and the optional CAPTCHA (stages 8, 11 and 13). See [conformance status](docs/contract/conformance-status.md) for C39 to C55. [L, split it]
+- An embeddable booking widget with no OpenCovers branding. Design accepted in [ADR-0017](docs/adr/0017-booking-widget-and-self-service-link.md): an iframe from a separate widget origin (required in production), public routes under `/v1/public/`, and a staged plan. The contract is written (stage 1: `openapi.yaml`, the five new error codes, cases C39 to C55, REQ-P1 to REQ-P8). Built: the admin settings and the booking key with its rotation (stage 2), the public config, availability and create (stage 3), the widget app and its framed page at `/w/{bookingKey}` (stage 5), the Online booking card in Setup (stage 7), the theme tokens in the widget and in Setup (stage 9), the optional `embed.js` that sizes the iframe to the widget (stage 10) and passes the host page's language, and the widget locales beyond `es` and `en`, which wait for native review (stage 15). From [ADR-0021](docs/adr/0021-widget-day-status-zones-waitlist.md): the day strip (stage 3), the zone choice and its Setup field (stage 6), and the summary step with the privacy notice link (stage 9). Pending: the email stage, the consent question, and the optional CAPTCHA (stages 8, 11 and 13). See [conformance status](docs/contract/conformance-status.md) for C39 to C55. [L, split it]
 - A self-service link to view, change, or cancel a booking. Design accepted in ADR-0017, and its contract is written in the same cases. Built: the link and its routes (stage 4), the page at `/r` (stage 6), and the lost-link resend with placeholder email text (stage 12). The link is stored as a hash and ends when the guest cancels. Pending: the link in the confirmation email, which waits for the legal review (stage 8). [M]
 - A public QR page to join the waitlist, and a notice when the table is ready. [M]
 - Theme tokens for the widget and the staff app: colors, radius, type, logo. The staff app already uses CSS variables. Built for the widget and its Setup form (ADR-0017 stage 9). Not built for the staff app. [M]
 - Themes as declarative packages, data only with no executable code, so a theme cannot touch guest data. [M]
 - A curated theme registry in the repository, reviewed through pull requests. [M]
-- Localization of the staff app and the widget. [L, split it]
+- Localization of the staff app and the widget. Partly done: the staff app in Spanish and English, and the widget in seven languages, five of them waiting for native review (ADR-0017 stage 15). [L, split it]
 - A PWA mode for a tablet at the host stand. [M]
-- A Wallet pass for a booking (Apple Wallet and Google Wallet), saved from the self-service page and updated when the booking changes or is cancelled. Proposed in ADR-0025 (pull request #254, not merged, not accepted). It is a convenience for the guest, not a messaging channel: Apple only shows an alert when a pass field changes, and Google caps its messages. It needs an Apple Developer account, so it waits for demand. It leaves out a loyalty card with points, which would need a guest identity across bookings and marketing consent. [L, split it]
-- Local search visibility for venue pages. Partly done (ADR-0012, C33): a separate opt-in public profile and a public `GET /v1/venues/{venueId}/public.jsonld` that returns schema.org Restaurant JSON-LD with address, phone, cuisine, hours from the configured services and a ReserveAction when a booking URL is set. The venue puts it in the HTML of its own page with a small server-side snippet. Done: the staff form (Setup, Public profile card). Still pending: per-weekday hours, and rendering it in the page that hosts the widget or in a hosted page, because content inside an iframe is not read as the venue's page. Booking completes without leaving the venue's site once the widget ships. [M]
+- A Wallet pass for a booking (Apple Wallet and Google Wallet), saved from the self-service page and updated when the booking changes or is cancelled. Proposed in [ADR-0025](docs/adr/0025-wallet-passes.md), merged as a proposal and not accepted. It is a convenience for the guest, not a messaging channel: Apple only shows an alert when a pass field changes, and Google caps its messages. It needs an Apple Developer account, so it waits for demand. It leaves out a loyalty card with points, which would need a guest identity across bookings and marketing consent. [L, split it]
+- An add-to-Wallet link in the confirmation email, as mature platforms offer. ADR-0025 puts the button on the self-service page only, so the link in the email needs an amendment to it. Like the pass, it is a convenience, not a messaging channel. [S]
+- Local search visibility for venue pages. Partly done (ADR-0012, C33): a separate opt-in public profile and a public `GET /v1/venues/{venueId}/public.jsonld` that returns schema.org Restaurant JSON-LD with address, phone, cuisine, hours from the configured services and a ReserveAction when a booking URL is set. The venue puts it in the HTML of its own page with a small server-side snippet. Done: the staff form (Setup, Public profile card). Still pending: per-weekday hours, and rendering it in the page that hosts the widget or in a hosted page, because content inside an iframe is not read as the venue's page. Booking completes without leaving the venue's site in the framed widget. [M]
 - A guide to putting the booking link on a Google Business Profile, written after trying it on a real profile. Nothing in the repository covers it today. The booking page is `noindex` on purpose, so search visibility comes from the venue's own page and the public profile above, not from the widget. [S]
 - Measured page speed of the booking page, saved in `docs/`. A local Lighthouse run of the built widget (Lighthouse 12.8.2, one run, simulated throttling, no Caddy in front, 2026-11-18) scored 93 on mobile and 100 on desktop for performance, 100 for accessibility and best practices on both, and 50 for SEO because of `noindex` and no meta description. Repeat it with PageSpeed Insights once the widget runs on a public domain. The mobile Largest Contentful Paint (2.7 s) comes from one 290 KB script (89 KB gzip), so splitting it is the one performance lever, and only worth it if a real measurement asks for it. [S]
 
@@ -175,7 +177,7 @@ Each venue connects its own payment account. OpenCovers does not take a fee and 
 - Deposits per service or party size. [M]
 - Card guarantee through a saved payment method, and a no-show charge. [M]
 - Refund windows per service. [S]
-- Automatic reconfirmation messages and release of unconfirmed tables. [M]
+- Automatic reconfirmation messages and release of unconfirmed tables. The messages are the reconfirmation request and the second confirmation in the [guest email lifecycle](#guest-email-lifecycle). The status they set already exists (C25). [M]
 - Waitlist back-fill when a booking is cancelled or marked no-show. [M]
 - A documented boundary of PCI scope, with hosted fields only. [S]
 
@@ -186,16 +188,42 @@ Exit criterion: a venue takes a deposit or a card guarantee, charges a no-show, 
 Messages run as consumers of the event feed and respect consent.
 
 - A messaging provider interface with email, SMS, and WhatsApp adapters. Providers need paid accounts, so each is optional. [L, split it]
-- A rating per reservation: `rating`, an integer from 1 to 5 that is absent when not given, and `ratingRecordedAt`. Staff and platforms with a write key set it first. The guest sets it through a link once Phase 11 ships the self-service link. It is returned on reads and on the `modified` event, and it follows the shape of per-reservation consent. [S]
+- A rating per reservation: `rating`, an integer from 1 to 5 that is absent when not given, and `ratingRecordedAt`. Done for staff and platforms with a write key (C16). Not built: the guest setting it through the self-service link. It is returned on reads and on the `modified` event, and it follows the shape of per-reservation consent. [S]
 - Optional rating dimensions (food, service, ambience) and a free-text comment, if venues ask for them. [M]
 - Enforcement of contact consent before any proactive message, and STOP handling. [M]
-- A booking reminder by email before the visit, the first automation to build. It needs the branded email layout and the per-language catalogs of [ADR-0024](docs/adr/0024-guest-email-language.md) (Q7), and the legal review of its text. [M]
-- Automations: reminder, thank-you, win-back after 30, 60, and 90 days. [M]
+- A booking reminder by email before the visit, the first automation to build. It reuses the branded email layout, and it needs the per-language catalogs of [ADR-0024](docs/adr/0024-guest-email-language.md) (Q7), the consent enforcement above, and the legal review of its text. [M]
+- An optional WhatsApp link in the reminder when the venue has a public phone. The link opens a chat with the venue and a prefilled message with the date, time, and party size, never text a guest typed. A venue setting turns it on, because the public phone may not take WhatsApp. The link needs no provider account. A message the venue sends over WhatsApp needs the provider interface above and the guest's consent. [S]
+- Automations after the reminder: a thank-you, and win-back after 30, 60, and 90 days. [M]
 - A post-visit survey, sent only to guests with granted consent. [M]
 - Score-based routing to a review link, and a private feedback inbox. [M]
 - Template editing per venue, with variables and a preview. [M]
+- A per-venue tone for guest emails, formal (`usted`) or informal (`tú`), as a follow-up to ADR-0024. The `es` catalog uses `tú` today. Each tone is a separate catalog, and each needs the native review that ADR-0024 requires. [M]
+- More of the venue theme in emails: page and card background, text and divider colors, and type. Today an email takes the theme's logo and its `primary` and `onPrimary` pair, and uses the brand pair when the venue's pair is below 4.5:1. The other theme keys (`background`, `surface`, `text`, `muted`, `border`, and `font`) must pass the same contrast check, with the brand palette as the fallback. [M]
 
 Exit criterion: a guest who consented gets a reminder and a survey, and one who did not gets neither.
+
+#### Guest email lifecycle
+
+A reservation product sends a guest a set of emails over the life of a booking. The table lists each one, what sends it, and where OpenCovers stands. A row that is not built is open work. Every built email is off until the venue turns email on.
+
+| Email | Sent when | Status | Depends on |
+| --- | --- | --- | --- |
+| Confirmation | A booking is made, on any channel. | Built. Placeholder text pending legal review. | REQ-N2. The self-service link in it is blocked on legal (ADR-0017 stage 8). |
+| Modification | The date, time, or party size changes. | Built. Placeholder text pending legal review. A guest's own changes send at most 3, 15 minutes apart. | REQ-N2. |
+| Cancellation by the guest | The guest cancels with the self-service link. | Built. Placeholder text pending legal review. | REQ-N2. The venue's notice of a guest cancel waits for ADR-0017 stage 8. |
+| Cancellation by the venue | Staff or a platform cancels. | Built, with the same text as a guest cancel. Placeholder text pending legal review. | REQ-N2. |
+| Reminder | A set time before the visit. | Planned in Phase 13. The calendar file in the confirmation already sets an alarm 2 hours before. | ADR-0024 catalogs, consent enforcement, REQ-N2. |
+| Reconfirmation request | A set time before the visit, to ask the guest to confirm. | Planned in Phase 12. The status exists, and staff or a platform set it by hand (C25). | A way for the guest to answer. REQ-N2. |
+| Second confirmation | The guest confirms the booking again. | Planned in Phase 12, with the reconfirmation messages. | The reconfirmation request. |
+| No-show notice | Staff mark the booking `no_show`. | Not planned on its own. The Phase 12 no-show charge needs it. | Phase 12 payments. REQ-N2. |
+| Waitlist table ready | A table frees up for a waiting party. | Planned in Phase 11. | The QR join page. SMS needs the Phase 13 provider interface. |
+| Request received | A booking waits for staff approval. | Blocked on a decision. ADR-0017 stage 14 is deferred, and `confirmationMode: approval` is reserved. | A `pending` status, which changes REQ-B6. |
+| Post-visit survey and review request | The visit is over. | Planned in Phase 13. | Granted consent. REQ-N2. |
+| Self-service link | The guest asks for a new link. | Built (ADR-0017 stage 12). Placeholder text pending legal review. | REQ-N2. |
+| Birthday | The guest's birthday comes near. | Blocked. | Data the product does not store (a date of birth, a guest identity across bookings) and marketing consent. See the [guest-data design rule](README.md#design-rules). |
+| Welcome | A guest signs up to hear from the venue. | Blocked. | Data the product does not store (a guest identity across bookings) and marketing consent. See the [guest-data design rule](README.md#design-rules). |
+
+Two more emails are built and go to people other than the guest: the venue's notice of a new booking, and the sign-in link of the hosted demo.
 
 ### Phase 14: Integrations
 

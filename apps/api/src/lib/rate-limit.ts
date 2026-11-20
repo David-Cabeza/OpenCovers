@@ -3,6 +3,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { isIP } from "node:net";
 import { normalizeEmail } from "../demo/normalize";
 import { ERRORS, errorBody } from "./errors";
+import { mcpRemoteEnabled } from "./mcp-remote";
 
 export const RULE_NAMES = [
   "auth",
@@ -18,6 +19,8 @@ export const RULE_NAMES = [
   "magic_link_day",
   "magic_link_ip",
   "demo_challenge",
+  "oauth_authorize",
+  "oauth_token",
 ] as const;
 export type RuleName = (typeof RULE_NAMES)[number];
 
@@ -44,12 +47,18 @@ export const DEFAULT_RULES: Rules = {
   magic_link_day: { max: 5, windowMs: 24 * 3_600_000 },
   magic_link_ip: { max: 10, windowMs: 3_600_000 },
   demo_challenge: { max: 60, windowMs: 3_600_000 },
+  // MCP_REMOTE=on only (ADR-0014). The token endpoint has its own budget, apart from the sign-in one, because agents
+  // of one hosting service share addresses. The authorization page is a GET that anyone can send.
+  oauth_authorize: { max: 30, windowMs: 15 * 60_000 },
+  oauth_token: { max: 60, windowMs: 15 * 60_000 },
 };
 
 export interface RateLimitConfig {
   enabled: boolean;
   trustProxy: boolean;
   rules: Rules;
+  /** MCP_REMOTE=on. Off, the OAuth paths are counted as they always were. */
+  oauth?: boolean;
 }
 
 export interface RateLimitOptions {
@@ -72,6 +81,8 @@ const RULE_ENV: Record<RuleName, string> = {
   magic_link_day: "RATE_LIMIT_MAGIC_LINK_DAY",
   magic_link_ip: "RATE_LIMIT_MAGIC_LINK_IP",
   demo_challenge: "RATE_LIMIT_DEMO_CHALLENGE",
+  oauth_authorize: "RATE_LIMIT_OAUTH_AUTHORIZE",
+  oauth_token: "RATE_LIMIT_OAUTH_TOKEN",
 };
 
 const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
@@ -90,6 +101,7 @@ const REFUNDED_ON: Partial<Record<RuleName, ReadonlySet<number>>> = {
 };
 const MAGIC_LINK_RULES: RuleName[] = ["auth", "magic_link", "magic_link_day", "magic_link_ip"];
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const READS = new Set(["GET", "HEAD"]);
 
 type Env = Record<string, string | undefined>;
 
@@ -129,6 +141,7 @@ export function rateLimitConfigFromEnv(env: Env = process.env): RateLimitConfig 
     enabled: choice(env, "RATE_LIMIT", ["on", "off"], fallback) === "on",
     trustProxy: choice(env, "TRUST_PROXY", ["true", "false"], "false") === "true",
     rules,
+    oauth: mcpRemoteEnabled(env),
   };
 }
 
@@ -148,10 +161,14 @@ function normalizePath(path: string): string {
 function publicRules(method: string, path: string): RuleName[] {
   const read = method === "GET" || method === "HEAD";
   const rest = path.slice("/v1/public/".length).split("/");
-  if (rest[0] === "self-service") return read ? ["public_read", "self_service"] : ["self_service"];
+  // The waitlist entry read and leave share the self-service budget (ADR-0021, C52).
+  if (rest[0] === "self-service" || rest[0] === "waitlist-entry") {
+    return read ? ["public_read", "self_service"] : ["self_service"];
+  }
   if (read) return rest.length === 2 && rest[1] === "days" ? ["public_read", "public_days"] : ["public_read"];
   const tail = rest.slice(1).join("/");
-  return method === "POST" && (tail === "reservations" || tail === "self-service/resend")
+  // A waitlist join shares the create's budgets, so alternating the two routes gives no extra budget (C52).
+  return method === "POST" && (tail === "reservations" || tail === "self-service/resend" || tail === "waitlist")
     ? ["public_booking", "public_venue"]
     : [];
 }
@@ -161,9 +178,11 @@ function bookingKeyOf(rawPath: string): string {
   return normalizePath(rawPath).slice("/v1/public/".length).split("/")[0] ?? "";
 }
 
-export function rulesFor(method: string, rawPath: string, hasInvitationToken: boolean): RuleName[] {
+export function rulesFor(method: string, rawPath: string, hasInvitationToken: boolean, oauth = false): RuleName[] {
   const path = normalizePath(rawPath);
   if (path.startsWith("/v1/public/")) return publicRules(method.toUpperCase(), path);
+  if (oauth && path === "/api/auth/oauth2/authorize" && READS.has(method.toUpperCase())) return ["oauth_authorize"];
+  if (oauth && path === "/api/auth/oauth2/token" && method.toUpperCase() === "POST") return ["oauth_token"];
   if (SAFE_METHODS.has(method.toUpperCase())) return [];
   if (path === "/v1/invitations/redeem" || path === "/v1/invitations/check") return ["invitation"];
   if (path === "/v1/venues" && method.toUpperCase() === "POST") return ["venue_creation"];
@@ -317,7 +336,7 @@ export function createRateLimiter(config: RateLimitConfig, options: RateLimitOpt
 
   const middleware: MiddlewareHandler = async (c, next) => {
     if (!config.enabled) return next();
-    const names = rulesFor(c.req.method, c.req.path, Boolean(c.req.header(INVITATION_HEADER)?.trim()));
+    const names = rulesFor(c.req.method, c.req.path, Boolean(c.req.header(INVITATION_HEADER)?.trim()), config.oauth);
     if (names.length === 0) return next();
     const client = clientOf(c);
     const address = names.includes("magic_link") ? await magicLinkAddress(c) : null;

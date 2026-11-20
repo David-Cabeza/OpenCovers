@@ -4,6 +4,7 @@ import { services, tables, venueOnlineBooking, venues } from "../db/schema";
 import type { Db, DbTx } from "./venue";
 import { isFrameAncestor } from "./widget-page";
 import { isSandboxVenue } from "../demo/limits";
+import { contrast } from "./contrast";
 
 export const LOCALES = ["es", "en", "ca", "fr", "de", "it", "pt"] as const;
 export const FONTS = ["system", "serif", "rounded"] as const;
@@ -54,6 +55,8 @@ export interface OnlineBooking {
   publicZones: string[];
   /** Whether availability names the service of each time (ADR-0021, C66). */
   showServiceNames: boolean;
+  /** Whether guests may join the public waitlist for a date (ADR-0021, section 3, C68). See `waitlistOpen`. */
+  waitlistEnabled: boolean;
 }
 
 export interface Warning {
@@ -92,6 +95,7 @@ function defaults(): OnlineBooking {
     privacyNoticeUrl: null,
     publicZones: [],
     showServiceNames: false,
+    waitlistEnabled: false,
   };
 }
 
@@ -116,6 +120,7 @@ function viewOf(r: Row | undefined): OnlineBooking {
     privacyNoticeUrl: r.privacyNoticeUrl,
     publicZones: r.publicZones,
     showServiceNames: r.showServiceNames,
+    waitlistEnabled: r.waitlistEnabled,
   };
 }
 
@@ -213,7 +218,7 @@ const INT_FIELDS = [
 export function parseOnlineBookingInput(body: unknown): OnlineBookingInput | null {
   if (!isObject(body) || Object.keys(body).length === 0) return null;
   const out: OnlineBookingInput = {};
-  for (const key of ["enabled", "askConsent", "showServiceNames"] as const) {
+  for (const key of ["enabled", "askConsent", "showServiceNames", "waitlistEnabled"] as const) {
     if (body[key] === undefined) continue;
     if (typeof body[key] !== "boolean") return null;
     out[key] = body[key];
@@ -278,19 +283,6 @@ export function parseOnlineBookingInput(body: unknown): OnlineBookingInput | nul
     out.publicZones = z as string[];
   }
   return out;
-}
-
-function luminance(hex: string): number {
-  const c = [1, 3, 5].map((i) => {
-    const v = parseInt(hex.slice(i, i + 2), 16) / 255;
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
-}
-
-function contrast(fg: string, bg: string): number {
-  const [a, b] = [luminance(fg), luminance(bg)];
-  return Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100;
 }
 
 /**
@@ -366,6 +358,9 @@ export async function setOnlineBooking(
     // A sandbox's widget may be embedded on the demo host only: the list was set when it was built (ADR-0022, F11).
     if (await isSandboxVenue(tx as unknown as Db, venueId)) merged.allowedOrigins = before.allowedOrigins;
     if (merged.minPartySize > merged.maxPartySize) return { ok: false, code: "invalid_request" };
+    // The join sends an email, so the waitlist cannot be turned on while the venue's email is off (C68). Turning
+    // email off later keeps the stored value; the public channel then reads the waitlist as off.
+    if (rest.waitlistEnabled === true && !venue.notificationsEnabled) return { ok: false, code: "invalid_request" };
     const rows = await tx
       .select({ name: services.name, days: services.days })
       .from(services)

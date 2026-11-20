@@ -5,6 +5,7 @@ import {
   createRateLimiter,
   describeRateLimit,
   rateLimitConfigFromEnv,
+  rulesFor,
   type RateLimitOptions,
 } from "../src/lib/rate-limit";
 
@@ -92,6 +93,8 @@ describe("rateLimitConfigFromEnv", () => {
       magic_link_day: { max: 5, windowMs: 24 * 60 * 60_000 },
       magic_link_ip: { max: 10, windowMs: 60 * 60_000 },
       demo_challenge: { max: 60, windowMs: 60 * 60_000 },
+      oauth_authorize: { max: 30, windowMs: 15 * 60_000 },
+      oauth_token: { max: 60, windowMs: 15 * 60_000 },
     });
   });
 
@@ -460,6 +463,43 @@ describe("what is limited", () => {
     expect(() => rateLimitConfigFromEnv({ RATE_LIMIT_VENUE_CREATION: "0/1h" })).toThrow(/RATE_LIMIT_VENUE_CREATION/);
   });
 
+  describe("with MCP_REMOTE=on (ADR-0014)", () => {
+    const OAUTH = { ...TRUST, MCP_REMOTE: "on", BETTER_AUTH_SECRET: "s".repeat(32) };
+    const AUTHORIZE = "/api/auth/oauth2/authorize?response_type=code&client_id=https://agent.example/c";
+    const TOKEN = "/api/auth/oauth2/token";
+
+    it("limits the authorization page per address at the default 30 per 15 minutes", async () => {
+      const { app } = build(OAUTH);
+      const out = await statuses(31, () => call(app, "GET", AUTHORIZE, { ip: "203.0.113.70" }));
+      expect(out.slice(0, 30)).toEqual(Array(30).fill(200));
+      expect(out[30]).toBe(429);
+      expect((await call(app, "GET", AUTHORIZE, { ip: "203.0.113.71" })).status).toBe(200);
+    });
+
+    it("keeps token requests off the sign-in budget: 31 of them leave sign-in open, the 61st is refused", async () => {
+      const { app } = build(OAUTH);
+      const ip = "203.0.113.72";
+      expect(new Set(await statuses(31, () => call(app, "POST", TOKEN, { ip })))).toEqual(new Set([200]));
+      expect((await call(app, "POST", SIGN_IN, { ip })).status).toBe(200);
+      expect(new Set(await statuses(29, () => call(app, "POST", TOKEN, { ip })))).toEqual(new Set([200]));
+      expect((await call(app, "POST", TOKEN, { ip })).status).toBe(429);
+      expect((await call(app, "POST", SIGN_IN, { ip })).status).toBe(200);
+    });
+
+    it("counts the OAuth paths as before while MCP_REMOTE is off", async () => {
+      const { app } = build({ ...TRUST, RATE_LIMIT_AUTH: "2/1m" });
+      const ip = "203.0.113.73";
+      expect(new Set(await statuses(40, () => call(app, "GET", AUTHORIZE, { ip })))).toEqual(new Set([200]));
+      expect(await statuses(3, () => call(app, "POST", TOKEN, { ip }))).toEqual([200, 200, 429]);
+    });
+
+    it("reads RATE_LIMIT_OAUTH_AUTHORIZE and RATE_LIMIT_OAUTH_TOKEN", () => {
+      const config = rateLimitConfigFromEnv({ RATE_LIMIT_OAUTH_AUTHORIZE: "5/1m", RATE_LIMIT_OAUTH_TOKEN: "7/1h" });
+      expect(config.rules.oauth_authorize).toEqual({ max: 5, windowMs: 60_000 });
+      expect(config.rules.oauth_token).toEqual({ max: 7, windowMs: 3_600_000 });
+    });
+  });
+
   it("does nothing when switched off", async () => {
     const { app, limiter } = build({ ...TRUST, RATE_LIMIT: "off", RATE_LIMIT_AUTH: "1/1m" });
     const out = await statuses(20, () => call(app, "POST", SIGN_IN, { ip: "203.0.113.1" }));
@@ -538,6 +578,35 @@ describe("public routes (C52)", () => {
     expect((await call(app, "GET", "/v1/public/self-service", { ip: "203.0.113.100" })).status).toBe(429);
     expect((await call(app, "POST", "/v1/public/self-service/cancel", { ip: "203.0.113.100" })).status).toBe(200);
     expect((await call(app, "POST", "/v1/public/self-service/modify", { ip: "203.0.113.100" })).status).toBe(429);
+  });
+
+  it("shares the create's public_booking budget with the waitlist join, and its public_venue budget (C52)", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_PUBLIC_BOOKING: "2/1h" });
+    const JOIN_A = `/v1/public/${KEY_A}/waitlist`;
+    expect(await statuses(3, (i) => call(app, "POST", [CREATE_A, JOIN_A, JOIN_A][i]!, { ip: "203.0.113.120" }))).toEqual([200, 200, 429]);
+    const venue = build({ ...TRUST, RATE_LIMIT_PUBLIC_VENUE: "2/1h" }).app;
+    const out = await statuses(3, (i) => call(venue, "POST", [JOIN_A, CREATE_A, `${JOIN_A}/`][i]!, { ip: `203.0.113.${121 + i}` }));
+    expect(out).toEqual([200, 200, 429]);
+    expect(rulesFor("POST", JOIN_A, false)).toEqual(["public_booking", "public_venue"]);
+  });
+
+  it("gives back a join's public_venue charge on 400 and 404 and keeps it on 409 (C52)", async () => {
+    const { app } = build({ ...TRUST, RATE_LIMIT_PUBLIC_VENUE: "1/1h" });
+    const JOIN_A = `/v1/public/${KEY_A}/waitlist`;
+    for (const [i, status] of ["400", "404", "400"].entries()) {
+      expect((await call(app, "POST", JOIN_A, { ip: `198.51.100.${20 + i}`, headers: { "x-test-status": status } })).status).toBe(Number(status));
+    }
+    expect((await call(app, "POST", JOIN_A, { ip: "198.51.100.30", headers: { "x-test-status": "409" } })).status).toBe(409);
+    expect((await call(app, "POST", JOIN_A, { ip: "198.51.100.31" })).status).toBe(429);
+  });
+
+  it("limits the waitlist entry read and leave with self_service, and the read also with public_read (C52)", async () => {
+    expect(rulesFor("GET", "/v1/public/waitlist-entry", false)).toEqual(["public_read", "self_service"]);
+    expect(rulesFor("POST", "/v1/public/waitlist-entry/leave/", false)).toEqual(["self_service"]);
+    const { app } = build({ ...TRUST, RATE_LIMIT_PUBLIC_SELF_SERVICE: "2/1m", RATE_LIMIT_PUBLIC_READ: "5/1m" });
+    expect((await call(app, "GET", "/v1/public/waitlist-entry", { ip: "203.0.113.130" })).status).toBe(200);
+    expect((await call(app, "POST", "/v1/public/self-service/cancel", { ip: "203.0.113.130" })).status).toBe(200);
+    expect((await call(app, "POST", "/v1/public/waitlist-entry/leave", { ip: "203.0.113.130" })).status).toBe(429);
   });
 
   it("leaves the JSON-LD route, the widget page and staff routes to their own rules", async () => {

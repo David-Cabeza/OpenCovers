@@ -94,7 +94,20 @@ it("serves the self-service page /r on the widget host only, and the staff host 
   expect(widget.headers.get("x-frame-options")).toBe("DENY");
 
   const staff = await app.request("http://app.example.com/r?lang=en");
-  const unknown = await app.request("http://book.example.com/w/pk_AAAAAAAAAAAAAAAAAAAAAA");
+  const unknown = await app.request("http://book.example.com/w/pk_AAAAAAAAAAAAAAAAAAAAAA?lang=en");
+  expect(staff.status).toBe(404);
+  expect(Object.fromEntries(staff.headers)).toEqual(Object.fromEntries(unknown.headers));
+  expect(await staff.text()).toBe(await unknown.text());
+});
+
+it("serves the waitlist page /r/waitlist on the widget host only, as /r is (C74)", async () => {
+  const widget = await app.request("http://book.example.com/r/waitlist?lang=en");
+  const r = await app.request("http://book.example.com/r?lang=en");
+  expect(widget.status).toBe(200);
+  expect(Object.fromEntries(widget.headers)).toEqual(Object.fromEntries(r.headers));
+
+  const staff = await app.request("http://app.example.com/r/waitlist?lang=en");
+  const unknown = await app.request("http://book.example.com/w/pk_AAAAAAAAAAAAAAAAAAAAAA?lang=en");
   expect(staff.status).toBe(404);
   expect(Object.fromEntries(staff.headers)).toEqual(Object.fromEntries(unknown.headers));
   expect(await staff.text()).toBe(await unknown.text());

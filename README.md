@@ -6,7 +6,7 @@
 
 **The open-source reservations engine for restaurants — availability, bookings, tables, and the event feed, with an API and an MCP server.**
 
-<sub>Pre-alpha: it runs locally with tests, nothing is deployed yet. Public site: <a href="https://opencovers.dev">opencovers.dev</a>.</sub>
+<sub>Pre-alpha: it runs locally with tests. Public site: <a href="https://opencovers.dev">opencovers.dev</a>. A hosted demo runs for internal testing and opens to the public after legal review.</sub>
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=node.js&logoColor=white)
@@ -68,15 +68,19 @@ The staff app speaks Spanish and English, with light and dark themes. A selector
 
 ### 🌐 Online booking (in progress)
 
-A venue can take bookings on its own website ([ADR-0017](docs/adr/0017-booking-widget-and-self-service-link.md)). In **Setup → Online booking**, an admin turns it on, sets the online limits and the allowed sites, and copies an `<iframe>` snippet. The widget at `/w/{bookingKey}` books through public routes under `/v1/public` that need no account, with a proof-of-work challenge and rate limits. After booking, the guest gets a private link to a page at `/r` that shows the booking and lets them change the party size or the note, or cancel. The same card sets the page's colors, corner radius, font and logo, with a preview, and warns after a save when the text is hard to read against the background. Parts not built yet include the link in the confirmation email, the consent question, and an optional CAPTCHA. A venue can also publish an opt-in public profile as schema.org Restaurant JSON-LD for its own pages.
+A venue can take bookings on its own website ([ADR-0017](docs/adr/0017-booking-widget-and-self-service-link.md)). In **Setup → Online booking**, an admin turns it on, sets the online limits and the allowed sites, and copies an `<iframe>` snippet. The widget at `/w/{bookingKey}` books through public routes under `/v1/public` that need no account, with a proof-of-work challenge and rate limits. After booking, the guest gets a private link to a page at `/r` that shows the booking and lets them change the party size or the note, or cancel. The same card sets the page's colors, corner radius, font and logo, with a preview, and warns after a save when the text is hard to read against the background. Parts not built yet include the link in the confirmation email, the consent question, and an optional CAPTCHA. The widget shows a strip of days with a status for each (available, full or closed), lets the guest choose a zone, and shows a summary before it asks for the guest's details. It speaks seven languages (Spanish, English, Catalan, French, German, Italian and Portuguese), taken from a `?lang=` on the address, the host page's language that `embed.js` passes, or the venue's language. It stays light unless the embed asks for more: `data-scheme="auto"` on the `embed.js` tag lets it follow the visitor's light or dark setting, and a venue can set a dark palette (colors, radius and font) in the same theme. A venue can also publish an opt-in public profile as schema.org Restaurant JSON-LD for its own pages.
 
 ### 🪑 A visual floor plan
 
 Drag tables and room elements onto a floor, snap them to a grid, rotate them, and resize them. Tables come in round, oval, square, rectangle, and long (banquet) shapes with chairs; room elements (bar, kitchen, wall, window, door, plant, large plant, counter, entrance, sofa, column, stairs, rug, umbrella, host stand, banquette, planter, fireplace, wine rack, restroom) are drawn as architectural symbols on a wood floor — so the plan reads like a plan, not a list.
 
-### 📧 Email confirmations
+### 🔎 Where a booking came from
 
-Confirmations, cancellations, and booking notices via Resend — one per reservation version, never duplicated. Each venue brings its own Resend account, and it's off until enabled.
+Every reservation event records which channel made the change (`widget`, `staff`, `api` or `mcp`) and a stable, non-personal actor reference, so the MCP server is told apart from any other API key and a later cancellation shows its own actor ([ADR-0023](docs/adr/0023-event-channel-and-actor.md)). The staff app shows it as a trace in the reservation dialog, and `GET /v1/venues/{venueId}/reservations/{reservationId}/trace` returns the same entries.
+
+### 📧 Guest emails
+
+Through Resend, a guest gets an email when a booking is confirmed, changed or cancelled (by the guest or by the venue), and when they ask for a new self-service link. The venue gets a notice of each new booking. Booking emails go out once per reservation version, never duplicated. The confirmation, change and cancellation emails carry a calendar file. Each email shows the venue's logo and its primary colors, and falls back to the OpenCovers colors when the venue's pair is hard to read. The text follows the guest's booking language, then the venue's, and only the Spanish catalog ships so far ([ADR-0024](docs/adr/0024-guest-email-language.md)). A venue uses its own Resend account or the instance's, and email is off until the venue turns it on. The email text is a placeholder pending legal review.
 
 ### 🔔 Signed webhooks
 
@@ -116,7 +120,7 @@ flowchart LR
 
 ## Quick start
 
-You need Node.js 22 or newer, pnpm, and Docker.
+You need Node.js 22.9 or newer, pnpm, and Docker.
 
 ```sh
 git clone https://github.com/David-Cabeza/OpenCovers.git
@@ -238,13 +242,17 @@ docs/        the contract, ADRs, and requirements
 - Erasure returns counts and keeps hashes, not personal values.
 - The contract and the conformance cases come before the implementation.
 
+## Hosted demo
+
+A hosted demo runs for internal testing. It opens to the public after legal review of its consent text and privacy notice. With `DEMO_MODE=1` one deployment becomes a public demo where each visitor signs in with an emailed magic link, after a proof-of-work challenge, and gets a sandbox restaurant of their own, with caps on what it can hold and a sandbox bar and guided tour in the staff app. It runs on its own host and database, never next to real data, and it is off by default. See [ADR-0022](docs/adr/0022-hosted-demo-sandbox.md) and the [deploy guide](docs/deploy.md#hosted-demo). The public site links to it only once an address is set.
+
 ## Deploy
 
 OpenCovers has no hosting vendor dependency. It needs PostgreSQL and a Node.js process. The API ships as a Docker image, and the staff app is a static build that any web server can serve. Whoever forks it for a venue decides where the database lives. The project's own site is on GitHub Pages at [opencovers.dev](https://opencovers.dev). See [docs/deploy.md](docs/deploy.md). Self-hosters should also read the [hardening guide](docs/hardening.md).
 
 ## Status
 
-Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally — 60 conformance cases pass (C1 to C42, C46 to C49 and C52 to C65), signed webhooks included. 17 cases (C39 to C55) specify the booking widget and self-service link, whose contract is written. Stages 2 to 7, 9, 10, 12 and 15 of ADR-0017 are built. They are the online booking settings, the public booking API for config, availability and create, the guest self-service link to read, change and cancel a booking, the booking widget with its framed page, the guest's self-service page, the Online booking card in Setup, the venue's theme (colors, corner radius, font and logo) in the widget and in Setup, the `embed.js` resize script, and a "lost your link?" form that emails a new link when the venue has email on (placeholder email text). Of those 17 cases, twelve pass and five are partial (C43, C44, C45, C50, C51). A deployment is prepared (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook) but not yet live. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
+Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally. Of the 78 conformance cases, 54 pass (C1 to C4, C6 to C17, C19 to C39, C41, C42, C46 to C49, C53, C54, C56 and C59 to C66), signed webhooks included. 13 are partial (C5, C18, C40, C43 to C45, C50 to C52, C55, C57, C58 and C67). The other 11 (C68 to C78) specify the public waitlist of ADR-0021, which is not built yet. 17 cases (C39 to C55) specify the booking widget and self-service link, whose contract is written. Stages 2 to 7, 9, 10, 12 and 15 of ADR-0017 are built. They are the online booking settings, the public booking API for config, availability and create, the guest self-service link to read, change and cancel a booking, the booking widget with its framed page, the guest's self-service page, the Online booking card in Setup, the venue's theme (colors, corner radius, font and logo) in the widget and in Setup, the `embed.js` script that sizes the iframe and passes the host page's language, a "lost your link?" form that emails a new link when the venue has email on (placeholder email text), and the widget in seven languages, five of them waiting for native review. ADR-0021 adds the day strip, the zone choice and the summary step (stages 3, 6 and 9). Of those 17 cases, nine pass and eight are partial (C40, C43, C44, C45, C50, C51, C52, C55). The production stack is ready (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook), and the same images run the hosted demo, which is open only for internal testing until legal review. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
 
 ## Contributing
 

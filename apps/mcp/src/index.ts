@@ -548,13 +548,21 @@ export function createServer(): McpServer {
     "waitlist.list",
     {
       title: "List waitlist",
-      description: "List the guests currently waiting for a table.",
+      description:
+        "List the guests waiting for a table, oldest first. Without date: today's queue, the entries with no date or today's date. With date (YYYY-MM-DD): the waiting entries guests made through the public waitlist for that date, plus today's queue when it is today. Each entry carries date (null for the same-day queue), windowStart, windowEnd and source (staff or widget). waitlist.seat works only for an entry of today or with no date; for a future date, book with reservation.create and then remove the entry with waitlist.cancel.",
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
-      inputSchema: z.object({ venueId: z.string() }),
+      inputSchema: z.object({
+        venueId: z.string(),
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD")
+          .optional()
+          .describe("A local date, YYYY-MM-DD. Omit it for today's queue."),
+      }),
     },
-    async ({ venueId }) => {
+    async ({ venueId, date }) => {
       try {
-        return ok(await request(`/v1/venues/${venueId}/waitlist`));
+        return ok(await request(`/v1/venues/${venueId}/waitlist`, date === undefined ? {} : { query: { date } }));
       } catch (err) {
         return fail(err);
       }
@@ -597,7 +605,9 @@ export function createServer(): McpServer {
     "waitlist.seat",
     {
       title: "Seat a waitlist entry",
-      description: "Seat a waiting guest, turning the entry into a reservation." + RETRY,
+      description:
+        "Seat a waiting guest now as a walk-in, turning the entry into a reservation. Only an entry whose date is null or today can be seated; another date fails with invalid_transition." +
+        RETRY,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         venueId: z.string(),

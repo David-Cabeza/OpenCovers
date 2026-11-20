@@ -1,4 +1,4 @@
-import { formatEmailDate } from "../src/lib/email-messages";
+import { formatEmailDay } from "../src/lib/email-messages";
 import { and, eq, sql } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -22,6 +22,8 @@ import { migrateDb } from "../src/db/migrate";
 import { events, reservations, selfServiceLinks, sentEmails, services, tables, venues } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
 import { LINK_RESEND, RESEND_KIND } from "../src/lib/link-resend";
+import { emailVenue } from "../src/lib/email-venue";
+import { buildLinkEmail } from "../src/lib/mailer";
 import { challengeConfigFromEnv, issueChallenge, solve } from "../src/lib/public-challenge";
 import { addDays, localDateTime } from "../src/lib/time";
 
@@ -116,7 +118,7 @@ async function waitFor<T>(probe: () => T | Promise<T>, ok: (value: T) => boolean
   throw new Error("timed out");
 }
 
-const tokensIn = (text: string) => [...text.matchAll(/\/r\?lang=es#([0-9a-f-]{36}\.[A-Za-z0-9_-]{43})/g)].map((m) => m[1]);
+const tokensIn = (text: string) => [...text.matchAll(/\/r\?lang=[a-z]{2}#([0-9a-f-]{36}\.[A-Za-z0-9_-]{43})/g)].map((m) => m[1]);
 /** The link emails sent to an address. A booking's own confirmation goes there too and is left out. */
 const mailTo = (address: string) => mail.sent.filter((m) => m.to === address && tokensIn(m.text).length > 0);
 
@@ -228,8 +230,8 @@ describe("a resend rotates the link and mails the stored address", () => {
     expect((await resend(v.key, { email: contact })).status).toBe(202);
     const [message] = await waitFor(() => mailTo(contact.trim()), (m) => m.length === 1);
     expect(tokensIn(message.text)).toHaveLength(LINK_RESEND.perEmail);
-    const dates = [...message.text.matchAll(/^- (.+) a las /gm)].map((m) => m[1]);
-    expect(dates).toEqual([1, 2, 3, 4, 5].map((d) => formatEmailDate(ahead(d), "es")));
+    const dates = [...message.text.matchAll(/^Día: (.+)$/gm)].map((m) => m[1]);
+    expect(dates).toEqual([1, 2, 3, 4, 5].map((d) => formatEmailDay(ahead(d), "es")));
     const latest = booked.find((b) => b.day === LINK_RESEND.perEmail + 1)!;
     expect((await read(latest.token)).status).toBe(200);
   });
@@ -243,7 +245,7 @@ describe("a resend rotates the link and mails the stored address", () => {
     const elsewhere = await book(other, contact);
     expect((await resend(v.key, { email: contact })).status).toBe(202);
     const [message] = await waitFor(() => mailTo(contact), (m) => m.length === 1);
-    expect(message.text).toContain(`${formatEmailDate(ahead(20), "es")} a las 21:00, 3 personas`);
+    expect(message.text).toContain(`Día: ${formatEmailDay(ahead(20), "es")}\nHora: 21:00\nPersonas: 3`);
     expect((await read(elsewhere.token)).status).toBe(200);
   });
 
@@ -430,5 +432,50 @@ describe("the public config says whether the resend can send", () => {
     const off = await makeVenue({ notificationsEnabled: false });
     expect((await (await app.request(`/v1/public/${on.key}`)).json()).linkResend).toBe(true);
     expect((await (await app.request(`/v1/public/${off.key}`)).json()).linkResend).toBe(false);
+  });
+});
+
+describe("the resend follows each booking's stored locale (ADR-0024, C51, C67)", () => {
+  const langs = (text: string) => [...text.matchAll(/\/r\?lang=([a-z]{2})#/g)].map((m) => m[1]);
+
+  async function bookIn(v: Venue, contact: string, date: string, locale?: string) {
+    const b = await book(v, contact, date);
+    if (locale) await db.update(reservations).set({ guestLocale: locale }).where(eq(reservations.id, b.id));
+    return b;
+  }
+
+  async function setLocale(v: Venue, locale: string) {
+    const res = await app.request(`/v1/venues/${v.id}/online-booking`, {
+      method: "PUT",
+      headers: { apikey: v.admin, "content-type": "application/json" },
+      body: JSON.stringify({ locale }),
+    });
+    expect(res.status).toBe(200);
+  }
+
+  it("gives each link its own booking's locale and writes the text of the earliest, falling back to es without a catalog", async () => {
+    const v = await makeVenue();
+    const contact = nextContact();
+    await bookIn(v, contact, ahead(30), "en");
+    await bookIn(v, contact, ahead(31), "fr");
+    await bookIn(v, contact, ahead(32));
+    expect((await resend(v.key, { email: contact }, { "accept-language": "de" })).status).toBe(202);
+    const [message] = await waitFor(() => mailTo(contact), (m) => m.length === 1);
+    expect(langs(message.text)).toEqual(["en", "fr", "es"]);
+    // Only the es catalog ships, so the en text falls back to es.
+    // The subject carries the venue name since the branded emails, so build the expected es line the way the code does.
+    const [row] = await db.select().from(venues).where(eq(venues.id, v.id));
+    expect(message.subject).toBe(buildLinkEmail([], "es", emailVenue(row)).subject);
+  });
+
+  it("uses the venue's locale for a booking with no stored locale, shipped catalog or not", async () => {
+    const v = await makeVenue();
+    await setLocale(v, "fr");
+    const contact = nextContact();
+    await bookIn(v, contact, ahead(30));
+    await bookIn(v, contact, ahead(31), "pt");
+    expect((await resend(v.key, { email: contact })).status).toBe(202);
+    const [message] = await waitFor(() => mailTo(contact), (m) => m.length === 1);
+    expect(langs(message.text)).toEqual(["fr", "pt"]);
   });
 });

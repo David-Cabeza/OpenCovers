@@ -117,8 +117,8 @@ describe("the demo bar", () => {
     search([]);
     useUiStore.setState({ locale: "es" });
     renderWithApp(<DemoBar status={status} />);
-    expect(screen.getByText(/Se borra el 3 de diciembre de 2026/)).toBeInTheDocument();
-    expect(screen.getByText("Haz el recorrido (0 de 4 hechos)")).toBeInTheDocument();
+    expect(screen.getByText(/Se borrará el 3 de diciembre de 2026/)).toBeInTheDocument();
+    expect(screen.getByText("Recorrido guiado: 0 de 4")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Cliente/ })).toBeInTheDocument();
   });
 

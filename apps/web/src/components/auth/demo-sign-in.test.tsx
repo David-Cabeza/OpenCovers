@@ -177,6 +177,18 @@ describe("the sign-in screen on a demo", () => {
     expect(screen.queryByRole("heading", { name: "Check your email" })).not.toBeInTheDocument();
   });
 
+  it("shows a guest-readable message when the validator rejects the address", async () => {
+    demoOn();
+    magicLink.mockResolvedValue({ error: { status: 400, code: "VALIDATION_ERROR", message: "[body.email] Invalid email address" } });
+    const user = userEvent.setup();
+    renderWithApp(<AuthScreen />);
+    const input = await screen.findByLabelText("Email");
+    await user.type(input, "a@b.c");
+    await user.click(screen.getByRole("button", { name: "Email me a sign-in link" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("does not look right");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+  });
+
   it("says the server cannot be reached when no answer comes back", async () => {
     demoOn();
     magicLink.mockImplementation(() => ({ then: (_: unknown, reject: (e: unknown) => void) => reject(new TypeError("Failed to fetch")) }));

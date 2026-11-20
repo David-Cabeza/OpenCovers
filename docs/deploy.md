@@ -169,6 +169,8 @@ The API limits sign-in, sign-up, invitation redemption and venue creation per cl
 | `RATE_LIMIT_PUBLIC_VENUE` | `100/1h` | The same routes, per booking key, all addresses together. Whoever spends it stops online booking in that venue until the window ends. Staff bookings are untouched. |
 | `RATE_LIMIT_PUBLIC_SELF_SERVICE` | `60/15m` | Every `/v1/public/self-service` request, per client address. |
 | `RATE_LIMIT_PUBLIC_DAYS` | `60/15m` | `GET /v1/public/{bookingKey}/days`, per client address. It also spends `RATE_LIMIT_PUBLIC_READ`. |
+| `RATE_LIMIT_OAUTH_AUTHORIZE` | `30/15m` | With `MCP_REMOTE=on` only. `GET /api/auth/oauth2/authorize`, per client address. |
+| `RATE_LIMIT_OAUTH_TOKEN` | `60/15m` | With `MCP_REMOTE=on` only. `POST /api/auth/oauth2/token`, per client address. Agents refreshing tokens do not spend `RATE_LIMIT_AUTH`. |
 
 A budget is `max/window`, with a window in `s`, `m` or `h`. An unknown value stops the API at startup and names the variable. An empty value means the default.
 
@@ -361,6 +363,8 @@ The API reads these variables regardless of host:
 | `RATE_LIMIT` | no | `on` or `off`. Default `on` in `compose.prod.yaml`. See Rate limiting. |
 | `TRUST_PROXY` | no | `false` (default) or `true`. See Rate limiting. |
 | `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION`, `RATE_LIMIT_VENUE_CREATION`, `RATE_LIMIT_PUBLIC_READ`, `RATE_LIMIT_PUBLIC_BOOKING`, `RATE_LIMIT_PUBLIC_VENUE`, `RATE_LIMIT_PUBLIC_SELF_SERVICE`, `RATE_LIMIT_PUBLIC_DAYS` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |
+| `MCP_REMOTE` | no | `on` or `off` (default). On, the API is an OAuth authorization server for remote MCP clients (ADR-0014), and Caddy forwards `/mcp` and the OAuth metadata to it. The API then refuses to start unless `BETTER_AUTH_URL` is `https` and `BETTER_AUTH_SECRET` is set, and refuses `DEMO_MODE=1`. Set it for the `web` service too. |
+| `RATE_LIMIT_OAUTH_AUTHORIZE`, `RATE_LIMIT_OAUTH_TOKEN` | no | With `MCP_REMOTE=on` only. Budgets as `max/window`. See Rate limiting. |
 | `DEMO_MODE` | no | `1` runs the hosted demo, `0` or unset does not. See Hosted demo. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | Demo mode only. Both or neither. See Hosted demo. |
 | `DEMO_MAX_RESERVATIONS`, `DEMO_MAX_GUESTS`, `DEMO_MAX_WAITLIST`, `DEMO_MAX_TABLES`, `DEMO_MAX_SERVICES`, `DEMO_MAX_FLOOR_ITEMS`, `DEMO_MAX_INVITATIONS`, `DEMO_MAX_API_KEYS`, `DEMO_MAX_BLOCKLIST` | no | Demo mode only. Caps per sandbox, defaults 150, 100, 60, 40, 8, 40, 20, 10, 50. |

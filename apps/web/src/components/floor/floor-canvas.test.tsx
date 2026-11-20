@@ -1,5 +1,6 @@
-import { screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithApp } from "@/test/mock-api";
 import { FloorCanvas } from "./floor-canvas";
 
@@ -72,11 +73,137 @@ describe("table shapes", () => {
     expect(room).toBeCloseTo(36 / Math.sin(Math.PI / 4) - 6, 2);
   });
 
-  it("leaves the names of other tables to wrap, as before", () => {
-    renderWithApp(<FloorCanvas tables={[{ ...table("round", 4), name: "Terraza 1" }]} mode="view" />);
+  it("lets the name of a free table take two lines at most, inside the table, and keeps it whole in a tooltip", () => {
+    renderWithApp(<FloorCanvas tables={[{ ...table("square", 2), name: "Terraza 1" }]} mode="view" />);
     const name = screen.getByText("Terraza 1");
-    expect(name.className).not.toContain("truncate");
-    expect(name.style.maxWidth).toBe("");
+    expect(name.className).toContain("line-clamp-2");
+    expect(name).toHaveAttribute("title", "Terraza 1");
+    expect(parseFloat(name.style.maxWidth)).toBe(52 - 6);
+  });
+
+  it("writes a longer name smaller, so a name like Terraza 1 stays on one line", () => {
+    renderWithApp(
+      <FloorCanvas
+        tables={[
+          { ...table("square", 2), id: "a", name: "Mesa 1" },
+          { ...table("square", 2), id: "b", name: "Terraza 1" },
+        ]}
+        mode="view"
+      />,
+    );
+    expect(screen.getByText("Mesa 1").className).toContain("text-[11px]");
+    expect(screen.getByText("Terraza 1").className).toContain("text-[10px]");
+  });
+
+  it("keeps the name of an occupied table on one line, over the guest and the party size", () => {
+    renderWithApp(
+      <FloorCanvas
+        tables={[{ ...table("round", 4), name: "Reservado VIP", occupied: true, guestName: "Dan", partySize: 3 }]}
+        mode="view"
+      />,
+    );
+    const name = screen.getByText("Reservado VIP");
+    expect(name.className).toContain("truncate");
+    expect(parseFloat(name.style.maxWidth)).toBeLessThan(58);
+    expect(screen.getByText("Dan").className).toContain("truncate");
+    expect(screen.getByText("3 pax")).toBeInTheDocument();
+  });
+
+  it("shows no placeholder line on an occupied table without a guest name", () => {
+    renderWithApp(<FloorCanvas tables={[{ ...table("square", 2), occupied: true, partySize: 2 }]} mode="view" />);
+    expect(screen.getByText("2 pax")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+
+  it("draws a table saved as rect as a rectangle", () => {
+    renderWithApp(<FloorCanvas tables={[table("rect")]} mode="view" />);
+    const el = face();
+    expect(el.style.width).toBe("64px");
+    expect(el.style.height).toBe("46px");
   });
 });
 
+describe("a plan wider than the screen", () => {
+  const wide = [
+    { id: "a", name: "A", seats: 2, shape: "square", posX: 0, posY: 0 },
+    { id: "b", name: "B", seats: 2, shape: "square", posX: 896, posY: 0 },
+  ];
+  // The plan is 896 + 80 + 24 = 1000 px wide.
+  function frameOf(width: number) {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(private readonly cb: () => void) {}
+        observe() {
+          this.cb();
+        }
+        disconnect() {}
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(width);
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("is left alone when it fits", () => {
+    frameOf(1200);
+    renderWithApp(<FloorCanvas tables={wide} mode="view" />);
+    expect(screen.getByTestId("floor-canvas").style.transform).toBe("");
+    expect(screen.queryByRole("button", { name: "Real size" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show all" })).not.toBeInTheDocument();
+  });
+
+  it("is shrunk to fit a tablet, and can be put back at its real size", async () => {
+    frameOf(800);
+    const user = userEvent.setup();
+    renderWithApp(<FloorCanvas tables={wide} mode="view" />);
+    expect(screen.getByTestId("floor-canvas").style.transform).toBe("scale(0.8)");
+    expect(screen.getByText("Whole plan, at 80%")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Real size" }));
+    expect(screen.getByTestId("floor-canvas").style.transform).toBe("");
+    expect(screen.getByTestId("floor-canvas").style.minWidth).toBe("1000px");
+    expect(screen.getByText("Scroll sideways for the rest")).toBeInTheDocument();
+  });
+
+  it("opens at its real size on a phone, where shrinking would make it unreadable, and can show the whole plan", async () => {
+    frameOf(350);
+    const user = userEvent.setup();
+    renderWithApp(<FloorCanvas tables={wide} mode="view" />);
+    expect(screen.getByTestId("floor-canvas").style.transform).toBe("");
+    await user.click(screen.getByRole("button", { name: "Show all" }));
+    expect(screen.getByTestId("floor-canvas").style.transform).toBe("scale(0.35)");
+  });
+
+  it("moves a table by the distance on the plan, not on the screen, while it is shrunk", () => {
+    frameOf(500);
+    Element.prototype.setPointerCapture = vi.fn();
+    const onTableUpdate = vi.fn();
+    renderWithApp(<FloorCanvas tables={wide} mode="edit" onTableUpdate={onTableUpdate} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+    expect(screen.getByTestId("floor-canvas").style.transform).toBe("scale(0.5)");
+    const node = screen.getByText("A").closest(".cursor-move") as HTMLElement;
+    fireEvent.pointerDown(node, { clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(node, { clientX: 50, clientY: 30 });
+    fireEvent.pointerUp(node);
+    expect(onTableUpdate).toHaveBeenCalledWith("a", { x: 80, y: 40 });
+  });
+});
+
+describe("editing room elements", () => {
+  const item = { id: "i1", type: "bar", label: "Bar", posX: 40, posY: 40, width: 160, height: 48 };
+
+  it("resizes an element from its corner without moving it", () => {
+    Element.prototype.setPointerCapture = vi.fn();
+    const onItemUpdate = vi.fn();
+    renderWithApp(<FloorCanvas tables={[]} items={[item]} mode="edit" onItemUpdate={onItemUpdate} />);
+    const handle = screen.getByTitle("Resize");
+    fireEvent.pointerDown(handle, { clientX: 200, clientY: 88 });
+    fireEvent.pointerMove(handle, { clientX: 240, clientY: 104 });
+    fireEvent.pointerUp(handle);
+    expect(onItemUpdate).toHaveBeenCalledTimes(1);
+    expect(onItemUpdate).toHaveBeenCalledWith("i1", { width: 200, height: 64 });
+  });
+});

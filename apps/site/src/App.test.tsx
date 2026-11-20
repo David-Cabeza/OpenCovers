@@ -44,7 +44,7 @@ describe("public site", () => {
     const { container } = render(<App />);
     const paths = [...container.querySelectorAll("a, img, source")]
       .map((el) => el.getAttribute("href") ?? el.getAttribute("src") ?? "")
-      .filter((p) => p.startsWith("/"));
+      .filter((p) => p.startsWith("/") && p !== "/"); // "/" is the page itself (the brand link)
     expect(paths).toEqual(expect.arrayContaining(["/privacidad.html", "/en/"]));
     for (const p of paths) {
       const file = p.endsWith("/") ? `${p}index.html` : p;

@@ -30,6 +30,6 @@ if (window.location.pathname === "/r") {
   );
 } else {
   const bookingKey = bookingKeyFrom(window.location.pathname) ?? "";
-  root.render(<App api={publicApi(bookingKey)} t={translator(locale)} locale={locale} />);
+  root.render(<App api={publicApi(bookingKey, undefined, locale)} t={translator(locale)} locale={locale} />);
   reportHeight(window);
 }

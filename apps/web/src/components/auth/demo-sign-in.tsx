@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { MailCheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,12 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wait, setWait] = useState(0);
+  const sentHeading = useRef<HTMLHeadingElement>(null);
+
+  // The form is replaced by the confirmation, so keyboard focus would otherwise drop to the page.
+  useEffect(() => {
+    if (sentTo) sentHeading.current?.focus();
+  }, [sentTo]);
 
   useEffect(() => {
     if (wait <= 0) return;
@@ -47,7 +53,10 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
         },
       );
       if (failure) {
-        setError(authErrorMessage(failure, fallback));
+        const message = authErrorMessage(failure, fallback);
+        // A rejected address comes back as the validator's own English text, which is no use to a guest.
+        const raw = message === failure.message && /^\[body\./.test(message);
+        setError(raw ? t("demo.signIn.invalidEmail") : message);
         if (failure.status === 429) setWait(retryAfter || RESEND_WINDOW_S);
         return;
       }
@@ -93,12 +102,14 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
       <div className="space-y-4 pt-2" role="status">
         <MailCheckIcon className="size-6 text-primary" aria-hidden="true" />
         <div className="space-y-1">
-          <h2 className="font-medium">{t("demo.sent.title")}</h2>
+          <h2 ref={sentHeading} tabIndex={-1} className="font-medium outline-none">
+            {t("demo.sent.title")}
+          </h2>
           <p className="text-sm text-muted-foreground">{t("demo.sent.body", { email: sentTo })}</p>
         </div>
         {error && (
           <p role="alert" className="text-sm text-destructive">
-            {error}
+            <LinkedText text={error} />
           </p>
         )}
         <div className="flex flex-wrap gap-2">
@@ -129,18 +140,20 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
             id="demo-email"
             type="email"
             autoComplete="email"
-            placeholder="you@example.com" // i18n-ok
+            placeholder={t("demo.signIn.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "demo-signin-error" : undefined}
           />
         </div>
 
         <Consent checked={consent} onChange={setConsent} t={t} />
 
         {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
+          <p id="demo-signin-error" role="alert" className="text-sm text-destructive">
+            <LinkedText text={error} />
           </p>
         )}
 
@@ -167,7 +180,7 @@ function Consent({ checked, onChange, t }: { checked: boolean; onChange: (next: 
       <label className="flex items-start gap-2 text-sm">
         <input
           type="checkbox"
-          className="mt-0.5 size-4 shrink-0 accent-primary"
+          className="mt-0.5 size-4 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
         />
@@ -181,5 +194,20 @@ function Consent({ checked, onChange, t }: { checked: boolean; onChange: (next: 
         .
       </p>
     </div>
+  );
+}
+
+/** The "demo is full" message points to opencovers.dev as plain text; make that a link. */
+function LinkedText({ text }: { text: string }) {
+  const [before, after] = text.split("opencovers.dev");
+  if (after === undefined) return <>{text}</>;
+  return (
+    <>
+      {before}
+      <a href="https://opencovers.dev" className="underline underline-offset-2">
+        opencovers.dev
+      </a>
+      {after}
+    </>
   );
 }

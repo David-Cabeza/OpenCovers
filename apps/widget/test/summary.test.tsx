@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../src/App";
@@ -66,7 +66,8 @@ describe("the summary step", () => {
     const user = userEvent.setup();
     const calls = setup();
     const heading = await toSummary(user);
-    expect(document.activeElement).toBe(heading);
+    // Focus moves in an effect that runs after the heading is found, so wait for it.
+    await waitFor(() => expect(document.activeElement).toBe(heading));
     const seen = { ...calls };
     expect(screen.getByText(formatDate(today, "en"))).toBeTruthy();
     expect(screen.getByText("20:30")).toBeTruthy();

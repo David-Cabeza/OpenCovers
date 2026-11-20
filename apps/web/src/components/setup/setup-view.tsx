@@ -111,7 +111,7 @@ function SectionTabs({
               onClick={() => onSelect(section.id)}
               onKeyDown={(e) => onKeyDown(e, index)}
               className={cn(
-                "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+                "shrink-0 rounded-full border px-3.5 py-1.5 text-sm max-sm:min-h-11 font-medium transition-colors",
                 "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                 selected
                   ? "border-primary bg-primary text-primary-foreground"

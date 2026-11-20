@@ -285,7 +285,7 @@ describe("C64 privacy notice URL setting", () => {
     const v = await makeVenue({ ...PROFILE, publicProfileEnabled: true, publicPhone: "+34 600 123 456", resendApiKey: "re_secret_key" }, { privacyNoticeUrl: URL_A });
     const answer = await config(v.key);
     expect(Object.keys(answer).sort()).toEqual(
-      ["askConsent", "captcha", "challenge", "confirmationMode", "leadTimeMinutes", "linkResend", "maxAdvanceDays", "maxPartySize", "minPartySize", "privacyNoticeUrl", "venue", "weekdays", "zones"],
+      ["askConsent", "captcha", "challenge", "confirmationMode", "leadTimeMinutes", "linkResend", "maxAdvanceDays", "maxPartySize", "minPartySize", "privacyNoticeUrl", "venue", "waitlistEnabled", "weekdays", "zones"],
     );
     expect(Object.keys(answer.venue).sort()).toEqual(["address", "locale", "name", "phone", "theme"]);
     const text = JSON.stringify(answer);
