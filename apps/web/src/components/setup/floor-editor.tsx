@@ -72,8 +72,8 @@ export function FloorEditor({ venueId }: { venueId: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex items-center justify-between gap-4">
-        <div>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <CardTitle>{t("setup.floor.title")}</CardTitle>
           <CardDescription>{t("setup.floor.description")}</CardDescription>
         </div>
@@ -83,7 +83,7 @@ export function FloorEditor({ venueId }: { venueId: string }) {
             if (cfg) addItem.mutate({ type, label: cfg.label, width: cfg.width, height: cfg.height });
           }}
         >
-          <SelectTrigger className="w-[180px]" aria-label={t("setup.floor.addElement")}>
+          <SelectTrigger className="w-full sm:w-[180px]" aria-label={t("setup.floor.addElement")}>
             <SelectValue placeholder={t("setup.floor.addElement")} />
           </SelectTrigger>
           <SelectContent>

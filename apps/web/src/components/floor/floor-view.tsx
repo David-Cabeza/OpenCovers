@@ -161,7 +161,7 @@ function Legend({ tone, label, value }: { tone: "free" | "occupied"; label: stri
         className={
           tone === "occupied"
             ? "size-3 rounded-full border-2 border-success bg-success-soft"
-            : "size-3 rounded-full border-2 border-border bg-card"
+            : "size-3 rounded-full border-2 border-wood-edge bg-tabletop"
         }
       />
       <span className="font-medium">{label}</span>
