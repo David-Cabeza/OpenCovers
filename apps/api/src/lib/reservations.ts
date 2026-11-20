@@ -1262,7 +1262,12 @@ export async function setStatus(
         return existing.version;
       }
       const current = (
-        await tx.select().from(reservations).where(and(eq(reservations.id, id), eq(reservations.venueId, venueId))).limit(1)
+        await tx
+          .select()
+          .from(reservations)
+          .where(and(eq(reservations.id, id), eq(reservations.venueId, venueId)))
+          .for("update")
+          .limit(1)
       )[0];
       if (!current) throw new ReservationError("reservation_not_found");
       const allowed = ALLOWED_TRANSITIONS[status];
