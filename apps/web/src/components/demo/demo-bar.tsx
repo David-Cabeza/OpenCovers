@@ -5,14 +5,14 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { shiftIso, todayIso } from "@/lib/date";
 import { useT } from "@/i18n";
-import { DEPLOY_YOURSELF_URL, formatExpiry, sendPendingConsent, type DemoStatus } from "@/lib/demo";
+import { DEPLOY_YOURSELF_URL, dinerLink, formatExpiry, sendPendingConsent, type DemoStatus } from "@/lib/demo";
 import { cn } from "cn";
 import { useNavigation } from "@/components/layout/navigation";
 
 /** The fixed bar of a demo sandbox (ADR-0022, decisions 2, 3 and 9): expiry, the Restaurant | Diner switch, the tour. */
 export function DemoBar({ status }: { status: DemoStatus }) {
   const t = useT();
-  const { venueId, bookingKey, expiresAt } = status;
+  const { venueId, bookingKey, expiresAt, widgetOrigin } = status;
   // The consent ticked on the sign-in form is recorded now that there is a session (ADR-0022, amendment of 2026-11-20).
   useEffect(() => {
     if (venueId) void sendPendingConsent();
@@ -33,14 +33,14 @@ export function DemoBar({ status }: { status: DemoStatus }) {
             {t("demo.bar.deploy")}
           </a>
         </p>
-        <ViewSwitch bookingKey={bookingKey ?? null} />
+        <ViewSwitch bookingKey={bookingKey ?? null} widgetOrigin={widgetOrigin ?? null} />
       </div>
       <Checklist venueId={venueId} />
     </div>
   );
 }
 
-function ViewSwitch({ bookingKey }: { bookingKey: string | null }) {
+function ViewSwitch({ bookingKey, widgetOrigin }: { bookingKey: string | null; widgetOrigin: string | null }) {
   const t = useT();
   const base = "inline-flex h-8 items-center gap-1.5 px-3 text-sm font-medium";
   return (
@@ -50,7 +50,7 @@ function ViewSwitch({ bookingKey }: { bookingKey: string | null }) {
       </span>
       {bookingKey ? (
         <a
-          href={`/w/${bookingKey}`}
+          href={dinerLink(bookingKey, widgetOrigin)}
           target="_blank"
           rel="noreferrer"
           className={cn(base, "hover:bg-accent")}
