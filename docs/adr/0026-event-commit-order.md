@@ -1,4 +1,6 @@
-# ADR-0024: A venue's events commit in id order
+# ADR-0026: A venue's events commit in id order
+
+This record was numbered 0024 until it was renumbered to 0026, because [ADR-0024](0024-guest-email-language.md) is the guest's email language. Pull requests and commits that call the event order ADR-0024 mean this record.
 
 - Status: Accepted
 - Date: 2026-11-20
