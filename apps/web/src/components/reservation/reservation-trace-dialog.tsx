@@ -55,7 +55,7 @@ export function ReservationTraceDialog({
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             {data.entries.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {t("reservation.trace.empty")}
@@ -78,14 +78,14 @@ export function ReservationTraceDialog({
                         {traceTime(entry.occurredAt)}
                       </time>
                     </div>
-                    <p className="text-sm font-medium">
+                    <p className="break-words text-sm font-medium">
                       {channelLabel(entry)}
                       {actorLabel(entry) && (
                         <span className="font-normal text-muted-foreground"> · {actorLabel(entry)}</span>
                       )}
                     </p>
                     {entry.idempotencyKey && (
-                      <p className="truncate text-xs text-muted-foreground">
+                      <p className="break-all text-xs text-muted-foreground">
                         {t("reservation.trace.idempotencyKey")}{" "}
                         <code className="font-mono text-foreground">{entry.idempotencyKey}</code>
                       </p>

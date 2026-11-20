@@ -71,9 +71,8 @@ export async function notifyReservation(
     if (already) return;
     if (guestModify && !(await claimGuestModify(db, venueId, reservationId, version))) return;
 
-    // Stage 3 will pass the guest's stored locale first. For now every email is in the venue's.
     const online = await getOnlineBooking(db, venueId);
-    const locale = resolveEmailLocale(null, online?.locale);
+    const locale = resolveEmailLocale(reservation.guestLocale, online?.locale);
     const { subject, text, html, attachments } = buildEmail(
       kind,
       {

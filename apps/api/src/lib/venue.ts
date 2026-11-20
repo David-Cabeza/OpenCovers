@@ -351,6 +351,7 @@ export async function eraseReservations(
         guestName: "",
         guestContact: "",
         guestId: null,
+        guestLocale: null,
         ...consentColumns("unknown"),
         ...ratingColumns(null),
         commentary: "",

@@ -3,6 +3,7 @@ import demo from "../demo.json";
 import { notPlanned, phases, today, type Phase, type Today } from "./roadmap";
 
 const REPO = "https://github.com/David-Cabeza/OpenCovers";
+const GOOD_FIRST_ISSUES = `${REPO}/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22`;
 const REPO_API = "https://api.github.com/repos/David-Cabeza/OpenCovers";
 // The hosted demo (ADR-0022). Empty hides every demo link. Set `url` in apps/site/demo.json once the demo is live.
 const DEMO_URL: string = demo.url;
@@ -30,7 +31,7 @@ const bands = [
   },
   {
     s: "Dibujas tu sala y la usas.",
-    c: "Mesas redondas, ovaladas, cuadradas, rectangulares y largas con sillas, y elementos de sala como barra, cocina, columnas o chimenea. Arrastra, rota y redimensiona con ajuste a rejilla.",
+    c: "Mesas redondas, ovaladas, cuadradas, rectangulares y largas con sillas, y elementos de sala como barra, cocina, columnas o chimenea. Arrastra, rota y redimensiona con ajuste a rejilla. La app de sala está en español e inglés, con modo claro y oscuro.",
     on: "var(--f3)",
   },
   {
@@ -59,7 +60,7 @@ const modules = [
   {
     name: "Agenda",
     tag: "Sala",
-    body: "Las reservas del día con su estado y quién las hizo. Mover, cancelar o sentar.",
+    body: "Las reservas del día con su estado. Cada una guarda su traza: por qué canal entró (widget, app, API o MCP) y quién la cambió después. Mover, cancelar o sentar.",
     img: "/media/agenda.webp",
     pos: "18% 28%",
     alt: "Agenda del día en la app de sala",
@@ -252,7 +253,7 @@ function Nav() {
   return (
     <header className="nav">
       <div className="in">
-        <a href="#" className="brand">
+        <a href="/" className="brand" aria-label="OpenCovers, inicio">
           <img src="/mark.svg" alt="" />
           OpenCovers
         </a>
@@ -306,7 +307,7 @@ function Hero() {
       <div className="copy">
         <h1 className="rv" style={d(0)}>Tu libro de reservas es tuyo</h1>
         <p className="lead rv" style={d(90)}>
-          Motor de reservas open source para restaurantes, con API y servidor MCP.
+          Motor de reservas open source para restaurantes. El local lo usa con una app de sala y un widget de reserva; las plataformas y los agentes, por la API y el servidor MCP.
         </p>
         <div className="acts rv" style={d(180)}>
           {DEMO_URL && <a className="btn accent" href={DEMO_URL}>Probar la demo</a>}
@@ -320,6 +321,26 @@ function Hero() {
 }
 
 function Intro() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(true);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      v.pause();
+      setPlaying(false);
+    }
+  }, []);
+  const toggle = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      void v.play();
+      setPlaying(true);
+    } else {
+      v.pause();
+      setPlaying(false);
+    }
+  };
   return (
     <section className="intro">
       <p className="rv">
@@ -333,9 +354,12 @@ function Intro() {
           <i style={{ background: "#28c840" }} />
           <b>OpenCovers — La Taberna del Faro</b>
         </div>
-        <video autoPlay muted loop playsInline preload="metadata" poster="/media/opencovers-demo-poster.webp" aria-label="Demo de OpenCovers: agenda del día, reservas desde el widget y el servidor MCP rechazando una doble reserva">
+        <video ref={videoRef} autoPlay muted loop playsInline preload="metadata" poster="/media/opencovers-demo-poster.webp" aria-label="Demo de OpenCovers: agenda del día, reservas desde el widget y el servidor MCP rechazando una doble reserva">
           <source src="/media/opencovers-demo.mp4" type="video/mp4" />
         </video>
+        <button type="button" className="vtoggle" onClick={toggle}>
+          {playing ? "Pausar vídeo" : "Reproducir vídeo"}
+        </button>
       </div>
     </section>
   );
@@ -487,7 +511,8 @@ function Modules() {
           <img
             key={m.name}
             src={m.img}
-            alt={m.alt}
+            alt={i === active ? m.alt : ""}
+            aria-hidden={i === active ? undefined : true}
             loading="lazy"
             className={i === active ? "on" : ""}
            
@@ -615,7 +640,7 @@ function Brigada() {
       <ul>
         {challenges.map((c, i) => (
           <li key={c.title} className="rv" style={d((i % 2) * 80)}>
-            <a href={`${REPO}/issues`}>
+            <a href={GOOD_FIRST_ISSUES}>
               <span className="n"><i />{c.title}</span>
               <small>{c.tag}</small>
               <p>{c.body}</p>

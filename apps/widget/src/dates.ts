@@ -43,7 +43,7 @@ export function formatInstant(iso: string, locale: string): string {
   }).format(new Date(iso));
 }
 
-/** The weekday as one letter (or the locale's narrowest form), for a chip. */
-export function formatWeekdayLetter(date: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: "narrow", timeZone: "UTC" }).format(asUtc(date));
+/** The weekday as a short name ("mar", "Tue"), so Tuesday and Wednesday differ on a chip. */
+export function formatWeekdayShort(date: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(asUtc(date));
 }

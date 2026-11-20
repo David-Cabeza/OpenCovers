@@ -140,7 +140,12 @@ async function call<T>(fetcher: Fetch, path: string, init: RequestInit = {}): Pr
   };
 }
 
-export function publicApi(bookingKey: string, fetcher: Fetch = (input, init) => fetch(input, init)) {
+export function publicApi(
+  bookingKey: string,
+  fetcher: Fetch = (input, init) => fetch(input, init),
+  /** The locale the widget shows. Sent on the create so guest emails follow it (ADR-0024, C43). */
+  locale?: string,
+) {
   const base = `/v1/public/${encodeURIComponent(bookingKey)}`;
   return {
     config: () => call<PublicConfig>(fetcher, base),
@@ -162,6 +167,7 @@ export function publicApi(bookingKey: string, fetcher: Fetch = (input, init) => 
           date: fields.date,
           time: fields.time,
           partySize: fields.partySize,
+          ...(locale ? { locale } : {}),
           ...(fields.zone ? { zone: fields.zone } : {}),
           guest: { name: fields.name.trim(), contact: fields.contact.trim() },
           ...(fields.commentary.trim() ? { commentary: fields.commentary.trim() } : {}),

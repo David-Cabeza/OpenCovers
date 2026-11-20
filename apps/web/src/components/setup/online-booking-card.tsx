@@ -596,7 +596,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                   {error("themeColors")}
                   <div className="space-y-3 rounded-lg border p-3">
                     <div className="flex items-start justify-between gap-4">
-                      <div>
+                      <div className="space-y-1">
                         <Label htmlFor="ob-dark-palette">{t("onlinebooking.dark.label")}</Label>
                         <p className="text-sm text-muted-foreground">
                           {t("onlinebooking.dark.help")}
