@@ -57,9 +57,10 @@ describe("production Caddyfile", () => {
     const headers = staff.slice(staff.indexOf("header {"), staff.indexOf("}", staff.indexOf("header {")));
     expect(headers).toContain('X-Frame-Options "DENY"');
     expect(headers).toMatch(/Content-Security-Policy "[^"]*frame-ancestors 'none'[^"]*"/);
-    expect(staff.match(/^\s*header\b/gm)).toHaveLength(2);
+    // The global header block, the HSTS line, and the Content-Type of the two 404 pages (/w/* and /r).
+    expect(staff.match(/^\s*header\b/gm)).toHaveLength(4);
     expect(staff).toMatch(/header @https Strict-Transport-Security/);
-    expect(handle(staff, "/w/*")).toMatch(/respond 404/);
+    expect(handle(staff, "/w/*")).toMatch(/respond ".*" 404/);
     expect(handle(staff, "/w/*")).not.toContain("reverse_proxy");
     expect(staff.indexOf("handle /w/*")).toBeLessThan(staff.indexOf("handle /v1/*"));
   });
@@ -77,7 +78,7 @@ describe("production Caddyfile", () => {
     expect(pub).toContain("reverse_proxy {$API_UPSTREAM:api:3000}");
     expect(widget).not.toMatch(/handle \/(api|v1)\/\* /);
     expect(widget).not.toContain("file_server");
-    expect(widget).toMatch(/handle \{\s*respond 404\s*\}/);
+    expect(widget).toMatch(/handle \{[^}]*respond "<!doctype html>.*" 404\s*\}/);
   });
 
   it("caps request bodies in both site blocks above the API's own limits", () => {
@@ -89,12 +90,12 @@ describe("production Caddyfile", () => {
   it("proxies /favicon.ico on the widget site only, and the staff site never names it", () => {
     expect(handle(widget, "/favicon.ico")).toMatch(/^handle \/favicon\.ico \{\s*reverse_proxy \{\$API_UPSTREAM:api:3000\}\s*$/);
     expect(staff).not.toContain("favicon");
-    expect(widget).toMatch(/handle \{\s*respond 404\s*\}/);
+    expect(widget).toMatch(/handle \{[^}]*respond "<!doctype html>.*" 404\s*\}/);
   });
 
   it("proxies the self-service page /r on the widget site only, with the API's headers", () => {
     expect(handle(widget, "/r")).toMatch(/^handle \/r \{\s*reverse_proxy \{\$API_UPSTREAM:api:3000\}\s*$/);
-    expect(handle(staff, "/r")).toMatch(/^handle \/r \{\s*respond 404\s*$/);
+    expect(handle(staff, "/r")).toMatch(/^handle \/r \{[\s\S]*respond ".*" 404$/);
     expect(staff.indexOf("handle /r {")).toBeLessThan(staff.indexOf("handle {"));
   });
 });

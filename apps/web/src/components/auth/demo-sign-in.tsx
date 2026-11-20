@@ -129,7 +129,7 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
             id="demo-email"
             type="email"
             autoComplete="email"
-            placeholder="you@example.com" // i18n-ok
+            placeholder={t("demo.signIn.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
