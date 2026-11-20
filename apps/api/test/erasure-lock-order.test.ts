@@ -4,6 +4,7 @@ import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
 import { events, guests, reservations, selfServiceLinks, services, tables, venues, waitlist } from "../src/db/schema";
 import { cancelReservation, createReservation, modifyReservation } from "../src/lib/reservations";
+import { runRetention } from "../src/lib/retention";
 import { mintLink, reissueLink } from "../src/lib/self-service";
 import { erase } from "../src/lib/venue";
 import { addWaitlist, seatWaitlist } from "../src/lib/waitlist";
@@ -69,6 +70,36 @@ async function leftovers(venueId: string, reservationId?: string) {
       ? (await db.select().from(reservations).where(eq(reservations.id, reservationId)))[0]
       : undefined,
   };
+}
+
+async function waiting(): Promise<number> {
+  const r = await db.execute(
+    sql`select count(*)::int as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'`,
+  );
+  return Number((r.rows[0] as { n: number }).n);
+}
+
+async function until(done: () => Promise<boolean>) {
+  for (let i = 0; i < 200; i++) {
+    if (await done()) return;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  throw new Error("timed out waiting for the interleaving");
+}
+
+/** Holds the waitlist entry's row lock from a transaction of its own until `release` runs. */
+async function holdEntry(venueId: string, entryId: string) {
+  let release!: () => void;
+  const hold = new Promise<void>((r) => (release = r));
+  let held!: () => void;
+  const locked = new Promise<void>((r) => (held = r));
+  const tx = db.transaction(async (t) => {
+    await t.select().from(waitlist).where(and(eq(waitlist.venueId, venueId), eq(waitlist.id, entryId))).for("update");
+    held();
+    await hold;
+  });
+  await locked;
+  return { release, done: tx };
 }
 
 beforeAll(async () => {
@@ -152,5 +183,31 @@ describe("erasure racing a modify", () => {
       expect(versions, feed.map((e) => `${e.type}:${e.version}`).join(" ")).toEqual([...versions].sort((a, b) => a - b));
       expect(feed.filter((e) => e.type === "erased")).toHaveLength(1);
     }
+  });
+});
+
+describe("erasure racing guest retention", () => {
+  it("settles a retention run and an erasure of the same guest without a deadlock", async () => {
+    // Erasure locks the reservation, then waits on the waitlist entry held here. Retention then takes the guest
+    // and wants the same reservation. When the entry frees, erasure wants the guest that retention holds.
+    const venueId = "lock-retention";
+    const id = await seedBooking(venueId);
+    const added = await addWaitlist(db, venueId, { partySize: 2, guestName: "Eva", guestContact: CONTACT });
+    if (!added.ok) throw new Error("waitlist add failed");
+    const hold = await holdEntry(venueId, added.id);
+    const before = await waiting();
+    const erasing = erase(db, venueId, CONTACT);
+    await until(async () => (await waiting()) > before);
+    let retentionDone = false;
+    const retention = runRetention(db, new Date(Date.now() + 10 * 365 * 86_400_000)).finally(() => (retentionDone = true));
+    // Before the fix retention blocked on the reservation here, holding the guest.
+    await until(async () => retentionDone || (await waiting()) > before + 1);
+    hold.release();
+    await settled(erasing, retention, hold.done);
+    const left = await leftovers(venueId, id);
+    expect(left.row?.erased).toBe(true);
+    expect(left.waiting).toEqual([]);
+    expect(left.live).toEqual([]);
+    expect(left.guests).toEqual([]);
   });
 });

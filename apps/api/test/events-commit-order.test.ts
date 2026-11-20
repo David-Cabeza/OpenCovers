@@ -263,11 +263,18 @@ describe("the events lock under load", () => {
         erase(db, venueId, undefined, "p"),
         runRetention(db, new Date(Date.now() + 10 * YEAR_MS)),
       ]);
-      for (const r of results) if (r.status === "rejected") failures.push(String(r.reason));
+      for (const r of results) if (r.status === "rejected") failures.push(describeFailure(r.reason));
     }
     expect(failures).toEqual([]);
   });
 });
+
+/** Drizzle's "Failed query" hides the Postgres error; its cause carries the SQLSTATE and, for a deadlock, both processes. */
+function describeFailure(reason: unknown): string {
+  const cause = (reason as { cause?: { code?: string; message?: string; detail?: string } } | null)?.cause;
+  if (!cause?.code) return String(reason);
+  return `${String(reason)}\n  SQLSTATE ${cause.code}: ${cause.message}${cause.detail ? `\n  ${cause.detail}` : ""}`;
+}
 
 describe("event writes", () => {
   it("go through the one helper that takes the events lock", () => {

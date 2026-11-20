@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull, isNull, lt, ne, notExists, or } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNotNull, isNull, lt, ne, notExists, or } from "drizzle-orm";
 import { guestAudit, guestBlocklist, guests, membershipAudit, reservations, venues, waitlist } from "../db/schema";
 import { appendEvents } from "./events";
 import { forgetMergeState } from "./guests";
@@ -79,16 +79,16 @@ async function expireGuests(db: Db, venueId: string, cutoff: Date, limit: number
     if (roots.length === 0) return 0;
 
     const ids = (await withMerged(tx, venueId, roots)).map((g) => g.id);
+    const owned = and(eq(reservations.venueId, venueId), inArray(reservations.guestId, ids), eq(reservations.erased, false));
+    // Erasure and merge lock a guest's reservations before the guest (ADR-0026). This holds the guests already, so
+    // waiting on a reservation could close a cycle: a reservation another write holds leaves the batch to the next run.
     const visits = await tx
       .select({ id: reservations.id, version: reservations.version })
       .from(reservations)
-      .where(
-        and(
-          eq(reservations.venueId, venueId),
-          inArray(reservations.guestId, ids),
-          eq(reservations.erased, false),
-        ),
-      );
+      .where(owned)
+      .for("update", { skipLocked: true });
+    const [{ total }] = await tx.select({ total: count() }).from(reservations).where(owned);
+    if (visits.length < total) return 0;
     const erased = await eraseReservations(tx, venueId, visits);
     await tx
       .update(guests)
