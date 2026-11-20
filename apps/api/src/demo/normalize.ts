@@ -1,13 +1,16 @@
 // The one spelling of a visitor's address that the demo counts (ADR-0022, decision 8b): rate limits, the one sandbox
 // per address rule and the daily caps all key on it.
 //
-// Rules: Unicode NFKC, trimmed, lower case. For gmail.com and googlemail.com the dots of the local part and the
+// Rules: Unicode NFKC, trimmed, lower case; the domain is folded to its ASCII (punycode) form with no trailing dot, so
+// `bücher.de` and `xn--bcher-kva.de` are one address. For gmail.com and googlemail.com the dots of the local part and the
 // `+tag` are removed and the domain becomes gmail.com, because Google delivers all of those spellings to one inbox.
 // A `+tag` on any other domain is kept: providers differ (some treat `+` as an ordinary character), so stripping it
 // could merge two real people. Aliases on other providers stay bounded by the per-IP limit and the sandbox caps.
 //
 // An address with whitespace, a comma, a control character, an angle bracket or a quote is refused (null): those
 // are how a list of recipients or a header injection hides in one field.
+
+import { domainToASCII } from "node:url";
 
 const GMAIL = new Set(["gmail.com", "googlemail.com"]);
 // eslint-disable-next-line no-control-regex
@@ -20,7 +23,8 @@ export function normalizeEmail(raw: unknown): string | null {
   const parts = text.split("@");
   if (parts.length !== 2) return null;
   let [local, domain] = parts as [string, string];
-  if (local.length === 0 || domain.length === 0 || !domain.includes(".")) return null;
+  domain = domainToASCII(domain.replace(/\.$/, ""));
+  if (local.length === 0 || !domain.includes(".") || domain.split(".").includes("")) return null;
   if (GMAIL.has(domain)) {
     local = local.split("+")[0]!.replace(/\./g, "");
     domain = "gmail.com";
