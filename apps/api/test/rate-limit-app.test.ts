@@ -123,7 +123,11 @@ describe("rate limiting on the real app", () => {
     expect(known.status).toBe(429);
     expect(unknown.status).toBe(429);
     expect(await known.text()).toBe(await unknown.text());
-    expect(known.headers.get("retry-after")).toBe(unknown.headers.get("retry-after"));
+    // Retry-After counts the seconds left in each address's own window, rounded up. The two windows opened at
+    // different moments (an existing account hashes the wrong password, a ghost one does not), so on a slow run
+    // the values can sit one second apart. The body, which must not differ, is compared exactly above.
+    const left = (res: Response) => Number(res.headers.get("retry-after"));
+    expect(Math.abs(left(known) - left(unknown))).toBeLessThanOrEqual(1);
   });
 
   it("limits sign-up and creates no account once the limit is spent", async () => {
