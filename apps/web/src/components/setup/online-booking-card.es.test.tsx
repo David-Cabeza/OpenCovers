@@ -25,6 +25,7 @@ const SETTINGS = {
   privacyNoticeUrl: null as string | null,
   publicZones: [] as string[],
   showServiceNames: false,
+  waitlistEnabled: false,
   theme: {},
 };
 

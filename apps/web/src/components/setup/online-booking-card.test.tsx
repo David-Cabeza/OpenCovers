@@ -29,6 +29,7 @@ const SETTINGS = {
   privacyNoticeUrl: null as string | null,
   publicZones: [] as string[],
   showServiceNames: false,
+  waitlistEnabled: false,
   theme: {},
 };
 
@@ -835,6 +836,21 @@ describe("OnlineBookingCard public zones and service names", () => {
     await user.click(save());
     await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
     expect(api.calls("PUT", PATH)[0]!.body).toEqual({ showServiceNames: true });
+  });
+
+  it("toggles the waitlist and sends it, and off again (ADR-0021)", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    const sw = screen.getByLabelText("Waitlist for full days");
+    expect(sw).not.toBeChecked();
+    expect(sw).toHaveAccessibleDescription(/Needs email notifications on/);
+    await user.click(sw);
+    await user.click(save());
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0]!.body).toEqual({ waitlistEnabled: true });
   });
 
   it("sends neither field when they are untouched", async () => {
