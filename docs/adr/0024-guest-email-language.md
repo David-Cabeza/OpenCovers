@@ -1,10 +1,10 @@
 # ADR-0024: The guest's language in emails and links
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-21
 - Deciders: David Cabeza
 
-Nothing in this record is built. It proposes how guest emails follow the language the guest booked in, so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow, in that order. It changes rules of [ADR-0017](0017-booking-widget-and-self-service-link.md) and [ADR-0021](0021-widget-day-status-zones-waitlist.md), listed under Consequences. Open questions for the owner are marked `Q1` to `Q7`. Q1 and Q3 are decided, see "Decided by the owner".
+Nothing in this record is built. It proposes how guest emails follow the language the guest booked in, so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow, in that order. It changes rules of [ADR-0017](0017-booking-widget-and-self-service-link.md) and [ADR-0021](0021-widget-day-status-zones-waitlist.md), listed under Consequences. Open questions for the owner are marked `Q1` to `Q7`. All seven are decided, see "Open questions for the owner" (now answered).
 
 ## Decisions at a glance
 
@@ -179,9 +179,9 @@ Venue-editable templates. SMS. Formatting times in the guest's own time zone (ti
 ## Open questions for the owner
 
 - **Q1. Decided: on the booking.** Store the language on each booking, not on the guest record.
-- **Q2. Staff control.** Should staff, the API and MCP be able to set or change a booking's language, for phone bookings? If yes, stage 5 ships.
+- **Q2. Decided: not in v1.** Staff, the API and MCP cannot set a booking's language. Stage 5 stays optional and is not scheduled; staff bookings read in the venue's locale.
 - **Q3. Decided: reviewed locales only.** No machine-drafted catalog ships. A language without a reviewed catalog falls back to the venue's locale, then `es`.
-- **Q4. Language through the link.** Should a guest modify through `/r` update the stored language to the page's `lang`?
-- **Q5. Legal review scope.** Does the REQ-N2 review cover each language's email text and the waitlist consent wording in each language, and who signs off per language?
-- **Q6. The venue's notice.** Keep `notice` in the venue's online-booking locale, or follow a staff app language when that exists?
-- **Q7. Reminders.** REQ-N2 names a reminder that is not built. Should its stage reference this record so it is localized from the start?
+- **Q4. Decided: no.** A guest modify through `/r` does not change the stored language.
+- **Q5. Decided.** Each language passes its own legal review with the same checklist as `es`, covering every email text and the waitlist consent wording in that language. One native reviewer per language signs translation quality and legal text together, consulting a lawyer first where local law requires it. A language without that sign-off does not ship. `es` goes first.
+- **Q6. Decided.** `notice` stays in the venue's online-booking locale.
+- **Q7. Decided: yes.** The reminder, when it is built, references this record and is localized from the start.
