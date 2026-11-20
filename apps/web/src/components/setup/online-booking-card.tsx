@@ -139,11 +139,14 @@ function Chip({
   checked,
   onChange,
   disabled,
+  verbatim,
   children,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
+  /** Shows the label as written. A zone name is an exact identifier, so its first letter is not capitalised. */
+  verbatim?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -157,7 +160,8 @@ function Chip({
       />
       <span
         className={cn(
-          "inline-flex items-center rounded-full border px-3.5 py-1.5 text-sm font-medium first-letter:uppercase transition-colors",
+          "inline-flex items-center rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+          !verbatim && "first-letter:uppercase",
           "hover:bg-muted peer-checked:border-primary peer-checked:bg-accent peer-checked:text-accent-foreground",
           "peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50",
         )}
@@ -495,6 +499,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                             key={name}
                             checked={form.publicZones.includes(name)}
                             disabled={!zonesReady}
+                            verbatim
                             onChange={(on) => toggleZone(name, on)}
                           >
                             {name}
