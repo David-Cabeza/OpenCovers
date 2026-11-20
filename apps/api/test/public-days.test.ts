@@ -111,9 +111,11 @@ async function fill(v: Venue, date: string) {
 describe("C63 public day status", () => {
   it("agrees with availability over a grid of dates and party sizes", async () => {
     const start = today();
+    // Every weekday is open: the full day (start + 3) must not land on a closed weekday, whatever day this runs on.
+    // `closed` comes from the blocked dates; the weekday case is in the next test.
     const v = await makeVenue({
       venue: { blockedDates: [{ from: addDays(start, 5), to: addDays(start, 6) }] },
-      settings: { weekdays: [2, 3, 4, 5, 6, 7], maxAdvanceDays: 12 },
+      settings: { weekdays: [1, 2, 3, 4, 5, 6, 7], maxAdvanceDays: 12 },
     });
     await fill(v, addDays(start, 3));
     const seen = new Set<string>();
