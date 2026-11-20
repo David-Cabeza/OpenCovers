@@ -65,6 +65,21 @@ const es = {
   "link.intro.many": "Aquí tienes un enlace nuevo para cada una de tus reservas.",
   "link.outro": "Los enlaces anteriores ya no funcionan. Si no lo has pedido tú, puedes ignorar este mensaje.",
   "link.button": "Gestionar mi reserva",
+  // The public waitlist join (ADR-0021, section 3, C70). PROVISIONAL text, pending the legal review of the consent
+  // and email wording (ADR-0021, Q11), like the placeholder templates above: replace it once the owner confirms it.
+  // It holds the venue, the date, the window, the party and the leave link, and never the guest's name.
+  "waitlist.subject": "Estás en la lista de espera de {venue}: {dayShort}",
+  "waitlist.subjectNoVenue": "Estás en la lista de espera: {dayShort}",
+  "waitlist.preheader": "{day}, {party}. Aún no tienes mesa.",
+  "waitlist.heading": "Estás en la lista de espera",
+  "waitlist.lead": "Te hemos apuntado en la lista de espera de {venue}. Esto no es una reserva: el restaurante te escribirá o te llamará si queda una mesa libre.",
+  "waitlist.leadNoVenue": "Te hemos apuntado en la lista de espera. Esto no es una reserva: el restaurante te escribirá o te llamará si queda una mesa libre.",
+  "waitlist.leaveHint": "Si ya no puedes venir, sal de la lista con este enlace.",
+  "waitlist.leave": "Salir de la lista de espera",
+  "waitlist.outro": "Solo te escribimos sobre esta solicitud. Si no la has hecho tú, puedes ignorar este mensaje.",
+  "row.window": "Franja",
+  "footer.whyWaitlist": "Recibes este mensaje porque te has apuntado en la lista de espera de {venue}.",
+  "footer.whyWaitlistNoVenue": "Recibes este mensaje porque te has apuntado en una lista de espera.",
   "footer": "Reservas con OpenCovers",
   "footer.why": "Recibes este mensaje porque has hecho una reserva en {venue}.",
   "footer.whyNoVenue": "Recibes este mensaje porque has hecho una reserva.",

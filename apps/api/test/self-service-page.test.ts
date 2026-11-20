@@ -103,6 +103,37 @@ describe("GET /r, the self-service page (ADR-0017 stage 6)", () => {
   });
 });
 
+describe("GET /r/waitlist, the page of a waitlist leave link (ADR-0021, C74)", () => {
+  const waitlistPage = (query = "", init: RequestInit = {}) => app.request(`/r/waitlist${query}`, init);
+
+  it("is served as /r is: the same build and headers, one page whatever the query, a cookie or a token carries", async () => {
+    const plain = await waitlistPage();
+    expect(plain.status).toBe(200);
+    expect(headersOf(plain)).toEqual(headersOf(await page()));
+    const body = await plain.text();
+    expect(body).toContain('<html lang="es">');
+    expect(body).toContain("<title>Tu lista de espera</title>");
+    expect(body).toContain('<meta name="robots" content="noindex">');
+    expect(body).toContain('<script type="module" src="/w/assets/main-R1.js"></script>');
+    for (const [query, init] of [
+      ["?token=abc.def", {}],
+      ["?lang=xx", {}],
+      ['?lang="><script>', {}],
+      ["", { headers: { cookie: "better-auth.session_token=abc" } }],
+      ["", { headers: { apikey: "some-key" } }],
+      ["", { headers: { "X-Self-Service-Token": "0f8fad5b-d9cb-469f-a165-70867728950e.x" } }],
+    ] as const) {
+      const res = await waitlistPage(query, init);
+      expect(res.status).toBe(200);
+      expect(headersOf(res)).toEqual(headersOf(plain));
+      expect(await res.text()).toBe(body);
+    }
+    const en = await (await waitlistPage("?lang=en")).text();
+    expect(en).toContain('<html lang="en">');
+    expect(en).toContain("<title>Your waitlist entry</title>");
+  });
+});
+
 describe("create, view, change and cancel through the widget's client", () => {
   async function venue() {
     await db.insert(venues).values({ id: "rflow", name: "Casa Flujo", timezone: "Europe/Madrid" });

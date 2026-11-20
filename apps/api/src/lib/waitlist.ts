@@ -1,13 +1,15 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { idempotencyKeys, waitlist } from "../db/schema";
+import { idempotencyKeys, venues, waitlist } from "../db/schema";
 import * as schema from "../db/schema";
 import { claimKey } from "./idempotency";
 import type { Origin } from "./origin";
 import { walkIn, type WriteErrorCode } from "./reservations";
+import { localDateTime } from "./time";
 import { enforceSandboxCap } from "../demo/limits";
 
 export type Db = NodePgDatabase<typeof schema>;
+type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 export interface WaitlistEntry {
   id: string;
@@ -19,6 +21,11 @@ export interface WaitlistEntry {
   status: string;
   reservationId: string | null;
   createdAt: string;
+  /** The local date a guest asked for through the public join, or null for the same-day queue (C76). */
+  date: string | null;
+  windowStart: string | null;
+  windowEnd: string | null;
+  source: string;
 }
 
 export type AddResult =
@@ -50,7 +57,18 @@ function toEntry(row: typeof waitlist.$inferSelect): WaitlistEntry {
     status: row.status,
     reservationId: row.reservationId,
     createdAt: row.createdAt.toISOString(),
+    // Never the consent time or anything of the leave link (C76).
+    date: row.date,
+    windowStart: row.windowStart,
+    windowEnd: row.windowEnd,
+    source: row.source,
   };
+}
+
+/** Today's date in the venue's time zone, or null for an unknown venue. */
+export async function venueToday(db: Db | DbTx, venueId: string): Promise<string | null> {
+  const venue = (await db.select({ timezone: venues.timezone }).from(venues).where(eq(venues.id, venueId)).limit(1))[0];
+  return venue ? localDateTime(new Date(), venue.timezone).date : null;
 }
 
 export async function addWaitlist(
@@ -89,12 +107,24 @@ export async function addWaitlist(
   }
 }
 
-export async function listWaitlist(db: Db, venueId: string): Promise<WaitlistEntry[]> {
+/**
+ * The waiting entries, oldest first (C76). Without `date`, or with today's, the same-day queue (a null date) and
+ * today's entries; with another date, only the entries of that date.
+ */
+export async function listWaitlist(db: Db, venueId: string, date?: string): Promise<WaitlistEntry[]> {
+  const today = (await venueToday(db, venueId)) ?? localDateTime(new Date()).date;
+  const day = date ?? today;
   const rows = await db
     .select()
     .from(waitlist)
-    .where(and(eq(waitlist.venueId, venueId), eq(waitlist.status, "waiting")))
-    .orderBy(waitlist.createdAt);
+    .where(
+      and(
+        eq(waitlist.venueId, venueId),
+        eq(waitlist.status, "waiting"),
+        day === today ? or(isNull(waitlist.date), eq(waitlist.date, day)) : eq(waitlist.date, day),
+      ),
+    )
+    .orderBy(waitlist.createdAt, waitlist.id);
   return rows.map(toEntry);
 }
 
@@ -124,6 +154,8 @@ export async function seatWaitlist(
       return { ok: false, code: "invalid_request" };
     }
     if (row.status !== "waiting") return { ok: false, code: "invalid_transition" };
+    // A seat is a walk-in now, so only today's queue seats: an entry for another date stays waiting (C77, Q8).
+    if (row.date !== null && row.date !== (await venueToday(tx, venueId))) return { ok: false, code: "invalid_transition" };
 
     const result = await walkIn(
       tx,
@@ -174,10 +206,7 @@ export async function cancelWaitlist(
       )[0];
       if (!row) throw new WaitlistFailure("waitlist_entry_not_found");
       if (row.status !== "waiting") throw new WaitlistFailure("invalid_transition");
-      await tx
-        .update(waitlist)
-        .set({ status: "cancelled" })
-        .where(and(eq(waitlist.venueId, venueId), eq(waitlist.id, entryId)));
+      await markCancelled(tx, venueId, entryId);
       if (key !== undefined) {
         await tx
           .insert(idempotencyKeys)
@@ -189,4 +218,15 @@ export async function cancelWaitlist(
     if (error instanceof WaitlistFailure) return { ok: false, code: error.code };
     throw error;
   }
+}
+
+/**
+ * The staff cancel's write, shared with the guest leave (C75). The caller holds the entry's row lock and has seen it
+ * `waiting`. A staff cancel leaves a public entry's leave link alone (Q8): the guest still reads the entry.
+ */
+export async function markCancelled(tx: DbTx, venueId: string, entryId: string): Promise<void> {
+  await tx
+    .update(waitlist)
+    .set({ status: "cancelled" })
+    .where(and(eq(waitlist.venueId, venueId), eq(waitlist.id, entryId)));
 }

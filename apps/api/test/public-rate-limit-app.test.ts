@@ -180,6 +180,29 @@ describe("C52 self_service limit in the app", () => {
       body: payload === undefined ? undefined : JSON.stringify(payload),
     });
 
+  it("shares the create's address budget with a waitlist join, and a refused join writes nothing (C52)", async () => {
+    expect((await create("rl-b", "203.0.113.150")).status).toBe(200);
+    const waiting = async () => (await db.execute(sql`select count(*)::int as n from waitlist`)).rows;
+    const before = await waiting();
+    const challenge = issueChallenge(challenges, keys["rl-b"]!, Date.now() - 10_000);
+    const res = await app.request(`/v1/public/${keys["rl-b"]}/waitlist`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "Idempotency-Key": crypto.randomUUID(), "x-forwarded-for": "203.0.113.150" },
+      body: JSON.stringify({
+        date: SATURDAY,
+        partySize: 2,
+        guest: { name: "Ana", contact: "rl-join@example.com" },
+        emailConsent: true,
+        challenge,
+        solution: solve(challenge),
+      }),
+    });
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).not.toBeNull();
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await waiting()).toEqual(before);
+  });
+
   it("shares one budget per address across read, modify and cancel, and a refused cancel does nothing", async () => {
     const { id, token } = await staffLink("203.0.113.20");
     const ip = "203.0.113.21";

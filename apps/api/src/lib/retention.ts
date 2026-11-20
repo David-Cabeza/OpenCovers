@@ -5,6 +5,7 @@ import { forgetMergeState } from "./guests";
 import { deleteLapsedInvitations } from "./invitations";
 import { pruneEvents } from "./reservations";
 import { deleteLapsedLinks } from "./self-service";
+import { localDateTime } from "./time";
 import { eraseReservations, withMerged, type Db } from "./venue";
 
 export interface RetentionBatch {
@@ -23,13 +24,17 @@ export async function runRetention(
 ): Promise<void> {
   await deleteLapsedInvitations(db, now);
   await deleteLapsedLinks(db, now);
-  const all = await db.select({ id: venues.id, retentionDays: venues.retentionDays }).from(venues);
+  const all = await db
+    .select({ id: venues.id, retentionDays: venues.retentionDays, timezone: venues.timezone })
+    .from(venues);
   for (const venue of all) {
     const cutoff = new Date(now.getTime() - venue.retentionDays * DAY_MS);
     await pruneEvents(db, venue.id, cutoff);
     await inBatches(batch, (limit) => expireGuests(db, venue.id, cutoff, limit));
     await inBatches(batch, (limit) => expireUnlinkedReservations(db, venue.id, cutoff, limit));
     await inBatches(batch, (limit) => expireWaitlist(db, venue.id, cutoff, limit));
+    const today = localDateTime(now, venue.timezone).date;
+    await inBatches(batch, (limit) => expirePublicWaitlist(db, venue.id, today, limit));
     await inBatches(batch, (limit) => expireMembershipAudit(db, venue.id, cutoff, limit));
     await inBatches(batch, (limit) => expireBlocklist(db, venue.id, cutoff, limit));
   }
@@ -140,6 +145,34 @@ async function expireWaitlist(db: Db, venueId: string, cutoff: Date, limit: numb
         ),
       )
       .orderBy(waitlist.createdAt, waitlist.id)
+      .limit(limit)
+      .for("update", { skipLocked: true });
+    if (due.length === 0) return 0;
+    await tx.delete(waitlist).where(
+      and(
+        eq(waitlist.venueId, venueId),
+        inArray(
+          waitlist.id,
+          due.map((r) => r.id),
+        ),
+      ),
+    );
+    return due.length;
+  });
+}
+
+/**
+ * A public entry has no use once its date is over, so it goes on the first run after the end of that date in the
+ * venue's time zone, in any status, before the retention period (C78). Its leave link goes with it (cascade).
+ */
+async function expirePublicWaitlist(db: Db, venueId: string, today: string, limit: number): Promise<number> {
+  // Same shape as expireWaitlist: choose the ids, then delete exactly those.
+  return db.transaction(async (tx) => {
+    const due = await tx
+      .select({ id: waitlist.id })
+      .from(waitlist)
+      .where(and(eq(waitlist.venueId, venueId), eq(waitlist.source, "widget"), lt(waitlist.date, today)))
+      .orderBy(waitlist.date, waitlist.id)
       .limit(limit)
       .for("update", { skipLocked: true });
     if (due.length === 0) return 0;

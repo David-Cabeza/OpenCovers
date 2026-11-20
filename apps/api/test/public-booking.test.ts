@@ -152,6 +152,7 @@ describe("C40 public surface and venue isolation", () => {
       linkResend: false,
       privacyNoticeUrl: null,
       zones: [],
+      waitlistEnabled: false,
     });
     const b = await (await getPublic(v.key)).json();
     expect(b.challenge.nonce).not.toBe(a.challenge.nonce);

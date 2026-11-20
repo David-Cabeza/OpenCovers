@@ -303,6 +303,53 @@ export function buildLinkEmail(lines: readonly LinkLine[], requested: string, ve
   };
 }
 
+/** What the waitlist join email says (C70): only what the engine stored, never the guest's name. */
+export interface WaitlistJoinMail {
+  date: string;
+  window: { from: string; to: string } | null;
+  partySize: number;
+  /** The leave link, `/r/waitlist?lang=<locale>#<token>` on the widget origin. */
+  url: string;
+}
+
+// The waitlist join kind (ADR-0021, section 3, C70). PROVISIONAL like the templates above: its text waits for the
+// legal review of the consent and email wording (ADR-0021, Q11). One email per successful join, sent after the commit.
+export function buildWaitlistJoinEmail(mail: WaitlistJoinMail, requested: string, venue?: EmailVenue): BuiltEmail {
+  const locale = resolveEmailLocale(requested, null);
+  const venueName = venue?.name ?? "";
+  const day = formatEmailDay(mail.date, locale);
+  const slots = { day, dayShort: formatEmailDayShort(mail.date, locale), party: partyLabel(locale, mail.partySize) };
+  const rows: EmailRow[] = [{ label: message(locale, "row.day"), value: day }];
+  if (mail.window) rows.push({ label: message(locale, "row.window"), value: `${mail.window.from}–${mail.window.to}` });
+  rows.push({ label: message(locale, "row.party"), value: String(mail.partySize) });
+  const layout: EmailLayout = {
+    ...brandOf(venue),
+    preheader: message(locale, "waitlist.preheader", slots),
+    heading: message(locale, "waitlist.heading"),
+    blocks: [
+      {
+        kind: "paragraph",
+        text: venueName ? message(locale, "waitlist.lead", { venue: venueName }) : message(locale, "waitlist.leadNoVenue"),
+      },
+      { kind: "summary", rows },
+      { kind: "paragraph", text: message(locale, "waitlist.leaveHint") },
+      { kind: "button", label: message(locale, "waitlist.leave"), url: mail.url, showUrl: true },
+      { kind: "paragraph", text: message(locale, "waitlist.outro") },
+    ],
+    footer: message(locale, "footer"),
+    footerNote: venueName
+      ? message(locale, "footer.whyWaitlist", { venue: venueName })
+      : message(locale, "footer.whyWaitlistNoVenue"),
+    lang: locale,
+  };
+  return {
+    subject: subjectLine(locale, "waitlist", venueName, slots),
+    text: renderEmailText(layout),
+    html: renderEmailHtml(layout),
+    attachments: [],
+  };
+}
+
 /** The demo's sign-in mail. OpenCovers sends it itself, so it is fully branded: no venue stands behind it. */
 export function buildMagicLinkEmail(locale: string, url: string): BuiltEmail {
   const { lang, text: t } = magicLinkMessages(locale);

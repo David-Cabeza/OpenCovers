@@ -53,7 +53,7 @@ export const ERRORS = {
   self_service_link_invalid: { status: 404, retryable: false },
   self_service_closed: { status: 409, retryable: false },
   reservation_changed: { status: 409, retryable: false },
-  // The public waitlist of ADR-0021. In the contract (stage 10), not emitted until stage 11.
+  // The public waitlist of ADR-0021 (stage 11): a join refused for a closed date, the waitlist off, email off or a cap.
   waitlist_unavailable: { status: 409, retryable: false },
 } as const satisfies Record<string, { status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503; retryable: boolean }>;
 

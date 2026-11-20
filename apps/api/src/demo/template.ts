@@ -113,6 +113,8 @@ export const DEMO_TEMPLATE: DemoTemplate = {
     // ADR-0021, section 2: the two zones of the tables above, and the service named on each time.
     publicZones: ["Sala", "Terraza"],
     showServiceNames: true,
+    // ADR-0021, section 3: the public waitlist. The sandbox's email goes to its owner only (limits.ts mayEmail).
+    waitlistEnabled: true,
   },
   guests: [
     { name: "Lucía Prado", local: "lucia.prado" },

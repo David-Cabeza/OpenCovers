@@ -6,7 +6,7 @@ import { magicLinkEmail } from "../src/lib/auth";
 import { accentFor, BODY_PX, DARK, DEFAULT_ACCENT, LIGHT } from "../src/lib/email-layout";
 import { EMAIL_CATALOGS, MAGIC_LINK_CATALOGS, formatEmailDay, message, partyLabel } from "../src/lib/email-messages";
 import { emailVenue, type EmailVenue } from "../src/lib/email-venue";
-import { buildEmail, buildLinkEmail, GUEST_MANAGE_LINK_ENABLED, MAX_SUBJECT_LENGTH, type BuiltEmail } from "../src/lib/mailer";
+import { buildEmail, buildLinkEmail, buildWaitlistJoinEmail, GUEST_MANAGE_LINK_ENABLED, MAX_SUBJECT_LENGTH, type BuiltEmail } from "../src/lib/mailer";
 import { contrast } from "../src/lib/contrast";
 import { icsUid } from "../src/lib/ics";
 import { parseIcs } from "./ics-parse";
@@ -72,6 +72,18 @@ function cases(): Case[] {
             { date: base.date, time: base.time, partySize: base.partySize, url: "https://reservas.example.com/r?lang=es#tokenA" },
             { date: "2026-12-05", time: "21:00", partySize: 1, url: "https://reservas.example.com/r?lang=es#tokenB" },
           ],
+          locale,
+          venue,
+        ),
+        facts,
+        calendar: null,
+      });
+      // The waitlist join (ADR-0021, C70): the date and the party; no time, only the window the guest gave.
+      out.push({
+        name: `${locale} waitlist join ${vname}`,
+        locale,
+        mail: buildWaitlistJoinEmail(
+          { date: base.date, window: { from: base.time, to: "22:00" }, partySize: base.partySize, url: "https://reservas.example.com/r/waitlist?lang=es#tokenW" },
           locale,
           venue,
         ),

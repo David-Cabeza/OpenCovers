@@ -55,6 +55,8 @@ export interface OnlineBooking {
   publicZones: string[];
   /** Whether availability names the service of each time (ADR-0021, C66). */
   showServiceNames: boolean;
+  /** Whether guests may join the public waitlist for a date (ADR-0021, section 3, C68). See `waitlistOpen`. */
+  waitlistEnabled: boolean;
 }
 
 export interface Warning {
@@ -93,6 +95,7 @@ function defaults(): OnlineBooking {
     privacyNoticeUrl: null,
     publicZones: [],
     showServiceNames: false,
+    waitlistEnabled: false,
   };
 }
 
@@ -117,6 +120,7 @@ function viewOf(r: Row | undefined): OnlineBooking {
     privacyNoticeUrl: r.privacyNoticeUrl,
     publicZones: r.publicZones,
     showServiceNames: r.showServiceNames,
+    waitlistEnabled: r.waitlistEnabled,
   };
 }
 
@@ -214,7 +218,7 @@ const INT_FIELDS = [
 export function parseOnlineBookingInput(body: unknown): OnlineBookingInput | null {
   if (!isObject(body) || Object.keys(body).length === 0) return null;
   const out: OnlineBookingInput = {};
-  for (const key of ["enabled", "askConsent", "showServiceNames"] as const) {
+  for (const key of ["enabled", "askConsent", "showServiceNames", "waitlistEnabled"] as const) {
     if (body[key] === undefined) continue;
     if (typeof body[key] !== "boolean") return null;
     out[key] = body[key];
@@ -354,6 +358,9 @@ export async function setOnlineBooking(
     // A sandbox's widget may be embedded on the demo host only: the list was set when it was built (ADR-0022, F11).
     if (await isSandboxVenue(tx as unknown as Db, venueId)) merged.allowedOrigins = before.allowedOrigins;
     if (merged.minPartySize > merged.maxPartySize) return { ok: false, code: "invalid_request" };
+    // The join sends an email, so the waitlist cannot be turned on while the venue's email is off (C68). Turning
+    // email off later keeps the stored value; the public channel then reads the waitlist as off.
+    if (rest.waitlistEnabled === true && !venue.notificationsEnabled) return { ok: false, code: "invalid_request" };
     const rows = await tx
       .select({ name: services.name, days: services.days })
       .from(services)

@@ -148,10 +148,14 @@ function normalizePath(path: string): string {
 function publicRules(method: string, path: string): RuleName[] {
   const read = method === "GET" || method === "HEAD";
   const rest = path.slice("/v1/public/".length).split("/");
-  if (rest[0] === "self-service") return read ? ["public_read", "self_service"] : ["self_service"];
+  // The waitlist entry read and leave share the self-service budget (ADR-0021, C52).
+  if (rest[0] === "self-service" || rest[0] === "waitlist-entry") {
+    return read ? ["public_read", "self_service"] : ["self_service"];
+  }
   if (read) return rest.length === 2 && rest[1] === "days" ? ["public_read", "public_days"] : ["public_read"];
   const tail = rest.slice(1).join("/");
-  return method === "POST" && (tail === "reservations" || tail === "self-service/resend")
+  // A waitlist join shares the create's budgets, so alternating the two routes gives no extra budget (C52).
+  return method === "POST" && (tail === "reservations" || tail === "self-service/resend" || tail === "waitlist")
     ? ["public_booking", "public_venue"]
     : [];
 }

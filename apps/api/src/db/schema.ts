@@ -329,8 +329,27 @@ export const waitlist = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // ADR-0021, section 3. A null date is the same-day queue staff add to; the public join sets a date, an optional
+    // window of local times, `source` `widget` and the time of the guest's email consent (C69, C70).
+    date: date("date", { mode: "string" }),
+    windowStart: text("window_start"),
+    windowEnd: text("window_end"),
+    source: text("source").notNull().default("staff"),
+    consentAt: timestamp("consent_at", { withTimezone: true }),
   },
-  (t) => [index("idx_waitlist_venue_created").on(t.venueId, t.createdAt)],
+  (t) => [
+    index("idx_waitlist_venue_created").on(t.venueId, t.createdAt),
+    index("idx_waitlist_venue_date").on(t.venueId, t.date),
+    check("waitlist_source", sql`${t.source} IN ('staff', 'widget')`),
+    check(
+      "waitlist_window",
+      sql`(${t.windowStart} IS NULL AND ${t.windowEnd} IS NULL) OR (${t.windowStart} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' AND ${t.windowEnd} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' AND ${t.windowStart} < ${t.windowEnd})`,
+    ),
+    check(
+      "waitlist_widget_entry",
+      sql`${t.source} = 'staff' OR (${t.date} IS NOT NULL AND ${t.consentAt} IS NOT NULL)`,
+    ),
+  ],
 );
 
 export const sentEmails = pgTable(
@@ -581,6 +600,8 @@ export const venueOnlineBooking = pgTable(
     // ADR-0021, section 2: the table zones the widget lets a guest pick, and whether it names the service of a time.
     publicZones: jsonb("public_zones").$type<string[]>().notNull().default([]),
     showServiceNames: boolean("show_service_names").notNull().default(false),
+    // ADR-0021, section 3: whether guests may join the waitlist for a date. Set true only while email is on (C68).
+    waitlistEnabled: boolean("waitlist_enabled").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -639,6 +660,33 @@ export const selfServiceLinks = pgTable(
     index("idx_self_service_links_expires").on(t.expiresAt),
     check("self_service_links_hash", sql`${t.secretHash} ~ '^[0-9a-f]{64}$'`),
     check("self_service_links_cancel_revoked", sql`${t.cancelKey} IS NULL OR ${t.revokedAt} IS NOT NULL`),
+  ],
+);
+
+// ADR-0021, section 3: the leave link of one public waitlist entry, in a table of its own so that a booking token
+// never names an entry and a waitlist token never names a booking (C74). Only the SHA-256 of the secret is stored.
+// The row goes with its entry, so erasure and retention end the link with the entry (C78).
+export const waitlistLinks = pgTable(
+  "waitlist_links",
+  {
+    id: text("id").primaryKey(),
+    venueId: text("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "cascade" }),
+    entryId: text("entry_id")
+      .notNull()
+      .references(() => waitlist.id, { onDelete: "cascade" }),
+    secretHash: text("secret_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    // The public key of the guest leave that revoked the link, so a repeat of that leave can replay (C75).
+    leaveKey: text("leave_key"),
+  },
+  (t) => [
+    uniqueIndex("uq_waitlist_links_entry").on(t.entryId),
+    check("waitlist_links_hash", sql`${t.secretHash} ~ '^[0-9a-f]{64}$'`),
+    check("waitlist_links_leave_revoked", sql`${t.leaveKey} IS NULL OR ${t.revokedAt} IS NOT NULL`),
   ],
 );
 
