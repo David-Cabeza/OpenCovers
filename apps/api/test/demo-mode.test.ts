@@ -582,6 +582,7 @@ describe("leads", () => {
   it("neutralizes spreadsheet formulas in the export", async () => {
     await db.insert(demoLeads).values({
       email: "f@example.com",
+      normalizedEmail: "f@example.com",
       name: '=HYPERLINK("x")',
       source: "google",
       contactConsent: true,

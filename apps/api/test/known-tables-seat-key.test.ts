@@ -88,6 +88,24 @@ describe("explicit table ids", () => {
   });
 });
 
+describe("replay of a create with explicit tables", () => {
+  it("returns the stored answer after a named table was deleted, and still refuses a first attempt", async () => {
+    await db.insert(tables).values({ id: "3", venueId: A, name: "T3", seats: 4 });
+    const body = { tables: ["3"], partySize: 2 };
+    const first = await create(A, body, "18:00");
+    expect(first.status).toBe(200);
+    const stored = await first.json();
+    const firstKey = `kt-${n}`;
+    await db.delete(tables).where(and(eq(tables.venueId, A), eq(tables.id, "3")));
+    const replay = await post(A, "/reservations", { date: DATE, time: "18:00", partySize: 2, ...body }, firstKey);
+    expect(replay.status).toBe(200);
+    expect((await replay.json()).id).toBe(stored.id);
+    const fresh = await create(A, body, "18:00");
+    expect(fresh.status).toBe(400);
+    expect((await fresh.json()).code).toBe("invalid_request");
+  });
+});
+
 describe("waitlist seat with a key that already made a create", () => {
   it("refuses a foreign create key and leaves the entry waiting", async () => {
     const made = await create(B, {}, "19:00");

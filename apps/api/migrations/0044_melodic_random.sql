@@ -1,0 +1,3 @@
+ALTER TABLE "venue_online_booking" ADD COLUMN "public_zones" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "venue_online_booking" ADD COLUMN "show_service_names" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "venue_online_booking" ADD CONSTRAINT "venue_online_booking_public_zones" CHECK (jsonb_array_length("venue_online_booking"."public_zones") = 0 OR jsonb_array_length("venue_online_booking"."public_zones") BETWEEN 2 AND 10);

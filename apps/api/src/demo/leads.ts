@@ -5,6 +5,7 @@ import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import { demoLeads } from "../db/schema";
 import { LOCALES } from "../lib/online-booking";
 import type { Db } from "../lib/venue";
+import { normalizeEmail } from "./normalize";
 import { CONSENT_TEXT_VERSION, LEAD_RETENTION_MONTHS } from "./settings";
 
 export type LeadSource = "magic-link" | "google";
@@ -44,11 +45,15 @@ export async function recordConsent(
   input: { email: string; source: LeadSource; consent: ConsentInput },
 ): Promise<void> {
   const email = input.email.trim().toLowerCase();
+  // A verified address always normalizes. Anything else would be a bug, and no row is better than a stray one.
+  const normalized = normalizeEmail(email);
+  if (normalized === null) return;
   const { consent } = input;
   await db
     .insert(demoLeads)
     .values({
       email,
+      normalizedEmail: normalized,
       name: consent.name,
       source: input.source,
       locale: consent.locale,
@@ -56,8 +61,10 @@ export async function recordConsent(
       consentTextVersion: consent.version,
     })
     .onConflictDoUpdate({
-      target: demoLeads.email,
+      target: demoLeads.normalizedEmail,
       set: {
+        // The spelling the visitor signs in with now: it is the verified one.
+        email,
         lastSeenAt: sql`now()`,
         name: sql`coalesce(${consent.name}, ${demoLeads.name})`,
         locale: consent.locale,
@@ -70,10 +77,9 @@ export async function recordConsent(
 
 /** A consented lead signed in again: keeps its 12 months running. Does nothing for a visitor who never consented. */
 export async function touchLead(db: Db, email: string): Promise<void> {
-  await db
-    .update(demoLeads)
-    .set({ lastSeenAt: sql`now()` })
-    .where(eq(demoLeads.email, email.trim().toLowerCase()));
+  const normalized = normalizeEmail(email);
+  if (normalized === null) return;
+  await db.update(demoLeads).set({ lastSeenAt: sql`now()` }).where(eq(demoLeads.normalizedEmail, normalized));
 }
 
 /** Deletes consented leads whose last sign-in is older than the retention, and any row without consent. */
@@ -87,11 +93,13 @@ export async function dropLeadsPastRetention(db: Db, now: Date = new Date()): Pr
   return rows.length;
 }
 
-/** Erasure of one address (`pnpm demo:leads --erase <email>`). Returns how many rows were deleted. */
+/** Erasure of one address (`pnpm demo:leads --erase <email>`), under any spelling of it. Returns the rows deleted. */
 export async function eraseLead(db: Db, email: string): Promise<number> {
+  const normalized = normalizeEmail(email);
+  if (normalized === null) return 0;
   const rows = await db
     .delete(demoLeads)
-    .where(eq(demoLeads.email, email.trim().normalize("NFKC").toLowerCase()))
+    .where(eq(demoLeads.normalizedEmail, normalized))
     .returning({ email: demoLeads.email });
   return rows.length;
 }

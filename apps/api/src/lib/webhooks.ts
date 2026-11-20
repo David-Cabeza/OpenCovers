@@ -205,6 +205,12 @@ async function claimEndpoint(db: Db, now: Date, visited: Set<string>): Promise<C
 
 async function deliverEndpoint(db: Db, deps: DeliveryDeps, claim: Claim): Promise<void> {
   const { endpoint } = claim;
+  // A sandbox sends no webhooks (ADR-0022, decision 8e). Creation is refused, so this only meets an endpoint that
+  // reached a sandbox some other way: it is switched off and nothing is posted.
+  if (await sandboxWebhooksBlocked(db, endpoint.venueId)) {
+    await db.update(webhookEndpoints).set({ enabled: false }).where(eq(webhookEndpoints.id, endpoint.id));
+    return;
+  }
   let cursor = endpoint.lastEventId;
   let dropped: string | null = null;
   const watermark = await getEventsWatermark(db, endpoint.venueId);

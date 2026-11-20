@@ -813,31 +813,27 @@ export async function createReservation(
   const { startsAt, endsAt } = bookingWindow(venue, request);
   const { service, reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
   reasons.push(...serviceReasons(service, request));
-  if (reasons.length > 0) return { ok: false, code: reasons[0].code };
-  if (!service) return { ok: false, code: "outside_hours" };
+  // A refusal binds a first attempt only. The key is looked up first, so a replay of a create that succeeded
+  // returns the stored answer whatever the rules or the clock say now (C2, C58).
+  let refusal: WriteErrorCode | null = reasons[0]?.code ?? (service ? null : "outside_hours");
   const autoAssign = !input.tableIds || input.tableIds.length === 0;
-  if (!autoAssign && !(await knownDistinctTables(db, venueId, input.tableIds as string[]))) {
-    return { ok: false, code: "invalid_request" };
-  }
-  if (
-    !autoAssign &&
-    input.partySize > (await totalSeats(db, venueId, input.tableIds as string[]))
-  ) {
-    return { ok: false, code: "party_size_too_large" };
-  }
-  if (!autoAssign && zone !== "") {
-    const inZone = await db
-      .select({ id: tables.id })
-      .from(tables)
-      .where(
-        and(
-          eq(tables.venueId, venueId),
-          inArray(tables.id, input.tableIds as string[]),
-          eq(tables.zone, zone),
-        ),
-      );
-    if (inZone.length !== (input.tableIds as string[]).length) {
-      return { ok: false, code: "invalid_request" };
+  if (!refusal && !autoAssign) {
+    if (!(await knownDistinctTables(db, venueId, input.tableIds as string[]))) {
+      refusal = "invalid_request";
+    } else if (input.partySize > (await totalSeats(db, venueId, input.tableIds as string[]))) {
+      refusal = "party_size_too_large";
+    } else if (zone !== "") {
+      const inZone = await db
+        .select({ id: tables.id })
+        .from(tables)
+        .where(
+          and(
+            eq(tables.venueId, venueId),
+            inArray(tables.id, input.tableIds as string[]),
+            eq(tables.zone, zone),
+          ),
+        );
+      if (inZone.length !== (input.tableIds as string[]).length) refusal = "invalid_request";
     }
   }
   const id = crypto.randomUUID();
@@ -854,6 +850,7 @@ export async function createReservation(
         const link = channel.kind === "public" ? await rotateLink(tx, venueId, existing.reservationId) : undefined;
         return { id: existing.reservationId, version: existing.version, selfServiceToken: link && link.token };
       }
+      if (refusal || !service) throw new ReservationError(refusal ?? "outside_hours");
       // A demo sandbox has lower caps (ADR-0022), counted here under a per-venue lock so concurrent bookings cannot
       // pass the last free place. A replayed key replayed above. Skipped, with no query, unless DEMO_MODE=1: the API
       // does not start with the flag off over a database that holds sandboxes (demo/guard.ts).
@@ -914,7 +911,11 @@ export async function createReservation(
         const fit = await tableReasons(tx, venueId, startsAt, endsAt, input.partySize, zone);
         if (fit.ok) {
           tableIds = fit.tableIds;
-        } else if (channel.kind === "public" && fit.reason.code === "no_suitable_table") {
+        } else if (
+          channel.kind === "public" &&
+          (fit.reason.code === "no_suitable_table" || (zone !== "" && fit.reason.code === "party_size_too_large"))
+        ) {
+          // In a zone the party may exceed the zone's seats: that is also a taken slot, and never carries a count (C66).
           throw new ReservationError("slot_taken");
         } else if (
           fit.reason.code === "no_suitable_table" &&
@@ -1243,7 +1244,8 @@ export async function cancelReservation(
       const nextVersion = current.version + 1;
       await tx.update(reservations).set({ status: "cancelled", version: nextVersion }).where(eq(reservations.id, id));
       await tx.delete(tableAllocations).where(eq(tableAllocations.reservationId, id));
-      await tx.insert(tombstones).values({ reservationId: id, venueId, hash });
+      // Erasure already wrote this reservation's tombstone, with the same hash.
+      await tx.insert(tombstones).values({ reservationId: id, venueId, hash }).onConflictDoNothing();
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "cancel", version: nextVersion });
       await tx.insert(events).values({ venueId, type: "cancelled", reservationId: id, version: nextVersion, ...originColumns(origin) });
       if (guest && !(await revokeForCancel(tx, guest.linkId, key))) {
@@ -1634,11 +1636,70 @@ export async function publicTimes(
   date: string,
   partySize: number,
   rules: OnlineRules,
-): Promise<{ times: string[]; reason: PublicEmptyReason | null }> {
+  extras?: PublicSlotOptions,
+): Promise<{ times: string[]; reason: PublicEmptyReason | null; slots?: PublicSlot[] }> {
   const view = await publicView(db, venueId, rules);
-  if (!view) return { times: [], reason: null };
-  const { times, reason } = await publicDayGrid(db, view, date, partySize);
-  return { times, reason };
+  if (!view) return { times: [], reason: null, ...(extras ? { slots: [] } : {}) };
+  const { times, reason, slots } = await publicDayGrid(db, view, date, partySize);
+  if (!extras) return { times, reason };
+  const detailed = await publicSlots(db, view, date, partySize, slots, extras);
+  return { times: detailed.map((s) => s.time), reason, slots: detailed };
+}
+
+export interface PublicSlotOptions {
+  /** The effective public zones (C66), in order. Empty when the slots carry no zones. */
+  zones: string[];
+  /** Keeps only the slots whose `zones` hold it. Must be one of `zones`. */
+  zone?: string;
+  showServiceNames: boolean;
+}
+
+export interface PublicSlot {
+  time: string;
+  zones?: string[];
+  service?: string;
+}
+
+/**
+ * The slots of C66 for the times `publicDayGrid` found free. A zone holds a time when the same rules, run with that
+ * zone, accept it (`evaluateSlot`, as a create in the zone does). The zones run together; a time free for no table
+ * at all is never evaluated again, since a table of a zone is a table.
+ */
+async function publicSlots(
+  db: Db,
+  view: PublicChannelView,
+  date: string,
+  partySize: number,
+  grid: GridSlot[],
+  { zones, zone, showServiceNames }: PublicSlotOptions,
+): Promise<PublicSlot[]> {
+  const times = [...new Set(grid.filter((s) => s.available).map((s) => s.time))].sort();
+  const freeIn = new Map<string, Set<string>>();
+  await Promise.all(
+    zones.map(async (z) => {
+      const free = new Set<string>();
+      for (const time of times) {
+        const reasons = await evaluateSlot(db, view.venue, view.serviceRows, {
+          date,
+          time,
+          partySize,
+          zone: z,
+          walkIn: false,
+        });
+        if (reasons.length === 0) free.add(time);
+      }
+      freeIn.set(z, free);
+    }),
+  );
+  const slots: PublicSlot[] = [];
+  for (const time of times) {
+    const slot: PublicSlot = { time };
+    if (zones.length > 0) slot.zones = zones.filter((z) => freeIn.get(z)!.has(time));
+    if (showServiceNames) slot.service = serviceAt(view.serviceRows, date, time)?.name ?? "";
+    if (zone !== undefined && !slot.zones?.includes(zone)) continue;
+    slots.push(slot);
+  }
+  return slots;
 }
 
 export type PublicDayStatus = "available" | "full" | "closed" | "outside_window";

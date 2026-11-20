@@ -68,6 +68,17 @@ Decision 7 said a lead exists only for a visitor who ticked the consent box, and
 
 After sign-in the form calls `POST /api/demo/consent` with the session cookie and `{ version, locale, name? }`. The server writes the `demo_lead` row for the verified address of that session, never for an address named in the request, and accepts only the current consent text version and a supported locale. The `X-Demo-Consent` and `X-Demo-Locale` headers and the claim cookie no longer exist. A sign-in alone creates no `demo_lead` row. The unsubscribe route of decision 7 is not part of this amendment.
 
+## Amendment, 2026-11-20: how the abuse limits of decision 8 are applied
+
+Decision 8(b) to (f) was implemented as written, with these clarifications and no change of intent.
+
+- **One normalized address, one place.** `normalizeEmail` (`apps/api/src/demo/normalize.ts`) is used by the sandbox rule, the lead table and the link limits. It is NFKC, lower case, the domain in ASCII (punycode) without a trailing dot, and for Gmail and Googlemail the dots and the `+tag` removed. A `+tag` on other domains is kept, because providers differ and stripping it could merge two people.
+- **Leads.** `demo_lead` has a unique `normalized_email`, so a person has one lead under any spelling, and erasure finds it under any spelling. `email` keeps the verified address the visitor last signed in with, which is where outreach goes.
+- **Disposable list.** The deny list is the CC0 list `disposable-email-domains`, vendored with its commit and date, plus a few local additions. Matching is by suffix.
+- **Mail (d).** "The visitor's own verified address" means the account that owns the sandbox. Another admin who joined through an invitation is not reachable.
+- **Webhooks (e).** Creation is refused, and a delivery to a sandbox's endpoint is skipped and switches the endpoint off.
+- **Values for the owner to confirm (c, f).** 500 live sandboxes, 100 new per 24 hours, 150 reservations and 100 guests per sandbox, and the other per-sandbox caps listed in the deployment guide. Each is an environment variable with a default.
+
 ## Alternatives considered
 
 - **One shared demo venue.** Cheapest, but visitors overwrite each other's data and the venue looks broken after the first hour. A nightly reset would still break live sessions. Rejected.

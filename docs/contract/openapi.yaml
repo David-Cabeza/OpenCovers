@@ -382,8 +382,8 @@ paths:
         event (`widget`, `staff`, `api` or `mcp`), so a later modify or cancel
         shows its own origin. `mcp` is a label the key's holder sets, not
         proof. An event stored without an origin has `recorded` false. The
-        top-level `source` and `actor` come from the booking's `bookedVia`
-        and are deprecated. Each entry has the
+        answer has no top-level `source` or `actor` (removed, they exposed the
+        booking's `bookedVia`, which is a staff email for a session). Each entry has the
         `Idempotency-Key` of the write that produced it, or null when the
         write carried none (erasure). For a public booking it is the key the
         client sent. It holds no guest
@@ -1978,7 +1978,7 @@ paths:
         `invalid_request`; with it only the times with a table in that
         zone are returned, and each agrees with a public create in that
         zone. Without either setting the answer is as before and has no
-        `slots`. Built in stage 5 of ADR-0021.
+        `slots`.
       security: []
       parameters:
         - $ref: "#/components/parameters/bookingKey"
@@ -3232,18 +3232,9 @@ components:
 
     ReservationTrace:
       type: object
-      required: [reservationId, source, actor, entries]
+      required: [reservationId, entries]
       properties:
         reservationId: { type: string }
-        source:
-          type: string
-          enum: [widget, staff, api]
-          deprecated: true
-          description: The booking's creator, derived from `bookedVia`. Read each entry's `channel` instead.
-        actor:
-          type: string
-          deprecated: true
-          description: The principal recorded as `bookedVia`. Read each entry's `actor` instead.
         entries:
           type: array
           items: { $ref: "#/components/schemas/TraceEntry" }
@@ -3807,6 +3798,8 @@ components:
         - locale
         - theme
         - privacyNoticeUrl
+        - publicZones
+        - showServiceNames
       properties:
         enabled:
           type: boolean
@@ -3952,8 +3945,7 @@ components:
             come later. The public channel uses the effective public zones:
             the names of this list that are still the zone of at least one
             table. With fewer than two of them nothing changes in the
-            public channel. The API returns this field from stage 5 of
-            ADR-0021, which then lists it in `required`.
+            public channel.
         showServiceNames:
           type: boolean
           default: false
@@ -3961,8 +3953,7 @@ components:
             Whether public availability names the service of each time in
             `slots[].service`, so the widget can group times by service
             (ADR-0021, Q3). Off, the default, no public answer holds a
-            service name (C40). The API returns this field from stage 5 of
-            ADR-0021, which then lists it in `required`.
+            service name (C40).
 
     OnlineBookingUpdate:
       type: object
@@ -4101,6 +4092,7 @@ components:
         - captcha
         - linkResend
         - privacyNoticeUrl
+        - zones
       properties:
         venue: { $ref: "#/components/schemas/PublicVenue" }
         minPartySize:
@@ -4154,8 +4146,7 @@ components:
             The effective public zones (`OnlineBooking.publicZones`), in
             the venue's order, when there are two or more; otherwise `[]`.
             Only these names may be sent as `zone` to availability and the
-            create (C66). The API returns this field from stage 5 of
-            ADR-0021, which then lists it in `required`.
+            create (C66).
 
     PublicAvailability:
       type: object
@@ -4178,8 +4169,7 @@ components:
           description: |
             One entry per time of `times`, in the same order. With the
             `zone` query, only the times with a table in that zone, so
-            `times` is narrowed the same way. The API sends it from stage 5
-            of ADR-0021 (C66).
+            `times` is narrowed the same way (C66).
           items: { $ref: "#/components/schemas/PublicSlot" }
         reason:
           type: [string, "null"]
@@ -4280,7 +4270,7 @@ components:
             value, and any value while the venue has fewer than two
             effective public zones, fails with `invalid_request` and writes
             nothing. Without it the create uses every table, as before
-            (ADR-0021, Q4). Accepted from stage 5 of ADR-0021.
+            (ADR-0021, Q4).
         date: { type: string, format: date }
         time: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "21:30" }
         partySize: { type: integer, minimum: 1 }

@@ -211,45 +211,26 @@ export async function erase(
     return { erasedReservations: 0, erasedGuests: 0, erasedWaitlistEntries: 0, blocklistEntriesKept: 0 };
   }
   return db.transaction(async (tx) => {
-    const byId = guestId
-      ? await tx
-          .select()
-          .from(guests)
-          .where(and(eq(guests.venueId, venueId), eq(guests.id, guestId)))
-          .for("update")
-      : [];
-    const contact = guestId && byId.length === 0 ? guestId : null;
-    const contactKey = contact ? normalizeContact(contact, venueCountry(venue)) : null;
-    const byContact = contactKey
-      ? await tx
-          .select()
-          .from(guests)
-          .where(
-            and(
-              eq(guests.venueId, venueId),
-              contactKey.kind === "email"
-                ? eq(guests.email, contactKey.value)
-                : eq(guests.phone, contactKey.value),
-            ),
-          )
-          .for("update")
-      : [];
-    const byGuest = await withMerged(tx, venueId, [...byId, ...byContact]);
-    const moved = await movedAtMerge(tx, venueId, byGuest);
-
-    const owned = guestId
-      ? or(
-          byGuest.length > 0 ? inArray(reservations.guestId, byGuest.map((g) => g.id)) : undefined,
-          moved.length > 0 ? inArray(reservations.id, moved) : undefined,
-          contact ? eq(reservations.guestContact, contact) : undefined,
-        )
-      : eq(reservations.ownerPrincipal, principal as string);
-    const matches = owned
-      ? await tx
-          .select({ id: reservations.id, version: reservations.version, guestId: reservations.guestId })
-          .from(reservations)
-          .where(and(eq(reservations.venueId, venueId), eq(reservations.erased, false), owned))
-      : [];
+    // Lock order, shared with the other writers: reservation rows (by id), then their links, then the waitlist
+    // entry, then the guests. A first pass reads without locks to learn what to lock; the second pass repeats
+    // the reads under the guest locks and so also sees what committed in between.
+    const first = await resolveTargets(tx, venue, venueId, guestId, principal, false);
+    await lockReservations(tx, venueId, first.matches.map((m) => m.id));
+    await deleteLinks(tx, venueId, first.matches.map((m) => m.id));
+    const erasedEarly = guestId
+      ? await deleteWaitlist(tx, venue, first.contact, [
+          ...first.byGuest.flatMap((g) => [g.email, g.phone]),
+          first.contactKey?.value ?? null,
+        ])
+      : 0;
+    const { contact, contactKey, byGuest, matches } = await resolveTargets(
+      tx,
+      venue,
+      venueId,
+      guestId,
+      principal,
+      true,
+    );
     const linked = guestId
       ? []
       : [...new Set(matches.flatMap((m) => (m.guestId ? [m.guestId] : [])))];
@@ -275,12 +256,14 @@ export async function erase(
     }
     await forgetMergeState(tx, venueId, targetIds);
 
-    const erasedWaitlistEntries = guestId
-      ? await deleteWaitlist(tx, venue, contact, [
-          ...byGuest.flatMap((g) => [g.email, g.phone]),
-          contactKey?.value ?? null,
-        ])
-      : 0;
+    const erasedWaitlistEntries =
+      erasedEarly +
+      (guestId
+        ? await deleteWaitlist(tx, venue, contact, [
+            ...byGuest.flatMap((g) => [g.email, g.phone]),
+            contactKey?.value ?? null,
+          ])
+        : 0);
     return {
       erasedReservations: matches.length,
       erasedGuests: targetIds.length,
@@ -291,6 +274,75 @@ export async function erase(
       ]),
     };
   });
+}
+
+type Matched = { id: string; version: number; guestId: string | null };
+
+/** Row-locks the reservations in id order, so two erasures and the writers that lock one row never cross. */
+async function lockReservations(tx: DbTx, venueId: string, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await tx
+    .select({ id: reservations.id })
+    .from(reservations)
+    .where(and(eq(reservations.venueId, venueId), inArray(reservations.id, ids)))
+    .orderBy(reservations.id)
+    .for("update");
+}
+
+/**
+ * Who and what an erasure covers. With `lock` the guests and the matched reservations are row-locked
+ * (reservations in id order); without it the reads take no lock, to learn what the locks must cover.
+ */
+async function resolveTargets(
+  tx: DbTx,
+  venue: typeof venues.$inferSelect,
+  venueId: string,
+  guestId: string | undefined,
+  principal: string | undefined,
+  lock: boolean,
+) {
+  let idQuery = tx
+    .select()
+    .from(guests)
+    .where(and(eq(guests.venueId, venueId), eq(guests.id, guestId ?? "")))
+    .orderBy(guests.id)
+    .$dynamic();
+  if (lock) idQuery = idQuery.for("update");
+  const byId = guestId ? await idQuery : [];
+  const contact = guestId && byId.length === 0 ? guestId : null;
+  const contactKey = contact ? normalizeContact(contact, venueCountry(venue)) : null;
+  let contactQuery = tx
+    .select()
+    .from(guests)
+    .where(
+      and(
+        eq(guests.venueId, venueId),
+        contactKey?.kind === "email" ? eq(guests.email, contactKey.value) : eq(guests.phone, contactKey?.value ?? ""),
+      ),
+    )
+    .orderBy(guests.id)
+    .$dynamic();
+  if (lock) contactQuery = contactQuery.for("update");
+  const byContact = contactKey ? await contactQuery : [];
+  const byGuest = await withMerged(tx, venueId, [...byId, ...byContact], lock);
+  const moved = await movedAtMerge(tx, venueId, byGuest);
+
+  const owned = guestId
+    ? or(
+        byGuest.length > 0 ? inArray(reservations.guestId, byGuest.map((g) => g.id)) : undefined,
+        moved.length > 0 ? inArray(reservations.id, moved) : undefined,
+        contact ? eq(reservations.guestContact, contact) : undefined,
+      )
+    : eq(reservations.ownerPrincipal, principal as string);
+  let matchQuery = tx
+    .select({ id: reservations.id, version: reservations.version, guestId: reservations.guestId })
+    .from(reservations)
+    .where(and(eq(reservations.venueId, venueId), eq(reservations.erased, false), owned))
+    .orderBy(reservations.id)
+    .$dynamic();
+  if (lock) matchQuery = matchQuery.for("update");
+  const matches: Matched[] = owned ? await matchQuery : [];
+  return { contact, contactKey, byGuest, matches };
 }
 
 export async function eraseReservations(
@@ -330,15 +382,18 @@ export async function eraseReservations(
 
 type Guest = typeof guests.$inferSelect;
 
-export async function withMerged(tx: DbTx, venueId: string, roots: Guest[]): Promise<Guest[]> {
+export async function withMerged(tx: DbTx, venueId: string, roots: Guest[], lock = true): Promise<Guest[]> {
   const found = new Map(roots.map((g) => [g.id, g]));
   let frontier = [...found.keys()];
   while (frontier.length > 0) {
-    const absorbed = await tx
+    let query = tx
       .select()
       .from(guests)
       .where(and(eq(guests.venueId, venueId), inArray(guests.mergedInto, frontier)))
-      .for("update");
+      .orderBy(guests.id)
+      .$dynamic();
+    if (lock) query = query.for("update");
+    const absorbed = await query;
     frontier = absorbed.filter((g) => !found.has(g.id)).map((g) => g.id);
     for (const g of absorbed) found.set(g.id, g);
   }
@@ -386,6 +441,13 @@ async function deleteWaitlist(
     .filter((r) => r.guestContact === contact || wanted.has(normalizeContact(r.guestContact, country)?.value ?? ""))
     .map((r) => r.id);
   if (ids.length === 0) return 0;
+  // Lock the entries before deleting them, the order a seat or a cancel of an entry takes.
+  await tx
+    .select({ id: waitlist.id })
+    .from(waitlist)
+    .where(and(eq(waitlist.venueId, venue.id), inArray(waitlist.id, ids)))
+    .orderBy(waitlist.id)
+    .for("update");
   await tx.delete(waitlist).where(and(eq(waitlist.venueId, venue.id), inArray(waitlist.id, ids)));
   return ids.length;
 }

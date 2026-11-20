@@ -76,6 +76,8 @@ describe("online booking settings", () => {
         locale: "es",
         theme: {},
         privacyNoticeUrl: null,
+        publicZones: [],
+        showServiceNames: false,
       });
     }
     expect(await db.select().from(venueOnlineBooking)).toHaveLength(0);
@@ -113,6 +115,8 @@ describe("online booking settings", () => {
       askConsent: true,
       locale: "en",
       privacyNoticeUrl: "https://www.example.com/privacy",
+      publicZones: [] as string[],
+      showServiceNames: true,
       theme: {
         colors: { primary: "#1f6f5c", onPrimary: "#ffffff", background: "#ffffff", surface: "#f7f7f7", text: "#111111", muted: "#666666", border: "#dddddd" },
         radius: 12,

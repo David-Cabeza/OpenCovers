@@ -122,7 +122,7 @@ import { isCommentary } from "./lib/commentary";
 import { isRating } from "./lib/rating";
 import { isReconfirmation } from "./lib/reconfirmation";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
-import { getOnlineBooking, LOCALES, parseOnlineBookingInput, rotateBookingKey, setOnlineBooking } from "./lib/online-booking";
+import { effectivePublicZones, getOnlineBooking, LOCALES, parseOnlineBookingInput, rotateBookingKey, setOnlineBooking } from "./lib/online-booking";
 import {
   etagMatches,
   etagOf,
@@ -382,11 +382,25 @@ app.get("/v1/public/:bookingKey/availability", async (c) => {
   const rawParty = c.req.query("partySize") ?? "";
   if (!isPublicDate(date) || !/^[1-9]\d{0,5}$/.test(rawParty)) return error(c, "invalid_request");
   const partySize = Number(rawParty);
-  const { times, reason } = await publicTimes(db, target.venue.id, date, partySize, rulesOf(target.settings));
-  return c.json({ date, partySize, times, reason });
+  const { publicZones, showServiceNames } = target.settings;
+  // A venue with nothing stored takes the old path: no extra query, no extra evaluation, the same answer (C66).
+  const zones = await effectivePublicZones(db, target.venue.id, publicZones);
+  const zone = c.req.query("zone");
+  if (zone !== undefined && !zones.includes(zone)) return error(c, "invalid_request");
+  const extras = zones.length > 0 || showServiceNames ? { zones, zone, showServiceNames } : undefined;
+  const { times, reason, slots } = await publicTimes(
+    db,
+    target.venue.id,
+    date,
+    partySize,
+    rulesOf(target.settings),
+    extras,
+  );
+  return c.json({ date, partySize, times, reason, ...(slots ? { slots } : {}) });
 });
 
-// The status of each date for a party (ADR-0021, C63). One venue lookup, then the availability rules per date.
+// The status of each date for a party (ADR-0021, C63). It takes no `zone` (C66): a stray `zone` query is ignored,
+// since a day is `available` when a create without a zone could book. One venue lookup, then the availability rules per date.
 app.get("/v1/public/:bookingKey/days", async (c) => {
   const target = await resolveBookingKey(db, c.req.param("bookingKey"));
   if (!target) return error(c, "venue_not_found");
@@ -417,6 +431,12 @@ app.post("/v1/public/:bookingKey/reservations", async (c) => {
   const input = parsePublicCreate(await c.req.json().catch(() => null), target);
   if (!input) return error(c, "invalid_request");
   const venueId = target.venue.id;
+  if (
+    input.zone !== undefined &&
+    !(await effectivePublicZones(db, venueId, target.settings.publicZones)).includes(input.zone)
+  ) {
+    return error(c, "invalid_request");
+  }
   const replay = await findKey(db, venueId, storedKey(key));
   if (!replay && !challenges.verify(bookingKey, input.challenge, input.solution, key)) {
     return error(c, "invalid_request");
@@ -432,6 +452,7 @@ app.post("/v1/public/:bookingKey/reservations", async (c) => {
       guestContact: input.contact,
       consent: input.consent,
       commentary: input.commentary,
+      zone: input.zone,
       bookedVia: "widget",
       basis: "service",
       ownerPrincipal: "widget",
