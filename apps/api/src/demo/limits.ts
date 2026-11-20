@@ -1,7 +1,7 @@
 // What a sandbox venue may not do (ADR-0022, decision 8). A venue is a sandbox when it has a `demo_sandbox` row, and
 // for nothing else: the answer does not depend on DEMO_MODE, so the restrictions cannot vanish with the flag (audit
 // F9). The API refuses to start with the flag off while that table has rows (demo/guard.ts).
-import { and, count, eq, sql } from "drizzle-orm";
+import { count, eq, sql } from "drizzle-orm";
 import {
   demoSandboxes,
   floorItems,
@@ -12,7 +12,6 @@ import {
   services,
   tables,
   user,
-  venueMemberships,
   waitlist,
 } from "../db/schema";
 import type { Db } from "../lib/venue";
@@ -96,18 +95,20 @@ export function sandboxWebhooksBlocked(db: Db, venueId: string): Promise<boolean
 }
 
 /**
- * Whether the engine may email `to` for this venue. A real venue: always. A sandbox: only the verified address of
- * its owner, so a diner booking in the demo can show a real confirmation without mailing a third party.
+ * Whether the engine may email `to` for this venue. A real venue: always. A sandbox: only the verified address of the
+ * account that owns it (the `demo_sandbox` row), so a diner booking in the demo can show a real confirmation without
+ * mailing a third party. Another admin who joined the sandbox through an invitation is not the owner: their address
+ * is not reachable either. The comparison is exact (case aside), so no spelling trick reaches a second inbox.
  */
 export async function mayEmail(db: Db, venueId: string, to: string): Promise<boolean> {
   if (!(await isSandboxVenue(db, venueId))) return true;
-  const owners = await db
+  const [owner] = await db
     .select({ email: user.email, verified: user.emailVerified })
-    .from(venueMemberships)
-    .innerJoin(user, eq(user.id, venueMemberships.userId))
-    .where(and(eq(venueMemberships.venueId, venueId), eq(venueMemberships.role, "admin")));
-  const target = to.trim().toLowerCase();
-  return owners.some((o) => o.verified && o.email.toLowerCase() === target);
+    .from(demoSandboxes)
+    .innerJoin(user, eq(user.id, demoSandboxes.userId))
+    .where(eq(demoSandboxes.venueId, venueId))
+    .limit(1);
+  return owner !== undefined && owner.verified && owner.email.toLowerCase() === to.trim().toLowerCase();
 }
 
 /**
