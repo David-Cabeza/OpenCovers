@@ -101,11 +101,11 @@ export default defineMessages({
     "onlinebooking.script.label": "Embed code with automatic height (recommended)",
     "onlinebooking.script.copyAria": "Copy script embed code",
     "onlinebooking.script.help":
-      "Use this where your website lets you paste a script. The booking page takes the height it needs. If your website sets a Content-Security-Policy, it must allow the booking page address in {script} and {frame}.",
+      "Use this where your website lets you paste a script. The booking page takes the height it needs. If your website sets a Content-Security-Policy, it must allow the booking page address in {script} and {frame}. The script follows the language of your page.",
     "onlinebooking.snippet.label": "Embed code with a fixed height",
     "onlinebooking.snippet.copyAria": "Copy embed code",
     "onlinebooking.snippet.help":
-      "Use this when your website builder removes scripts. If your website sets a Content-Security-Policy, it must allow the booking page address in {frame}.",
+      "Use this when your website builder removes scripts. If your website sets a Content-Security-Policy, it must allow the booking page address in {frame}. To choose the language, add ?lang=xx to the address (for example ?lang=en).",
     "onlinebooking.snippet.origins": "The embedding website also has to be listed above.",
     "onlinebooking.embedCopied": "Embed code copied",
     "onlinebooking.copyFailed": "Could not copy. Select the text and copy it by hand.",
@@ -231,11 +231,11 @@ export default defineMessages({
     "onlinebooking.script.label": "Código para incrustar con altura automática (recomendado)",
     "onlinebooking.script.copyAria": "Copiar código de incrustación con script",
     "onlinebooking.script.help":
-      "Úsalo donde tu web te deje pegar un script. La página de reservas toma la altura que necesita. Si tu web define una Content-Security-Policy, debe permitir la dirección de la página de reservas en {script} y {frame}.",
+      "Úsalo donde tu web te deje pegar un script. La página de reservas toma la altura que necesita. Si tu web define una Content-Security-Policy, debe permitir la dirección de la página de reservas en {script} y {frame}. El script sigue el idioma de tu página.",
     "onlinebooking.snippet.label": "Código para incrustar con altura fija",
     "onlinebooking.snippet.copyAria": "Copiar código de incrustación",
     "onlinebooking.snippet.help":
-      "Úsalo cuando el editor de tu web elimina los scripts. Si tu web define una Content-Security-Policy, debe permitir la dirección de la página de reservas en {frame}.",
+      "Úsalo cuando el editor de tu web elimina los scripts. Si tu web define una Content-Security-Policy, debe permitir la dirección de la página de reservas en {frame}. Para elegir el idioma, añade ?lang=xx a la dirección (por ejemplo ?lang=en).",
     "onlinebooking.snippet.origins": "La web que incrusta la página también tiene que estar en la lista de arriba.",
     "onlinebooking.embedCopied": "Código copiado",
     "onlinebooking.copyFailed": "No se pudo copiar. Selecciona el texto y cópialo a mano.",

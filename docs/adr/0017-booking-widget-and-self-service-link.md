@@ -552,3 +552,11 @@ The widget config of decision 4, in the `GET /v1/public/{bookingKey}` row of sec
 ## Amendment 2026-11-20: public zones
 
 Section 2 says "No table or zone choice", and the availability row of its table says "no zones". [ADR-0021](0021-widget-day-status-zones-waitlist.md), section 2, reverses the zone part for a venue that publishes two or more zones in the online booking setting `publicZones`. The guest may then pick one of those zones, availability says which of them has a table at each time, and the create books a table in the chosen zone (C66). A venue with fewer than two public zones keeps the rule as written. Tables stay out of the public channel: the public create still refuses `tables`, and no public answer holds a table id or a count. The same amendment adds `publicZones` and `showServiceNames` to section 5.
+
+## Amendment 2026-11-21: `embed.js` passes the page language
+
+`embed.js` now sets `lang` on the iframe address, so the widget shows the language of the page it sits in. The contract does not change: `lang` on `/w/{bookingKey}` already exists (stage 15).
+
+- **Order of precedence.** (1) `data-lang` on the script tag, when it is one of the supported codes. (2) The `lang` of the host page's `<html>` element, reduced to the part before the first `-` or `_` and lower-cased, when that is exactly a supported code. (3) No `lang`, and the venue's `locale` applies. `?scheme=auto` and `lang` can both be present.
+- **Privacy and safety.** The script reads one fixed-vocabulary value from the page, the `<html>` `lang`, and writes into the URL only the matching entry of its own list, never the attribute or page text, as it does for `data-scheme`. Nothing but a height crosses `postMessage`, as before. The list in the script is a fifth place that must match the locales (`LOCALES`, `CATALOGS`); the locales test reads `embed.js` and fails when they differ.
+- **Not changed.** The confirmation email and the self-service link are not affected by this change.

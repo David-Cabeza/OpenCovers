@@ -11,6 +11,10 @@ describe("widget locales", () => {
     const declared = /export const CATALOGS = \{([^}]*)\}/.exec(source)?.[1] ?? "";
     const catalogs = declared.split(",").map((s) => s.trim()).filter(Boolean);
     expect([...catalogs].sort()).toEqual([...LOCALES].sort());
+    const embed = readFileSync(path.resolve(import.meta.dirname, "../../widget/public/embed.js"), "utf8");
+    const langs = /var LANGS = \[([^\]]*)\]/.exec(embed)?.[1] ?? "";
+    const embedded = langs.split(",").map((s) => s.trim().replace(/"/g, "")).filter(Boolean);
+    expect([...embedded].sort()).toEqual([...LOCALES].sort());
     expect(Object.keys(SELF_SERVICE_TITLES).sort()).toEqual([...LOCALES].sort());
   });
 });

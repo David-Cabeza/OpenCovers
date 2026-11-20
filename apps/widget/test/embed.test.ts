@@ -47,9 +47,10 @@ function scriptTag(attributes: Record<string, string>, src = `${WIDGET}/w/embed.
   };
 }
 
-function run(script: ReturnType<typeof scriptTag> | null) {
+function run(script: ReturnType<typeof scriptTag> | null, pageLang?: string) {
   const document = {
     currentScript: script,
+    documentElement: pageLang === undefined ? {} : { lang: pageLang },
     createElement: (tag: string): FakeFrame => {
       expect(tag).toBe("iframe");
       return {
@@ -99,6 +100,51 @@ describe("embed.js", () => {
       run(scriptTag({ "data-key": KEY, "data-scheme": value }));
       expect(page.inserted[0].node.src, value).toBe(`${WIDGET}/w/${KEY}`);
     }
+  });
+
+  it("passes the host page's language when it is a supported code", () => {
+    for (const [lang, code] of [["en", "en"], ["en-GB", "en"], ["ES_es", "es"], ["pt-BR", "pt"], ["CA", "ca"]]) {
+      page.inserted.length = 0;
+      run(scriptTag({ "data-key": KEY }), lang);
+      expect(page.inserted[0].node.src, lang).toBe(`${WIDGET}/w/${KEY}?lang=${code}`);
+    }
+  });
+
+  it("adds no lang for an unsupported, empty or missing page language", () => {
+    for (const lang of ["ja", "", "zh-Hans", "eng", "e", "-en", undefined]) {
+      page.inserted.length = 0;
+      run(scriptTag({ "data-key": KEY }), lang);
+      expect(page.inserted[0].node.src, String(lang)).toBe(`${WIDGET}/w/${KEY}`);
+    }
+  });
+
+  it("lets data-lang beat the page language, and falls back to the page when it is invalid", () => {
+    run(scriptTag({ "data-key": KEY, "data-lang": "fr" }), "en");
+    expect(page.inserted[0].node.src).toBe(`${WIDGET}/w/${KEY}?lang=fr`);
+    page.inserted.length = 0;
+    run(scriptTag({ "data-key": KEY, "data-lang": "klingon" }), "en-GB");
+    expect(page.inserted[0].node.src).toBe(`${WIDGET}/w/${KEY}?lang=en`);
+    page.inserted.length = 0;
+    run(scriptTag({ "data-key": KEY, "data-lang": "xx" }), "ja");
+    expect(page.inserted[0].node.src).toBe(`${WIDGET}/w/${KEY}`);
+  });
+
+  it("never lets hostile language text reach the URL", () => {
+    const hostile = ['en"><script>', "en&x=1", "en/../x", `${"a".repeat(5000)}`, "de?x=1#y"];
+    for (const value of hostile) {
+      page.inserted.length = 0;
+      run(scriptTag({ "data-key": KEY, "data-lang": value }), value);
+      const src = page.inserted[0].node.src;
+      expect(src, value.slice(0, 20)).toMatch(/^https:\/\/book\.example\.com\/w\/pk_[A-Za-z0-9_-]+(\?lang=[a-z]{2})?$/);
+    }
+    page.inserted.length = 0;
+    run(scriptTag({ "data-key": KEY }), "en&x=1");
+    expect(page.inserted[0].node.src).toBe(`${WIDGET}/w/${KEY}`);
+  });
+
+  it("sends both scheme and lang when both apply", () => {
+    run(scriptTag({ "data-key": KEY, "data-scheme": "auto" }), "en-US");
+    expect(page.inserted[0].node.src).toBe(`${WIDGET}/w/${KEY}?scheme=auto&lang=en`);
   });
 
   it("takes the title from data-title", () => {
