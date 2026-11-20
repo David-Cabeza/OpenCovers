@@ -17,6 +17,10 @@ export interface OnlineBooking {
   locale: string;
   theme: Theme;
   privacyNoticeUrl: string | null;
+  /** Zone names guests may pick online: empty, or 2 to 10 names (ADR-0021). */
+  publicZones: string[];
+  /** Whether the widget groups available times by service. */
+  showServiceNames: boolean;
 }
 
 export interface OnlineBookingSaved extends OnlineBooking {
@@ -236,6 +240,9 @@ export interface OnlineBookingForm {
   allowedOrigins: string;
   locale: string;
   privacyNoticeUrl: string;
+  /** Zone names ticked, in the order ticked. */
+  publicZones: string[];
+  showServiceNames: boolean;
   theme: ThemeForm;
 }
 
@@ -258,6 +265,8 @@ export function toForm(s: OnlineBooking): OnlineBookingForm {
     allowedOrigins: s.allowedOrigins.join("\n"),
     locale: s.locale,
     privacyNoticeUrl: s.privacyNoticeUrl ?? "",
+    publicZones: s.publicZones ?? [],
+    showServiceNames: s.showServiceNames ?? false,
     theme: themeToForm(s.theme),
   };
 }
@@ -348,6 +357,12 @@ export function parseForm(
   if (notice !== "" && !isPrivacyNoticeUrl(notice))
     errors.privacyNoticeUrl = t("onlinebooking.error.privacyUrl");
   else if (notice !== (stored.privacyNoticeUrl ?? "")) update.privacyNoticeUrl = notice === "" ? null : notice;
+
+  if (form.publicZones.length === 1) errors.publicZones = t("onlinebooking.error.zonesOne");
+  else if (form.publicZones.length > 10) errors.publicZones = t("onlinebooking.error.zonesMax");
+  else if (!sameSet(form.publicZones, stored.publicZones ?? [])) update.publicZones = [...form.publicZones];
+
+  if (form.showServiceNames !== (stored.showServiceNames ?? false)) update.showServiceNames = form.showServiceNames;
 
   const theme = parseTheme(form.theme, errors);
   if (theme && JSON.stringify(theme) !== JSON.stringify(compact(stored.theme)))

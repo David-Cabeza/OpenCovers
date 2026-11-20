@@ -27,6 +27,8 @@ const SETTINGS = {
   askConsent: false,
   locale: "es",
   privacyNoticeUrl: null as string | null,
+  publicZones: [] as string[],
+  showServiceNames: false,
   theme: {},
 };
 
@@ -718,5 +720,130 @@ describe("OnlineBookingCard", () => {
 
     renderWithApp(<SetupView venueId="v1" role="admin" />);
     expect(await screen.findByText("Online booking")).toBeInTheDocument();
+  });
+});
+
+function tablesWith(...zones: string[]) {
+  return {
+    "GET /v1/venues/v1/tables": {
+      body: {
+        tables: zones.map((zone, i) => ({
+          id: `t${i}`, name: `T${i}`, seats: 4, zone, shape: "round", posX: 0, posY: 0, rotation: 0,
+        })),
+      },
+    },
+  };
+}
+
+describe("OnlineBookingCard public zones and service names", () => {
+  afterEach(resetApiMocks);
+  const save = () => screen.getByRole("button", { name: "Save online booking" });
+
+  it("offers the distinct non-empty zones of the tables and saves two", async () => {
+    const user = userEvent.setup();
+    const api = setup({}, tablesWith("terrace", "indoor", "terrace", ""));
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await screen.findByLabelText("terrace");
+    expect(screen.getByLabelText("indoor")).not.toBeChecked();
+    expect(screen.getAllByLabelText("terrace")).toHaveLength(1);
+    await user.click(screen.getByLabelText("terrace"));
+    await user.click(screen.getByLabelText("indoor"));
+    await user.click(save());
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0]!.body).toEqual({ publicZones: ["terrace", "indoor"] });
+  });
+
+  it("blocks saving exactly one zone with a message", async () => {
+    const user = userEvent.setup();
+    const api = setup({}, tablesWith("terrace", "indoor"));
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await user.click(await screen.findByLabelText("terrace"));
+    await user.click(save());
+    expect(await screen.findByText("Pick at least two zones, or none.")).toBeInTheDocument();
+    expect(api.calls("PUT", PATH)).toHaveLength(0);
+  });
+
+  it("clears the zones with an empty list", async () => {
+    const user = userEvent.setup();
+    const api = setup({ publicZones: ["terrace", "indoor"] }, tablesWith("terrace", "indoor"));
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    const terrace = await screen.findByLabelText("terrace");
+    await waitFor(() => expect(terrace).toBeChecked());
+    await user.click(terrace);
+    await user.click(screen.getByLabelText("indoor"));
+    await user.click(save());
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0]!.body).toEqual({ publicZones: [] });
+  });
+
+  it("blocks more than 10 zones", async () => {
+    const user = userEvent.setup();
+    const names = Array.from({ length: 11 }, (_, i) => `zone${i}`);
+    const api = setup({}, tablesWith(...names));
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await screen.findByLabelText("zone0");
+    for (const n of names) await user.click(screen.getByLabelText(n));
+    await user.click(save());
+    expect(await screen.findByText("At most 10 zones.")).toBeInTheDocument();
+    expect(api.calls("PUT", PATH)).toHaveLength(0);
+  });
+
+  it("disables the field and points to Tables when fewer than two zones exist", async () => {
+    setup({}, tablesWith("terrace", ""));
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    expect(await screen.findByText(/Zones are set per table/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("terrace")).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Public zones" })).toBeDisabled();
+  });
+
+  it("shows a saved zone that no table has, marked, and lets it be removed", async () => {
+    const user = userEvent.setup();
+    const api = setup({ publicZones: ["terrace", "indoor", "garden"] }, tablesWith("terrace", "indoor"));
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    const garden = await screen.findByLabelText(/garden/);
+    expect(garden).toBeChecked();
+    expect(screen.getByText(/no table uses this zone/)).toBeInTheDocument();
+    await user.click(garden);
+    await user.click(save());
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0]!.body).toEqual({ publicZones: ["terrace", "indoor"] });
+  });
+
+  it("toggles show service names and sends it", async () => {
+    const user = userEvent.setup();
+    const api = setup();
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    const sw = screen.getByLabelText("Show service names");
+    expect(sw).not.toBeChecked();
+    await user.click(sw);
+    await user.click(save());
+    await waitFor(() => expect(api.calls("PUT", PATH)).toHaveLength(1));
+    expect(api.calls("PUT", PATH)[0]!.body).toEqual({ showServiceNames: true });
+  });
+
+  it("sends neither field when they are untouched", async () => {
+    const user = userEvent.setup();
+    const api = setup({ publicZones: ["terrace", "indoor"], showServiceNames: true }, tablesWith("terrace", "indoor"));
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    await waitFor(() => expect(screen.getByLabelText("Show service names")).toBeChecked());
+    await user.click(save());
+    expect(await screen.findByText("Nothing to save")).toBeInTheDocument();
+    expect(api.calls("PUT", PATH)).toHaveLength(0);
   });
 });
