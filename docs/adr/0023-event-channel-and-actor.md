@@ -31,6 +31,10 @@ Rows written before this change, and events written by a system sweep (retention
 
 The reservation trace (C65) now returns each entry's `channel`, an `actor` label and `recorded`. A staff user id is turned into the member's display name only for a member of the venue, and never when the name looks like an email. A key reference is returned as stored. The events feed and the webhook payload stay as they were. The `mcp` caveat above still holds and is repeated in the contract.
 
+## Amendment: the trace drops the top-level `source` and `actor`
+
+The trace's top-level `source` and `actor` are removed. `actor` held the booking's `bookedVia`, which is a staff member's email for a booking made from a session, and the engine has no need to expose it. Nothing reads them: the staff app reads each entry, and the MCP server has no trace tool. This is a breaking change to the contract, made on purpose while the project is pre-alpha with no stable version. `bookedVia` stays internal, only to derive `channel` of a `created` entry stored without an origin. C65 now asserts that no value in the answer is an email-like string.
+
 ## Alternatives considered
 
 - The key's `principal` label as actor. It is free text an admin writes and may be an email.
