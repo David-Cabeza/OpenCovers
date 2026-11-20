@@ -4,19 +4,19 @@
   Los hechos sobre la demo salen del código; cada afirmación lleva su fuente en la descripción del PR que añadió esta versión.
 
   Puntos abiertos para quien revise:
-  1. Responsable del tratamiento: identidad legal (persona o sociedad), NIF si aplica y dirección, según el RGPD y la LSSI. Hoy es el marcador [RESPONSABLE].
-  2. Buzón de privacidad: hoy es el marcador [CORREO DE PRIVACIDAD]. Propuesta: privacidad@opencovers.dev con Cloudflare Email Routing hacia el buzón del propietario. No está creado.
+  1. Responsable del tratamiento: David Cabeza, autónomo, con domicilio en Madrid. El NIF y la dirección no están en el repositorio público: se ponen al publicar la web (marcador [RESPONSABLE]).
+  2. Buzón de privacidad: privacidad@opencovers.dev, activo con Cloudflare Email Routing hacia el buzón del propietario (prueba de recepción correcta).
   3. Base jurídica de cada finalidad. Propuesta del equipo, sin validar:
      - cuenta, sesión y restaurante de prueba: ejecución de un contrato o medidas precontractuales a petición del visitante;
      - novedades sobre OpenCovers: consentimiento (casilla, texto v1);
      - prevención de abuso (límites por IP y por correo, registro de sesión): interés legítimo.
   4. Transferencias internacionales: Resend, Google, Cloudflare y GitHub pueden tratar datos fuera del EEE. No hemos verificado sus garantías (cláusulas tipo, marco UE-EE. UU.).
-  5. Región de Resend: el propietario indica que el dominio se creó en la región UE (Irlanda). No consta en el repositorio.
-  6. Rotación de los registros de Docker en el servidor: docs/deploy.md recomienda limitarla pero no fija valores. Confirmar la configuración real.
+  5. Región de Resend: el propietario confirma en el panel que el dominio está en la región UE (Irlanda). No consta en el repositorio.
+  6. Rotación de los registros de Docker en el servidor: 10 MB por archivo y 3 archivos, según lo configurado en el servidor. docs/deploy.md solo la recomienda.
   7. Retirada del consentimiento: todavía no hay enlace de baja; hoy se atiende por correo y el operador borra la fila a mano.
   8. Herramienta con la que se enviarán las novedades a quien consiente: no está decidida.
   9. Datos de terceros en el restaurante de prueba: si el visitante comparte su widget, otra persona puede escribir sus datos. Revisar quién es responsable de esos datos y si basta este aviso.
-  10. Autoridad de control ante la que reclamar (depende de dónde esté establecido el responsable).
+  10. Autoridad de control: se ha puesto la AEPD porque el responsable está establecido en Madrid. Confirmar.
 -->
 <html lang="es">
   <head>
@@ -85,9 +85,9 @@
 
       <h2>Responsable</h2>
       <p>
-        <span class="todo">[RESPONSABLE: nombre y datos de contacto por confirmar]</span><br />
+        <span class="todo">[RESPONSABLE: NIF y dirección se añaden al publicar, no están en el repositorio]</span><br />
         Correo para cualquier asunto de privacidad:
-        <span class="todo">[CORREO DE PRIVACIDAD POR CONFIRMAR]</span>.
+        <a href="mailto:privacidad@opencovers.dev">privacidad@opencovers.dev</a>.
       </p>
 
       <h2>Qué ve cada servicio al visitar la web</h2>
@@ -191,7 +191,7 @@
       </p>
       <p>
         Puedes retirar el consentimiento o pedir que lo borremos en cualquier momento escribiendo a
-        <span class="todo">[CORREO DE PRIVACIDAD POR CONFIRMAR]</span>. Todavía no hay enlace de
+        <a href="mailto:privacidad@opencovers.dev">privacidad@opencovers.dev</a>. Todavía no hay enlace de
         baja automático.
       </p>
 
@@ -214,8 +214,8 @@
         La API no registra las peticiones, ni las direcciones IP ni los correos. Escribe líneas de
         arranque y errores. Un error inesperado puede incluir detalles técnicos, y no descartamos
         que alguno contenga un dato como un correo. El servidor web (Caddy) no tiene activado el
-        registro de accesos. Los registros se rotan en el servidor
-        <span class="todo">[tamaño y número de ficheros por confirmar]</span>.
+        registro de accesos. Los registros se rotan en el servidor: se
+        conservan hasta tres archivos de 10 MB por contenedor.
       </p>
 
       <h3>Lo que se guarda en tu navegador</h3>
@@ -250,7 +250,7 @@
         <li>
           <strong>Resend</strong> envía los correos, así que recibe la dirección de destino y el
           contenido. Región de envío:
-          <span class="todo">[UE (Irlanda) según el propietario, por confirmar]</span>. Consulta la
+          UE (Irlanda). Consulta la
           <a href="https://resend.com/legal/privacy-policy">política de privacidad de Resend</a>.
         </li>
         <li>
@@ -292,8 +292,8 @@
       <h3>Tus derechos</h3>
       <p>
         Puedes pedir acceso, rectificación, borrado, limitación, portabilidad u oponerte, escribiendo
-        a <span class="todo">[CORREO DE PRIVACIDAD POR CONFIRMAR]</span>. También puedes reclamar
-        ante <span class="todo">[AUTORIDAD DE CONTROL POR CONFIRMAR]</span>.
+        a <a href="mailto:privacidad@opencovers.dev">privacidad@opencovers.dev</a>. También puedes reclamar
+        ante <a href="https://www.aepd.es">la Agencia Española de Protección de Datos</a>.
       </p>
 
       <h2>El software OpenCovers</h2>
@@ -307,7 +307,7 @@
       <h2>Contacto</h2>
       <p>
         Para asuntos de privacidad, y para cualquier petición con datos personales, escribe a
-        <span class="todo">[CORREO DE PRIVACIDAD POR CONFIRMAR]</span>. No los publiques en una
+        <a href="mailto:privacidad@opencovers.dev">privacidad@opencovers.dev</a>. No los publiques en una
         incidencia. Para otras dudas sobre el proyecto, abre una incidencia en
         <a href="https://github.com/David-Cabeza/OpenCovers/issues">github.com/David-Cabeza/OpenCovers</a>.
       </p>
