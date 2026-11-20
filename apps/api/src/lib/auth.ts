@@ -18,8 +18,7 @@ import {
   claimForSignup,
   grantClaimedInvitation,
 } from "./invitations";
-import { renderEmailHtml } from "./email-layout";
-import { sendEmail } from "./mailer";
+import { buildMagicLinkEmail, sendEmail } from "./mailer";
 import { LOCALES } from "./online-booking";
 import { decideSignup, signupMode } from "./signup";
 
@@ -40,29 +39,8 @@ export const trustedOrigins = [
 ];
 
 export function magicLinkEmail(locale: string, url: string): { subject: string; text: string; html: string } {
-  const es = locale.startsWith("es");
-  const subject = es ? "Tu enlace para entrar en la demo de OpenCovers" : "Your link to the OpenCovers demo";
-  const intro = es
-    ? "Abre este enlace para entrar en la demo de OpenCovers (caduca en 5 minutos):"
-    : "Open this link to sign in to the OpenCovers demo (it expires in 5 minutes):";
-  const outro = es ? "Si no lo has pedido tu, ignora este mensaje." : "If you did not ask for it, ignore this message.";
-  return {
-    subject,
-    text: `${intro}\n\n${url}\n\n${outro}`,
-    // OpenCovers sends this one itself, so it is fully branded (no venue behind it).
-    html: renderEmailHtml({
-      brand: { kind: "opencovers" },
-      preheader: intro,
-      heading: subject,
-      blocks: [
-        { kind: "paragraph", text: intro },
-        { kind: "button", label: es ? "Entrar en la demo" : "Open the demo", url },
-        { kind: "paragraph", text: outro },
-      ],
-      footer: "OpenCovers · opencovers.dev",
-      lang: es ? "es" : "en",
-    }),
-  };
+  const { subject, text, html } = buildMagicLinkEmail(locale, url);
+  return { subject, text, html };
 }
 
 /** The language of the mail: the first supported language of Accept-Language, else English. */

@@ -3,6 +3,7 @@ import { reservations, sentEmails, venues } from "../db/schema";
 import { mailIdentity, mayEmail } from "../demo/limits";
 import { resolveEmailLocale } from "./email-messages";
 import { normalizeContact } from "./contact";
+import { emailVenue } from "./email-venue";
 import { buildLinkEmail, canSendEmail, sendEmail, type LinkLine } from "./mailer";
 import type { PublicVenue } from "./public-booking";
 import { rotateLink } from "./self-service";
@@ -101,7 +102,7 @@ export async function resendLinks(db: Db, { venue, settings }: PublicVenue, emai
     });
     if (!mail) return;
     if (!(await mayEmail(db, venue.id, mail.to))) return;
-    const { subject, text, html } = buildLinkEmail(mail.lines, resolveEmailLocale(null, settings.locale), venue.name);
+    const { subject, text, html } = buildLinkEmail(mail.lines, resolveEmailLocale(null, settings.locale), emailVenue(venue, settings.theme));
     const identity = await mailIdentity(db, venue.id, venue);
     await sendEmail(identity.apiKey, identity.from, mail.to, subject, text, html);
   } catch (err) {

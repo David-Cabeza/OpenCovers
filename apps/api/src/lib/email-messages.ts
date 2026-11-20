@@ -4,24 +4,110 @@
 // carry no guest name and no typed text (C61), and they are plain text.
 
 const es = {
+  // Words the booking card and the party size share.
+  "party.one": "1 persona",
+  "party.other": "{partySize} personas",
+  "row.day": "Día",
+  "row.time": "Hora",
+  "row.party": "Personas",
+  "row.service": "Servicio",
+  "row.where": "Dónde",
+  "row.phone": "Teléfono",
+  "map.open": "Cómo llegar",
+  "calendar.add": "Añadir al calendario",
+  "calendar.attached": "También la tienes adjunta como archivo .ics.",
+  "calendar.updated": "El archivo .ics adjunto actualiza la reserva en tu calendario.",
+  "calendar.removed": "Abre el archivo .ics adjunto para quitar la reserva de tu calendario.",
+  // The guest's confirmation, after a change, and after a cancel.
+  "confirmation.subject": "Reserva confirmada en {venue}: {dayShort}, {time}",
+  "confirmation.subjectNoVenue": "Reserva confirmada: {dayShort}, {time}",
+  "confirmation.preheader": "{day} a las {time}, {party}. Te esperamos.",
   "confirmation.heading": "Tu reserva está confirmada",
-  "confirmation.subject": "Tu reserva está confirmada - {date} a las {time}",
-  "confirmation.text": "Hola, tu reserva para {partySize} personas el {date} a las {time} está confirmada.",
+  "confirmation.lead": "Todo listo: tienes mesa en {venue} para {party}.",
+  "confirmation.leadNoVenue": "Todo listo: tienes mesa para {party}.",
+  "confirmation.change": "¿Cambio de planes? Avisa al restaurante cuanto antes: otro grupo podrá ocupar tu mesa.",
+  // Stays off until ADR-0017 stage 8 passes legal review (REQ-N2). See `GUEST_MANAGE_LINK_ENABLED`.
+  "confirmation.manage": "Gestionar mi reserva",
+  "confirmation.manageHint": "Desde aquí puedes ver, cambiar o cancelar tu reserva.",
+  "modification.subject": "Reserva modificada en {venue}: {dayShort}, {time}",
+  "modification.subjectNoVenue": "Reserva modificada: {dayShort}, {time}",
+  "modification.preheader": "Nuevo horario: {day} a las {time}, {party}.",
+  "modification.heading": "Tu reserva ha cambiado",
+  "modification.lead": "Hemos actualizado tu reserva en {venue}. Estos son los datos nuevos.",
+  "modification.leadNoVenue": "Hemos actualizado tu reserva. Estos son los datos nuevos.",
+  "cancellation.subject": "Reserva cancelada en {venue}: {dayShort}, {time}",
+  "cancellation.subjectNoVenue": "Reserva cancelada: {dayShort}, {time}",
+  "cancellation.preheader": "Cancelada: {day} a las {time}, {party}.",
   "cancellation.heading": "Tu reserva está cancelada",
-  "cancellation.subject": "Tu reserva está cancelada - {date} a las {time}",
-  "cancellation.text": "Hola, tu reserva del {date} a las {time} ha sido cancelada.",
+  "cancellation.lead": "Hemos cancelado tu reserva en {venue}. Estos eran los datos.",
+  "cancellation.leadNoVenue": "Hemos cancelado tu reserva. Estos eran los datos.",
+  "cancellation.again": "¿Fue un error o quieres otro día? Contacta con el restaurante para reservar de nuevo.",
+  // The venue's notice of a new booking.
+  "notice.subject": "Nueva reserva: {party}, {dayShort} a las {time}",
+  "notice.preheader": "{party}, {day} a las {time}.",
   "notice.heading": "Nueva reserva",
-  "notice.subject": "Nueva reserva - {date} a las {time}",
-  "notice.text": "Nueva reserva para {partySize} personas el {date} a las {time} ({guestName}).",
-  "notice.noName": "sin nombre",
-  "link.subject": "Tu enlace para gestionar tu reserva",
-  "link.intro": "Hola, aquí tienes un enlace nuevo para ver, cambiar o cancelar tu reserva:",
-  "link.outro": "Los enlaces anteriores ya no funcionan.",
-  "link.booking": "{date} a las {time}, {partySize} personas",
-  "link.line": "- {booking}: {url}",
+  "notice.lead": "Hay una reserva nueva en {venue}.",
+  "notice.leadNoVenue": "Hay una reserva nueva.",
+  "notice.where": "La encontrarás en la agenda de OpenCovers.",
+  // The calendar entry.
+  "ics.summary": "Reserva en {venue}",
+  "ics.summaryNoVenue": "Reserva",
+  "ics.cancelled": "Cancelada: {summary}",
+  "ics.description": "Reserva para {party}.",
+  "ics.alarm": "Tu reserva es en 2 horas, a las {time}.",
+  // The self-service link (ADR-0017).
+  "link.subject": "Tu enlace para gestionar tu reserva en {venue}",
+  "link.subjectNoVenue": "Tu enlace para gestionar tu reserva",
+  "link.preheader": "Un enlace nuevo para ver, cambiar o cancelar tu reserva.",
+  "link.heading": "Tu enlace para gestionar tu reserva",
+  "link.intro": "Aquí tienes un enlace nuevo para ver, cambiar o cancelar tu reserva.",
+  "link.intro.many": "Aquí tienes un enlace nuevo para cada una de tus reservas.",
+  "link.outro": "Los enlaces anteriores ya no funcionan. Si no lo has pedido tú, puedes ignorar este mensaje.",
   "link.button": "Gestionar mi reserva",
   "footer": "Reservas con OpenCovers",
+  "footer.why": "Recibes este mensaje porque has hecho una reserva en {venue}.",
+  "footer.whyNoVenue": "Recibes este mensaje porque has hecho una reserva.",
+  "footer.notice": "Aviso automático de las reservas de {venue}.",
 } as const;
+
+/** The OpenCovers-owned sign-in mail of the hosted demo. English and Spanish, reviewed with the site copy. */
+export interface MagicLinkMessages {
+  subject: string;
+  preheader: string;
+  heading: string;
+  intro: string;
+  button: string;
+  outro: string;
+  footer: string;
+}
+
+const MAGIC_LINK: Record<"es" | "en", MagicLinkMessages> = {
+  es: {
+    subject: "Tu enlace para entrar en la demo de OpenCovers",
+    preheader: "Pulsa el enlace para entrar. Caduca en 5 minutos.",
+    heading: "Entra en la demo",
+    intro: "Pulsa el botón para entrar en la demo de OpenCovers. El enlace caduca en 5 minutos.",
+    button: "Entrar en la demo",
+    outro: "Si no lo has pedido tú, ignora este mensaje.",
+    footer: "OpenCovers · opencovers.dev",
+  },
+  en: {
+    subject: "Your link to the OpenCovers demo",
+    preheader: "Tap the link to sign in. It expires in 5 minutes.",
+    heading: "Sign in to the demo",
+    intro: "Tap the button to sign in to the OpenCovers demo. The link expires in 5 minutes.",
+    button: "Open the demo",
+    outro: "If you did not ask for this, you can ignore this message.",
+    footer: "OpenCovers · opencovers.dev",
+  },
+};
+
+/** The sign-in mail text for a locale: Spanish for `es*`, English for everything else. */
+export function magicLinkMessages(locale: string): { lang: "es" | "en"; text: MagicLinkMessages } {
+  return locale.toLowerCase().startsWith("es") ? { lang: "es", text: MAGIC_LINK.es } : { lang: "en", text: MAGIC_LINK.en };
+}
+
+export const MAGIC_LINK_CATALOGS = MAGIC_LINK;
 
 export type EmailMessageId = keyof typeof es;
 
@@ -79,4 +165,42 @@ export function formatEmailDate(date: string, locale: string): string {
     }
   }
   return date;
+}
+
+function formatUtc(date: string, locale: string, options: Intl.DateTimeFormatOptions): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!m) return null;
+  const at = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (at.toISOString().slice(0, 10) !== date) return null;
+  for (const tag of [locale, FALLBACK_EMAIL_LOCALE]) {
+    try {
+      const text = new Intl.DateTimeFormat(tag, { ...options, timeZone: "UTC" }).format(at);
+      // Spanish writes "martes 1 de diciembre", with no comma after the weekday.
+      return tag.startsWith("es") ? text.replace(",", "") : text;
+    } catch {
+      // try the fallback
+    }
+  }
+  return null;
+}
+
+/** `martes 1 de diciembre`: the weekday and day of a calendar date, with no year, for the card and the text. */
+export function formatEmailDay(date: string, locale: string): string {
+  return formatUtc(date, locale, { weekday: "long", day: "numeric", month: "long" }) ?? date;
+}
+
+/** `mar 1 dic`: the short form for subject lines. */
+export function formatEmailDayShort(date: string, locale: string): string {
+  return (formatUtc(date, locale, { weekday: "short", day: "numeric", month: "short" }) ?? date).replace(/\./g, "");
+}
+
+/** `1 persona` or `4 personas`. */
+export function partyLabel(locale: string, partySize: number): string {
+  let category = "other";
+  try {
+    category = new Intl.PluralRules(hasCatalog(locale) ? locale : FALLBACK_EMAIL_LOCALE).select(partySize);
+  } catch {
+    // keep "other"
+  }
+  return message(locale, category === "one" ? "party.one" : "party.other", { partySize });
 }

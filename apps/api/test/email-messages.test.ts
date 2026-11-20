@@ -3,10 +3,13 @@ import {
   EMAIL_CATALOGS,
   FALLBACK_EMAIL_LOCALE,
   formatEmailDate,
+  formatEmailDay,
+  formatEmailDayShort,
   message,
   resolveEmailLocale,
   slotNames,
 } from "../src/lib/email-messages";
+import { DEFAULT_ACCENT } from "../src/lib/email-layout";
 import { buildEmail, buildLinkEmail } from "../src/lib/mailer";
 import { LOCALES } from "../src/lib/online-booking";
 
@@ -30,10 +33,10 @@ describe("email catalogs (ADR-0024)", () => {
     }
   });
 
-  it.each(shipped)("%s has no long dash and no guest name slot outside the notice", (locale) => {
+  it.each(shipped)("%s has no long dash in a subject and no guest-typed slot anywhere", (locale) => {
     for (const [id, text] of Object.entries(EMAIL_CATALOGS[locale])) {
-      if (id.endsWith(".subject")) expect(text, id).not.toContain("—");
-      if (!id.startsWith("notice.")) expect(slotNames(text), id).not.toContain("guestName");
+      if (id.includes(".subject")) expect(text, id).not.toContain("—");
+      expect(slotNames(text), id).not.toContain("guestName");
     }
   });
 });
@@ -54,7 +57,7 @@ describe("resolveEmailLocale", () => {
   });
 
   it("builds emails for a locale without a catalog, in es", () => {
-    const c = { date: "2026-12-24", time: "21:00", partySize: 4, guestName: "", service: "" };
+    const c = { date: "2026-12-24", time: "21:00", partySize: 4, service: "" };
     for (const kind of ["confirmation", "cancellation", "notice"] as const) {
       expect(() => buildEmail(kind, c, unshipped)).not.toThrow();
       expect(buildEmail(kind, c, unshipped)).toEqual(buildEmail(kind, c, "es"));
@@ -77,6 +80,9 @@ describe("formatEmailDate", () => {
 
   it("writes es dates in Spanish and never throws", () => {
     expect(formatEmailDate("2026-11-20", "es")).toBe("viernes, 20 de noviembre de 2026");
+    expect(formatEmailDay("2026-12-01", "es")).toBe("martes 1 de diciembre");
+    expect(formatEmailDayShort("2026-12-01", "es")).toBe("mar 1 dic");
+    expect(formatEmailDay("2026-02-30", "es")).toBe("2026-02-30");
     expect(formatEmailDate("not a date", "es")).toBe("not a date");
     expect(formatEmailDate("2026-13-45", "es")).toBe("2026-13-45");
     expect(() => formatEmailDate("2026-11-20", "!!bad!!")).not.toThrow();
@@ -84,18 +90,18 @@ describe("formatEmailDate", () => {
 });
 
 describe("html", () => {
-  const c = { date: "2026-12-24", time: "21:00", partySize: 4, guestName: "", service: "", venueName: "Casa" };
+  const c = { date: "2026-12-24", time: "21:00", partySize: 4, service: "", venue: { name: "Casa", accent: DEFAULT_ACCENT } };
 
   it("carries the catalog heading and footer, and lang is the resolved locale", () => {
     for (const locale of shipped) {
       for (const kind of ["confirmation", "cancellation", "notice"] as const) {
         const { html } = buildEmail(kind, c, locale);
-        expect(html).toContain(`<html lang="${locale}">`);
+        expect(html).toContain(`<html lang="${locale}"`);
         expect(html).toContain(message(locale, `${kind}.heading`));
         expect(html).toContain(message(locale, "footer"));
       }
       const link = buildLinkEmail([{ date: "2026-12-24", time: "21:00", partySize: 2, url: "https://x.test/r#t" }], locale, "Casa");
-      expect(link.html).toContain(`<html lang="${locale}">`);
+      expect(link.html).toContain(`<html lang="${locale}"`);
       expect(link.html).toContain(message(locale, "link.button"));
     }
   });
@@ -107,13 +113,13 @@ describe("html", () => {
 
 describe("message", () => {
   it("fills slots and leaves unknown ones as written", () => {
-    expect(message("es", "confirmation.text", { partySize: 2, date: "D", time: "T" })).toBe(
-      "Hola, tu reserva para 2 personas el D a las T está confirmada.",
-    );
-    expect(message("es", "link.booking", { date: "D" })).toContain("{time}");
+    expect(message("es", "confirmation.preheader", { day: "D", time: "T", party: "P" })).toBe("D a las T, P. Te esperamos.");
+    expect(message("es", "confirmation.preheader", { day: "D" })).toContain("{time}");
   });
 
-  it("does not read a typed value as a slot", () => {
-    expect(message("es", "notice.text", { partySize: 1, date: "D", time: "T", guestName: "{date}" })).toContain("({date})");
+  it("does not read a value as a slot", () => {
+    expect(message("es", "confirmation.lead", { venue: "{party}", party: "4 personas" })).toBe(
+      "Todo listo: tienes mesa en {party} para 4 personas.",
+    );
   });
 });
