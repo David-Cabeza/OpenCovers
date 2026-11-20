@@ -117,18 +117,31 @@ describe("GET /w/{bookingKey} (C41)", () => {
     const disabled = await makeVenue({ allowedOrigins: ["https://disabled.example"] });
     expect((await putSettings(disabled, { enabled: false })).status).toBe(200);
 
-    const answers = await Promise.all(
-      ["pk_AAAAAAAAAAAAAAAAAAAAAA", "not-a-key", rotated.key, disabled.key, `${disabled.key}?lang=en`].map((key) => page(key)),
-    );
-    const [first, ...rest] = await Promise.all(
-      answers.map(async (res) => ({ status: res.status, headers: headersOf(res), body: await res.text() })),
-    );
+    const keys = ["pk_AAAAAAAAAAAAAAAAAAAAAA", "not-a-key", rotated.key, disabled.key];
+    const read = async (res: Response) => ({ status: res.status, headers: headersOf(res), body: await res.text() });
+    const [first, ...rest] = await Promise.all(keys.map((key) => page(key).then(read)));
     expect(first.status).toBe(404);
     expect(first.headers["content-security-policy"]).toBe(`${POLICY}; frame-ancestors 'none'`);
     expect(first.headers["x-frame-options"]).toBeUndefined();
     expect(first.headers["x-robots-tag"]).toBe("noindex");
     expect(first.body).toContain('<meta name="robots" content="noindex">');
     for (const other of rest) expect(other).toEqual(first);
+
+    // The page depends only on the request's language, never on why the key failed: no oracle.
+    for (const query of ["?lang=en", "?lang=fr"]) {
+      const [one, ...others] = await Promise.all(keys.map((key) => page(`${key}${query}`).then(read)));
+      for (const other of others) expect(other).toEqual(one);
+      expect(one.body).toContain(`<html lang="${query.slice(6)}">`);
+    }
+    const withHeader = (key: string) => app.request(`/w/${key}`, { headers: { "accept-language": "de-DE,de;q=0.9" } }).then(read);
+    const [de, ...deOthers] = await Promise.all(keys.map(withHeader));
+    for (const other of deOthers) expect(other).toEqual(de);
+    expect(de.body).toContain('<html lang="de">');
+    // A different language changes the text and nothing else.
+    const en = await page(`${keys[0]}?lang=en`).then(read);
+    expect(en.status).toBe(first.status);
+    expect(en.headers).toEqual(first.headers);
+    expect(en.body).not.toBe(first.body);
 
     expect((await page(rotated.key.replace(/.$/, "x"))).status).toBe(404);
     const fresh = (await (await app.request(`/v1/venues/${rotated.id}/online-booking`, { headers: { apikey: rotated.admin } })).json())
