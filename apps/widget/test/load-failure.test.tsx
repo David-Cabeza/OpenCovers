@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../src/App";
@@ -47,7 +47,8 @@ describe("a config that does not load", () => {
     render(<App api={api} t={t} locale="es" />);
 
     const heading = await screen.findByRole("heading", { name: t("loadFailed.title") });
-    expect(document.activeElement).toBe(heading);
+    // Focus moves in an effect that runs after the heading is found, so wait for it.
+    await waitFor(() => expect(document.activeElement).toBe(heading));
     expect(screen.getByRole("alert").textContent).toBe(t("loadFailed.body"));
     expect(screen.queryByText(t("unavailable.body"))).toBeNull();
 
