@@ -319,20 +319,16 @@ $dc up -d --build --wait
 
 **What the repository checks do not cover.** A real deploy to a server, Let's Encrypt, Resend delivery and Google sign-in need your accounts. The repository checks cover the compose file, the Caddy host rules (`STAFF_HOST=demo.opencovers.dev WIDGET_HOST=book.demo.opencovers.dev bash scripts/check-caddy-widget.sh`) and the workflow's syntax.
 
-#### Privacy notice wording for the demo
+#### Privacy notice for the demo
 
-`apps/site/public/privacidad.html` does not mention the demo yet, and the demo stores visitor data. Before opening the demo, add wording like this and have it reviewed. It is a draft, not legal advice.
+The demo's privacy notice is the "La demo" section of [`apps/site/public/privacidad.html`](../apps/site/public/privacidad.html) (live at `https://opencovers.dev/privacidad.html#demo`). It is the one source of truth: change the page, not a copy here. It is a draft for legal review, not legal advice. Its open points (controller, privacy mailbox, legal basis, international transfers, Resend region, log rotation) are listed in a comment at the top of the file and as `[...]` placeholders in the text.
 
-> **Demo alojada.** Si pruebas la demo en demo.opencovers.dev guardamos tu dirección de correo (o la que verifica Google) para crear tu restaurante de prueba y enviarte el enlace de acceso. Tu restaurante de prueba y tu cuenta se borran tras 14 días sin acceso. Si marcas la casilla de contacto, guardamos además tu correo, tu nombre si lo das, el idioma y la fecha, para escribirte sobre OpenCovers, durante un máximo de 12 meses desde tu último acceso. Puedes retirar el consentimiento o pedir el borrado escribiendo a [contacto].
->
-> **Hosted demo.** If you try the demo at demo.opencovers.dev we store your email address (or the one Google verifies) to create your sandbox restaurant and send you the sign-in link. The sandbox and your account are deleted after 14 days without sign-in. If you tick the contact box we also keep your email, your name if you give one, the language and the date, to write to you about OpenCovers, for at most 12 months after your last sign-in. You can withdraw consent or ask for erasure by writing to [contact].
-
-Resend (email) and Google (sign-in) process that data, so the privacy page should name them. The consent text version is `v1` (`CONSENT_TEXT_VERSION` in `apps/api/src/demo/settings.ts`). A new wording needs a new version, which the sign-in form and `POST /api/demo/consent` must send together.
+The consent text version is `v1` (`CONSENT_TEXT_VERSION` in `apps/api/src/demo/settings.ts`). A new wording needs a new version, which the sign-in form and `POST /api/demo/consent` must send together, and the page's "Si aceptas recibir novedades" paragraph must name it.
 
 #### Launch checklist
 
-- [ ] Legal review of the consent text (`v1`) and of the privacy notice above, including the legal basis for storing leads and for sending news, and who the controller is. Do not open the demo to the public before this.
-- [ ] `privacidad.html` carries the demo wording, with a real contact address.
+- [ ] Legal review of the consent text (`v1`) and of the privacy notice (`privacidad.html`, section "La demo"), including the legal basis for storing leads and for sending news, and who the controller is. Do not open the demo to the public before this.
+- [ ] `privacidad.html` describes the demo (done), and its `[...]` placeholders are filled: the controller, a working privacy address, the legal basis, the transfers, the Resend region and the log rotation.
 - [ ] DNS records resolve, and ports 80 and 443 are open on the server and nothing else.
 - [ ] Resend domain verified, and a test magic link reaches a real inbox (check spam too).
 - [ ] Google client created, its redirect URI added, and a test sign-in works (or both Google variables left empty).

@@ -1,4 +1,23 @@
 <!doctype html>
+<!--
+  BORRADOR PARA REVISIÓN LEGAL. No es asesoramiento jurídico y nada de esta página es definitivo.
+  Los hechos sobre la demo salen del código; cada afirmación lleva su fuente en la descripción del PR que añadió esta versión.
+
+  Puntos abiertos para quien revise:
+  1. Responsable del tratamiento: identidad legal (persona o sociedad), NIF si aplica y dirección, según el RGPD y la LSSI. Hoy es el marcador [RESPONSABLE].
+  2. Buzón de privacidad: hoy es el marcador [CORREO DE PRIVACIDAD]. Propuesta: privacidad@opencovers.dev con Cloudflare Email Routing hacia el buzón del propietario. No está creado.
+  3. Base jurídica de cada finalidad. Propuesta del equipo, sin validar:
+     - cuenta, sesión y restaurante de prueba: ejecución de un contrato o medidas precontractuales a petición del visitante;
+     - novedades sobre OpenCovers: consentimiento (casilla, texto v1);
+     - prevención de abuso (límites por IP y por correo, registro de sesión): interés legítimo.
+  4. Transferencias internacionales: Resend, Google, Cloudflare y GitHub pueden tratar datos fuera del EEE. No hemos verificado sus garantías (cláusulas tipo, marco UE-EE. UU.).
+  5. Región de Resend: el propietario indica que el dominio se creó en la región UE (Irlanda). No consta en el repositorio.
+  6. Rotación de los registros de Docker en el servidor: docs/deploy.md recomienda limitarla pero no fija valores. Confirmar la configuración real.
+  7. Retirada del consentimiento: todavía no hay enlace de baja; hoy se atiende por correo y el operador borra la fila a mano.
+  8. Herramienta con la que se enviarán las novedades a quien consiente: no está decidida.
+  9. Datos de terceros en el restaurante de prueba: si el visitante comparte su widget, otra persona puede escribir sus datos. Revisar quién es responsable de esos datos y si basta este aviso.
+  10. Autoridad de control ante la que reclamar (depende de dónde esté establecido el responsable).
+-->
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
@@ -6,15 +25,15 @@
     <title>Política de privacidad — OpenCovers</title>
     <meta
       name="description"
-      content="Qué datos trata la web opencovers.dev: ninguno propio. Qué ven GitHub Pages, Google Fonts y la API de GitHub."
+      content="Qué datos trata OpenCovers: ninguno propio en la web opencovers.dev; en la demo demo.opencovers.dev, tu correo, tu sesión y lo que escribas en tu restaurante de prueba, que se borra a los 14 días sin uso."
     />
     <link rel="canonical" href="https://opencovers.dev/privacidad.html" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#0e7c5a" />
     <style>
-      :root { --bg: #f7f7f5; --ink: #000; --muted: #55554f; --accent: #0e7c5a; }
+      :root { --bg: #f7f7f5; --ink: #000; --muted: #55554f; --accent: #0e7c5a; --mark: #fff1b8; }
       @media (prefers-color-scheme: dark) {
-        :root { --bg: #111210; --ink: #f2f2ee; --muted: #a8a8a0; --accent: #4fd1a5; }
+        :root { --bg: #111210; --ink: #f2f2ee; --muted: #a8a8a0; --accent: #4fd1a5; --mark: #4a3f10; }
       }
       * { box-sizing: border-box; }
       body {
@@ -26,13 +45,16 @@
         line-height: 1.6;
       }
       main { max-width: 42rem; margin: 0 auto; padding: 48px 16px 96px; }
-      h1, h2 { font-family: "League Spartan", "Helvetica Neue", Arial, sans-serif; letter-spacing: -0.03em; line-height: 1.05; }
+      h1, h2, h3 { font-family: "League Spartan", "Helvetica Neue", Arial, sans-serif; letter-spacing: -0.03em; line-height: 1.05; }
       h1 { font-size: clamp(2.25rem, 8vw, 3.5rem); margin: 0 0 8px; }
       h2 { font-size: 1.5rem; margin: 40px 0 8px; }
+      h3 { font-size: 1.1875rem; margin: 28px 0 8px; }
       p, ul { margin: 0 0 16px; }
       ul { padding-left: 1.25rem; }
-      a { color: var(--accent); }
+      a { color: var(--accent); overflow-wrap: anywhere; }
+      code { font-size: 0.9em; overflow-wrap: anywhere; }
       .muted { color: var(--muted); }
+      .todo { background: var(--mark); color: var(--ink); padding: 0 4px; border-radius: 3px; }
       :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
     </style>
   </head>
@@ -40,12 +62,32 @@
     <main>
       <p><a href="/">← OpenCovers</a></p>
       <h1>Política de privacidad</h1>
-      <p class="muted">Última actualización: 16 de noviembre de 2026.</p>
+      <p class="muted">Última actualización: 20 de noviembre de 2026.</p>
+      <p class="muted">Borrador en revisión. Lo que aparece entre corchetes está por confirmar.</p>
 
       <h2>Resumen</h2>
+      <p>Esta política cubre tres cosas distintas:</p>
+      <ul>
+        <li>
+          <strong>La web opencovers.dev</strong> no tiene cuentas, formularios, analítica ni cookies
+          propias. OpenCovers no recoge datos personales de quienes la visitan.
+        </li>
+        <li>
+          <strong>La demo en demo.opencovers.dev</strong> sí trata datos: tu correo, tu sesión y lo
+          que escribas en tu restaurante de prueba. Todo eso se borra a los 14 días sin entrar. Si
+          aceptas recibir novedades, guardamos tu correo hasta 12 meses desde tu último acceso.
+        </li>
+        <li>
+          <strong>El software OpenCovers</strong>, instalado por un restaurante en su propia
+          infraestructura, queda fuera: ese restaurante es el responsable de sus datos.
+        </li>
+      </ul>
+
+      <h2>Responsable</h2>
       <p>
-        La web <strong>opencovers.dev</strong> no tiene cuentas, formularios, analítica ni cookies
-        propias. OpenCovers no recoge datos personales de quienes la visitan.
+        <span class="todo">[RESPONSABLE: nombre y datos de contacto por confirmar]</span><br />
+        Correo para cualquier asunto de privacidad:
+        <span class="todo">[CORREO DE PRIVACIDAD POR CONFIRMAR]</span>.
       </p>
 
       <h2>Qué ve cada servicio al visitar la web</h2>
@@ -74,16 +116,199 @@
         sobre el dominio opencovers.dev y no identifican a visitantes concretos.
       </p>
 
+      <h2 id="demo">La demo (demo.opencovers.dev)</h2>
+      <p>
+        La demo te da un restaurante de prueba propio. Para entrar necesitas una cuenta, con un
+        enlace por correo o con Google. No hay registro con contraseña.
+      </p>
+
+      <h3>Tu cuenta y tu sesión</h3>
+      <ul>
+        <li>
+          <strong>Con enlace por correo</strong> guardamos tu dirección. El enlace caduca a los 5
+          minutos y solo sirve una vez. Mientras está pendiente guardamos tu dirección y una huella
+          del enlace, nunca el enlace en claro.
+        </li>
+        <li>
+          <strong>Con Google</strong> pedimos los permisos básicos (<code>openid</code>,
+          <code>email</code>, <code>profile</code>). Google nos da tu correo verificado, tu nombre,
+          la dirección de tu foto de perfil y los identificadores y tokens de ese inicio de sesión.
+          Guardamos todo ello con tu cuenta. Si Google no confirma que tu correo está verificado, no
+          entras.
+        </li>
+        <li>
+          <strong>Cada sesión</strong> guarda la fecha, la dirección IP y el navegador
+          (<em>user agent</em>) desde los que entraste. La sesión dura 7 días y se renueva al usarla.
+        </li>
+        <li>
+          Para que cada persona tenga un solo restaurante de prueba guardamos también tu correo
+          normalizado (en minúsculas y, en Gmail, sin puntos ni <code>+etiqueta</code>).
+        </li>
+      </ul>
+
+      <h3>Tu restaurante de prueba</h3>
+      <p>
+        Se crea con datos inventados (mesas, turnos, clientes y reservas de ejemplo). Lo que tú
+        añadas se guarda en él: reservas, clientes, lista de espera, notas, bloqueos y claves de API.
+        También lo que se escriba en su widget de reservas como comensal: nombre, un correo o un
+        teléfono, el comentario y, si se marca, la casilla de comunicaciones del restaurante. Si
+        compartes el enlace de tu widget, lo que escriba otra persona lo verás tú en tu restaurante.
+        Un bloqueo guarda una huella del correo o del teléfono calculada con una clave secreta, no el
+        dato.
+      </p>
+      <p>
+        Tu restaurante y tu cuenta, con todo lo anterior, se borran cuando pasan 14 días desde tu
+        último acceso. Una tarea diaria hace el borrado. Las cuentas que no llegaron a tener
+        restaurante se borran a los 14 días. La base de datos de la demo no tiene copias de
+        seguridad.
+      </p>
+
+      <h3>Correos que envía la demo</h3>
+      <ul>
+        <li>
+          <strong>El enlace de acceso</strong>, a la dirección que escribes. Lleva el enlace y avisa
+          de que caduca en 5 minutos. Para pedirlo, tu navegador resuelve antes un pequeño cálculo
+          (prueba de trabajo) que frena el envío automático.
+        </li>
+        <li>
+          <strong>Los avisos de reservas</strong> de tu restaurante de prueba (confirmación,
+          cancelación, nueva reserva y enlace para gestionar una reserva) solo llegan a tu correo
+          verificado. Si un comensal escribe otra dirección, no se le envía nada. Llevan el nombre
+          del restaurante, la fecha, la hora y el número de personas; el aviso de nueva reserva
+          lleva el nombre del comensal, y el de gestión, los enlaces.
+        </li>
+      </ul>
+      <p>La demo no envía correos a nadie más ni invitaciones del equipo.</p>
+
+      <h3>Si aceptas recibir novedades</h3>
+      <p>
+        La casilla «Acepto recibir novedades sobre OpenCovers» es opcional y la demo funciona igual
+        sin ella. Si la marcas, guardamos tu correo (tal como entras y normalizado), cómo entraste
+        (enlace o Google), el idioma, la fecha de alta, la de tu último acceso y la versión del texto
+        que aceptaste (<code>v1</code>). El formulario no pide nombre. Este registro no depende de
+        tu restaurante de prueba: sigue después de que se borre, hasta 12 meses desde tu último
+        acceso, y entonces se elimina.
+      </p>
+      <p>
+        Puedes retirar el consentimiento o pedir que lo borremos en cualquier momento escribiendo a
+        <span class="todo">[CORREO DE PRIVACIDAD POR CONFIRMAR]</span>. Todavía no hay enlace de
+        baja automático.
+      </p>
+
+      <h3>Prevención de abuso</h3>
+      <ul>
+        <li>
+          Límites de peticiones por dirección IP (en IPv6, por bloque <code>/48</code>) y por correo
+          normalizado. Se cuentan en la memoria del servidor, no se escriben en la base de datos ni
+          en los registros y se pierden al reiniciar. Con la configuración por defecto, el más largo
+          dura un día.
+        </li>
+        <li>
+          Una lista de dominios de correo desechable que está en el propio servidor. Comprobarla no
+          envía tu dirección a nadie.
+        </li>
+      </ul>
+
+      <h3>Registros del servidor</h3>
+      <p>
+        La API no registra las peticiones, ni las direcciones IP ni los correos. Escribe líneas de
+        arranque y errores. Un error inesperado puede incluir detalles técnicos, y no descartamos
+        que alguno contenga un dato como un correo. El servidor web (Caddy) no tiene activado el
+        registro de accesos. Los registros se rotan en el servidor
+        <span class="todo">[tamaño y número de ficheros por confirmar]</span>.
+      </p>
+
+      <h3>Lo que se guarda en tu navegador</h3>
+      <ul>
+        <li>
+          Cookie <code>__Secure-better-auth.session_token</code>: tu sesión. Es imprescindible para
+          entrar, no es accesible desde JavaScript y dura 7 días.
+        </li>
+        <li>
+          Cookie <code>__Secure-better-auth.state</code>: solo durante el inicio con Google, 5
+          minutos, para completar ese inicio de forma segura.
+        </li>
+        <li>
+          En el almacenamiento local: <code>opencovers-ui</code> (restaurante elegido, idioma, aspecto
+          del plano y menú lateral), <code>theme</code> (modo claro u oscuro),
+          <code>oc-demo-checklist:…</code> (la lista de la visita guiada) y
+          <code>oc-demo-consent</code> (tu casilla de novedades, hasta que se envía al entrar).
+        </li>
+      </ul>
+      <p>
+        No hay cookies de analítica ni de publicidad. El widget de reservas no guarda cookies ni
+        datos en tu navegador.
+      </p>
+
+      <h3>Quién más trata estos datos</h3>
+      <ul>
+        <li>
+          <strong>Hetzner Cloud</strong> aloja el servidor y su base de datos, en Helsinki
+          (Finlandia). Consulta la
+          <a href="https://www.hetzner.com/legal/privacy-policy">política de privacidad de Hetzner</a>.
+        </li>
+        <li>
+          <strong>Resend</strong> envía los correos, así que recibe la dirección de destino y el
+          contenido. Región de envío:
+          <span class="todo">[UE (Irlanda) según el propietario, por confirmar]</span>. Consulta la
+          <a href="https://resend.com/legal/privacy-policy">política de privacidad de Resend</a>.
+        </li>
+        <li>
+          <strong>Google</strong> gestiona el inicio de sesión con Google, si lo usas, y sirve las
+          tipografías de la aplicación de la demo, por lo que tu navegador se conecta a sus
+          servidores. Consulta la
+          <a href="https://policies.google.com/privacy?hl=es">política de privacidad de Google</a>.
+        </li>
+        <li>
+          <strong>Cloudflare</strong> da el servicio de DNS del dominio. Los nombres de la demo
+          apuntan directamente al servidor, así que tu tráfico no pasa por Cloudflare. Consulta la
+          <a href="https://www.cloudflare.com/es-es/privacypolicy/">política de privacidad de Cloudflare</a>.
+        </li>
+        <li>
+          <strong>GitHub</strong> aloja esta web y el código. No recibe datos de la demo.
+        </li>
+      </ul>
+      <p>
+        Transferencias fuera del Espacio Económico Europeo y sus garantías:
+        <span class="todo">[por confirmar en la revisión]</span>.
+      </p>
+
+      <h3>Para qué y con qué base</h3>
+      <ul>
+        <li>
+          Darte la cuenta y el restaurante de prueba:
+          <span class="todo">[BASE JURÍDICA POR CONFIRMAR]</span>.
+        </li>
+        <li>
+          Enviarte novedades sobre OpenCovers: tu consentimiento
+          <span class="todo">[POR CONFIRMAR]</span>.
+        </li>
+        <li>
+          Frenar el abuso de la demo:
+          <span class="todo">[BASE JURÍDICA POR CONFIRMAR]</span>.
+        </li>
+      </ul>
+
+      <h3>Tus derechos</h3>
+      <p>
+        Puedes pedir acceso, rectificación, borrado, limitación, portabilidad u oponerte, escribiendo
+        a <span class="todo">[CORREO DE PRIVACIDAD POR CONFIRMAR]</span>. También puedes reclamar
+        ante <span class="todo">[AUTORIDAD DE CONTROL POR CONFIRMAR]</span>.
+      </p>
+
       <h2>El software OpenCovers</h2>
       <p>
         OpenCovers es un motor de reservas de código abierto que cada restaurante instala en su
         propia infraestructura. Quien lo instala es el responsable de los datos de sus clientes. Este
-        proyecto no tiene acceso a ellos. Esta política solo cubre la web opencovers.dev.
+        proyecto no tiene acceso a ellos. Esta política cubre la web opencovers.dev y la demo
+        demo.opencovers.dev, no esas instalaciones.
       </p>
 
       <h2>Contacto</h2>
       <p>
-        Para cualquier duda sobre privacidad, abre una incidencia en
+        Para asuntos de privacidad, y para cualquier petición con datos personales, escribe a
+        <span class="todo">[CORREO DE PRIVACIDAD POR CONFIRMAR]</span>. No los publiques en una
+        incidencia. Para otras dudas sobre el proyecto, abre una incidencia en
         <a href="https://github.com/David-Cabeza/OpenCovers/issues">github.com/David-Cabeza/OpenCovers</a>.
       </p>
     </main>
