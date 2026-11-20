@@ -44,6 +44,17 @@ export default defineMessages({
     "onlinebooking.privacy.label": "Privacy notice address",
     "onlinebooking.privacy.help":
       "Optional. Your own privacy notice: an https address with no spaces. You write and host it. OpenCovers writes no legal text. Leave it empty to show no link.",
+    "onlinebooking.guest.title": "Guest choices",
+    "onlinebooking.guest.description": "What guests can choose in the booking page.",
+    "onlinebooking.zones.legend": "Public zones",
+    "onlinebooking.zones.help":
+      "Guests choose a zone online only when two or more are selected. With none or one selected, the booking page shows no zone choice.",
+    "onlinebooking.zones.fewer":
+      "Zones are set per table. Give your tables at least two different zones in the Tables setup to offer a choice.",
+    "onlinebooking.zones.unused": "no table uses this zone",
+    "onlinebooking.serviceNames.label": "Show service names",
+    "onlinebooking.serviceNames.help":
+      "When on, available times are grouped by service (for example Lunch, Dinner) in the booking page.",
     "onlinebooking.embedding.title": "Embedding",
     "onlinebooking.embedding.description": "Where the booking page may appear.",
     "onlinebooking.origins.label": "Websites that may embed the page",
@@ -126,6 +137,8 @@ export default defineMessages({
     "onlinebooking.error.weekdays": "Pick at least one day.",
     "onlinebooking.error.services": "Pick at least one service.",
     "onlinebooking.error.privacyUrl": "An https address with no spaces, up to 2048 characters.",
+    "onlinebooking.error.zonesOne": "Pick at least two zones, or none.",
+    "onlinebooking.error.zonesMax": "At most 10 zones.",
     "onlinebooking.error.radius": "Whole number of pixels from 0 to 24.",
     "onlinebooking.error.darkRadius": "Whole number of pixels from 0 to 24, or empty for the same as light mode.",
     "onlinebooking.error.logoUrl": "An https address of an image, with no spaces, up to 2048 characters.",
@@ -174,6 +187,17 @@ export default defineMessages({
     "onlinebooking.privacy.label": "Dirección del aviso de privacidad",
     "onlinebooking.privacy.help":
       "Opcional. Tu propio aviso de privacidad: una dirección https sin espacios. Lo redactas y lo alojas tú. OpenCovers no escribe textos legales. Déjala vacía para no mostrar ningún enlace.",
+    "onlinebooking.guest.title": "Opciones del cliente",
+    "onlinebooking.guest.description": "Lo que el cliente puede elegir en la página de reservas.",
+    "onlinebooking.zones.legend": "Zonas públicas",
+    "onlinebooking.zones.help":
+      "El cliente elige zona en línea solo cuando hay dos o más seleccionadas. Con ninguna o una, la página de reservas no muestra la elección de zona.",
+    "onlinebooking.zones.fewer":
+      "Las zonas se asignan por mesa. Da a tus mesas al menos dos zonas distintas en la configuración de Mesas para ofrecer una elección.",
+    "onlinebooking.zones.unused": "ninguna mesa usa esta zona",
+    "onlinebooking.serviceNames.label": "Mostrar los nombres de los servicios",
+    "onlinebooking.serviceNames.help":
+      "Si está activado, los horarios disponibles se agrupan por servicio (por ejemplo Comida, Cena) en la página de reservas.",
     "onlinebooking.embedding.title": "Incrustación",
     "onlinebooking.embedding.description": "Dónde puede aparecer la página de reservas.",
     "onlinebooking.origins.label": "Webs que pueden incrustar la página",
@@ -256,6 +280,8 @@ export default defineMessages({
     "onlinebooking.error.weekdays": "Elige al menos un día.",
     "onlinebooking.error.services": "Elige al menos un servicio.",
     "onlinebooking.error.privacyUrl": "Una dirección https sin espacios, de hasta 2048 caracteres.",
+    "onlinebooking.error.zonesOne": "Elige al menos dos zonas, o ninguna.",
+    "onlinebooking.error.zonesMax": "Como máximo 10 zonas.",
     "onlinebooking.error.radius": "Un número entero de píxeles de 0 a 24.",
     "onlinebooking.error.darkRadius": "Un número entero de píxeles de 0 a 24, o vacío para igualar el modo claro.",
     "onlinebooking.error.logoUrl": "Una dirección https de una imagen, sin espacios, de hasta 2048 caracteres.",

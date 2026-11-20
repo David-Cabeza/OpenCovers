@@ -30,6 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useT, type MessageKey } from "@/i18n";
 import { useOnlineBooking } from "@/hooks/use-online-booking";
 import { useServices } from "@/hooks/use-services";
+import { useTables } from "@/hooks/use-tables";
 import { useVenues } from "@/hooks/use-venues";
 import { api } from "@/lib/api";
 import { errorMessage, isApiError } from "@/lib/error-message";
@@ -137,23 +138,30 @@ function ThemePreview({
 function Chip({
   checked,
   onChange,
+  disabled,
+  verbatim,
   children,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  /** Shows the label as written. A zone name is an exact identifier, so its first letter is not capitalised. */
+  verbatim?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <label className="cursor-pointer">
+    <label className={disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         className="peer sr-only"
       />
       <span
         className={cn(
-          "inline-flex items-center rounded-full border px-3.5 py-1.5 text-sm font-medium first-letter:uppercase transition-colors",
+          "inline-flex items-center rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+          !verbatim && "first-letter:uppercase",
           "hover:bg-muted peer-checked:border-primary peer-checked:bg-accent peer-checked:text-accent-foreground",
           "peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50",
         )}
@@ -179,6 +187,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
   const { data, isPending, isError, error: loadError, isRefetching, refetch } = useOnlineBooking(venueId);
   const { data: serviceData } = useServices(venueId);
   const { data: venueData } = useVenues();
+  const { data: tableData } = useTables(venueId);
   const services = serviceData?.services ?? [];
   const serviceNames = services.map((s) => s.name);
   const venueName = venueData?.venues.find((v) => v.id === venueId)?.name;
@@ -296,6 +305,14 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
     setForm({ ...form, services: next });
   }
 
+  function toggleZone(name: string, on: boolean) {
+    if (!form) return;
+    setForm({
+      ...form,
+      publicZones: on ? [...new Set([...form.publicZones, name])] : form.publicZones.filter((z) => z !== name),
+    });
+  }
+
   function toggleDay(day: number, on: boolean) {
     if (!form) return;
     setForm({
@@ -303,6 +320,12 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
       weekdays: on ? [...new Set([...form.weekdays, day])] : form.weekdays.filter((d) => d !== day),
     });
   }
+
+  // The zone names the venue's tables carry. A saved name no table has is still listed, so it can be removed.
+  const tableZones = [...new Set((tableData?.tables ?? []).map((tb) => tb.zone.trim()).filter((z) => z !== ""))];
+  const zonesReady = tableData !== undefined;
+  const zoneOptions = [...tableZones, ...(form?.publicZones ?? []).filter((z) => !tableZones.includes(z))];
+  const zonesLocked = tableZones.length < 2;
 
   const bookable = services.some(
     (s) =>
@@ -456,6 +479,57 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     ))}
                   </select>
                 </div>
+              </div>
+            </Group>
+
+            <Group title={t("onlinebooking.guest.title")} description={t("onlinebooking.guest.description")}>
+              <fieldset className="space-y-2" disabled={zonesReady && zonesLocked && form.publicZones.length === 0}>
+                <legend className="text-sm font-medium">{t("onlinebooking.zones.legend")}</legend>
+                {zonesReady && zonesLocked && form.publicZones.length === 0 ? (
+                  <p id="ob-zones-help" className="text-sm text-muted-foreground">
+                    {t("onlinebooking.zones.fewer")}
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-2" aria-describedby="ob-zones-help">
+                      {zoneOptions.map((name) => {
+                        const unused = zonesReady && !tableZones.includes(name);
+                        return (
+                          <Chip
+                            key={name}
+                            checked={form.publicZones.includes(name)}
+                            disabled={!zonesReady}
+                            verbatim
+                            onChange={(on) => toggleZone(name, on)}
+                          >
+                            {name}
+                            {unused && (
+                              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                ({t("onlinebooking.zones.unused")})
+                              </span>
+                            )}
+                          </Chip>
+                        );
+                      })}
+                    </div>
+                    <p id="ob-zones-help" className="text-sm text-muted-foreground">
+                      {t("onlinebooking.zones.help")}
+                    </p>
+                  </>
+                )}
+                {error("publicZones")}
+              </fieldset>
+
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <Label htmlFor="ob-service-names">{t("onlinebooking.serviceNames.label")}</Label>
+                  <p className="text-sm text-muted-foreground">{t("onlinebooking.serviceNames.help")}</p>
+                </div>
+                <Switch
+                  id="ob-service-names"
+                  checked={form.showServiceNames}
+                  onCheckedChange={(v) => setForm({ ...form, showServiceNames: v })}
+                />
               </div>
             </Group>
 

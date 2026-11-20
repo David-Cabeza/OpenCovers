@@ -23,6 +23,8 @@ const SETTINGS = {
   askConsent: false,
   locale: "es",
   privacyNoticeUrl: null as string | null,
+  publicZones: [] as string[],
+  showServiceNames: false,
   theme: {},
 };
 
@@ -95,5 +97,31 @@ describe("OnlineBookingCard in Spanish", () => {
       expect(screen.getByText(/Guardado, pero el color del texto tiene un contraste de 2.5:1 con el fondo/)).toBeInTheDocument(),
     );
     expect(screen.queryByText(/Saved, but/)).not.toBeInTheDocument();
+  });
+
+  it("shows the zones and service names fields and their errors in Spanish", async () => {
+    const user = userEvent.setup();
+    mockApi({
+      [`GET ${PATH}`]: { body: SETTINGS },
+      [`PUT ${PATH}`]: (r) => ({ body: { ...SETTINGS, ...(r.body as object), warnings: [] } }),
+      "GET /v1/venues/v1/services": { body: SERVICES },
+      "GET /v1/venues/v1/tables": {
+        body: {
+          tables: [
+            { id: "a", name: "A", seats: 4, zone: "terraza", shape: "round", posX: 0, posY: 0, rotation: 0 },
+            { id: "b", name: "B", seats: 4, zone: "sala", shape: "round", posX: 0, posY: 0, rotation: 0 },
+          ],
+        },
+      },
+    });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+
+    expect(screen.getByText("Zonas públicas")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mostrar los nombres de los servicios")).toBeInTheDocument();
+    await user.click(await screen.findByLabelText("terraza"));
+    await user.click(screen.getByRole("button", { name: "Guardar reserva en línea" }));
+    expect(await screen.findByText("Elige al menos dos zonas, o ninguna.")).toBeInTheDocument();
+    expect(screen.queryByText(/Pick at least two zones/)).not.toBeInTheDocument();
   });
 });

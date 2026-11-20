@@ -20,6 +20,8 @@ const STORED: OnlineBooking = {
   locale: "es",
   theme: {},
   privacyNoticeUrl: null,
+  publicZones: [],
+  showServiceNames: false,
 };
 
 const PROFILE: PublicProfile = {
