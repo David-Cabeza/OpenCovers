@@ -92,6 +92,9 @@ a { color: inherit; }
 .win .bar i { width: 12px; height: 12px; border-radius: 50%; display: block; }
 .win .bar b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--small); font-weight: 600; color: #4d4d4d; pointer-events: none; }
 .win video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: contain; background: #0b3d2e; }
+.win .vtoggle { display: block; width: 100%; padding: 10px 16px; border: 0; background: #ececec; color: #4d4d4d; font: inherit; font-size: var(--small); font-weight: 600; cursor: pointer; text-align: right; }
+.win .vtoggle:hover { background: #e2e2e2; }
+.win .vtoggle:focus-visible { outline: 2px solid var(--accent, #0e7c5a); outline-offset: -2px; }
 @media (max-width: 760px) { .win .bar { height: 36px; padding: 0 12px; } .win .bar b { display: none; } }
 
 /* ---------- features: sentences with switches ---------- */
