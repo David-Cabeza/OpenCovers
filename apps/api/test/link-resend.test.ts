@@ -1,3 +1,4 @@
+import { formatEmailDate } from "../src/lib/email-messages";
 import { and, eq, sql } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -227,8 +228,8 @@ describe("a resend rotates the link and mails the stored address", () => {
     expect((await resend(v.key, { email: contact })).status).toBe(202);
     const [message] = await waitFor(() => mailTo(contact.trim()), (m) => m.length === 1);
     expect(tokensIn(message.text)).toHaveLength(LINK_RESEND.perEmail);
-    const dates = [...message.text.matchAll(/(\d{4}-\d{2}-\d{2}) a las/g)].map((m) => m[1]);
-    expect(dates).toEqual([1, 2, 3, 4, 5].map(ahead));
+    const dates = [...message.text.matchAll(/^- (.+) a las /gm)].map((m) => m[1]);
+    expect(dates).toEqual([1, 2, 3, 4, 5].map((d) => formatEmailDate(ahead(d), "es")));
     const latest = booked.find((b) => b.day === LINK_RESEND.perEmail + 1)!;
     expect((await read(latest.token)).status).toBe(200);
   });
@@ -242,7 +243,7 @@ describe("a resend rotates the link and mails the stored address", () => {
     const elsewhere = await book(other, contact);
     expect((await resend(v.key, { email: contact })).status).toBe(202);
     const [message] = await waitFor(() => mailTo(contact), (m) => m.length === 1);
-    expect(message.text).toContain(`${ahead(20)} a las 21:00, 3 personas`);
+    expect(message.text).toContain(`${formatEmailDate(ahead(20), "es")} a las 21:00, 3 personas`);
     expect((await read(elsewhere.token)).status).toBe(200);
   });
 

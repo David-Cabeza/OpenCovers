@@ -1,4 +1,5 @@
 import { renderEmailHtml, type EmailLayout } from "./email-layout";
+import { formatEmailDate, message, resolveEmailLocale } from "./email-messages";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL;
@@ -20,9 +21,6 @@ function venueBrand(name: string | undefined): EmailLayout["brand"] {
   const trimmed = name?.trim();
   return trimmed ? { kind: "venue", name: trimmed } : { kind: "opencovers" };
 }
-
-// Placeholder wording, like the texts below. The layout takes it as parameters (ADR-0024 will feed it from a catalog).
-const VENUE_FOOTER = "Reservas con OpenCovers";
 
 /** One booking in a `self_service_link` email: when, how many, and its new link. */
 export interface LinkLine {
@@ -64,51 +62,52 @@ export async function sendEmail(
   }
 }
 
-// Placeholder templates. The wording and the legal basis are pending review. Emails to the guest carry no
-// guest name: whoever books types it, so it would put a stranger's text, links included, in the guest's inbox.
-export function buildEmail(kind: EmailKind, c: EmailContext): { subject: string; text: string; html: string } {
-  const page = (heading: string, text: string) =>
-    renderEmailHtml({
+// Placeholder templates, now catalogs (email-messages.ts). The wording and the legal basis are pending review.
+// Emails to the guest carry no guest name: whoever books types it, so it would put a stranger's text, links
+// included, in the guest's inbox. `requested` is the resolved locale (`resolveEmailLocale`); a locale without a
+// catalog reads, and dates, in es.
+export function buildEmail(
+  kind: EmailKind,
+  c: EmailContext,
+  requested: string,
+): { subject: string; text: string; html: string } {
+  const locale = resolveEmailLocale(requested, null);
+  const slots = { date: formatEmailDate(c.date, locale), time: c.time, partySize: c.partySize };
+  // The notice goes to the venue, not the guest, so it keeps the name (or none) and the venue's locale.
+  const text = message(locale, `${kind}.text`, {
+    ...slots,
+    guestName: c.guestName || message(locale, "notice.noName"),
+  });
+  const heading = message(locale, `${kind}.heading`);
+  return {
+    subject: message(locale, `${kind}.subject`, slots),
+    text,
+    html: renderEmailHtml({
       brand: venueBrand(c.venueName),
       heading,
       blocks: [{ kind: "paragraph", text }],
-      footer: VENUE_FOOTER,
-      lang: "es",
-    });
-  switch (kind) {
-    case "confirmation": {
-      const text = `Hola, tu reserva para ${c.partySize} personas el ${c.date} a las ${c.time} está confirmada.`;
-      return {
-        subject: `Tu reserva está confirmada — ${c.date} a las ${c.time}`,
-        text,
-        html: page("Tu reserva está confirmada", text),
-      };
-    }
-    case "cancellation": {
-      const text = `Hola, tu reserva del ${c.date} a las ${c.time} ha sido cancelada.`;
-      return {
-        subject: `Tu reserva está cancelada — ${c.date} a las ${c.time}`,
-        text,
-        html: page("Tu reserva está cancelada", text),
-      };
-    }
-    case "notice": {
-      const text = `Nueva reserva para ${c.partySize} personas el ${c.date} a las ${c.time} (${c.guestName || "sin nombre"}).`;
-      return { subject: `Nueva reserva — ${c.date} a las ${c.time}`, text, html: page("Nueva reserva", text) };
-    }
-  }
+      footer: message(locale, "footer"),
+      lang: locale,
+    }),
+  };
 }
 
 // The `self_service_link` kind (ADR-0017), a placeholder like the templates above, pending the same review. It
 // carries only what the engine wrote: dates, times, party sizes and links. No name, note or other text a guest typed.
 export function buildLinkEmail(
   lines: readonly LinkLine[],
+  requested: string,
   venueName?: string,
 ): { subject: string; text: string; html: string } {
-  const bookings = lines.map((l) => `- ${l.date} a las ${l.time}, ${l.partySize} personas: ${l.url}`).join("\n");
-  const subject = "Tu enlace para gestionar tu reserva";
-  const intro = "Hola, aquí tienes un enlace nuevo para ver, cambiar o cancelar tu reserva:";
-  const outro = "Los enlaces anteriores ya no funcionan.";
+  const locale = resolveEmailLocale(requested, null);
+  const rows = lines.map((l) => ({
+    booking: message(locale, "link.booking", { date: formatEmailDate(l.date, locale), time: l.time, partySize: l.partySize }),
+    url: l.url,
+  }));
+  const intro = message(locale, "link.intro");
+  const outro = message(locale, "link.outro");
+  const bookings = rows.map((r) => message(locale, "link.line", r)).join("\n");
+  const subject = message(locale, "link.subject");
   return {
     subject,
     text: `${intro}\n\n${bookings}\n\n${outro}`,
@@ -117,14 +116,14 @@ export function buildLinkEmail(
       heading: subject,
       blocks: [
         { kind: "paragraph", text: intro },
-        ...lines.flatMap((l): EmailLayout["blocks"][number][] => [
-          { kind: "paragraph", text: `${l.date} a las ${l.time}, ${l.partySize} personas` },
-          { kind: "button", label: "Gestionar mi reserva", url: l.url },
+        ...rows.flatMap((r): EmailLayout["blocks"][number][] => [
+          { kind: "paragraph", text: r.booking },
+          { kind: "button", label: message(locale, "link.button"), url: r.url },
         ]),
         { kind: "paragraph", text: outro },
       ],
-      footer: VENUE_FOOTER,
-      lang: "es",
+      footer: message(locale, "footer"),
+      lang: locale,
     }),
   };
 }

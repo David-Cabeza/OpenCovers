@@ -3,6 +3,8 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { reservations, sentEmails, venues } from "../db/schema";
 import * as schema from "../db/schema";
 import { mailIdentity, mayEmail } from "../demo/limits";
+import { resolveEmailLocale } from "./email-messages";
+import { getOnlineBooking } from "./online-booking";
 import { buildEmail, sendEmail, type EmailKind } from "./mailer";
 import { formatTime } from "./time";
 
@@ -67,14 +69,20 @@ export async function notifyReservation(
     if (already) return;
     if (guestModify && !(await claimGuestModify(db, venueId, reservationId, version))) return;
 
-    const { subject, text, html } = buildEmail(kind, {
-      venueName: venue.name,
-      date: reservation.date,
-      time: formatTime(reservation.startsAt, venue.timezone),
-      partySize: reservation.partySize,
-      guestName: reservation.guestName,
-      service: reservation.service,
-    });
+    // Stage 3 will pass the guest's stored locale first. For now every email is in the venue's.
+    const locale = resolveEmailLocale(null, (await getOnlineBooking(db, venueId))?.locale);
+    const { subject, text, html } = buildEmail(
+      kind,
+      {
+        venueName: venue.name,
+        date: reservation.date,
+        time: formatTime(reservation.startsAt, venue.timezone),
+        partySize: reservation.partySize,
+        guestName: reservation.guestName,
+        service: reservation.service,
+      },
+      locale,
+    );
     const identity = await mailIdentity(db, venueId, venue);
     await sendEmail(
       identity.apiKey,

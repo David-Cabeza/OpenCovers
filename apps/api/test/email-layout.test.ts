@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { magicLinkEmail } from "../src/lib/auth";
 import { escapeHtml, LOGO_URL, renderEmailHtml } from "../src/lib/email-layout";
+import { formatEmailDate } from "../src/lib/email-messages";
 import { buildEmail, buildLinkEmail, sendEmail } from "../src/lib/mailer";
 
 const ctx = { date: "2026-12-01", time: "20:30", partySize: 4, guestName: "Ana", service: "dinner" };
+const D1 = formatEmailDate("2026-12-01", "es");
+const D2 = formatEmailDate("2026-12-02", "es");
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -54,7 +57,7 @@ describe("email layout", () => {
   });
 
   it("leads with the venue name and carries only the small credit for a guest mail", () => {
-    const { html } = buildEmail("confirmation", { ...ctx, venueName: "Casa <Paco>" });
+    const { html } = buildEmail("confirmation", { ...ctx, venueName: "Casa <Paco>" }, "es");
     expect(html).toContain("Casa &lt;Paco&gt;");
     expect(html).toContain("Reservas con OpenCovers");
     expect(html).not.toContain(LOGO_URL);
@@ -62,15 +65,15 @@ describe("email layout", () => {
 
   it("never puts the guest name in a guest mail, and keeps the text part unchanged", () => {
     for (const kind of ["confirmation", "cancellation"] as const) {
-      const { html, text } = buildEmail(kind, { ...ctx, guestName: "Mallory", venueName: "Casa" });
+      const { html, text } = buildEmail(kind, { ...ctx, guestName: "Mallory", venueName: "Casa" }, "es");
       expect(html).not.toContain("Mallory");
       expect(text).not.toContain("Mallory");
     }
-    expect(buildEmail("confirmation", ctx).text).toBe(
-      "Hola, tu reserva para 4 personas el 2026-12-01 a las 20:30 está confirmada.",
+    expect(buildEmail("confirmation", ctx, "es").text).toBe(
+      `Hola, tu reserva para 4 personas el ${D1} a las 20:30 está confirmada.`,
     );
-    expect(buildEmail("cancellation", ctx).text).toBe("Hola, tu reserva del 2026-12-01 a las 20:30 ha sido cancelada.");
-    expect(buildEmail("notice", ctx).text).toBe("Nueva reserva para 4 personas el 2026-12-01 a las 20:30 (Ana).");
+    expect(buildEmail("cancellation", ctx, "es").text).toBe(`Hola, tu reserva del ${D1} a las 20:30 ha sido cancelada.`);
+    expect(buildEmail("notice", ctx, "es").text).toBe(`Nueva reserva para 4 personas el ${D1} a las 20:30 (Ana).`);
   });
 
   it("builds the self-service mail with one button per booking and the old text", () => {
@@ -78,11 +81,11 @@ describe("email layout", () => {
       { date: "2026-12-01", time: "20:30", partySize: 2, url: "https://x.example/r?lang=es#a" },
       { date: "2026-12-02", time: "21:00", partySize: 3, url: "https://x.example/r?lang=es#b" },
     ];
-    const { text, html } = buildLinkEmail(lines, "Casa");
+    const { text, html } = buildLinkEmail(lines, "es", "Casa");
     expect(text).toBe(
       "Hola, aquí tienes un enlace nuevo para ver, cambiar o cancelar tu reserva:\n\n" +
-        "- 2026-12-01 a las 20:30, 2 personas: https://x.example/r?lang=es#a\n" +
-        "- 2026-12-02 a las 21:00, 3 personas: https://x.example/r?lang=es#b\n\n" +
+        `- ${D1} a las 20:30, 2 personas: https://x.example/r?lang=es#a\n` +
+        `- ${D2} a las 21:00, 3 personas: https://x.example/r?lang=es#b\n\n` +
         "Los enlaces anteriores ya no funcionan.",
     );
     expect(html.match(/Gestionar mi reserva/g)).toHaveLength(2);
