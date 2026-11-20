@@ -115,7 +115,9 @@ describe("C63 public day status", () => {
       venue: { blockedDates: [{ from: addDays(start, 5), to: addDays(start, 6) }] },
       settings: { weekdays: [2, 3, 4, 5, 6, 7], maxAdvanceDays: 12 },
     });
-    await fill(v, addDays(start, 3));
+    // The date to fill must be one the venue opens on, or no date is ever full, and Monday is the closed weekday.
+    const fillDate = [1, 2, 3, 4].map((n) => addDays(start, n)).find((d) => isoWeekday(d) !== 1)!;
+    await fill(v, fillDate);
     const seen = new Set<string>();
     for (const partySize of [1, 2, 4, 5, 8]) {
       const { res, body } = await days(v, `from=${addDays(start, -2)}&days=14&partySize=${partySize}`);
