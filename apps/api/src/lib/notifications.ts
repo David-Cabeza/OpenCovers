@@ -67,7 +67,8 @@ export async function notifyReservation(
     if (already) return;
     if (guestModify && !(await claimGuestModify(db, venueId, reservationId, version))) return;
 
-    const { subject, text } = buildEmail(kind, {
+    const { subject, text, html } = buildEmail(kind, {
+      venueName: venue.name,
       date: reservation.date,
       time: formatTime(reservation.startsAt, venue.timezone),
       partySize: reservation.partySize,
@@ -81,6 +82,7 @@ export async function notifyReservation(
       to,
       subject,
       text,
+      html,
     );
     await db
       .insert(sentEmails)

@@ -18,6 +18,7 @@ import {
   claimForSignup,
   grantClaimedInvitation,
 } from "./invitations";
+import { renderEmailHtml } from "./email-layout";
 import { sendEmail } from "./mailer";
 import { LOCALES } from "./online-booking";
 import { decideSignup, signupMode } from "./signup";
@@ -38,16 +39,29 @@ export const trustedOrigins = [
   ]),
 ];
 
-export function magicLinkEmail(locale: string, url: string): { subject: string; text: string } {
-  if (locale.startsWith("es")) {
-    return {
-      subject: "Tu enlace para entrar en la demo de OpenCovers",
-      text: `Abre este enlace para entrar en la demo de OpenCovers (caduca en 5 minutos):\n\n${url}\n\nSi no lo has pedido tu, ignora este mensaje.`,
-    };
-  }
+export function magicLinkEmail(locale: string, url: string): { subject: string; text: string; html: string } {
+  const es = locale.startsWith("es");
+  const subject = es ? "Tu enlace para entrar en la demo de OpenCovers" : "Your link to the OpenCovers demo";
+  const intro = es
+    ? "Abre este enlace para entrar en la demo de OpenCovers (caduca en 5 minutos):"
+    : "Open this link to sign in to the OpenCovers demo (it expires in 5 minutes):";
+  const outro = es ? "Si no lo has pedido tu, ignora este mensaje." : "If you did not ask for it, ignore this message.";
   return {
-    subject: "Your link to the OpenCovers demo",
-    text: `Open this link to sign in to the OpenCovers demo (it expires in 5 minutes):\n\n${url}\n\nIf you did not ask for it, ignore this message.`,
+    subject,
+    text: `${intro}\n\n${url}\n\n${outro}`,
+    // OpenCovers sends this one itself, so it is fully branded (no venue behind it).
+    html: renderEmailHtml({
+      brand: { kind: "opencovers" },
+      preheader: intro,
+      heading: subject,
+      blocks: [
+        { kind: "paragraph", text: intro },
+        { kind: "button", label: es ? "Entrar en la demo" : "Open the demo", url },
+        { kind: "paragraph", text: outro },
+      ],
+      footer: "OpenCovers · opencovers.dev",
+      lang: es ? "es" : "en",
+    }),
   };
 }
 
@@ -86,7 +100,7 @@ function refusal(reason: Refusal): APIError {
 
 export interface AuthDeps {
   /** Delivers the magic link mail. Default: Resend through `sendEmail`. A test passes a capture. */
-  sendMail?: (to: string, subject: string, text: string) => Promise<void>;
+  sendMail?: (to: string, subject: string, text: string, html?: string) => Promise<void>;
   /** The magic link challenge issuer and checker. Default: the process-wide one. A test passes one with its own clock. */
   challenges?: () => MagicLinkChallenges;
 }
@@ -147,14 +161,14 @@ export function createAuth(settings: DemoSettings, deps: AuthDeps = {}) {
               // The token in the database is a hash, so a read of `verification` yields no usable link (audit F13).
               storeToken: "hashed",
               sendMagicLink: async ({ email, url }, context) => {
-                const { subject, text } = magicLinkEmail(mailLocale(context?.headers ?? context?.request?.headers), url);
-                if (deps.sendMail) return deps.sendMail(email, subject, text);
+                const { subject, text, html } = magicLinkEmail(mailLocale(context?.headers ?? context?.request?.headers), url);
+                if (deps.sendMail) return deps.sendMail(email, subject, text, html);
                 // Never log the link: whoever reads the log would sign in as the visitor.
                 if (!settings.mailConfigured) {
                   console.warn("demo magic link not delivered: set RESEND_API_KEY and RESEND_FROM_EMAIL");
                   return;
                 }
-                await sendEmail("", "", email, subject, text);
+                await sendEmail("", "", email, subject, text, html);
               },
             }),
           ],
