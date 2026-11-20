@@ -633,6 +633,17 @@ async function evaluateSlot(
   return [...reasons, fit.reason];
 }
 
+// Explicit table ids must be distinct tables of this venue (venue isolation: another venue's id is unknown).
+async function knownDistinctTables(db: Db | DbTx, venueId: string, tableIds: string[]) {
+  if (new Set(tableIds).size !== tableIds.length) return false;
+  if (tableIds.length === 0) return true;
+  const rows = await db
+    .select({ id: tables.id })
+    .from(tables)
+    .where(and(eq(tables.venueId, venueId), inArray(tables.id, tableIds)));
+  return rows.length === tableIds.length;
+}
+
 async function totalSeats(db: Db, venueId: string, tableIds: string[]) {
   if (tableIds.length === 0) return 0;
   const rows = await db
@@ -807,7 +818,9 @@ export async function createReservation(
   let refusal: WriteErrorCode | null = reasons[0]?.code ?? (service ? null : "outside_hours");
   const autoAssign = !input.tableIds || input.tableIds.length === 0;
   if (!refusal && !autoAssign) {
-    if (input.partySize > (await totalSeats(db, venueId, input.tableIds as string[]))) {
+    if (!(await knownDistinctTables(db, venueId, input.tableIds as string[]))) {
+      refusal = "invalid_request";
+    } else if (input.partySize > (await totalSeats(db, venueId, input.tableIds as string[]))) {
       refusal = "party_size_too_large";
     } else if (zone !== "") {
       const inZone = await db
@@ -1091,6 +1104,7 @@ export async function modifyReservation(
         guest && partyChanged ? await guestTables(tx, venueId, current, input.partySize!, guest.rules) : input.tableIds;
       let tablesChanged = false;
       if (tableIds !== undefined) {
+        if (!(await knownDistinctTables(tx, venueId, tableIds))) throw new ReservationError("invalid_request");
         const currentTables = await tx
           .select({ tableId: tableAllocations.tableId })
           .from(tableAllocations)

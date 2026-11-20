@@ -412,7 +412,9 @@ paths:
         with `invalid_transition`. A body with only consent or rating sends no
         email to the guest. A modify that would leave a `seated` reservation
         without tables fails with `table_required`. A table that another
-        booking holds fails with `slot_taken`.
+        booking holds fails with `slot_taken`. A table id that is not a table
+        of the venue, or a repeated id, fails with `invalid_request`, as on
+        create.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/reservationId"

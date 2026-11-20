@@ -120,12 +120,8 @@ export async function seatWaitlist(
       if (stored.kind === "create" && row.reservationId === stored.reservationId) {
         return { ok: true, reservationId: stored.reservationId };
       }
-      const seatedElsewhere = await tx
-        .select({ id: waitlist.id })
-        .from(waitlist)
-        .where(and(eq(waitlist.venueId, venueId), eq(waitlist.reservationId, stored.reservationId)))
-        .limit(1);
-      if (stored.kind !== "create" || seatedElsewhere.length > 0) return { ok: false, code: "invalid_request" };
+      // Any other stored key (another entry's seat, an unrelated create or write) is a reused key.
+      return { ok: false, code: "invalid_request" };
     }
     if (row.status !== "waiting") return { ok: false, code: "invalid_transition" };
 
