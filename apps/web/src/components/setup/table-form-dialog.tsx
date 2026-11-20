@@ -81,7 +81,13 @@ export function TableFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        // The id is a technical key; a person adding a table starts with its name.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          document.getElementById("table-name")?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{editing ? t("setup.table.editTitle") : t("setup.table.addTitle")}</DialogTitle>
           <DialogDescription>

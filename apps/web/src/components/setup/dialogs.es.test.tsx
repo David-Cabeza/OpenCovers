@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ThemeProvider } from "@/lib/theme";
@@ -31,6 +31,11 @@ describe("setup dialogs in Spanish", () => {
     await user.click(screen.getByRole("button", { name: "Añadir mesa" }));
     expect(await screen.findByText("El ID es obligatorio.")).toBeInTheDocument();
     expect(screen.queryByText("ID is required.")).not.toBeInTheDocument();
+  });
+
+  it("starts a new table on its name, not on the technical id", async () => {
+    renderWith(<TableFormDialog venueId="v1" open onOpenChange={() => {}} initial={null} />);
+    await waitFor(() => expect(screen.getByLabelText("Nombre")).toHaveFocus());
   });
 
   it("shows the service dialog with Spanish weekday names", () => {

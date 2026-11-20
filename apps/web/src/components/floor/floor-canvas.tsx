@@ -537,7 +537,7 @@ export function FloorCanvas({
                       </span>
                     ) : (
                       <>
-                        <span aria-hidden="true" className="text-[10px] opacity-70">
+                        <span aria-hidden="true" className="text-[10px] font-medium">
                           {t.seats}
                         </span>
                         {seatable && (
