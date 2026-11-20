@@ -25,6 +25,7 @@ The guest-facing routes under `/v1/public/` and the `online-booking` settings. S
 - `self_service_link_invalid`: the self-service token does not work. It is missing or malformed, its id is unknown, its secret is wrong, or the link expired, was revoked, or belongs to an erased booking. One answer for every cause, which names no venue and no booking. `404`. Not retryable.
 - `self_service_closed`: the booking can no longer be changed or cancelled through the link, because it is not `booked` or it starts within the venue's `selfServiceCutoffMinutes`. Reading through the link still works. `409`. Not retryable.
 - `reservation_changed`: the `version` sent with a self-service modify is not the stored version, because the booking changed after the guest read it. Read it again, then send the change with the new version. `409`. Nothing changed. Not retryable.
+- `waitlist_unavailable`: the public waitlist join cannot take this entry. The venue's waitlist or email is off, the date is closed or outside the booking window, or a cap is reached (per contact, per contact and date, or per date in the venue). One answer for every cause, which does not say which. Public waitlist join only ([ADR-0021](../adr/0021-widget-day-status-zones-waitlist.md), C68 to C71). `409`. Nothing is written and no email is sent. Not retryable.
 
 ## Auth
 
@@ -48,7 +49,7 @@ The guest-facing routes under `/v1/public/` and the `online-booking` settings. S
 - `beyond_booking_horizon`: the date is further ahead than the venue's `maxAdvanceDays`. Not retryable.
 - `date_blocked`: the venue takes no bookings on that date. Not retryable.
 - `guest_booking_limit`: the guest already holds the venue's `maxActivePerGuestPerDay` active bookings on that date. Create only, because availability does not know the guest. Not retryable.
-- `booking_declined`: the venue does not accept bookings for this contact. Show the guest a neutral message and send them to the venue directly. `409`. The body has no details: no reason, no date, no actor, and nothing about other entries. Create only, because availability does not know the guest. A walk-in and a seat from the waitlist are never declined. Not retryable.
+- `booking_declined`: the venue does not accept bookings for this contact. Show the guest a neutral message and send them to the venue directly. `409`. The body has no details: no reason, no date, no actor, and nothing about other entries. Create and the public waitlist join only (C72), because availability does not know the guest. A walk-in, a staff waitlist add and a seat from the waitlist are never declined. Not retryable.
 
 `GET /availability/explain` returns `outside_hours`, `lead_time_violation`, `beyond_booking_horizon`, `date_blocked`, `party_size_too_small`, `party_size_too_large`, and `no_suitable_table` as reason codes in a `200` answer, with the same meaning.
 
