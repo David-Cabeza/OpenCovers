@@ -36,7 +36,8 @@ export function MoveDialog({
 
   return (
     <Dialog open={source !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      {/* Opened from a table's card, which closes; its button is not a place to send focus back to. */}
+      <DialogContent onCloseAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>
             {source?.guestName

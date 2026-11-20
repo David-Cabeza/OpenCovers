@@ -55,14 +55,7 @@ export function AssignTablesDialog({
 
   async function onSave() {
     if (!reservation) return;
-    if (selected.length === 0) {
-      toast.error(t("reservation.selectTable"));
-      return;
-    }
-    if (tooSmall) {
-      toast.error(t("reservation.partyTooLarge"));
-      return;
-    }
+    if (selected.length === 0 || tooSmall) return;
     setSaving(true);
     try {
       await api.modifyReservation(venueId, reservation.id, { tables: selected });
@@ -96,11 +89,11 @@ export function AssignTablesDialog({
         </DialogHeader>
 
         <div className="space-y-2">
-          <Label>{t("reservation.tables")}</Label>
+          <Label id="assign-tables-label">{t("reservation.tables")}</Label>
           {tables.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("reservation.noTables")}</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div role="group" aria-labelledby="assign-tables-label" className="flex flex-wrap gap-2">
               {tables.map((tbl) => (
                 <Button
                   key={tbl.id}
@@ -121,13 +114,18 @@ export function AssignTablesDialog({
               guests: t("common.guests", { count: partySize }),
             })}
           </p>
+          {tooSmall && (
+            <p role="alert" className="text-sm text-destructive">
+              {t("reservation.partyTooLarge")}
+            </p>
+          )}
         </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common.cancel")}
+            {t("common.close")}
           </Button>
-          <Button type="button" disabled={saving} onClick={() => void onSave()}>
+          <Button type="button" disabled={saving || selected.length === 0 || tooSmall} onClick={() => void onSave()}>
             {saving ? t("common.saving") : t("reservation.assign.save")}
           </Button>
         </DialogFooter>
