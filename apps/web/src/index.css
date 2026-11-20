@@ -164,6 +164,13 @@
     @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
   }
+  /* A native select has a transparent background, so the browser paints its list on white while the text inherits
+     the light dark-mode colour. Give the options the theme's own colours. */
+  select option,
+  select optgroup {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
 }
 
 /* Display type: League Spartan 700, tight tracking (brand kit). */
