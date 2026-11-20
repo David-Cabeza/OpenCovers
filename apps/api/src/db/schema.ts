@@ -766,7 +766,12 @@ export const oauthClient = pgTable(
     referenceId: text("reference_id"),
     metadata: jsonb("metadata"),
   },
-  (t) => [index("idx_oauth_client_user").on(t.userId)],
+  (t) => [
+    index("idx_oauth_client_user").on(t.userId),
+    // ADR-0014: PKCE is required and consent is never skipped, whatever code writes the row.
+    check("oauth_client_require_pkce", sql`${t.requirePKCE} IS NOT FALSE`),
+    check("oauth_client_no_skip_consent", sql`${t.skipConsent} IS NOT TRUE`),
+  ],
 );
 
 export const oauthResource = pgTable("oauth_resource", {

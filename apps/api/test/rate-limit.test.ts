@@ -93,6 +93,8 @@ describe("rateLimitConfigFromEnv", () => {
       magic_link_day: { max: 5, windowMs: 24 * 60 * 60_000 },
       magic_link_ip: { max: 10, windowMs: 60 * 60_000 },
       demo_challenge: { max: 60, windowMs: 60 * 60_000 },
+      oauth_authorize: { max: 30, windowMs: 15 * 60_000 },
+      oauth_token: { max: 60, windowMs: 15 * 60_000 },
     });
   });
 
@@ -459,6 +461,43 @@ describe("what is limited", () => {
     const config = rateLimitConfigFromEnv({ RATE_LIMIT_VENUE_CREATION: "3/2h" });
     expect(config.rules.venue_creation).toEqual({ max: 3, windowMs: 2 * 3_600_000 });
     expect(() => rateLimitConfigFromEnv({ RATE_LIMIT_VENUE_CREATION: "0/1h" })).toThrow(/RATE_LIMIT_VENUE_CREATION/);
+  });
+
+  describe("with MCP_REMOTE=on (ADR-0014)", () => {
+    const OAUTH = { ...TRUST, MCP_REMOTE: "on", BETTER_AUTH_SECRET: "s".repeat(32) };
+    const AUTHORIZE = "/api/auth/oauth2/authorize?response_type=code&client_id=https://agent.example/c";
+    const TOKEN = "/api/auth/oauth2/token";
+
+    it("limits the authorization page per address at the default 30 per 15 minutes", async () => {
+      const { app } = build(OAUTH);
+      const out = await statuses(31, () => call(app, "GET", AUTHORIZE, { ip: "203.0.113.70" }));
+      expect(out.slice(0, 30)).toEqual(Array(30).fill(200));
+      expect(out[30]).toBe(429);
+      expect((await call(app, "GET", AUTHORIZE, { ip: "203.0.113.71" })).status).toBe(200);
+    });
+
+    it("keeps token requests off the sign-in budget: 31 of them leave sign-in open, the 61st is refused", async () => {
+      const { app } = build(OAUTH);
+      const ip = "203.0.113.72";
+      expect(new Set(await statuses(31, () => call(app, "POST", TOKEN, { ip })))).toEqual(new Set([200]));
+      expect((await call(app, "POST", SIGN_IN, { ip })).status).toBe(200);
+      expect(new Set(await statuses(29, () => call(app, "POST", TOKEN, { ip })))).toEqual(new Set([200]));
+      expect((await call(app, "POST", TOKEN, { ip })).status).toBe(429);
+      expect((await call(app, "POST", SIGN_IN, { ip })).status).toBe(200);
+    });
+
+    it("counts the OAuth paths as before while MCP_REMOTE is off", async () => {
+      const { app } = build({ ...TRUST, RATE_LIMIT_AUTH: "2/1m" });
+      const ip = "203.0.113.73";
+      expect(new Set(await statuses(40, () => call(app, "GET", AUTHORIZE, { ip })))).toEqual(new Set([200]));
+      expect(await statuses(3, () => call(app, "POST", TOKEN, { ip }))).toEqual([200, 200, 429]);
+    });
+
+    it("reads RATE_LIMIT_OAUTH_AUTHORIZE and RATE_LIMIT_OAUTH_TOKEN", () => {
+      const config = rateLimitConfigFromEnv({ RATE_LIMIT_OAUTH_AUTHORIZE: "5/1m", RATE_LIMIT_OAUTH_TOKEN: "7/1h" });
+      expect(config.rules.oauth_authorize).toEqual({ max: 5, windowMs: 60_000 });
+      expect(config.rules.oauth_token).toEqual({ max: 7, windowMs: 3_600_000 });
+    });
   });
 
   it("does nothing when switched off", async () => {

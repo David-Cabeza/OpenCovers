@@ -41,6 +41,16 @@
 		reverse_proxy {$API_UPSTREAM:api:3000}
 	}
 
+	# Remote MCP (ADR-0014): the endpoint and the OAuth metadata, only with MCP_REMOTE=on. Off, these paths stay the
+	# staff app's, as before. The OAuth routes themselves are under /api, which the API answers with 404 while off.
+	@mcp_remote {
+		expression `"{$MCP_REMOTE:off}" == "on"`
+		path /mcp /.well-known/oauth-authorization-server /.well-known/oauth-authorization-server/* /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/*
+	}
+	handle @mcp_remote {
+		reverse_proxy {$API_UPSTREAM:api:3000}
+	}
+
 	handle {
 		root * /srv
 		try_files {path} /index.html

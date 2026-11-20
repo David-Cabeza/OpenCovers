@@ -1,0 +1,2 @@
+ALTER TABLE "oauth_client" ADD CONSTRAINT "oauth_client_require_pkce" CHECK ("oauth_client"."require_pkce" IS NOT FALSE);--> statement-breakpoint
+ALTER TABLE "oauth_client" ADD CONSTRAINT "oauth_client_no_skip_consent" CHECK ("oauth_client"."skip_consent" IS NOT TRUE);

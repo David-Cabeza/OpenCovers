@@ -1,19 +1,19 @@
 import { createHash, randomBytes } from "node:crypto";
+import { createServer, type Socket } from "node:net";
 import { eq, sql } from "drizzle-orm";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.hoisted(() => {
   process.env.MCP_REMOTE = "on";
+  process.env.BETTER_AUTH_SECRET = "oauth-provider-test-secret-0123456789";
 });
 
-import { oauthProvider } from "@better-auth/oauth-provider";
-import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import app from "../src/app";
 import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
-import { betterAuthSchema, oauthAccessToken, oauthRefreshToken } from "../src/db/schema";
-import { auth, oauthProviderOptions } from "../src/lib/auth";
+import { oauthAccessToken, oauthClient, oauthRefreshToken, user } from "../src/db/schema";
+import { demoSettings } from "../src/demo/settings";
+import { auth, createAuth, metadataFetcher } from "../src/lib/auth";
 import { MCP_SCOPES } from "../src/lib/mcp-remote";
 
 const ORIGIN = "http://localhost:3000";
@@ -23,23 +23,6 @@ const REDIRECT = "https://agent.example.com/callback";
 
 type Handler = (request: Request) => Promise<Response>;
 const appHandler: Handler = async (request) => app.fetch(request);
-
-// The same provider settings with `offline_access` added, the scope the plugin
-// requires before it issues a refresh token. Used only to observe refresh behavior.
-const withOfflineAccess = betterAuth({
-  secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-me",
-  baseURL: ORIGIN,
-  database: drizzleAdapter(db, { provider: "pg", schema: betterAuthSchema }),
-  emailAndPassword: { enabled: true },
-  rateLimit: { enabled: false },
-  plugins: [
-    oauthProvider({
-      ...oauthProviderOptions(RESOURCE),
-      scopes: [...MCP_SCOPES, "offline_access"],
-    }),
-  ],
-});
-const offlineHandler: Handler = (request) => withOfflineAccess.handler(request);
 
 beforeAll(async () => {
   await migrateDb();
@@ -75,8 +58,15 @@ async function staffCookie(): Promise<string> {
   return res.headers.get("set-cookie")!;
 }
 
-async function registerClient(cookie: string): Promise<string> {
-  const client = await auth.api.adminCreateOAuthClient({
+/** Gives the cookie's account the first-user mark, which makes it the instance owner. */
+async function makeOwner(cookie: string): Promise<void> {
+  const session = await auth.api.getSession({ headers: new Headers({ cookie }) });
+  await db.update(user).set({ firstSignup: false });
+  await db.update(user).set({ firstSignup: true }).where(eq(user.id, session!.user.id));
+}
+
+function createClient(cookie: string, extra: Record<string, unknown> = {}) {
+  return auth.api.adminCreateOAuthClient({
     headers: new Headers({ cookie }),
     body: {
       client_name: "Test agent",
@@ -84,9 +74,14 @@ async function registerClient(cookie: string): Promise<string> {
       token_endpoint_auth_method: "none",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
+      ...extra,
     },
   });
-  return client.client_id;
+}
+
+async function registerClient(cookie: string): Promise<string> {
+  await makeOwner(cookie);
+  return (await createClient(cookie)).client_id;
 }
 
 interface AuthorizeInput {
@@ -185,16 +180,28 @@ describe("authorization server metadata", () => {
     expect(meta.grant_types_supported).toEqual(["authorization_code", "refresh_token"]);
   });
 
-  it("keeps client and consent management off the HTTP surface", async () => {
+  it.each([
+    ["POST", "/oauth2/register"],
+    ["POST", "/oauth2/create-client"],
+    ["GET", "/oauth2/get-client?client_id=x"],
+    ["GET", "/oauth2/get-clients"],
+    ["POST", "/oauth2/update-client"],
+    ["POST", "/oauth2/client/rotate-secret"],
+    ["POST", "/oauth2/delete-client"],
+    ["GET", "/oauth2/get-consent?id=x"],
+    ["GET", "/oauth2/get-consents"],
+    ["POST", "/oauth2/update-consent"],
+    ["POST", "/oauth2/delete-consent"],
+  ])("keeps client and consent management off the HTTP surface: %s %s is 404 for an owner", async (method, path) => {
     const cookie = await staffCookie();
-    for (const path of ["/oauth2/register", "/oauth2/create-client", "/oauth2/get-clients", "/oauth2/get-consents"]) {
-      const res = await app.request(`/api/auth${path}`, {
-        method: path === "/oauth2/get-clients" || path === "/oauth2/get-consents" ? "GET" : "POST",
-        headers: { cookie, origin: ORIGIN, "content-type": "application/json" },
-        body: path.startsWith("/oauth2/get") ? undefined : JSON.stringify({ redirect_uris: [REDIRECT] }),
-      });
-      expect(res.status, path).toBe(404);
-    }
+    await makeOwner(cookie);
+    const res = await app.request(`/api/auth${path}`, {
+      method,
+      headers: { cookie, origin: ORIGIN, "content-type": "application/json" },
+      body: method === "GET" ? undefined : JSON.stringify({ redirect_uris: [REDIRECT], client_id: "x", id: "x" }),
+    });
+    // The closed-path answer, not the plugin's own 404 for an unknown id.
+    expect([res.status, await res.text()]).toEqual([404, "Not Found"]);
   });
 });
 
@@ -225,17 +232,33 @@ describe("ADR-0014 must verify", () => {
     expect(body.refresh_token).toBeUndefined();
   });
 
+  it("(a) accepts offline_access and issues a refresh token that works", async () => {
+    const cookie = await staffCookie();
+    const clientId = await registerClient(cookie);
+    const { status, body } = await grantTokens(appHandler, cookie, clientId, "opencovers:read offline_access");
+    expect(status).toBe(200);
+    expect(body.refresh_token).toEqual(expect.any(String));
+    expect((await accessRow(body.access_token)).scopes).toEqual(["opencovers:read", "offline_access"]);
+    const refreshed = await token(appHandler, {
+      grant_type: "refresh_token",
+      refresh_token: body.refresh_token,
+      client_id: clientId,
+    });
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body.access_token).toEqual(expect.any(String));
+  });
+
   it("(b) a reused rotated refresh token revokes every token the client holds for that person", async () => {
     const cookie = await staffCookie();
     const clientId = await registerClient(cookie);
-    const first = await grantTokens(offlineHandler, cookie, clientId, "opencovers:read offline_access");
+    const first = await grantTokens(appHandler, cookie, clientId, "opencovers:read offline_access");
     expect(first.status).toBe(200);
     expect(first.body.refresh_token).toEqual(expect.any(String));
     expect((await refreshRow(first.body.refresh_token)).expiresAt!.getTime()).toBeGreaterThan(
       Date.now() + 29 * 24 * 3600_000,
     );
 
-    const rotated = await token(offlineHandler, {
+    const rotated = await token(appHandler, {
       grant_type: "refresh_token",
       refresh_token: first.body.refresh_token,
       client_id: clientId,
@@ -243,10 +266,10 @@ describe("ADR-0014 must verify", () => {
     expect(rotated.status).toBe(200);
     expect(rotated.body.refresh_token).not.toBe(first.body.refresh_token);
 
-    const secondGrant = await grantTokens(offlineHandler, cookie, clientId, "opencovers:read offline_access");
+    const secondGrant = await grantTokens(appHandler, cookie, clientId, "opencovers:read offline_access");
     expect(secondGrant.status).toBe(200);
 
-    const reuse = await token(offlineHandler, {
+    const reuse = await token(appHandler, {
       grant_type: "refresh_token",
       refresh_token: first.body.refresh_token,
       client_id: clientId,
@@ -254,7 +277,7 @@ describe("ADR-0014 must verify", () => {
     expect(reuse.status).toBe(400);
     expect(reuse.body.error).toBe("invalid_grant");
 
-    const afterReuse = await token(offlineHandler, {
+    const afterReuse = await token(appHandler, {
       grant_type: "refresh_token",
       refresh_token: rotated.body.refresh_token,
       client_id: clientId,
@@ -269,12 +292,12 @@ describe("ADR-0014 must verify", () => {
   it("(b) a refresh resets the refresh token to 30 days from now, with no cap from the first consent", async () => {
     const cookie = await staffCookie();
     const clientId = await registerClient(cookie);
-    const first = await grantTokens(offlineHandler, cookie, clientId, "opencovers:read offline_access");
+    const first = await grantTokens(appHandler, cookie, clientId, "opencovers:read offline_access");
     await db
       .update(oauthRefreshToken)
       .set({ createdAt: new Date(Date.now() - 89 * 24 * 3600_000) })
       .where(eq(oauthRefreshToken.token, sha256Base64url(first.body.refresh_token)));
-    const rotated = await token(offlineHandler, {
+    const rotated = await token(appHandler, {
       grant_type: "refresh_token",
       refresh_token: first.body.refresh_token,
       client_id: clientId,
@@ -328,7 +351,7 @@ describe("ADR-0014 must verify", () => {
     }
   });
 
-  it.each(["opencovers:admin", "openid", "offline_access", "opencovers:read profile"])(
+  it.each(["opencovers:admin", "openid", "opencovers:read profile"])(
     "(f) refuses scope %s with invalid_scope",
     async (scope) => {
       const cookie = await staffCookie();
@@ -383,5 +406,174 @@ describe("plugin defaults that ADR-0014 overrides in part 2", () => {
       resource: "https://other.example.com/mcp",
     });
     expect(new URL(res.headers.get("location")!).searchParams.get("error")).toBe("invalid_target");
+  });
+});
+
+describe("authorization code lifetime", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function exchangeAfter(ms: number) {
+    const cookie = await staffCookie();
+    const clientId = await registerClient(cookie);
+    const { verifier, challenge } = pkce();
+    const redirect = await codeFor(appHandler, cookie, clientId, "opencovers:read", challenge);
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + ms);
+    const result = await token(appHandler, {
+      grant_type: "authorization_code",
+      code: redirect.searchParams.get("code")!,
+      code_verifier: verifier,
+      redirect_uri: REDIRECT,
+      client_id: clientId,
+      resource: RESOURCE,
+    });
+    vi.restoreAllMocks();
+    return result;
+  }
+
+  it("redeems a code just under 10 minutes old and refuses one just over", async () => {
+    expect((await exchangeAfter(9 * 60_000 + 50_000)).status).toBe(200);
+    const late = await exchangeAfter(10 * 60_000 + 10_000);
+    expect(late.status).toBe(400);
+    expect(late.body.error).toBe("invalid_grant");
+  });
+});
+
+describe("client registration (ADR-0014)", () => {
+  async function clientRows() {
+    return (await db.select({ id: oauthClient.id }).from(oauthClient)).length;
+  }
+
+  it("refuses a signed-in person who is not the instance owner", async () => {
+    const cookie = await staffCookie();
+    await expect(createClient(cookie)).rejects.toMatchObject({ statusCode: 401 });
+    expect(await clientRows()).toBe(0);
+  });
+
+  it.each([{ skip_consent: true }, { require_pkce: false }])("refuses the owner a client with %o", async (extra) => {
+    const cookie = await staffCookie();
+    await makeOwner(cookie);
+    await expect(createClient(cookie, extra)).rejects.toMatchObject({
+      statusCode: 400,
+      body: { error: "invalid_client_metadata" },
+    });
+    expect(await clientRows()).toBe(0);
+  });
+
+  it.each([
+    ["oauth_client_require_pkce", sql`false`, sql`null`],
+    ["oauth_client_no_skip_consent", sql`null`, sql`true`],
+  ])("the database refuses a client row that breaks %s", async (constraint, requirePkce, skipConsent) => {
+    const insert = db.execute(
+      sql`INSERT INTO oauth_client (id, client_id, redirect_uris, require_pkce, skip_consent)
+          VALUES ('c1', 'c1', ARRAY['https://agent.example.com/callback'], ${requirePkce}, ${skipConsent})`,
+    );
+    await expect(insert).rejects.toMatchObject({ cause: { constraint } });
+    expect(await clientRows()).toBe(0);
+  });
+});
+
+describe("client metadata documents", () => {
+  const CIMD_REDIRECT = "https://agent.example.com/callback";
+
+  /** An auth whose metadata fetches never leave the process: every URL serves a valid document. */
+  function stubbedAuth() {
+    const fetched: string[] = [];
+    const instance = createAuth(demoSettings({}), {
+      fetchMetadata: async (input) => {
+        const url = String(input instanceof Request ? input.url : input);
+        fetched.push(url);
+        const document = { client_id: url, client_name: "Agent", redirect_uris: [CIMD_REDIRECT], token_endpoint_auth_method: "none" };
+        return new Response(JSON.stringify(document), { status: 200, headers: { "content-type": "application/json" } });
+      },
+    });
+    return { handler: (request: Request) => instance.handler(request), fetched };
+  }
+
+  function cimdAuthorize(clientId: string, cookie?: string) {
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: clientId,
+      redirect_uri: CIMD_REDIRECT,
+      scope: "opencovers:read",
+      state: "s",
+      resource: RESOURCE,
+      code_challenge: pkce().challenge,
+      code_challenge_method: "S256",
+    });
+    return new Request(`${ORIGIN}/api/auth/oauth2/authorize?${params}`, {
+      headers: cookie ? { cookie } : {},
+      redirect: "manual",
+    });
+  }
+
+  async function cimdRows() {
+    return (await db.select({ id: oauthClient.id }).from(oauthClient).where(eq(oauthClient.clientDiscoveryId, "cimd")))
+      .length;
+  }
+
+  it("sends 30 anonymous authorization requests to sign in, with no fetch and no client row", async () => {
+    const { handler, fetched } = stubbedAuth();
+    for (let i = 0; i < 30; i++) {
+      const res = await handler(cimdAuthorize(`https://agent${i}.example/client.json`));
+      expect(res.status).toBe(302);
+      const location = new URL(res.headers.get("location")!, ORIGIN);
+      expect(location.pathname).toBe("/");
+      expect(location.searchParams.get("client_id")).toBe(`https://agent${i}.example/client.json`);
+    }
+    expect(fetched).toEqual([]);
+    expect(await cimdRows()).toBe(0);
+  });
+
+  it("writes no client row for an anonymous token or revoke request that names a new document", async () => {
+    const { handler, fetched } = stubbedAuth();
+    for (const path of ["token", "revoke"]) {
+      const res = await handler(
+        new Request(`${ORIGIN}/api/auth/oauth2/${path}`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: "x",
+            code_verifier: "x".repeat(43),
+            redirect_uri: CIMD_REDIRECT,
+            client_id: "https://agent.example/client.json",
+            token: "x",
+          }),
+        }),
+      );
+      expect(res.status, path).toBeGreaterThanOrEqual(400);
+    }
+    expect(fetched).toEqual([]);
+    expect(await cimdRows()).toBe(0);
+  });
+
+  it("keeps the fetch budget for people: after 121 anonymous requests a signed-in one still reaches consent", async () => {
+    const { handler, fetched } = stubbedAuth();
+    for (let i = 0; i < 121; i++) await handler(cimdAuthorize(`https://flood${i}.example/c`));
+    const cookie = await staffCookie();
+    const res = await handler(cimdAuthorize("https://agent.example/client.json", cookie));
+    expect(res.status).toBe(302);
+    expect(new URL(res.headers.get("location")!, ORIGIN).pathname).toBe("/oauth/consent");
+    expect(fetched).toEqual(["https://agent.example/client.json"]);
+    expect(await cimdRows()).toBe(1);
+  });
+
+  it("the metadata transport refuses a name that resolves to loopback, before any connection", async () => {
+    const sockets: Socket[] = [];
+    const server = createServer((socket) => {
+      sockets.push(socket);
+      socket.destroy();
+    });
+    await new Promise<void>((resolve) => server.listen({ port: 0, host: "::" }, resolve));
+    const { port } = server.address() as { port: number };
+    try {
+      await expect(metadataFetcher(`https://localhost:${port}/client.json`)).rejects.toThrow();
+      expect(sockets).toHaveLength(0);
+    } finally {
+      server.close();
+    }
   });
 });
