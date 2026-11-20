@@ -75,7 +75,7 @@
       <h1>OpenCovers</h1>
       <p>OpenCovers is an open source reservation engine for restaurants. It handles availability, bookings, tables and a signed event feed. You use it through an HTTP API or an MCP server.</p>
       <p>The same engine runs a staff app (agenda, availability, floor plan and setup, in Spanish and English) and a booking widget guests can embed on a venue's own site, with seven languages and a light or dark look.</p>
-      <p class="muted">Status: pre-alpha. License: Apache-2.0. Stack: Node.js, Hono, Drizzle and PostgreSQL.</p>
+      <p class="muted">Status: pre-alpha. The engine, the staff app and the MCP server run locally and pass their tests, and the booking widget is in progress. License: Apache-2.0. Stack: Node.js, Hono, Drizzle and PostgreSQL.</p>
       <p><a href="https://github.com/David-Cabeza/OpenCovers">Source code on GitHub</a></p>
       <!--demo-link-->
 
@@ -98,7 +98,7 @@
       <p>Create an agent key in the staff app under Setup, API keys. See the <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/mcp.md">MCP contract</a> and the <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/apps/mcp/README.md">package README</a>.</p>
 
       <h2>Run it locally</h2>
-      <p>You need Node.js 22 or newer, pnpm and Docker.</p>
+      <p>You need Node.js 22.9 or newer, pnpm and Docker.</p>
       <pre><code>git clone https://github.com/David-Cabeza/OpenCovers.git
 cd OpenCovers
 docker compose up -d   # PostgreSQL
