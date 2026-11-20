@@ -651,7 +651,7 @@ describe("F7 and F8: consent is recorded by the signed-in account", () => {
     await recordConsent(db, { email: "old@example.com", source: "google", consent: input });
     await recordConsent(db, { email: "new@example.com", source: "google", consent: input });
     await db.update(demoLeads).set({ lastSeenAt: new Date(Date.now() - 400 * 864e5) }).where(eq(demoLeads.email, "old@example.com"));
-    await db.insert(demoLeads).values({ email: "stray@example.com", source: "google", contactConsent: false });
+    await db.insert(demoLeads).values({ email: "stray@example.com", normalizedEmail: "stray@example.com", source: "google", contactConsent: false });
     const result = await cleanupExpiredSandboxes(db);
     expect(result.leads).toBe(2);
     expect((await db.select().from(demoLeads)).map((l) => l.email)).toEqual(["new@example.com"]);
