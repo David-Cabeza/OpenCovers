@@ -54,6 +54,15 @@ describe("the demo bar", () => {
     expect(screen.getByText("Restaurant")).toHaveAttribute("aria-current", "true");
   });
 
+  it("links the Diner view to the widget's own origin when the API gives one", () => {
+    search([]);
+    renderWithApp(<DemoBar status={{ ...status, widgetOrigin: "https://book.demo.opencovers.dev" }} />);
+    expect(screen.getByRole("link", { name: /Diner/ })).toHaveAttribute(
+      "href",
+      "https://book.demo.opencovers.dev/w/pk_abcdefghijklmnopqrstuv",
+    );
+  });
+
   it("lists the tour with a trace step, and ticks steps from real bookings", async () => {
     search([reservation({ id: "a" }), reservation({ id: "b", status: "cancelled" })]);
     renderWithApp(<DemoBar status={status} />);

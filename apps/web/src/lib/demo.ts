@@ -18,6 +18,13 @@ export interface DemoStatus {
   venueId?: string;
   bookingKey?: string | null;
   expiresAt?: string;
+  /** The widget's own origin in production; absent in development, where `/w/` goes through the dev proxy. */
+  widgetOrigin?: string;
+}
+
+/** The guest widget link. The staff host answers 404 on `/w/*`, so with a widget origin the link is absolute. */
+export function dinerLink(bookingKey: string, widgetOrigin?: string | null): string {
+  return `${widgetOrigin ? widgetOrigin.replace(/\/+$/, "") : ""}/w/${bookingKey}`;
 }
 
 const OFF: DemoStatus = { enabled: false, googleEnabled: false };

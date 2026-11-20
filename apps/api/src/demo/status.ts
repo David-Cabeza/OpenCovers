@@ -3,6 +3,7 @@
 import { eq } from "drizzle-orm";
 import { demoSandboxes, venueOnlineBooking } from "../db/schema";
 import type { Db } from "../lib/venue";
+import { widgetOrigin, widgetServingFromEnv } from "../lib/widget-page";
 import { demoSettings, SANDBOX_TTL_DAYS } from "./settings";
 
 export interface DemoStatus {
@@ -12,6 +13,12 @@ export interface DemoStatus {
   venueId?: string;
   bookingKey?: string | null;
   expiresAt?: string;
+  /**
+   * Where the guest widget lives when it has a host of its own (`WIDGET_ADDRESS`), which the staff host never
+   * serves (ADR-0017, Q1). Omitted when the API serves the widget on the staff origin, as in development, so the
+   * staff app keeps its relative `/w/{bookingKey}`.
+   */
+  widgetOrigin?: string;
 }
 
 /**
@@ -34,8 +41,11 @@ export async function demoStatus(db: Db, userId: string | null): Promise<DemoSta
     .where(eq(demoSandboxes.userId, userId))
     .limit(1);
   if (!row) return status;
+  const serving = widgetServingFromEnv();
+  const origin = serving.kind === "host" ? widgetOrigin(serving) : null;
   return {
     ...status,
+    ...(origin ? { widgetOrigin: origin } : {}),
     venueId: row.venueId,
     bookingKey: row.bookingKey,
     expiresAt: new Date(row.lastSignInAt.getTime() + SANDBOX_TTL_DAYS * 24 * 3_600_000).toISOString(),

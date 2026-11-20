@@ -89,6 +89,14 @@ describe("GET /api/demo/status", () => {
     expect(body.bookingKey).toMatch(/^pk_/);
   });
 
+  it("gives the widget's own origin when WIDGET_ADDRESS is set, and none otherwise", async () => {
+    vi.stubEnv("DEMO_MODE", "1");
+    const cookie = await signIn(freshEmail());
+    expect((await (await status(cookie)).json()).widgetOrigin).toBeUndefined();
+    vi.stubEnv("WIDGET_ADDRESS", "book.demo.opencovers.dev");
+    expect((await (await status(cookie)).json()).widgetOrigin).toBe("https://book.demo.opencovers.dev");
+  });
+
   it("never shows one visitor another's sandbox, and no personal data", async () => {
     vi.stubEnv("DEMO_MODE", "1");
     const aliceEmail = freshEmail();
