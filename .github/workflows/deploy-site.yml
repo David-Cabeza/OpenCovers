@@ -26,6 +26,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @opencovers/site build
+        env:
+          REQUIRE_LEGAL: "1"
+          LEGAL_TAX_ID: ${{ secrets.LEGAL_TAX_ID }}
+          LEGAL_ADDRESS: ${{ secrets.LEGAL_ADDRESS }}
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
