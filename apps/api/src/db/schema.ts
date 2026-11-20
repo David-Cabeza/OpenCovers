@@ -573,6 +573,9 @@ export const venueOnlineBooking = pgTable(
     locale: text("locale").notNull().default("es"),
     theme: jsonb("theme").$type<Record<string, unknown>>().notNull().default({}),
     privacyNoticeUrl: text("privacy_notice_url"),
+    // ADR-0021, section 2: the table zones the widget lets a guest pick, and whether it names the service of a time.
+    publicZones: jsonb("public_zones").$type<string[]>().notNull().default([]),
+    showServiceNames: boolean("show_service_names").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -596,6 +599,10 @@ export const venueOnlineBooking = pgTable(
       sql`${t.weekdays} IS NULL OR (cardinality(${t.weekdays}) BETWEEN 1 AND 7 AND ${t.weekdays} <@ ARRAY[1,2,3,4,5,6,7]::smallint[])`,
     ),
     check("venue_online_booking_services", sql`${t.services} IS NULL OR jsonb_array_length(${t.services}) >= 1`),
+    check(
+      "venue_online_booking_public_zones",
+      sql`jsonb_array_length(${t.publicZones}) = 0 OR jsonb_array_length(${t.publicZones}) BETWEEN 2 AND 10`,
+    ),
     check("venue_online_booking_origins", sql`jsonb_array_length(${t.allowedOrigins}) <= 10`),
     check(
       "venue_online_booking_privacy_url",

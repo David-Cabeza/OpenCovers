@@ -900,7 +900,11 @@ export async function createReservation(
         const fit = await tableReasons(tx, venueId, startsAt, endsAt, input.partySize, zone);
         if (fit.ok) {
           tableIds = fit.tableIds;
-        } else if (channel.kind === "public" && fit.reason.code === "no_suitable_table") {
+        } else if (
+          channel.kind === "public" &&
+          (fit.reason.code === "no_suitable_table" || (zone !== "" && fit.reason.code === "party_size_too_large"))
+        ) {
+          // In a zone the party may exceed the zone's seats: that is also a taken slot, and never carries a count (C66).
           throw new ReservationError("slot_taken");
         } else if (
           fit.reason.code === "no_suitable_table" &&
@@ -1619,11 +1623,70 @@ export async function publicTimes(
   date: string,
   partySize: number,
   rules: OnlineRules,
-): Promise<{ times: string[]; reason: PublicEmptyReason | null }> {
+  extras?: PublicSlotOptions,
+): Promise<{ times: string[]; reason: PublicEmptyReason | null; slots?: PublicSlot[] }> {
   const view = await publicView(db, venueId, rules);
-  if (!view) return { times: [], reason: null };
-  const { times, reason } = await publicDayGrid(db, view, date, partySize);
-  return { times, reason };
+  if (!view) return { times: [], reason: null, ...(extras ? { slots: [] } : {}) };
+  const { times, reason, slots } = await publicDayGrid(db, view, date, partySize);
+  if (!extras) return { times, reason };
+  const detailed = await publicSlots(db, view, date, partySize, slots, extras);
+  return { times: detailed.map((s) => s.time), reason, slots: detailed };
+}
+
+export interface PublicSlotOptions {
+  /** The effective public zones (C66), in order. Empty when the slots carry no zones. */
+  zones: string[];
+  /** Keeps only the slots whose `zones` hold it. Must be one of `zones`. */
+  zone?: string;
+  showServiceNames: boolean;
+}
+
+export interface PublicSlot {
+  time: string;
+  zones?: string[];
+  service?: string;
+}
+
+/**
+ * The slots of C66 for the times `publicDayGrid` found free. A zone holds a time when the same rules, run with that
+ * zone, accept it (`evaluateSlot`, as a create in the zone does). The zones run together; a time free for no table
+ * at all is never evaluated again, since a table of a zone is a table.
+ */
+async function publicSlots(
+  db: Db,
+  view: PublicChannelView,
+  date: string,
+  partySize: number,
+  grid: GridSlot[],
+  { zones, zone, showServiceNames }: PublicSlotOptions,
+): Promise<PublicSlot[]> {
+  const times = [...new Set(grid.filter((s) => s.available).map((s) => s.time))].sort();
+  const freeIn = new Map<string, Set<string>>();
+  await Promise.all(
+    zones.map(async (z) => {
+      const free = new Set<string>();
+      for (const time of times) {
+        const reasons = await evaluateSlot(db, view.venue, view.serviceRows, {
+          date,
+          time,
+          partySize,
+          zone: z,
+          walkIn: false,
+        });
+        if (reasons.length === 0) free.add(time);
+      }
+      freeIn.set(z, free);
+    }),
+  );
+  const slots: PublicSlot[] = [];
+  for (const time of times) {
+    const slot: PublicSlot = { time };
+    if (zones.length > 0) slot.zones = zones.filter((z) => freeIn.get(z)!.has(time));
+    if (showServiceNames) slot.service = serviceAt(view.serviceRows, date, time)?.name ?? "";
+    if (zone !== undefined && !slot.zones?.includes(zone)) continue;
+    slots.push(slot);
+  }
+  return slots;
 }
 
 export type PublicDayStatus = "available" | "full" | "closed" | "outside_window";
