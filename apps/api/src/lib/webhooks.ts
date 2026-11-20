@@ -29,7 +29,9 @@ const LEASE_MS = 5 * 60_000;
 // No longer needed for correctness: the events lock (lib/events.ts) makes a
 // venue's commit order its id order, so a cursor never passes an id that is
 // still to appear. It never covered a long write either, as occurred_at is the
-// writer's transaction start. Kept for now and can be removed (ADR-0024).
+// writer's transaction start. Kept for now: it delays each delivery by up to 2 s
+// (documented in webhooks.md, tested in webhooks.test.ts), so removing it is a
+// latency change and needs its own contract edit (ADR-0024).
 const SETTLE_MS = 2_000;
 
 export type EndpointState = typeof webhookEndpoints.$inferSelect;

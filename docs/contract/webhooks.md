@@ -77,7 +77,7 @@ When a delivery fails, the engine stops that endpoint. It never skips ahead. It 
 
 Endpoints are delivered independently. A slow or failing endpoint does not delay another one.
 
-The engine holds back an event for about 2 seconds after it was written. Concurrent writes can commit their event ids out of order, and the wait keeps the cursor from moving past an id that is about to appear.
+Within a venue, events commit in id order. A write takes a per-venue lock for its event insert and holds it to commit, so an event with a lower id is always visible before one with a higher id, and a cursor never passes an id that has yet to appear. Ordering does not depend on a wait. The engine still sends an event only once it is about 2 seconds old, so a delivery can start up to 2 seconds after the write.
 
 ## At-least-once
 
