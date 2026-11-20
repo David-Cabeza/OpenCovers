@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useVenues } from "@/hooks/use-venues";
 import { useT } from "@/i18n";
 import { useUiStore } from "@/stores/ui-store";
+import { readSectionParam, sectionForTarget, setSectionParam } from "@/lib/settings-section";
 import { AgendaView } from "./agenda/agenda-view";
 import { AvailabilityView } from "./availability/availability-view";
 import { FloorView } from "./floor/floor-view";
@@ -28,7 +29,7 @@ export function Dashboard() {
   const demo = useDemoStatus();
   const venueId = useUiStore((s) => s.venueId);
   const setVenue = useUiStore((s) => s.setVenue);
-  const [active, setActive] = useState<ViewId>("agenda");
+  const [active, setActive] = useState<ViewId>(() => (readSectionParam() ? "setup" : "agenda"));
   const [navOpen, setNavOpen] = useState(false);
   const [section, setSection] = useState<string | null>(null);
 
@@ -47,6 +48,9 @@ export function Dashboard() {
   const goTo = useCallback((view: ViewId, to?: string) => {
     setActive(view);
     setSection(to ?? null);
+    // Open the Settings section that holds the target; it is scrolled to once drawn.
+    const target = to ? sectionForTarget(to) : undefined;
+    if (view === "setup" && target) setSectionParam(target, "push");
   }, []);
   const navigation = useMemo(() => ({ goTo, role }), [goTo, role]);
 
@@ -61,6 +65,11 @@ export function Dashboard() {
       document.title = "OpenCovers";
     };
   }, [active, venueName, t]);
+
+  // The section is part of the address only while Settings is open.
+  useEffect(() => {
+    if (active !== "setup" && readSectionParam()) setSectionParam(null);
+  }, [active]);
 
   const mainRef = useRef<HTMLElement>(null);
 

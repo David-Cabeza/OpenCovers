@@ -1,7 +1,7 @@
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { errorMessage } from "@/lib/error-message";
 import { useT, type MessageKey } from "@/i18n";
-import { useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ import { OnlineBookingCard } from "./online-booking-card";
 import { ApiKeysCard } from "./api-keys-card";
 import { FloorEditor } from "./floor-editor";
 import type { Role } from "@/lib/api";
+import { readSectionParam, setSectionParam, subscribeSectionParam } from "@/lib/settings-section";
 
 interface Section {
   id: string;
@@ -56,46 +57,96 @@ const SECTIONS: Section[] = [
   },
 ];
 
-function SectionNav({ sections }: { sections: Section[] }) {
+const tabId = (id: string) => `settings-tab-${id}`;
+
+function SectionTabs({
+  sections,
+  active,
+  onSelect,
+}: {
+  sections: Section[];
+  active: string;
+  onSelect: (id: string) => void;
+}) {
   const t = useT();
+  const refs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // The bar scrolls sideways on a narrow screen; keep the active tab in view.
+  useEffect(() => {
+    refs.current[active]?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [active]);
+
+  const onKeyDown = (e: React.KeyboardEvent, index: number) => {
+    const last = sections.length - 1;
+    const next =
+      e.key === "ArrowRight" ? (index === last ? 0 : index + 1)
+      : e.key === "ArrowLeft" ? (index === 0 ? last : index - 1)
+      : e.key === "Home" ? 0
+      : e.key === "End" ? last
+      : null;
+    if (next === null) return;
+    e.preventDefault();
+    const id = sections[next].id;
+    onSelect(id);
+    refs.current[id]?.focus();
+  };
+
   return (
-    <nav
-      aria-label={t("setup.nav")}
-      className="sticky top-16 z-[5] -mx-4 flex gap-2 overflow-x-auto border-b bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
-    >
-      {sections.map((section) => (
-        <button
-          key={section.id}
-          type="button"
-          onClick={() =>
-            document.getElementById(`settings-${section.id}`)?.scrollIntoView?.({ behavior: "smooth" })
-          }
-          className={cn(
-            "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors",
-            "hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-          )}
-        >
-          {t(section.label)}
-        </button>
-      ))}
-    </nav>
+    <div className="sticky top-16 z-[5] -mx-4 border-b bg-background/95 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div role="tablist" aria-label={t("setup.nav")} className="flex gap-2 overflow-x-auto py-2">
+        {sections.map((section, index) => {
+          const selected = section.id === active;
+          return (
+            <button
+              key={section.id}
+              ref={(el) => {
+                refs.current[section.id] = el;
+              }}
+              id={tabId(section.id)}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls={`settings-${section.id}`}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => onSelect(section.id)}
+              onKeyDown={(e) => onKeyDown(e, index)}
+              className={cn(
+                "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                selected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              )}
+            >
+              {t(section.label)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
 function SettingsSection({
   section,
+  hidden,
   children,
 }: {
   section: Section;
+  hidden?: boolean;
   children: React.ReactNode;
 }) {
   const t = useT();
   return (
-    <section id={`settings-${section.id}`} aria-labelledby={`settings-${section.id}-title`} className="scroll-mt-32 space-y-4">
+    <section
+      id={`settings-${section.id}`}
+      role="tabpanel"
+      aria-labelledby={tabId(section.id)}
+      hidden={hidden}
+      className="scroll-mt-32 space-y-4"
+    >
       <div>
-        <h2 id={`settings-${section.id}-title`} className="font-display text-2xl">
-          {t(section.label)}
-        </h2>
+        <h2 className="font-display text-2xl">{t(section.label)}</h2>
         <p className="text-sm text-muted-foreground">{t(section.description)}</p>
       </div>
       <div className="space-y-6">{children}</div>
@@ -103,37 +154,66 @@ function SettingsSection({
   );
 }
 
+/**
+ * Sections whose cards hold an edited form in local state. They are mounted the first time they are opened and then
+ * kept mounted (hidden), so switching tabs never discards unsaved edits. The others (Dining room, Developers) save
+ * each change at once through dialogs and mutations, so they are mounted only while open.
+ */
+const KEEP_MOUNTED = new Set(["venue", "online"]);
+
 export function SetupView({ venueId, role }: { venueId: string; role?: Role }) {
   const t = useT();
   const isAdmin = role === "admin";
   const sections = SECTIONS.filter((s) => !s.adminOnly || isAdmin);
-  const section = (id: string) => SECTIONS.find((s) => s.id === id) as Section;
+  const param = useSyncExternalStore(subscribeSectionParam, readSectionParam, () => null);
+  const active = sections.find((s) => s.id === param)?.id ?? sections[0].id;
+
+  // Sections opened at least once (the first mount fires their data fetches).
+  const [opened, setOpened] = useState<string[]>([active]);
+  if (!opened.includes(active)) setOpened([...opened, active]);
+
+  const content = (id: string): React.ReactNode => {
+    switch (id) {
+      case "venue":
+        return (
+          <>
+            <VenueSettings venueId={venueId} role={role} />
+            <BookingPolicyCard venueId={venueId} role={role} />
+          </>
+        );
+      case "online":
+        return (
+          <>
+            <PublicProfileCard venueId={venueId} />
+            <OnlineBookingCard venueId={venueId} />
+          </>
+        );
+      case "room":
+        return (
+          <>
+            <TablesSection venueId={venueId} />
+            <FloorEditor venueId={venueId} />
+            <ServicesSection venueId={venueId} />
+          </>
+        );
+      default:
+        return <ApiKeysCard venueId={venueId} />;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader title={t("setup.title")} description={t("setup.description")} />
-      <SectionNav sections={sections} />
-      <div className="space-y-12">
-        <SettingsSection section={section("venue")}>
-          <VenueSettings venueId={venueId} role={role} />
-          <BookingPolicyCard venueId={venueId} role={role} />
-        </SettingsSection>
-        {isAdmin && (
-          <SettingsSection section={section("online")}>
-            <PublicProfileCard venueId={venueId} />
-            <OnlineBookingCard venueId={venueId} />
+      <SectionTabs sections={sections} active={active} onSelect={(id) => setSectionParam(id, "push")} />
+      {sections.map((section) => {
+        const isActive = section.id === active;
+        const mounted = isActive || (KEEP_MOUNTED.has(section.id) && opened.includes(section.id));
+        return mounted ? (
+          <SettingsSection key={section.id} section={section} hidden={!isActive}>
+            {content(section.id)}
           </SettingsSection>
-        )}
-        <SettingsSection section={section("room")}>
-          <TablesSection venueId={venueId} />
-          <FloorEditor venueId={venueId} />
-          <ServicesSection venueId={venueId} />
-        </SettingsSection>
-        {isAdmin && (
-          <SettingsSection section={section("developers")}>
-            <ApiKeysCard venueId={venueId} />
-          </SettingsSection>
-        )}
-      </div>
+        ) : null;
+      })}
     </div>
   );
 }

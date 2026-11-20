@@ -91,23 +91,23 @@ describe("Try again", () => {
 
 describe("Settings when its cards cannot be loaded", () => {
   it("says so on each card, and offers no form that would save blanks over the real settings", async () => {
+    const user = userEvent.setup();
     renderWithApp(<SetupView venueId="v1" role="admin" />);
-    for (const what of [
-      "the venue settings",
-      "the booking policy",
-      "online booking",
-      "the public profile",
-      "the services",
-      "the API keys",
-    ]) {
-      expect(await screen.findByText(`Could not load ${what}`), what).toBeInTheDocument();
-    }
+    const inSection = async (tab: string, whats: string[]) => {
+      await user.click(screen.getByRole("tab", { name: tab }));
+      for (const what of whats) {
+        expect(await screen.findByText(`Could not load ${what}`), what).toBeInTheDocument();
+      }
+    };
+    await inSection("General", ["the venue settings", "the booking policy"]);
+    await inSection("Online", ["online booking", "the public profile"]);
+    await inSection("Dining room", ["the services"]);
     // The tables are read by the list and by the floor editor, and both say so.
     expect(screen.getAllByText("Could not load the tables")).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: "Save settings" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save booking policy" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save public profile" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save online booking" })).not.toBeInTheDocument();
+    await inSection("Developers", ["the API keys"]);
+    for (const name of ["Save settings", "Save booking policy", "Save public profile", "Save online booking"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
     expect(screen.queryByText("No tables yet.")).not.toBeInTheDocument();
     expect(screen.queryByText("No services yet.")).not.toBeInTheDocument();
     expect(screen.queryByText("No keys yet.")).not.toBeInTheDocument();
@@ -116,6 +116,7 @@ describe("Settings when its cards cannot be loaded", () => {
   it("shows a card again once its own data can be read", async () => {
     const user = userEvent.setup();
     renderWithApp(<SetupView venueId="v1" role="admin" />);
+    await user.click(screen.getByRole("tab", { name: "Dining room" }));
     await screen.findByText("Could not load the services");
 
     server.down = false;
