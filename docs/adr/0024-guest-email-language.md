@@ -4,7 +4,7 @@
 - Date: 2026-11-21
 - Deciders: David Cabeza
 
-Nothing in this record is built. It proposes how guest emails follow the language the guest booked in, so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow, in that order. It changes rules of [ADR-0017](0017-booking-widget-and-self-service-link.md) and [ADR-0021](0021-widget-day-status-zones-waitlist.md), listed under Consequences. Open questions for the owner are marked `Q1` to `Q7`.
+Nothing in this record is built. It proposes how guest emails follow the language the guest booked in, so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow, in that order. It changes rules of [ADR-0017](0017-booking-widget-and-self-service-link.md) and [ADR-0021](0021-widget-day-status-zones-waitlist.md), listed under Consequences. Open questions for the owner are marked `Q1` to `Q7`. Q1 and Q3 are decided, see "Decided by the owner".
 
 ## Decisions at a glance
 
@@ -12,7 +12,7 @@ Nothing in this record is built. It proposes how guest emails follow the languag
 | --- | --- | --- | --- |
 | 1 | Where the language comes from | The widget sends the locale it shows as an optional `locale` on the public create, one of the seven. The reservation stores it in a nullable `guest_locale`. Erasure and retention reset it to null. Staff bookings store null and use the venue's locale. | The venue's locale only (today). |
 | 2 | Which messages use it | Every email to the guest: confirmation (also sent after a change), cancellation, the `self_service_link` email, the lost-link resend, the guest-cancel notice, and the waitlist join email. Every `/r` link carries `lang=<stored locale>`. The venue's `notice` stays in the venue's locale. | Localizing only the confirmation. |
-| 3 | How templates are localized | One catalog per locale in `apps/api`, next to the mailer, same ids and slots, a parity test. Plain text only. Fallback: stored locale, then venue locale, then `es`. No venue-editable text. Every translation is a draft until a native review, and the legal review covers each language. | Sharing the widget's catalog. |
+| 3 | How templates are localized | One catalog per locale in `apps/api`, next to the mailer, same ids and slots, a parity test. Plain text only. Fallback: stored locale, then venue locale, then `es`. No venue-editable text. A locale ships only once a native speaker has reviewed its catalog (Q3, decided); until then it falls back along the chain. | Sharing the widget's catalog. |
 | 4 | Contract and data impact | One optional request field, one nullable read field, one migration, amended cases C5, C18, C43, C51, C55, one new case C67. Nothing breaking. | A new event field or webhook field. |
 | 5 | Staging | Six stages, contract first. The catalog stage ships alone and comes before ADR-0021's join email. | One PR for all of it. |
 | 6 | Non-goals | Venue-editable templates, SMS, per-recipient time zones, guessing a language from an email domain. | |
@@ -101,7 +101,7 @@ Option A. A new `apps/api/src/lib/email-messages.ts` holds `EMAIL_CATALOGS = { e
 - **Unchanged rules.** No guest name in emails to the guest (C61). No note or other typed text. The once per reservation, kind and version rule of `sent_emails` and the guest-modify limit are untouched.
 - **No venue-editable text** in v1, as for the widget.
 
-**Who writes the translations.** The project drafts all seven. A draft may be machine-assisted. Each catalog is marked a draft until a native speaker reviews it (Q3). The legal review of REQ-N2 and of the consent wording (REQ-N4, ADR-0021 Q11) must cover each language it is sent in. This record does not claim any translation, Spanish included, is legally approved.
+**Who writes the translations.** Only reviewed locales ship (Q3, decided). A catalog is added to the shipped set when a native speaker has reviewed it, and a locale without one falls through the fallback chain to the venue's locale, then `es`. The parity test covers the shipped catalogs. A draft may be machine-assisted but stays out of the repository's shipped set until reviewed. The legal review of REQ-N2 and of the consent wording (REQ-N4, ADR-0021 Q11) must cover each language it is sent in. This record does not claim any translation, Spanish included, is legally approved.
 
 ## 4. Contract and data model
 
@@ -129,7 +129,7 @@ Each stage is one pull request. A contract stage changes `openapi.yaml`, `confor
 | --- | --- | --- | --- |
 | 0 | This ADR, accepted. | none | yes |
 | 1 | Contract: `locale` on the public create, `guestLocale` on reads, amend C5, C18, C43, C51, C55, add C67. | 0 | yes |
-| 2 | Email catalogs: `email-messages.ts` with all seven drafts, locale-aware `buildEmail` and `buildLinkEmail`, the parity test. Callers still pass the venue's locale, so a venue whose locale is `en` already gets English mail. | 0 | yes |
+| 2 | Email catalogs: `email-messages.ts` with the reviewed locales only (`es` first; each other language is a small follow-up PR once reviewed), locale-aware `buildEmail` and `buildLinkEmail`, the parity test. Callers still pass the venue's locale, so a venue whose locale is `en` already gets English mail. | 0 | yes |
 | 3 | API: migration, store `locale` at create, reset on erasure and retention, `notifyReservation` and `resendLinks` use the stored locale. | 1, 2 | yes |
 | 4 | Widget: send `locale` on the create. | 3 | yes |
 | 5 | Optional (Q2): staff field on create and modify, staff app control, MCP schemas, demo template. Contract first within the PR. | 3 | yes |
@@ -153,7 +153,7 @@ Venue-editable templates. SMS. Formatting times in the guest's own time zone (ti
 
 **Easier.** A guest gets mail in the language they booked in. Links in mail open `/r` in that language. Adding a locale is one catalog per app plus the lists the parity test reads.
 
-**Harder.** Seven email catalogs to keep in step with the widget's. The legal review grows from one language to seven. A new nullable column joins the erasure path.
+**Harder.** Up to seven email catalogs to keep in step with the widget's, added one reviewed language at a time. The legal review grows by one language per added catalog. A new nullable column joins the erasure path.
 
 **Accepted.** A stranger who books with someone's address chooses the language of the mail it sends, as they already choose the booking. A staff booking reads in the venue's language until Q2. A guest who books in one language and manages the booking in another keeps the first for mail.
 
@@ -178,9 +178,9 @@ Venue-editable templates. SMS. Formatting times in the guest's own time zone (ti
 
 ## Open questions for the owner
 
-- **Q1. Booking or guest.** Store the language on each booking (recommended) or as a preference on the guest record?
+- **Q1. Decided: on the booking.** Store the language on each booking, not on the guest record.
 - **Q2. Staff control.** Should staff, the API and MCP be able to set or change a booking's language, for phone bookings? If yes, stage 5 ships.
-- **Q3. Draft translations.** Ship machine-assisted drafts of all seven catalogs before a native review, marked as drafts in the file, or ship only reviewed locales and fall back to `es` for the rest?
+- **Q3. Decided: reviewed locales only.** No machine-drafted catalog ships. A language without a reviewed catalog falls back to the venue's locale, then `es`.
 - **Q4. Language through the link.** Should a guest modify through `/r` update the stored language to the page's `lang`?
 - **Q5. Legal review scope.** Does the REQ-N2 review cover each language's email text and the waitlist consent wording in each language, and who signs off per language?
 - **Q6. The venue's notice.** Keep `notice` in the venue's online-booking locale, or follow a staff app language when that exists?
