@@ -55,6 +55,9 @@ export default defineMessages({
     "onlinebooking.serviceNames.label": "Show service names",
     "onlinebooking.serviceNames.help":
       "When on, available times are grouped by service (for example Lunch, Dinner) in the booking page.",
+    "onlinebooking.waitlist.label": "Waitlist for full days",
+    "onlinebooking.waitlist.help":
+      "Lets guests ask to join the waitlist for a date, with an email to leave it. Needs email notifications on in Settings. You book them yourself; nothing is booked automatically.",
     "onlinebooking.embedding.title": "Embedding",
     "onlinebooking.embedding.description": "Where the booking page may appear.",
     "onlinebooking.origins.label": "Websites that may embed the page",
@@ -198,6 +201,9 @@ export default defineMessages({
     "onlinebooking.serviceNames.label": "Mostrar los nombres de los servicios",
     "onlinebooking.serviceNames.help":
       "Si está activado, los horarios disponibles se agrupan por servicio (por ejemplo Comida, Cena) en la página de reservas.",
+    "onlinebooking.waitlist.label": "Lista de espera para días completos",
+    "onlinebooking.waitlist.help":
+      "Permite que el cliente se apunte a la lista de espera de una fecha, con un correo para salir de ella. Necesita los avisos por correo activados en Ajustes. La reserva la haces tú: nada se reserva solo.",
     "onlinebooking.embedding.title": "Incrustación",
     "onlinebooking.embedding.description": "Dónde puede aparecer la página de reservas.",
     "onlinebooking.origins.label": "Webs que pueden incrustar la página",
