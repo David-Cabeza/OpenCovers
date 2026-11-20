@@ -21,6 +21,8 @@ export interface OnlineBooking {
   publicZones: string[];
   /** Whether the widget groups available times by service. */
   showServiceNames: boolean;
+  /** Whether guests may join the waitlist for a date (ADR-0021). The API refuses true while email is off. */
+  waitlistEnabled: boolean;
 }
 
 export interface OnlineBookingSaved extends OnlineBooking {
@@ -243,6 +245,7 @@ export interface OnlineBookingForm {
   /** Zone names ticked, in the order ticked. */
   publicZones: string[];
   showServiceNames: boolean;
+  waitlistEnabled: boolean;
   theme: ThemeForm;
 }
 
@@ -267,6 +270,7 @@ export function toForm(s: OnlineBooking): OnlineBookingForm {
     privacyNoticeUrl: s.privacyNoticeUrl ?? "",
     publicZones: s.publicZones ?? [],
     showServiceNames: s.showServiceNames ?? false,
+    waitlistEnabled: s.waitlistEnabled ?? false,
     theme: themeToForm(s.theme),
   };
 }
@@ -363,6 +367,7 @@ export function parseForm(
   else if (!sameSet(form.publicZones, stored.publicZones ?? [])) update.publicZones = [...form.publicZones];
 
   if (form.showServiceNames !== (stored.showServiceNames ?? false)) update.showServiceNames = form.showServiceNames;
+  if (form.waitlistEnabled !== (stored.waitlistEnabled ?? false)) update.waitlistEnabled = form.waitlistEnabled;
 
   const theme = parseTheme(form.theme, errors);
   if (theme && JSON.stringify(theme) !== JSON.stringify(compact(stored.theme)))

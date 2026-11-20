@@ -22,6 +22,7 @@ const STORED: OnlineBooking = {
   privacyNoticeUrl: null,
   publicZones: [],
   showServiceNames: false,
+  waitlistEnabled: false,
 };
 
 const PROFILE: PublicProfile = {
