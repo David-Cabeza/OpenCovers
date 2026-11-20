@@ -11,7 +11,7 @@ Nothing in this record is built. It proposes how guest emails follow the languag
 | # | Question | Recommended | Main alternative rejected |
 | --- | --- | --- | --- |
 | 1 | Where the language comes from | The widget sends the locale it shows as an optional `locale` on the public create, one of the seven. The reservation stores it in a nullable `guest_locale`. Erasure and retention reset it to null. Staff bookings store null and use the venue's locale. | The venue's locale only (today). |
-| 2 | Which messages use it | Every email to the guest: confirmation (also sent after a change), cancellation, the `self_service_link` email, the lost-link resend, the guest-cancel notice, and the waitlist join email. Every `/r` link carries `lang=<stored locale>`. The venue's `notice` stays in the venue's locale. | Localizing only the confirmation. |
+| 2 | Which messages use it | Every email to the guest: confirmation (also sent after a change), cancellation, the `self_service_link` email, the lost-link resend, and the waitlist join email. Every `/r` link carries `lang=<stored locale>`. The venue's `notice` stays in the venue's locale. | Localizing only the confirmation. |
 | 3 | How templates are localized | One catalog per locale in `apps/api`, next to the mailer, same ids and slots, a parity test. Plain text only. Fallback: stored locale, then venue locale, then `es`. No venue-editable text. A locale ships only once a native speaker has reviewed its catalog (Q3, decided); until then it falls back along the chain. | Sharing the widget's catalog. |
 | 4 | Contract and data impact | One optional request field, one nullable read field, one migration, amended cases C5, C18, C43, C51, C55, one new case C67. Nothing breaking. | A new event field or webhook field. |
 | 5 | Staging | Six stages, contract first. The catalog stage ships alone and comes before ADR-0021's join email. | One PR for all of it. |
@@ -94,7 +94,7 @@ The reservation stores it as `guest_locale`, nullable text, with a check constra
 
 Option A. A new `apps/api/src/lib/email-messages.ts` holds `EMAIL_CATALOGS = { es, en, ca, fr, de, it, pt }`, typed `Record<EmailMessageId, string>` with ids from `es`. `buildEmail` and `buildLinkEmail` take a resolved locale and read from it. Rules:
 
-- **Same ids and slots.** A test checks every catalog has the keys of `es` and the same `{slot}` names, as `apps/widget/test/messages.test.ts` does. `apps/api/test/locales.test.ts` adds `EMAIL_CATALOGS` to the lists that must equal `LOCALES`.
+- **Same ids and slots.** A test checks every catalog has the keys of `es` and the same `{slot}` names, as `apps/widget/test/messages.test.ts` does. `apps/api/test/locales.test.ts` checks that `EMAIL_CATALOGS` includes `es` and is a subset of `LOCALES`, since only reviewed locales ship (Q3).
 - **Plain text.** `sendEmail` sends `text` only today. v1 keeps that. HTML is a later change.
 - **Formatting.** The date is formatted with `Intl.DateTimeFormat` in the resolved locale, from the calendar date, so the day never shifts. The time stays `formatTime` in the venue's zone.
 - **Fallback.** Stored locale, then the venue's online-booking `locale`, then `es`. A value outside the catalogs (a future column value with no catalog) falls through the chain and never throws.
@@ -139,7 +139,7 @@ ADR-0017 stage 8 needs only stage 2 to send its new emails localized. Its link i
 
 ## 6. Non-goals
 
-Venue-editable templates. SMS. Formatting times in the guest's own time zone (times stay in the venue's zone, as today). Guessing a language from the contact's email domain or phone prefix. A language switch inside the widget. Localizing the staff app or the venue's `notice`.
+Venue-editable templates. SMS. Formatting times in the guest's own time zone (times stay in the venue's zone, as today). Guessing a language from the contact's email domain or phone prefix. A language switch inside the widget. Localizing the staff app, or giving the venue's `notice` the guest's language (it stays in the venue's locale, Q6).
 
 ## Evidence and limits
 

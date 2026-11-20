@@ -921,7 +921,8 @@ paths:
         Erasure returns counts. For each erased reservation the event feed
         emits an `erased` event carrying a tombstone hash. Erasure also resets
         the reservation's consent to `unknown`, its rating to null, its
-        commentary to an empty string, and its reconfirmation to `none`.
+        commentary to an empty string, its reconfirmation to `none`, and its
+        `guestLocale` to null (ADR-0024). Retention resets them the same way.
 
         `guestId` is the guest record id, as returned in `guest.guestId`.
         Erasure by guest id blanks every reservation linked to that guest and
@@ -2123,6 +2124,11 @@ paths:
         `tables`, `rating` or `reconfirmation` fails with
         `invalid_request`.
 
+        Language (ADR-0024, C43, C67). An optional `locale`, one of the
+        seven widget locales in lower case, is stored on the reservation and
+        read by staff as `guestLocale`. Any other value fails with
+        `invalid_request` and writes nothing. Guest emails follow it.
+
         Zone (ADR-0021, section 2, C66, built in stage 5). `zone` is
         accepted only when it is one of the venue's effective public zones
         (`PublicConfig.zones`); any other value fails with
@@ -2212,7 +2218,11 @@ paths:
         address stored on the booking. Otherwise it does nothing. At most
         one email per address and venue every 15 minutes, a reservation in
         at most 3 of them, and at most 5 bookings in one, the earliest
-        first; a booking left out keeps its link (C51). A body without one
+        first; a booking left out keeps its link (C51). The email's text is
+        in the stored `guestLocale` of the earliest booking it names, and
+        each link carries its own booking's stored locale, each falling
+        back to the venue's `locale` and then `es`; the request's own
+        language is never used (ADR-0024, C67). A body without one
         email address fails with `invalid_request`. An unknown or disabled
         key gives `venue_not_found`. Limited by `public_booking` and
         `public_venue`. The config's `linkResend` says whether the resend
@@ -3123,6 +3133,23 @@ components:
           format: date-time
           nullable: true
           description: When the reconfirmation last changed. Null while `reconfirmation` is `none`.
+        guestLocale:
+          type: string
+          nullable: true
+          readOnly: true
+          example: en
+          x-extensible-enum: [es, en, ca, fr, de, it, pt]
+          description: |
+            Read only (ADR-0024). The language the guest booked in: the
+            `locale` sent on the public create, one of the `WidgetLocale`
+            codes, written once at create and never changed after. Null for
+            a public create without `locale` and for every booking made by
+            staff, the API, MCP or a walk-in; emails to the guest then use
+            the venue's online-booking `locale`. A replay of the create key
+            does not change it, and neither does a guest modify. Erasure and
+            retention reset it to null. As with `WidgetLocale`, clients must
+            accept any value on read. It cannot be set through
+            `ReservationCreate` or `ReservationModify` (ADR-0024, Q2).
         status:
           $ref: "#/components/schemas/ReservationStatus"
         type:
@@ -4261,6 +4288,21 @@ components:
         `source` and `service` are ignored. There is no allergy, diet or
         health field.
       properties:
+        locale:
+          type: string
+          enum: [es, en, ca, fr, de, it, pt]
+          example: en
+          description: |
+            Optional (ADR-0024). The language the guest booked in, which the
+            widget sends as the locale it shows. Exactly one of the seven
+            lower-case codes. Any other value, an upper-case code, `null` and
+            a value that is not a string fail with `invalid_request` and
+            write nothing. The staff read shows it as `guestLocale`; without
+            it `guestLocale` is null. It is stored once: a repeat of the
+            create's `Idempotency-Key` changes nothing, whatever `locale` the
+            repeat sends. Emails to the guest about this booking, and the
+            `/r` links in them, use it, falling back to the venue's
+            online-booking `locale` and then `es` (C67).
         zone:
           type: string
           description: |
