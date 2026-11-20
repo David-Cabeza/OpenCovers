@@ -61,6 +61,17 @@ function submitter(answers: Answer[]) {
 
 const error = (status: number, code: string, retryable: boolean): Answer => ({ status, body: { code, retryable } });
 
+describe("guest language", () => {
+  it("sends the locale the widget shows on the create, and nothing when none is given", async () => {
+    const withLocale = scriptedServer([{ status: 201, body: created }]);
+    await publicApi("pk_AAAAAAAAAAAAAAAAAAAAAA", withLocale.fetcher, "fr").create("k", fields, challenge(1), "1");
+    expect(withLocale.sent[0].body.locale).toBe("fr");
+    const without = scriptedServer([{ status: 201, body: created }]);
+    await publicApi("pk_AAAAAAAAAAAAAAAAAAAAAA", without.fetcher).create("k", fields, challenge(1), "1");
+    expect("locale" in without.sent[0].body).toBe(false);
+  });
+});
+
 describe("idempotency key per attempt", () => {
   it("resends the same key, challenge and solution after a network failure", async () => {
     const { submit, sent } = submitter(["network"]);
