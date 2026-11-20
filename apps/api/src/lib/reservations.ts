@@ -19,8 +19,9 @@ import { normalizeContact, venueCountry } from "./contact";
 import { linkGuest } from "./guests";
 import { sandboxGuestsFull, sandboxReservationsFull } from "../demo/limits";
 import { demoMode } from "../demo/settings";
+import { appendEvents } from "./events";
 import { claimKey } from "./idempotency";
-import { originColumns, type Origin } from "./origin";
+import type { Origin } from "./origin";
 import { ratingColumns, type Rating } from "./rating";
 import { reconfirmationColumns, type Reconfirmation } from "./reconfirmation";
 import { linkWorks, mintLink, revokeForCancel, rotateLink } from "./self-service";
@@ -970,13 +971,7 @@ export async function createReservation(
         kind: "create",
         version: 1,
       });
-      await tx.insert(events).values({
-        venueId,
-        type: "created",
-        reservationId: id,
-        version: 1,
-        ...originColumns(input.origin),
-      });
+      await appendEvents(tx, venueId, [{ type: "created", reservationId: id, version: 1, origin: input.origin }]);
       return { id, version: 1, selfServiceToken: link?.token };
     }));
     return { ok: true, ...result };
@@ -1198,7 +1193,7 @@ export async function modifyReservation(
         }
       }
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "modify", version: nextVersion });
-      await tx.insert(events).values({ venueId, type: "modified", reservationId: id, version: nextVersion, ...originColumns(input.origin) });
+      await appendEvents(tx, venueId, [{ type: "modified", reservationId: id, version: nextVersion, origin: input.origin }]);
       return nextVersion;
     }));
     return { ok: true, id, version };
@@ -1247,10 +1242,10 @@ export async function cancelReservation(
       // Erasure already wrote this reservation's tombstone, with the same hash.
       await tx.insert(tombstones).values({ reservationId: id, venueId, hash }).onConflictDoNothing();
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "cancel", version: nextVersion });
-      await tx.insert(events).values({ venueId, type: "cancelled", reservationId: id, version: nextVersion, ...originColumns(origin) });
       if (guest && !(await revokeForCancel(tx, guest.linkId, key))) {
         throw new ReservationError("self_service_link_invalid");
       }
+      await appendEvents(tx, venueId, [{ type: "cancelled", reservationId: id, version: nextVersion, origin }]);
     });
     return { ok: true, hash };
   } catch (error) {
@@ -1305,7 +1300,7 @@ export async function setStatus(
         await tx.update(tableAllocations).set({ active: false }).where(eq(tableAllocations.reservationId, id));
       }
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "status", version: nextVersion });
-      await tx.insert(events).values({ venueId, type: status, reservationId: id, version: nextVersion, ...originColumns(origin) });
+      await appendEvents(tx, venueId, [{ type: status, reservationId: id, version: nextVersion, origin }]);
       return nextVersion;
     });
     return { ok: true, id, version };

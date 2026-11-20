@@ -4,6 +4,7 @@ import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
 import { idempotencyKeys, reservations, services, tableAllocations, tables, tombstones, venues } from "../src/db/schema";
 import { cancelReservation, createReservation } from "../src/lib/reservations";
+import { appendEvents } from "../src/lib/events";
 import { eraseReservations } from "../src/lib/venue";
 
 const DATE = "2026-11-12";
@@ -29,7 +30,7 @@ async function book(venueId: string, key: string, time = "20:00") {
 async function erase(venueId: string, id: string) {
   await db.transaction(async (tx) => {
     const [row] = await tx.select().from(reservations).where(eq(reservations.id, id));
-    await eraseReservations(tx, venueId, [{ id, version: row.version }]);
+    await appendEvents(tx, venueId, await eraseReservations(tx, venueId, [{ id, version: row.version }]));
   });
 }
 

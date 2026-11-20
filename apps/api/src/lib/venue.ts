@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, ne, or } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
-  events,
   guestAudit,
   guests,
   reservations,
@@ -15,7 +14,8 @@ import * as schema from "../db/schema";
 import type { CountryCode } from "libphonenumber-js";
 import type { DateRange } from "./booking-policy";
 import { consentColumns } from "./consent";
-import { originColumns, type Origin } from "./origin";
+import { appendEvents, type NewEvent } from "./events";
+import type { Origin } from "./origin";
 import { countBlocklistEntries, guestContactKeys } from "./blocklist";
 import { normalizeContact, venueCountry } from "./contact";
 import { forgetMergeState, movedAtMerge } from "./guests";
@@ -243,7 +243,7 @@ export async function erase(
             .for("update")
         : [];
     const family = await withMerged(tx, venueId, linkedGuests);
-    await eraseReservations(tx, venueId, matches, origin);
+    const erasedEvents = await eraseReservations(tx, venueId, matches, origin);
 
     const targets = guestId ? byGuest : await unreferenced(tx, venueId, family);
     const targetIds = targets.map((g) => g.id);
@@ -264,15 +264,12 @@ export async function erase(
             contactKey?.value ?? null,
           ])
         : 0);
-    return {
-      erasedReservations: matches.length,
-      erasedGuests: targetIds.length,
-      erasedWaitlistEntries,
-      blocklistEntriesKept: await countBlocklistEntries(tx, venueId, [
-        ...targets.flatMap(guestContactKeys),
-        ...(contactKey ? [contactKey] : []),
-      ]),
-    };
+    const blocklistEntriesKept = await countBlocklistEntries(tx, venueId, [
+      ...targets.flatMap(guestContactKeys),
+      ...(contactKey ? [contactKey] : []),
+    ]);
+    await appendEvents(tx, venueId, erasedEvents);
+    return { erasedReservations: matches.length, erasedGuests: targetIds.length, erasedWaitlistEntries, blocklistEntriesKept };
   });
 }
 
@@ -345,13 +342,18 @@ async function resolveTargets(
   return { contact, contactKey, byGuest, matches };
 }
 
+/**
+ * Blanks the reservations and writes their tombstones. It returns their `erased` events instead of writing them:
+ * the caller appends them as its last statement, so the events lock is held only for that tail (lib/events.ts).
+ */
 export async function eraseReservations(
   tx: DbTx,
   venueId: string,
   rows: { id: string; version: number }[],
   origin: Origin | null = null,
-): Promise<void> {
+): Promise<NewEvent[]> {
   await deleteLinks(tx, venueId, rows.map((m) => m.id));
+  const erased: NewEvent[] = [];
   for (const m of rows) {
     const hash = await sha256Hex(m.id);
     await tx
@@ -369,15 +371,9 @@ export async function eraseReservations(
       .where(and(eq(reservations.venueId, venueId), eq(reservations.id, m.id)));
     // A cancel already wrote this reservation's tombstone, with the same hash.
     await tx.insert(tombstones).values({ reservationId: m.id, venueId, hash }).onConflictDoNothing();
-    await tx.insert(events).values({
-      venueId,
-      type: "erased",
-      reservationId: m.id,
-      version: m.version,
-      tombstoneHash: hash,
-      ...originColumns(origin),
-    });
+    erased.push({ type: "erased", reservationId: m.id, version: m.version, tombstoneHash: hash, origin });
   }
+  return erased;
 }
 
 type Guest = typeof guests.$inferSelect;

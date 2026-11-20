@@ -1,5 +1,6 @@
 import { and, eq, gte, inArray, isNotNull, isNull, lt, ne, notExists, or } from "drizzle-orm";
 import { guestAudit, guestBlocklist, guests, membershipAudit, reservations, venues, waitlist } from "../db/schema";
+import { appendEvents } from "./events";
 import { forgetMergeState } from "./guests";
 import { deleteLapsedInvitations } from "./invitations";
 import { pruneEvents } from "./reservations";
@@ -83,7 +84,7 @@ async function expireGuests(db: Db, venueId: string, cutoff: Date, limit: number
           eq(reservations.erased, false),
         ),
       );
-    await eraseReservations(tx, venueId, visits);
+    const erased = await eraseReservations(tx, venueId, visits);
     await tx
       .update(guests)
       .set({ email: null, phone: null, name: "" })
@@ -92,6 +93,7 @@ async function expireGuests(db: Db, venueId: string, cutoff: Date, limit: number
       .insert(guestAudit)
       .values(ids.map((id) => ({ venueId, guestId: id, action: "expired" as const, principal: "retention" })));
     await forgetMergeState(tx, venueId, ids);
+    await appendEvents(tx, venueId, erased);
     return roots.length;
   });
 }
@@ -118,7 +120,7 @@ async function expireUnlinkedReservations(
       .orderBy(reservations.endsAt, reservations.id)
       .limit(limit)
       .for("update", { skipLocked: true });
-    await eraseReservations(tx, venueId, due);
+    await appendEvents(tx, venueId, await eraseReservations(tx, venueId, due));
     return due.length;
   });
 }
