@@ -116,7 +116,7 @@ const faqs = [
   {
     t: "Estado",
     q: "¿En qué estado está?",
-    a: "Pre-alfa. Funciona y se prueba en local, con tests y casos de conformidad en verde. El widget de reservas para la web del local está en curso. Todavía no hay un servicio gestionado en producción.",
+    a: "Pre-alfa. El motor, la app de sala y el servidor MCP funcionan en local y pasan sus tests. El widget de reservas para la web del local está en curso. Hay una demo alojada para pruebas internas, que se abrirá al público tras la revisión legal. Todavía no hay un servicio gestionado en producción.",
   },
   {
     t: "Hosting",
@@ -697,7 +697,7 @@ function Cta() {
       <div className="l">
         <h2 className="rv">Hazlo tuyo.</h2>
         <p className="rv" style={d(90)}>
-          Clona el repositorio, levanta PostgreSQL con Docker y monta tu primer local. Necesitas Node.js 22+, pnpm y Docker.
+          Clona el repositorio, levanta PostgreSQL con Docker y monta tu primer local. Necesitas Node.js 22.9+, pnpm y Docker.
         </p>
       </div>
       <div className="r">
