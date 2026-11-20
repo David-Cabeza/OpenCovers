@@ -109,6 +109,7 @@ export const DEMO_TEMPLATE: DemoTemplate = {
     maxAdvanceDays: 60,
     selfServiceCutoffMinutes: 120,
     locale: "es",
+    privacyNoticeUrl: "https://opencovers.dev/privacidad.html",
   },
   guests: [
     { name: "Lucia Prado", local: "lucia.prado" },
