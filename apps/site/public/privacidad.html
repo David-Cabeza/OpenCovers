@@ -4,7 +4,7 @@
   Los hechos sobre la demo salen del código; cada afirmación lleva su fuente en la descripción del PR que añadió esta versión.
 
   Puntos abiertos para quien revise:
-  1. Responsable del tratamiento: David Cabeza, autónomo, con domicilio en Madrid. El NIF y la dirección no están en el repositorio público: se ponen al publicar la web (marcador [RESPONSABLE]).
+  1. Responsable del tratamiento: David Cabeza, autónomo, con domicilio en Madrid. El NIF y la dirección no están en el repositorio público: el despliegue los pone desde los secretos LEGAL_TAX_ID y LEGAL_ADDRESS.
   2. Buzón de privacidad: privacidad@opencovers.dev, activo con Cloudflare Email Routing hacia el buzón del propietario (prueba de recepción correcta).
   3. Base jurídica de cada finalidad. Propuesta del equipo, sin validar:
      - cuenta, sesión y restaurante de prueba: ejecución de un contrato o medidas precontractuales a petición del visitante;
@@ -85,7 +85,8 @@
 
       <h2>Responsable</h2>
       <p>
-        <span class="todo">[RESPONSABLE: NIF y dirección se añaden al publicar, no están en el repositorio]</span><br />
+        NIF {{LEGAL_TAX_ID}}.<br />
+        {{LEGAL_ADDRESS}}.<br />
         Correo para cualquier asunto de privacidad:
         <a href="mailto:privacidad@opencovers.dev">privacidad@opencovers.dev</a>.
       </p>
