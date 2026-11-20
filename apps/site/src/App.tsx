@@ -30,7 +30,7 @@ const bands = [
   },
   {
     s: "Dibujas tu sala y la usas.",
-    c: "Mesas redondas, cuadradas y rectangulares con sillas. Arrastra, rota y redimensiona con ajuste a rejilla.",
+    c: "Mesas redondas, ovaladas, cuadradas, rectangulares y largas con sillas, y elementos de sala como barra, cocina, columnas o chimenea. Arrastra, rota y redimensiona con ajuste a rejilla.",
     on: "var(--f3)",
   },
   {
@@ -100,8 +100,7 @@ const modules = [
 
 const challenges = [
   { title: "Ficha de cliente en sala", tag: "producto", body: "Una pantalla con la ficha y el historial de visitas. El motor ya guarda un cliente por local." },
-  { title: "Por qué está cerrado, en sala", tag: "producto", body: "Mostrar en la app de sala la explicación que la API ya da de un hueco cerrado." },
-  { title: "El widget en más idiomas", tag: "producto", body: "El widget habla español e inglés. Añadir otro idioma es una tarea pequeña y sin dependencias." },
+  { title: "Revisar o añadir idiomas del widget", tag: "producto", body: "El widget habla siete idiomas: español, inglés, catalán, francés, alemán, italiano y portugués. Revisar una traducción o añadir otro idioma es una tarea pequeña y sin dependencias." },
   { title: "Temas declarativos", tag: "producto", body: "Paquetes de tema solo de datos que se puedan compartir. El local ya cambia colores, fuente y logo desde Setup." },
   { title: "Primer adaptador de TPV", tag: "integración", body: "Leer la reserva de una mesa, enviar la cuenta y liberar la mesa." },
   { title: "Pagos con Stripe y Redsys", tag: "motor", body: "Depósitos y garantías con la cuenta de pago de cada local." },

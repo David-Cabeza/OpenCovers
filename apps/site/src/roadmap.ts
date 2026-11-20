@@ -10,7 +10,6 @@ export const phases: Phase[] = [
       "Ficha de cliente en la app de sala, con notas e historial de visitas.",
       "Alergias y dieta como campo propio, cuando pase la revisión legal.",
       "Etiquetas manuales y por reglas, con aviso en la reserva.",
-      "Ver en la app de sala por qué un hueco está cerrado.",
     ],
     exit: "Sala ve quién viene y qué necesita, y una plataforma puede preguntar por qué un hueco está cerrado.",
   },

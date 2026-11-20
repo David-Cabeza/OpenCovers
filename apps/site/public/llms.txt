@@ -2,6 +2,8 @@
 
 > OpenCovers is an open source reservation engine for restaurants: availability, bookings, tables and a signed event feed, exposed through an HTTP API and an MCP server with 18 tools over stdio. Pre-alpha. License: Apache-2.0. Built with Node.js, Hono, Drizzle and PostgreSQL. PostgreSQL enforces the no-double-booking rule with a GiST exclusion constraint. The MCP server is the npm package `@opencovers/mcp` (`npx -y @opencovers/mcp`).
 
+The product around the engine: a staff app (agenda, availability, floor plan, setup; Spanish and English) and a guest booking widget for a venue's own site (seven languages, light and dark).
+
 ## Start here
 
 - [Overview for developers (English)](https://opencovers.dev/en/): what it is, guarantees, API, MCP server and local setup.
