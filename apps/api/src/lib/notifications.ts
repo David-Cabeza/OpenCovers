@@ -4,6 +4,8 @@ import { reservations, sentEmails, venues } from "../db/schema";
 import * as schema from "../db/schema";
 import { mailIdentity, mayEmail } from "../demo/limits";
 import { resolveEmailLocale } from "./email-messages";
+import { emailVenue } from "./email-venue";
+import { icsUid } from "./ics";
 import { getOnlineBooking } from "./online-booking";
 import { buildEmail, sendEmail, type EmailKind } from "./mailer";
 import { formatTime } from "./time";
@@ -69,28 +71,23 @@ export async function notifyReservation(
     if (already) return;
     if (guestModify && !(await claimGuestModify(db, venueId, reservationId, version))) return;
 
-    const locale = resolveEmailLocale(reservation.guestLocale, (await getOnlineBooking(db, venueId))?.locale);
-    const { subject, text, html } = buildEmail(
+    const online = await getOnlineBooking(db, venueId);
+    const locale = resolveEmailLocale(reservation.guestLocale, online?.locale);
+    const { subject, text, html, attachments } = buildEmail(
       kind,
       {
-        venueName: venue.name,
+        venue: emailVenue(venue, online?.theme),
         date: reservation.date,
         time: formatTime(reservation.startsAt, venue.timezone),
         partySize: reservation.partySize,
-        guestName: reservation.guestName,
         service: reservation.service,
+        ...(kind === "notice" ? { guestName: reservation.guestName } : {}),
+        booking: { uid: icsUid(venueId, reservationId), version, startsAt: reservation.startsAt, endsAt: reservation.endsAt },
       },
       locale,
     );
     const identity = await mailIdentity(db, venueId, venue);
-    await sendEmail(
-      identity.apiKey,
-      identity.from,
-      to,
-      subject,
-      text,
-      html,
-    );
+    await sendEmail(identity.apiKey, identity.from, to, subject, text, html, attachments);
     await db
       .insert(sentEmails)
       .values({ id: crypto.randomUUID(), venueId, reservationId, kind, version })
