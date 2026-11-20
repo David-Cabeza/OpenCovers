@@ -26,9 +26,10 @@ const LAST_ERROR_MAX = 500;
 // (BATCH_SIZE events at TIMEOUT_MS each) so a live worker never loses its
 // endpoint mid-batch. A crashed worker's endpoint frees up when it expires.
 const LEASE_MS = 5 * 60_000;
-// Event ids come from a sequence, so a transaction can commit id N after
-// another committed N+1. Holding back events younger than this window keeps
-// a cursor from moving past an id that is about to appear.
+// No longer needed for correctness: the events lock (lib/events.ts) makes a
+// venue's commit order its id order, so a cursor never passes an id that is
+// still to appear. It never covered a long write either, as occurred_at is the
+// writer's transaction start. Kept for now and can be removed (ADR-0024).
 const SETTLE_MS = 2_000;
 
 export type EndpointState = typeof webhookEndpoints.$inferSelect;

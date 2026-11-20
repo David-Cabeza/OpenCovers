@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { sql } from "drizzle-orm";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import app from "../src/app";
 import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
 import { services, tables, venues, webhookEndpoints } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
 import { createReservation, getEvents, pruneEvents } from "../src/lib/reservations";
+import { erase } from "../src/lib/venue";
 import type { ResolvedAddress, TargetPolicy } from "../src/lib/webhook-target";
 import {
   backoffMs,
@@ -17,6 +18,7 @@ import {
   type DeliveryDeps,
   type WebhookRequest,
 } from "../src/lib/webhooks";
+import { PARK, dropParkTrigger, holdPark, installParkTrigger, parked, settlesOrBlocks, waitUntil } from "./event-park";
 
 const PUBLIC_V4 = "93.184.215.14";
 const PUBLIC_V6 = "2606:2800:21f:cb07:6820:80da:af6b:8b2c";
@@ -374,6 +376,54 @@ describe("webhook claims across workers", () => {
     await first;
     await runWebhookDeliveries(db, deps);
     expect(receiver.idsFor(hook.url)).toEqual(ids);
+  });
+});
+
+describe("webhook delivery beside a slow erasure", () => {
+  beforeAll(installParkTrigger);
+  afterAll(dropParkTrigger);
+
+  it("delivers every event when bookings of the venue commit while its erasure is still open", async () => {
+    const { receiver, policy, deps } = setup();
+    const venueId = await seedVenue();
+    const ERASED = 20;
+    for (let i = 0; i < ERASED; i++) {
+      const res = await createReservation(
+        db,
+        venueId,
+        {
+          date: `2028-01-${String(i + 1).padStart(2, "0")}`,
+          time: "20:00",
+          durationMinutes: 120,
+          partySize: 2,
+          tableIds: ["1"],
+          ownerPrincipal: "eraser",
+          guestName: "Eva",
+          guestContact: `eva${i}@example.com`,
+        },
+        `wh-erase-seed-${i}`,
+      );
+      if (!res.ok) throw new Error(`seed failed: ${res.code}`);
+    }
+    const before = new Set((await getEvents(db, venueId, 0, 1000)).map((e) => e.id));
+    const hook = await register(venueId, "https://a.example/hook", policy);
+
+    // The erasure stops between its event insert and its commit, as a long one does.
+    const hold = await holdPark();
+    const erasure = erase(db, venueId, undefined, "eraser", "", { channel: "api", actor: PARK });
+    await waitUntil(async () => (await parked()) === 1, "the erasure to park");
+    const bookings = book(venueId, 3);
+    await settlesOrBlocks(bookings, 1);
+    await runWebhookDeliveries(db, deps);
+    await runWebhookDeliveries(db, deps);
+    await hold.release();
+    expect((await erasure).erasedReservations).toBe(ERASED);
+    await bookings;
+    for (let i = 0; i < 3; i++) await runWebhookDeliveries(db, deps);
+
+    const written = (await getEvents(db, venueId, 0, 1000)).filter((e) => !before.has(e.id));
+    expect(written.filter((e) => e.type === "erased")).toHaveLength(ERASED);
+    expect(receiver.idsFor(hook.url)).toEqual(written.map((e) => String(e.id)));
   });
 });
 

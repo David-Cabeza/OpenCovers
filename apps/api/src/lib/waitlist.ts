@@ -139,6 +139,7 @@ export async function seatWaitlist(
     );
     if (!result.ok) return result;
 
+    // After the walk-in's event, so it must not wait: this transaction already holds the entry's row lock.
     await tx
       .update(waitlist)
       .set({ status: "seated", reservationId: result.id })
