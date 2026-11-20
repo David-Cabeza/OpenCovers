@@ -35,7 +35,8 @@ info:
     through MCP. A guest names a venue with its public booking key, which
     is a lookup handle and not a secret, and names one booking with a
     self-service token in the `X-Self-Service-Token` header. No public
-    response holds another guest's data, a table id, a zone, a reservation
+    response holds another guest's data, a table id, a zone other than the
+    venue's effective public zones (C66), a reservation
     id, a guest id, attribution, a key other than the booking key it was
     called with, or an unmasked contact. Every answer under `/public/`, an
     error included, sends `Cache-Control: no-store` and no CORS headers.
@@ -1784,7 +1785,9 @@ paths:
         only and is ignored in the body. Every invalid field fails with
         `invalid_request` and changes nothing, including a `confirmationMode`
         other than `auto` (`approval` is reserved until stage 14 of
-        ADR-0017).
+        ADR-0017). `publicZones` is checked against the venue's tables when
+        it is sent; a save that leaves it out does not check it again
+        (C66).
 
         Setting `enabled` to true needs a venue name and at least one
         service bookable online, a service named in `services` (any service
@@ -1899,8 +1902,9 @@ paths:
         only while that profile is enabled, the online party limits, the
         weekdays with an online service, the effective lead time and
         horizon, whether the consent question is shown, the confirmation
-        mode, the venue's privacy notice URL or null, and a fresh form
-        challenge. It never holds the venue id, any other address,
+        mode, the venue's privacy notice URL or null, the effective public
+        zones when there are two or more (`zones`, otherwise `[]`, C66),
+        and a fresh form challenge. It never holds the venue id, any other address,
         `noticeAddress`, an email, a key other than the booking key in the
         path, or any booking. See
         docs/adr/0021-widget-day-status-zones-waitlist.md, section 5.
@@ -1936,8 +1940,11 @@ paths:
       summary: List the times a guest can book online for a date and party size
       description: |
         Public, with no credentials. Returns only the times a public create
-        would accept now, sorted, with no service names, table ids, zones,
-        counts of free covers or seats, or anything about other bookings. It
+        would accept now, sorted, with no table ids, counts of free covers
+        or seats, or anything about other bookings. Zone names appear only
+        as the venue's effective public zones in `slots[].zones`, and
+        service names only in `slots[].service` while `showServiceNames` is
+        on (C66). It
         runs the same reason functions as the staff availability and the
         create, with the online limits on top: the online services and
         weekdays, the online party limits, and the stricter of the online
@@ -1958,6 +1965,18 @@ paths:
         unknown or disabled key gives `venue_not_found` as
         `public.getConfig` does. Limited by `public_read`. Not exposed
         through MCP.
+
+        Zones and services (ADR-0021, section 2, C66). With two or more
+        effective public zones, or `showServiceNames` on, the answer adds
+        `slots`, one entry per time of `times`: `zones` lists the public
+        zones with a free table for that time and party, and `service`
+        names the service. `times` is exactly the times of `slots`, so a
+        client that ignores `slots` keeps working. The optional `zone`
+        query must be one of the config's `zones`, otherwise
+        `invalid_request`; with it only the times with a table in that
+        zone are returned, and each agrees with a public create in that
+        zone. Without either setting the answer is as before and has no
+        `slots`. Built in stage 5 of ADR-0021.
       security: []
       parameters:
         - $ref: "#/components/parameters/bookingKey"
@@ -1969,6 +1988,16 @@ paths:
           in: query
           required: true
           schema: { type: integer, minimum: 1 }
+        - name: zone
+          in: query
+          required: false
+          description: |
+            One of the venue's effective public zones (`PublicConfig.zones`),
+            compared exactly. Any other value, and any value while the venue
+            has fewer than two effective public zones, fails with
+            `invalid_request`. Narrows `times` and `slots` to the times with
+            a free table in that zone (C66).
+          schema: { type: string }
       responses:
         "200":
           description: The bookable times
@@ -2030,6 +2059,11 @@ paths:
         inside the online limits that no service takes gets `full` on the
         dates the venue serves online, as availability gives it no time.
 
+        It takes no `zone` in v1, and a status covers every table, as a
+        create without `zone`. A day shown `available` may have no table in
+        the zone a guest chose; the times of `public.availability` with
+        that `zone` are authoritative (C66).
+
         The answer holds no table id, zone, service name, count of tables,
         covers or seats, or guest data. It takes no contact, so the
         per-contact caps and the guest blocklist never change it. An
@@ -2084,8 +2118,18 @@ paths:
         booking is `booked` at once. It always holds a table, and when no
         free table combination fits the party at that time the create fails
         with `slot_taken`, whatever the venue's ceiling. A body that names
-        `tables`, `zone`, `rating` or `reconfirmation` fails with
+        `tables`, `rating` or `reconfirmation` fails with
         `invalid_request`.
+
+        Zone (ADR-0021, section 2, C66, built in stage 5). `zone` is
+        accepted only when it is one of the venue's effective public zones
+        (`PublicConfig.zones`); any other value fails with
+        `invalid_request` and writes nothing. With it the booked table is
+        in that zone, through the same table search as a staff create with
+        `zone`, and when no free table or combination in that zone fits the
+        party at that time the create fails with `slot_taken`. Without it
+        the create uses every table, as before. The guest view does not
+        show the zone; the staff read does.
 
         The guest's contact must normalize to an email or a phone, otherwise
         `invalid_request`. The contact is held to two caps. The venue's
@@ -3887,6 +3931,36 @@ components:
             and the widget then shows a link to it next to the submit button.
             The scheme may be written in any case, and the value is stored
             as sent. OpenCovers writes no legal text (ADR-0021, section 5).
+        publicZones:
+          type: array
+          maxItems: 10
+          uniqueItems: true
+          default: []
+          items: { type: string, minLength: 1 }
+          description: |
+            The zone names a guest may choose online (ADR-0021, section 2).
+            Empty, the default, or 2 to 10 distinct names, each the `zone`
+            of at least one of the venue's tables when saved, compared
+            exactly. A list of exactly one, more than 10, a duplicate, an
+            empty name, a name that is no table's zone, or a value that is
+            not an array of strings fails with `invalid_request` and
+            changes nothing. Not nullable: `[]` clears it. The order is
+            kept and is the order the public answers use. The guest sees
+            the names as stored; a public label per zone and locale may
+            come later. The public channel uses the effective public zones:
+            the names of this list that are still the zone of at least one
+            table. With fewer than two of them nothing changes in the
+            public channel. The API returns this field from stage 5 of
+            ADR-0021, which then lists it in `required`.
+        showServiceNames:
+          type: boolean
+          default: false
+          description: |
+            Whether public availability names the service of each time in
+            `slots[].service`, so the widget can group times by service
+            (ADR-0021, Q3). Off, the default, no public answer holds a
+            service name (C40). The API returns this field from stage 5 of
+            ADR-0021, which then lists it in `required`.
 
     OnlineBookingUpdate:
       type: object
@@ -3921,6 +3995,8 @@ components:
             - $ref: "#/components/schemas/Theme"
           nullable: true
         privacyNoticeUrl: { type: string, format: uri, nullable: true, maxLength: 2048 }
+        publicZones: { type: array, maxItems: 10, uniqueItems: true, items: { type: string, minLength: 1 } }
+        showServiceNames: { type: boolean }
 
     OnlineBookingSaved:
       allOf:
@@ -4069,21 +4145,69 @@ components:
             The online booking setting `privacyNoticeUrl` as stored, or null
             when the venue set none. When set, the widget links to it next to
             the submit button. When null, it shows no notice link (C64).
+        zones:
+          type: array
+          items: { type: string }
+          description: |
+            The effective public zones (`OnlineBooking.publicZones`), in
+            the venue's order, when there are two or more; otherwise `[]`.
+            Only these names may be sent as `zone` to availability and the
+            create (C66). The API returns this field from stage 5 of
+            ADR-0021, which then lists it in `required`.
 
     PublicAvailability:
       type: object
       required: [date, partySize, times, reason]
+      description: |
+        `slots` is present only when the venue has two or more effective
+        public zones or `showServiceNames` on. Without either the answer is
+        `{ date, partySize, times, reason }` (C42, C66).
       properties:
         date: { type: string, format: date }
         partySize: { type: integer }
         times:
           type: array
-          description: The bookable local times, ascending, each listed once.
+          description: |
+            The bookable local times, ascending, each listed once. When
+            `slots` is present, exactly the times of `slots`.
           items: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "21:30" }
+        slots:
+          type: array
+          description: |
+            One entry per time of `times`, in the same order. With the
+            `zone` query, only the times with a table in that zone, so
+            `times` is narrowed the same way. The API sends it from stage 5
+            of ADR-0021 (C66).
+          items: { $ref: "#/components/schemas/PublicSlot" }
         reason:
           type: [string, "null"]
           enum: [past_date, beyond_horizon, null]
           description: Why `times` is empty, when the date itself is the cause. `null` when `times` is not empty or for any other reason.
+
+    PublicSlot:
+      type: object
+      required: [time]
+      description: |
+        One bookable time. It holds no table id and no count of tables,
+        covers or seats.
+      properties:
+        time: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "21:30" }
+        zones:
+          type: array
+          items: { type: string }
+          description: |
+            Present only when the venue has two or more effective public
+            zones. The public zones in which a free table or combination
+            fits the party at this time, in the venue's order. A public
+            create with one of them as `zone` books at this time. It is
+            `[]` when only a table outside the public zones fits: the time
+            is then bookable only by a create without `zone`, which uses
+            every table.
+        service:
+          type: string
+          description: |
+            Present only when `showServiceNames` is on. The name of the
+            service a public create at this time books under.
 
     PublicDays:
       type: object
@@ -4139,10 +4263,22 @@ components:
       type: object
       required: [date, time, partySize, guest, challenge, solution]
       description: |
-        `tables`, `zone`, `rating` and `reconfirmation` fail with
-        `invalid_request`. `basis`, `ownerPrincipal`, `bookedVia`, `source`
-        and `service` are ignored. There is no allergy, diet or health field.
+        `tables`, `rating` and `reconfirmation` fail with
+        `invalid_request`, and so does a `zone` that is not one of the
+        config's `zones` (C66). `basis`, `ownerPrincipal`, `bookedVia`,
+        `source` and `service` are ignored. There is no allergy, diet or
+        health field.
       properties:
+        zone:
+          type: string
+          description: |
+            Optional. One of the venue's effective public zones
+            (`PublicConfig.zones`), compared exactly. The engine then assigns
+            a table in that zone, as a staff create with `zone`. Any other
+            value, and any value while the venue has fewer than two
+            effective public zones, fails with `invalid_request` and writes
+            nothing. Without it the create uses every table, as before
+            (ADR-0021, Q4). Accepted from stage 5 of ADR-0021.
         date: { type: string, format: date }
         time: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "21:30" }
         partySize: { type: integer, minimum: 1 }
