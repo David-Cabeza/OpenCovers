@@ -26,12 +26,15 @@
 	}
 
 	# The booking widget never shares the staff origin in production (ADR-0017, Q1). It has its own site below.
+	# The 404 reads as a page, not as a blank screen. Styles are attributes, because `{` opens a placeholder here.
 	handle /w/* {
-		respond 404
+		header Content-Type "text/html; charset=utf-8"
+		respond "<!doctype html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><meta name='robots' content='noindex'><title>Esta dirección no existe</title></head><body style='font:16px/1.5 system-ui,sans-serif;max-width:28rem;margin:4rem auto;padding:0 16px;color:#1f2933'><h1 style='font-size:1.25rem'>Aquí no hay nada que reservar</h1><p>Esta dirección no existe o ya no está activa. Reserva desde la web del restaurante o llámalo directamente.</p><p lang='en' style='color:#52606d'>There is nothing to book here. Book from the restaurant's website or call them directly.</p></body></html>" 404
 	}
 
 	handle /r {
-		respond 404
+		header Content-Type "text/html; charset=utf-8"
+		respond "<!doctype html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><meta name='robots' content='noindex'><title>Esta dirección no existe</title></head><body style='font:16px/1.5 system-ui,sans-serif;max-width:28rem;margin:4rem auto;padding:0 16px;color:#1f2933'><h1 style='font-size:1.25rem'>Aquí no hay nada que reservar</h1><p>Esta dirección no existe o ya no está activa. Reserva desde la web del restaurante o llámalo directamente.</p><p lang='en' style='color:#52606d'>There is nothing to book here. Book from the restaurant's website or call them directly.</p></body></html>" 404
 	}
 
 	handle /v1/* {
@@ -84,6 +87,7 @@
 	}
 
 	handle {
-		respond 404
+		header Content-Type "text/html; charset=utf-8"
+		respond "<!doctype html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><meta name='robots' content='noindex'><title>Esta dirección no existe</title></head><body style='font:16px/1.5 system-ui,sans-serif;max-width:28rem;margin:4rem auto;padding:0 16px;color:#1f2933'><h1 style='font-size:1.25rem'>Aquí no hay nada que reservar</h1><p>Esta dirección no existe o ya no está activa. Reserva desde la web del restaurante o llámalo directamente.</p><p lang='en' style='color:#52606d'>There is nothing to book here. Book from the restaurant's website or call them directly.</p></body></html>" 404
 	}
 }

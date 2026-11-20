@@ -66,7 +66,7 @@ import { findLink, reissueLink, type Link } from "./lib/self-service";
 import {
   defaultWidgetDist,
   embedScriptHeaders,
-  NOT_FOUND_HTML,
+  notFoundHtml,
   readWidgetAsset,
   SELF_SERVICE_TITLES,
   selfServiceHeaders,
@@ -475,7 +475,8 @@ app.post("/v1/public/:bookingKey/reservations", async (c) => {
 // The widget page (ADR-0017 section 1). The API serves it, not Caddy, because `frame-ancestors` is per venue.
 // Not rate limited. An unknown, rotated or disabled key, and a host that is not the widget's, read alike.
 const widgetDist = () => process.env.WIDGET_DIST || defaultWidgetDist();
-const widgetNotFound = (c: any) => c.body(NOT_FOUND_HTML, 404, widgetHeaders([]));
+const widgetNotFound = (c: any) =>
+  c.body(notFoundHtml(c.req.query("lang"), c.req.header("accept-language")), 404, widgetHeaders([]));
 const widgetNotBuilt = (c: any) => {
   console.error(`widget page: no build in ${widgetDist()}. Run pnpm --filter @opencovers/widget build.`);
   return c.body("The booking widget is not built.", 503, {

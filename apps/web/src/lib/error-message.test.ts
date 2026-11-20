@@ -62,7 +62,7 @@ describe("authErrorMessage", () => {
   });
 
   it("explains a demo sandbox at its limit", () => {
-    expect(errorMessage(new ApiError("demo_limit_reached", 409), "f")).toMatch(/reached its limit.*reset the demo/);
+    expect(errorMessage(new ApiError("demo_limit_reached", 409), "f")).toMatch(/reached its limit.*to keep going/);
     expect(CATALOG.es["errors.api.demo_limit_reached" as keyof typeof CATALOG.es]).toMatch(/límite/);
   });
 });

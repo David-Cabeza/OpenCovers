@@ -6,7 +6,7 @@
 //   pnpm demo:seed
 //   ALLDAY=1 pnpm demo:seed      # one service 09:00-23:45, so walk-ins and the waitlist work at any hour
 //
-// It also fills the Team screen: a second member "Andres Roca" (role write, joined by redeeming an
+// It also fills the Team screen: a second member "Andrés Roca" (role write, joined by redeeming an
 // invitation at sign-up) and one pending read invitation for sala@example.com, so the audit log has
 // invitation created and redeemed rows. All through the real routes.
 //
@@ -22,7 +22,7 @@ const BASE = process.env.BASE ?? "http://localhost:3000";
 const EMAIL = process.env.EMAIL ?? "demo@opencovers.test";
 const PASSWORD = process.env.PASSWORD ?? "demo-password-123";
 const OWNER_NAME = process.env.OWNER_NAME ?? "Marta Quiroga";
-const MEMBER_NAME = "Andres Roca";
+const MEMBER_NAME = "Andrés Roca";
 const MEMBER_EMAIL = process.env.MEMBER_EMAIL ?? "andres.roca@example.com";
 const MEMBER_PASSWORD = process.env.MEMBER_PASSWORD ?? "demo-member-123";
 const PENDING_INVITE_EMAIL = DEMO_TEMPLATE.pendingInvitation.email;
