@@ -1,9 +1,9 @@
-import { cimd } from "@better-auth/cimd";
+import { createCimdClientDiscovery } from "@better-auth/cimd";
 import { fetchClientMetadataResource } from "@better-auth/cimd/node";
 import { oauthProvider, type OAuthOptions } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { magicLink } from "better-auth/plugins";
 import { db } from "../db/client";
 import { betterAuthSchema, user } from "../db/schema";
@@ -24,14 +24,16 @@ import {
 import {
   ACCESS_TOKEN_TTL_S,
   AUTHORIZATION_CODE_TTL_S,
+  DEV_AUTH_SECRET,
   MCP_SCOPES,
+  OFFLINE_ACCESS,
   REFRESH_TOKEN_TTL_S,
   mcpRemoteEnabled,
   mcpResourceUri,
 } from "./mcp-remote";
 import { buildMagicLinkEmail, sendEmail } from "./mailer";
 import { LOCALES } from "./online-booking";
-import { decideSignup, signupMode } from "./signup";
+import { decideSignup, isCreator, signupMode } from "./signup";
 
 function invitationToken(
   context: { headers?: Headers; request?: Request } | null,
@@ -60,9 +62,13 @@ const OAUTH_CLOSED_PATHS = [
   "/oauth2/delete-consent",
 ];
 
+const LOGIN_PAGE = "/";
+
 export function oauthProviderOptions(resource: string) {
   return {
-    scopes: [...MCP_SCOPES] as string[],
+    // offline_access only asks for a refresh token. The metadata lists the two scopes that reach the API.
+    scopes: [...MCP_SCOPES, OFFLINE_ACCESS] as string[],
+    advertisedMetadata: { scopes_supported: [...MCP_SCOPES] },
     grantTypes: ["authorization_code", "refresh_token"],
     // Opaque access tokens, so every call reads the token row and revocation is immediate.
     disableJwtPlugin: true,
@@ -72,18 +78,57 @@ export function oauthProviderOptions(resource: string) {
     refreshTokenReuseInterval: 0,
     codeExpiresIn: AUTHORIZATION_CODE_TTL_S,
     allowDynamicClientRegistration: false,
+    // Only the instance owner (the first-user mark) creates a client. Nobody reads, changes or deletes one this way.
+    clientPrivileges: async ({ action, user }) => action === "create" && user !== undefined && isCreator(db, user.id),
     resources: [{ identifier: resource, name: "OpenCovers MCP", accessTokenTtl: ACCESS_TOKEN_TTL_S }],
     clientRegistrationDefaultResources: [resource],
-    loginPage: "/",
+    loginPage: LOGIN_PAGE,
     consentPage: "/oauth/consent",
   } satisfies OAuthOptions<string[]>;
 }
 
-function oauthPlugins() {
+/** The metadata document transport: HTTPS only, every DNS answer public, the socket pinned to the checked address. */
+export const metadataFetcher: typeof fetchClientMetadataResource = fetchClientMetadataResource;
+
+/**
+ * Client ID Metadata Documents (ADR-0014), with one rule on top of the plugin: a document becomes a client row only
+ * for a signed-in person. A request without a session never fetches a new document, so it neither writes rows nor
+ * spends the plugin's fetch budget. On the authorization page it is sent to sign in first, and the page sends the
+ * person back to the same authorization URL afterwards.
+ */
+function signedInMetadataDocuments(fetcher: typeof fetchClientMetadataResource) {
+  const discovery = createCimdClientDiscovery({ fetchClientMetadataResource: fetcher, metadataProfile: "mcp-2026-07-28" });
+  return {
+    ...discovery,
+    resolve: async (...[ctx, clientId, existing]: Parameters<typeof discovery.resolve>) => {
+      if (existing || (await getSessionFromCtx(ctx))) return discovery.resolve(ctx, clientId, existing);
+      if (ctx.path === "/oauth2/authorize") {
+        throw ctx.redirect(`${LOGIN_PAGE}?${new URLSearchParams(ctx.query as Record<string, string>)}`);
+      }
+      return null;
+    },
+  };
+}
+
+function oauthPlugins(fetcher: typeof fetchClientMetadataResource) {
   return [
-    oauthProvider(oauthProviderOptions(mcpResourceUri(baseURL))),
-    cimd({ fetchClientMetadataResource, metadataProfile: "mcp-2026-07-28" }),
+    oauthProvider({
+      ...oauthProviderOptions(mcpResourceUri(baseURL)),
+      extensions: [{ clientDiscovery: signedInMetadataDocuments(fetcher) }],
+    }),
   ];
+}
+
+/** ADR-0014: PKCE and consent hold for every client. The database refuses such a row too (migration 0048). */
+function refuseUnsafeClient(path: string, body: unknown) {
+  if (path !== "/admin/oauth2/create-client" && path !== "/oauth2/create-client") return;
+  const fields = (body ?? {}) as { skip_consent?: unknown; require_pkce?: unknown };
+  if (fields.skip_consent === true || fields.require_pkce === false) {
+    throw new APIError("BAD_REQUEST", {
+      error: "invalid_client_metadata",
+      error_description: "Every client requires PKCE and consent.",
+    });
+  }
 }
 
 /** The browser origins that may sign in and send cookie-authenticated writes (lib/staff-origin.ts). */
@@ -138,6 +183,8 @@ export interface AuthDeps {
   sendMail?: (to: string, subject: string, text: string, html?: string) => Promise<void>;
   /** The magic link challenge issuer and checker. Default: the process-wide one. A test passes one with its own clock. */
   challenges?: () => MagicLinkChallenges;
+  /** The Client ID Metadata Document transport. Default: `metadataFetcher`. A test passes a stub. */
+  fetchMetadata?: typeof fetchClientMetadataResource;
 }
 
 /**
@@ -172,7 +219,7 @@ export function createAuth(settings: DemoSettings, deps: AuthDeps = {}) {
   }
 
   return betterAuth({
-    secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-me",
+    secret: process.env.BETTER_AUTH_SECRET ?? DEV_AUTH_SECRET,
     baseURL,
     database: drizzleAdapter(db, { provider: "pg", schema: betterAuthSchema }),
     emailAndPassword: { enabled: !demo },
@@ -200,22 +247,23 @@ export function createAuth(settings: DemoSettings, deps: AuthDeps = {}) {
                 },
               }
             : undefined,
-          hooks: {
-            before: createAuthMiddleware(async (ctx) => {
-              if (ctx.path !== "/sign-in/magic-link") return;
-              const email = (ctx.body as { email?: unknown } | undefined)?.email;
-              // A body with no usable address never reaches the limits or the mailer (audit F3c).
-              if (typeof email !== "string" || normalizeEmail(email) === null) throw refusal("invalid_address");
-              if (isDisposableEmail(email)) throw new APIError("BAD_REQUEST", DISPOSABLE);
-              // ADR-0022, decision 8(a). The answer never depends on whether the address has an account.
-              const challenge = challenges().check(email, ctx.headers ?? undefined);
-              if (challenge) throw new APIError("BAD_REQUEST", { code: challenge, message: CHALLENGE_MESSAGES[challenge] });
-              const refused = await admissionForEmail(db, email);
-              if (refused) throw refusal(refused);
-            }),
-          },
         }
       : {}),
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (mcpRemote) refuseUnsafeClient(ctx.path, ctx.body);
+        if (!demo || ctx.path !== "/sign-in/magic-link") return;
+        const email = (ctx.body as { email?: unknown } | undefined)?.email;
+        // A body with no usable address never reaches the limits or the mailer (audit F3c).
+        if (typeof email !== "string" || normalizeEmail(email) === null) throw refusal("invalid_address");
+        if (isDisposableEmail(email)) throw new APIError("BAD_REQUEST", DISPOSABLE);
+        // ADR-0022, decision 8(a). The answer never depends on whether the address has an account.
+        const challenge = challenges().check(email, ctx.headers ?? undefined);
+        if (challenge) throw new APIError("BAD_REQUEST", { code: challenge, message: CHALLENGE_MESSAGES[challenge] });
+        const refused = await admissionForEmail(db, email);
+        if (refused) throw refusal(refused);
+      }),
+    },
     plugins: [
       ...(demo
         ? [
@@ -235,7 +283,7 @@ export function createAuth(settings: DemoSettings, deps: AuthDeps = {}) {
           }),
         ]
         : []),
-      ...(mcpRemote ? oauthPlugins() : []),
+      ...(mcpRemote ? oauthPlugins(deps.fetchMetadata ?? metadataFetcher) : []),
     ],
     disabledPaths: mcpRemote ? OAUTH_CLOSED_PATHS : [],
     databaseHooks: {
