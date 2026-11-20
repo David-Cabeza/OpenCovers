@@ -42,7 +42,7 @@ describe("AgendaView in Spanish", () => {
     expect(screen.getByText(longDate(todayIso()))).toBeInTheDocument();
     expect(longDate(todayIso())).toContain(" de ");
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Acciones de la reserva" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Acciones de la reserva de las 20:30, Jane Doe" }));
     expect(await screen.findByRole("menuitem", { name: "Sentar" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Asignar mesas" })).toBeInTheDocument();
 
