@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import app from "./app";
 import { db } from "./db/client";
+import { mcpRemote } from "./lib/auth";
 import { blocklistKeys } from "./lib/blocklist";
 import { runRetention } from "./lib/retention";
 import { challengeConfigFromEnv, describeChallenge } from "./lib/public-challenge";
@@ -19,7 +20,7 @@ const rateLimit = rateLimitConfigFromEnv();
 const challenge = describeChallenge(challengeConfigFromEnv());
 const port = Number(process.env.PORT ?? 3000);
 serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`opencovers api listening on port ${info.port} (sign-up: ${signup}, trust proxy: ${rateLimit.trustProxy})`);
+  console.log(`opencovers api listening on port ${info.port} (sign-up: ${signup}, trust proxy: ${rateLimit.trustProxy}, remote MCP: ${mcpRemote ? "on" : "off"})`);
   console.log(describeDemo(demo));
   console.log(describeRateLimit(rateLimit));
   console.log(describeWidgetServing(widgetServingFromEnv()));

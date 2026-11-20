@@ -1,3 +1,6 @@
+import { cimd } from "@better-auth/cimd";
+import { fetchClientMetadataResource } from "@better-auth/cimd/node";
+import { oauthProvider, type OAuthOptions } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -18,6 +21,14 @@ import {
   claimForSignup,
   grantClaimedInvitation,
 } from "./invitations";
+import {
+  ACCESS_TOKEN_TTL_S,
+  AUTHORIZATION_CODE_TTL_S,
+  MCP_SCOPES,
+  REFRESH_TOKEN_TTL_S,
+  mcpRemoteEnabled,
+  mcpResourceUri,
+} from "./mcp-remote";
 import { buildMagicLinkEmail, sendEmail } from "./mailer";
 import { LOCALES } from "./online-booking";
 import { decideSignup, signupMode } from "./signup";
@@ -29,9 +40,55 @@ function invitationToken(
   return value ? value : null;
 }
 
+const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+
+export const mcpRemote = mcpRemoteEnabled();
+
+// ADR-0014: only the instance owner registers clients, and grants live in our own tables.
+// These plugin routes would let any signed-in person manage clients or consents.
+const OAUTH_CLOSED_PATHS = [
+  "/oauth2/register",
+  "/oauth2/create-client",
+  "/oauth2/get-client",
+  "/oauth2/get-clients",
+  "/oauth2/update-client",
+  "/oauth2/client/rotate-secret",
+  "/oauth2/delete-client",
+  "/oauth2/get-consent",
+  "/oauth2/get-consents",
+  "/oauth2/update-consent",
+  "/oauth2/delete-consent",
+];
+
+export function oauthProviderOptions(resource: string) {
+  return {
+    scopes: [...MCP_SCOPES] as string[],
+    grantTypes: ["authorization_code", "refresh_token"],
+    // Opaque access tokens, so every call reads the token row and revocation is immediate.
+    disableJwtPlugin: true,
+    storeTokens: "hashed",
+    accessTokenExpiresIn: ACCESS_TOKEN_TTL_S,
+    refreshTokenExpiresIn: REFRESH_TOKEN_TTL_S,
+    refreshTokenReuseInterval: 0,
+    codeExpiresIn: AUTHORIZATION_CODE_TTL_S,
+    allowDynamicClientRegistration: false,
+    resources: [{ identifier: resource, name: "OpenCovers MCP", accessTokenTtl: ACCESS_TOKEN_TTL_S }],
+    clientRegistrationDefaultResources: [resource],
+    loginPage: "/",
+    consentPage: "/oauth/consent",
+  } satisfies OAuthOptions<string[]>;
+}
+
+function oauthPlugins() {
+  return [
+    oauthProvider(oauthProviderOptions(mcpResourceUri(baseURL))),
+    cimd({ fetchClientMetadataResource, metadataProfile: "mcp-2026-07-28" }),
+  ];
+}
+
 /** The browser origins that may sign in and send cookie-authenticated writes (lib/staff-origin.ts). */
 export const trustedOrigins = [
-  process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+  baseURL,
   ...(process.env.TRUSTED_ORIGINS?.split(",").filter(Boolean) ?? [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -116,7 +173,7 @@ export function createAuth(settings: DemoSettings, deps: AuthDeps = {}) {
 
   return betterAuth({
     secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-me",
-    baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+    baseURL,
     database: drizzleAdapter(db, { provider: "pg", schema: betterAuthSchema }),
     emailAndPassword: { enabled: !demo },
     // lib/rate-limit.ts limits /api/auth. Better Auth's own limiter would answer a second 429 in another shape.
@@ -134,22 +191,6 @@ export function createAuth(settings: DemoSettings, deps: AuthDeps = {}) {
     },
     ...(demo
       ? {
-          plugins: [
-            magicLink({
-              // The token in the database is a hash, so a read of `verification` yields no usable link (audit F13).
-              storeToken: "hashed",
-              sendMagicLink: async ({ email, url }, context) => {
-                const { subject, text, html } = magicLinkEmail(mailLocale(context?.headers ?? context?.request?.headers), url);
-                if (deps.sendMail) return deps.sendMail(email, subject, text, html);
-                // Never log the link: whoever reads the log would sign in as the visitor.
-                if (!settings.mailConfigured) {
-                  console.warn("demo magic link not delivered: set RESEND_API_KEY and RESEND_FROM_EMAIL");
-                  return;
-                }
-                await sendEmail("", "", email, subject, text, html);
-              },
-            }),
-          ],
           socialProviders: settings.google
             ? {
                 google: {
@@ -175,6 +216,28 @@ export function createAuth(settings: DemoSettings, deps: AuthDeps = {}) {
           },
         }
       : {}),
+    plugins: [
+      ...(demo
+        ? [
+          magicLink({
+            // The token in the database is a hash, so a read of `verification` yields no usable link (audit F13).
+            storeToken: "hashed",
+            sendMagicLink: async ({ email, url }, context) => {
+              const { subject, text, html } = magicLinkEmail(mailLocale(context?.headers ?? context?.request?.headers), url);
+              if (deps.sendMail) return deps.sendMail(email, subject, text, html);
+              // Never log the link: whoever reads the log would sign in as the visitor.
+              if (!settings.mailConfigured) {
+                console.warn("demo magic link not delivered: set RESEND_API_KEY and RESEND_FROM_EMAIL");
+                return;
+              }
+              await sendEmail("", "", email, subject, text, html);
+            },
+          }),
+        ]
+        : []),
+      ...(mcpRemote ? oauthPlugins() : []),
+    ],
+    disabledPaths: mcpRemote ? OAUTH_CLOSED_PATHS : [],
     databaseHooks: {
       user: {
         create: {
