@@ -18,7 +18,7 @@ export interface NewEvent {
  * The only way to write events. Event ids come from one sequence and a row is visible only at commit, so without
  * this lock a later id of a venue could commit while an earlier one is still pending, and a cursor reader would
  * pass the earlier one for good (C11). The per-venue lock, held to commit, makes a venue's commit order its id
- * order: the next writer takes its ids only after the previous one committed (ADR-0024).
+ * order: the next writer takes its ids only after the previous one committed (ADR-0026).
  *
  * Lock order: this lock is the last one a write takes, after the idempotency key, guest-day, online-open, the
  * planner, the reservation, link, waitlist and guest rows, and overbooking. Call it as the last statement of the
