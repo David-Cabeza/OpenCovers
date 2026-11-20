@@ -30,7 +30,7 @@ const bands = [
   },
   {
     s: "Dibujas tu sala y la usas.",
-    c: "Mesas redondas, ovaladas, cuadradas, rectangulares y largas con sillas, y elementos de sala como barra, cocina, columnas o chimenea. Arrastra, rota y redimensiona con ajuste a rejilla.",
+    c: "Mesas redondas, ovaladas, cuadradas, rectangulares y largas con sillas, y elementos de sala como barra, cocina, columnas o chimenea. Arrastra, rota y redimensiona con ajuste a rejilla. La app de sala está en español e inglés, con modo claro y oscuro.",
     on: "var(--f3)",
   },
   {
@@ -59,7 +59,7 @@ const modules = [
   {
     name: "Agenda",
     tag: "Sala",
-    body: "Las reservas del día con su estado y quién las hizo. Mover, cancelar o sentar.",
+    body: "Las reservas del día con su estado. Cada una guarda su traza: por qué canal entró (widget, app, API o MCP) y quién la cambió después. Mover, cancelar o sentar.",
     img: "/media/agenda.webp",
     pos: "18% 28%",
     alt: "Agenda del día en la app de sala",
@@ -306,7 +306,7 @@ function Hero() {
       <div className="copy">
         <h1 className="rv" style={d(0)}>Tu libro de reservas es tuyo</h1>
         <p className="lead rv" style={d(90)}>
-          Motor de reservas open source para restaurantes, con API y servidor MCP.
+          Motor de reservas open source para restaurantes. El local lo usa con una app de sala y un widget de reserva; las plataformas y los agentes, por la API y el servidor MCP.
         </p>
         <div className="acts rv" style={d(180)}>
           {DEMO_URL && <a className="btn accent" href={DEMO_URL}>Probar la demo</a>}
