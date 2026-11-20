@@ -802,28 +802,25 @@ export async function createReservation(
   const { startsAt, endsAt } = bookingWindow(venue, request);
   const { service, reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
   reasons.push(...serviceReasons(service, request));
-  if (reasons.length > 0) return { ok: false, code: reasons[0].code };
-  if (!service) return { ok: false, code: "outside_hours" };
+  // A refusal binds a first attempt only. The key is looked up first, so a replay of a create that succeeded
+  // returns the stored answer whatever the rules or the clock say now (C2, C58).
+  let refusal: WriteErrorCode | null = reasons[0]?.code ?? (service ? null : "outside_hours");
   const autoAssign = !input.tableIds || input.tableIds.length === 0;
-  if (
-    !autoAssign &&
-    input.partySize > (await totalSeats(db, venueId, input.tableIds as string[]))
-  ) {
-    return { ok: false, code: "party_size_too_large" };
-  }
-  if (!autoAssign && zone !== "") {
-    const inZone = await db
-      .select({ id: tables.id })
-      .from(tables)
-      .where(
-        and(
-          eq(tables.venueId, venueId),
-          inArray(tables.id, input.tableIds as string[]),
-          eq(tables.zone, zone),
-        ),
-      );
-    if (inZone.length !== (input.tableIds as string[]).length) {
-      return { ok: false, code: "invalid_request" };
+  if (!refusal && !autoAssign) {
+    if (input.partySize > (await totalSeats(db, venueId, input.tableIds as string[]))) {
+      refusal = "party_size_too_large";
+    } else if (zone !== "") {
+      const inZone = await db
+        .select({ id: tables.id })
+        .from(tables)
+        .where(
+          and(
+            eq(tables.venueId, venueId),
+            inArray(tables.id, input.tableIds as string[]),
+            eq(tables.zone, zone),
+          ),
+        );
+      if (inZone.length !== (input.tableIds as string[]).length) refusal = "invalid_request";
     }
   }
   const id = crypto.randomUUID();
@@ -840,6 +837,7 @@ export async function createReservation(
         const link = channel.kind === "public" ? await rotateLink(tx, venueId, existing.reservationId) : undefined;
         return { id: existing.reservationId, version: existing.version, selfServiceToken: link && link.token };
       }
+      if (refusal || !service) throw new ReservationError(refusal ?? "outside_hours");
       // A demo sandbox has lower caps (ADR-0022), counted here under a per-venue lock so concurrent bookings cannot
       // pass the last free place. A replayed key replayed above. Skipped, with no query, unless DEMO_MODE=1: the API
       // does not start with the flag off over a database that holds sandboxes (demo/guard.ts).
@@ -1228,7 +1226,8 @@ export async function cancelReservation(
       const nextVersion = current.version + 1;
       await tx.update(reservations).set({ status: "cancelled", version: nextVersion }).where(eq(reservations.id, id));
       await tx.delete(tableAllocations).where(eq(tableAllocations.reservationId, id));
-      await tx.insert(tombstones).values({ reservationId: id, venueId, hash });
+      // Erasure already wrote this reservation's tombstone, with the same hash.
+      await tx.insert(tombstones).values({ reservationId: id, venueId, hash }).onConflictDoNothing();
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "cancel", version: nextVersion });
       await tx.insert(events).values({ venueId, type: "cancelled", reservationId: id, version: nextVersion, ...originColumns(origin) });
       if (guest && !(await revokeForCancel(tx, guest.linkId, key))) {
