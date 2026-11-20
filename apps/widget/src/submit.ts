@@ -23,7 +23,7 @@ export function mayRetry(failure: Failure): boolean {
 }
 
 const fingerprintOf = (f: BookingFields) =>
-  JSON.stringify([f.date, f.time, f.partySize, f.name.trim(), f.contact.trim(), f.commentary.trim(), f.honeypot]);
+  JSON.stringify([f.date, f.time, f.partySize, f.name.trim(), f.contact.trim(), f.commentary.trim(), f.honeypot, f.zone ?? ""]);
 
 export function createSubmitter(deps: {
   send(key: string, fields: BookingFields, ticket: Ticket): Promise<Result<Created>>;
