@@ -174,6 +174,17 @@ export async function getGuest(db: Db, venueId: string, id: string): Promise<Gue
   };
 }
 
+/** Row-locks the reservations in id order, so two erasures, a merge, and the writers that lock one row never cross. */
+export async function lockReservations(tx: DbTx, venueId: string, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await tx
+    .select({ id: reservations.id })
+    .from(reservations)
+    .where(and(eq(reservations.venueId, venueId), inArray(reservations.id, ids)))
+    .orderBy(reservations.id)
+    .for("update");
+}
+
 export async function mergeGuest(
   db: Db,
   venueId: string,
@@ -185,6 +196,12 @@ export async function mergeGuest(
   if (sourceId === targetId) return { ok: false, code: "invalid_request" };
   try {
     return await db.transaction(async (tx) => {
+      // Reservations before guests, the order erasure takes: a read without locks learns which rows to lock.
+      const owned = await tx
+        .select({ id: reservations.id })
+        .from(reservations)
+        .where(and(eq(reservations.venueId, venueId), eq(reservations.guestId, sourceId)));
+      await lockReservations(tx, venueId, owned.map((r) => r.id));
       const locked = await tx
         .select()
         .from(guests)
@@ -255,6 +272,14 @@ export async function mergeGuest(
 export async function unmergeGuest(db: Db, venueId: string, guestId: string, actor: string): Promise<GuestWrite> {
   try {
     return await db.transaction(async (tx) => {
+      // Reservations before guests, the order erasure takes: the merge entry names the rows this moves back.
+      const [mergedEntry] = await tx
+        .select({ reservationIds: guestAudit.reservationIds })
+        .from(guestAudit)
+        .where(and(eq(guestAudit.venueId, venueId), eq(guestAudit.guestId, guestId), eq(guestAudit.action, "merged")))
+        .orderBy(desc(guestAudit.id))
+        .limit(1);
+      await lockReservations(tx, venueId, mergedEntry?.reservationIds ?? []);
       // Absorbed before target, the order the booking path locks a merged chain in.
       const [source] = await tx
         .select()

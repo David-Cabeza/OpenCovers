@@ -18,7 +18,7 @@ import { appendEvents, type NewEvent } from "./events";
 import type { Origin } from "./origin";
 import { countBlocklistEntries, guestContactKeys } from "./blocklist";
 import { normalizeContact, venueCountry } from "./contact";
-import { forgetMergeState, movedAtMerge } from "./guests";
+import { forgetMergeState, lockReservations, movedAtMerge } from "./guests";
 import { ratingColumns } from "./rating";
 import { reconfirmationColumns } from "./reconfirmation";
 import { sha256Hex } from "./reservations";
@@ -274,17 +274,6 @@ export async function erase(
 }
 
 type Matched = { id: string; version: number; guestId: string | null };
-
-/** Row-locks the reservations in id order, so two erasures and the writers that lock one row never cross. */
-async function lockReservations(tx: DbTx, venueId: string, ids: string[]): Promise<void> {
-  if (ids.length === 0) return;
-  await tx
-    .select({ id: reservations.id })
-    .from(reservations)
-    .where(and(eq(reservations.venueId, venueId), inArray(reservations.id, ids)))
-    .orderBy(reservations.id)
-    .for("update");
-}
 
 /**
  * Who and what an erasure covers. With `lock` the guests and the matched reservations are row-locked
