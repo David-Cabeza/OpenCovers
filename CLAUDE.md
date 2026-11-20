@@ -54,7 +54,7 @@ The staff app dev server proxies `/api`, `/v1` and `/w` to the API on :3000, so 
 
 ## External services
 - GitHub: source of truth, CI (`.github/workflows/ci.yml`: typecheck + tests against a Postgres service) and the site deploy.
-- GitHub Pages serves `apps/site` at opencovers.dev (`.github/workflows/deploy-site.yml`, runs on every push to `main`). `apps/site/public/CNAME` must stay `opencovers.dev`.
+- GitHub Pages serves `apps/site` at opencovers.dev (`.github/workflows/deploy-site.yml`, runs on every push to `main`). `apps/site/public/CNAME` must stay `opencovers.dev`. The privacy page carries `{{LEGAL_TAX_ID}}` and `{{LEGAL_ADDRESS}}` tokens that the deploy fills from the repository secrets of the same names (`apps/site/scripts/inject-legal.mjs`); never write the real values in the repository.
 - Resend sends confirmation emails (optional; off until `RESEND_API_KEY` is set).
 
 ## Do not touch / be careful
