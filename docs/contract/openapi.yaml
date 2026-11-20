@@ -382,8 +382,8 @@ paths:
         event (`widget`, `staff`, `api` or `mcp`), so a later modify or cancel
         shows its own origin. `mcp` is a label the key's holder sets, not
         proof. An event stored without an origin has `recorded` false. The
-        top-level `source` and `actor` come from the booking's `bookedVia`
-        and are deprecated. Each entry has the
+        answer has no top-level `source` or `actor` (removed, they exposed the
+        booking's `bookedVia`, which is a staff email for a session). Each entry has the
         `Idempotency-Key` of the write that produced it, or null when the
         write carried none (erasure). For a public booking it is the key the
         client sent. It holds no guest
@@ -3230,18 +3230,9 @@ components:
 
     ReservationTrace:
       type: object
-      required: [reservationId, source, actor, entries]
+      required: [reservationId, entries]
       properties:
         reservationId: { type: string }
-        source:
-          type: string
-          enum: [widget, staff, api]
-          deprecated: true
-          description: The booking's creator, derived from `bookedVia`. Read each entry's `channel` instead.
-        actor:
-          type: string
-          deprecated: true
-          description: The principal recorded as `bookedVia`. Read each entry's `actor` instead.
         entries:
           type: array
           items: { $ref: "#/components/schemas/TraceEntry" }

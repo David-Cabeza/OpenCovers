@@ -48,6 +48,16 @@ async function makeVenue(cookie: string): Promise<string> {
   return id;
 }
 
+/** Every object key and every string value of a JSON value, at any depth. */
+function strings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(strings);
+  if (value && typeof value === "object") {
+    return Object.entries(value).flatMap(([k, v]) => [k, ...strings(v)]);
+  }
+  return [];
+}
+
 const trace = (venueId: string, id: string, headers: Record<string, string>) =>
   app.request(`/v1/venues/${venueId}/reservations/${id}/trace`, { headers });
 
@@ -78,8 +88,8 @@ describe("C65 reservation trace", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.reservationId).toBe(id);
-    expect(body.source).toBe("api");
-    expect(body.actor).toBe("agent-1");
+    expect(Object.keys(body).sort()).toEqual(["entries", "reservationId"]);
+    expect(strings(body).filter((v) => v.includes("@"))).toEqual([]);
     expect(body.entries.map((e: any) => [e.type, e.version, e.idempotencyKey])).toEqual([
       ["created", 1, "k-create"],
       ["modified", 2, "k-modify"],
@@ -89,16 +99,24 @@ describe("C65 reservation trace", () => {
     expect(JSON.stringify(body)).not.toContain("ana@example.com");
   });
 
-  it("names a staff member's booking as staff", async () => {
-    const cookie = await signUp("trace-staff@example.com");
+  it("shows a session's booking by the member's display name and no email anywhere", async () => {
+    const cookie = await signUp("trace-staff@example.com", "Marta Staff");
     const venueId = await makeVenue(cookie);
     const created = await write(venueId, "/reservations", { Cookie: cookie }, "s-create", {
-      date: DATE, time: "20:00", partySize: 2, guest: { name: "Luis" },
+      date: DATE, time: "20:00", partySize: 2, guest: { name: "Luis", contact: "luis@example.com" },
     });
     const { id } = await created.json();
+    await write(venueId, `/reservations/${id}/modify`, { Cookie: cookie }, "s-modify", { partySize: 3 });
     const body = await (await trace(venueId, id, { Cookie: cookie })).json();
-    expect(body.source).toBe("staff");
-    expect(body.actor).toBe("trace-staff@example.com");
+    expect(Object.keys(body).sort()).toEqual(["entries", "reservationId"]);
+    expect(body.entries.map((e: any) => [e.type, e.channel, e.actor, e.recorded])).toEqual([
+      ["created", "staff", "Marta Staff", true],
+      ["modified", "staff", "Marta Staff", true],
+    ]);
+    // Every key and every value, at any depth: no staff email, no guest contact.
+    const all = strings(body);
+    expect(all.filter((v) => v.includes("@"))).toEqual([]);
+    expect(all).not.toContain("trace-staff@example.com");
   });
 
   it("names a public booking as widget", async () => {
@@ -127,8 +145,8 @@ describe("C65 reservation trace", () => {
     ).json();
     const id = agenda.reservations[0].id;
     const body = await (await trace(venueId, id, { Cookie: cookie })).json();
-    expect(body.source).toBe("widget");
-    expect(body.actor).toBe("widget");
+    expect(Object.keys(body).sort()).toEqual(["entries", "reservationId"]);
+    expect(strings(body).filter((v) => v.includes("@"))).toEqual([]);
     expect(body.entries.map((e: any) => [e.type, e.idempotencyKey])).toEqual([["created", widgetKey]]);
   });
 
