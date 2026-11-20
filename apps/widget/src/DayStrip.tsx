@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { PublicDay } from "./api";
-import { formatDate, formatWeekdayLetter } from "./dates";
+import { formatDate, formatWeekdayShort } from "./dates";
 import type { MessageId, Translate } from "./messages";
 import { isSelectable } from "./strip";
 
@@ -66,7 +66,7 @@ export function DayStrip(props: {
           ref={scroller}
           role="group"
           aria-label={t("strip.label")}
-          className="relative flex min-w-0 flex-1 snap-x gap-1 overflow-x-auto pb-1 [scrollbar-width:none] motion-safe:scroll-smooth [&::-webkit-scrollbar]:hidden"
+          className="relative flex min-w-0 flex-1 snap-x gap-1 overflow-x-auto pb-1 [mask-image:linear-gradient(to_right,black_calc(100%-1.5rem),transparent)] [scrollbar-width:none] motion-safe:scroll-smooth [&::-webkit-scrollbar]:hidden"
         >
           {days.map((day) => {
             const status = day.status === "outside_window" ? "closed" : day.status;
@@ -88,7 +88,7 @@ export function DayStrip(props: {
                 }
               >
                 <span aria-hidden="true" className="text-xs uppercase">
-                  {formatWeekdayLetter(day.date, locale)}
+                  {formatWeekdayShort(day.date, locale)}
                 </span>
                 <span aria-hidden="true" className="text-base font-medium">
                   {Number(day.date.slice(8))}

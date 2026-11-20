@@ -61,7 +61,7 @@ export default defineMessages({
     "common.status.cancelled": "Cancelada",
     "common.role.read": "lectura",
     "common.role.write": "escritura",
-    "common.role.admin": "admin",
+    "common.role.admin": "administrador",
     "common.consent.unknown": "Sin preguntar",
     "common.consent.granted": "Concedido",
     "common.consent.denied": "Denegado",
