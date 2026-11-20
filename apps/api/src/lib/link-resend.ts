@@ -100,9 +100,9 @@ export async function resendLinks(db: Db, { venue, settings }: PublicVenue, emai
     });
     if (!mail) return;
     if (!(await mayEmail(db, venue.id, mail.to))) return;
-    const { subject, text } = buildLinkEmail(mail.lines);
+    const { subject, text, html } = buildLinkEmail(mail.lines, venue.name);
     const identity = await mailIdentity(db, venue.id, venue);
-    await sendEmail(identity.apiKey, identity.from, mail.to, subject, text);
+    await sendEmail(identity.apiKey, identity.from, mail.to, subject, text, html);
   } catch (err) {
     // The message only: a provider's answer could quote the email, and the email holds tokens.
     console.error("notification self_service_link failed:", err instanceof Error ? err.message.split(":")[0] : "unknown");
