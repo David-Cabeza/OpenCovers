@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.hoisted(() => {
@@ -9,9 +9,10 @@ vi.hoisted(() => {
 import app from "../src/app";
 import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
-import { services, tables } from "../src/db/schema";
+import { events, services, tables } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
 import { auth } from "../src/lib/auth";
+import { addMembership } from "../src/lib/memberships";
 import { challengeConfigFromEnv, issueChallenge, solve } from "../src/lib/public-challenge";
 import { saturdayAhead } from "./dates";
 
@@ -25,9 +26,9 @@ beforeAll(async () => {
   );
 });
 
-async function signUp(email: string): Promise<string> {
+async function signUp(email: string, name = "Staff"): Promise<string> {
   const res = await auth.api.signUpEmail({
-    body: { name: "Staff", email, password: "password123" },
+    body: { name, email, password: "password123" },
     asResponse: true,
   });
   return res.headers.get("set-cookie") as string;
@@ -144,5 +145,97 @@ describe("C65 reservation trace", () => {
       expect(res.status).toBe(404);
       expect((await res.json()).code).toBe("reservation_not_found");
     }
+  });
+});
+
+describe("C65 each entry's persisted origin", () => {
+  const origins = (body: any) => body.entries.map((e: any) => [e.type, e.channel, e.actor, e.recorded]);
+
+  it("shows a key's create, a session's modify and a guest's cancel, each with its own channel and actor", async () => {
+    const cookie = await signUp("trace-origin@example.com", "Marta Chef");
+    const venueId = await makeVenue(cookie);
+    await addKey(db, "origin-key", "origin-1", [venueId], "write");
+    const created = await write(venueId, "/reservations", { apikey: "origin-key" }, "o-create", {
+      date: DATE, time: "20:00", partySize: 2, guest: { name: "Ana", contact: "ana-o@example.com" },
+    });
+    const { id } = await created.json();
+    expect((await write(venueId, `/reservations/${id}/modify`, { Cookie: cookie }, "o-modify", { partySize: 3 })).status).toBe(200);
+    const link = await write(venueId, `/reservations/${id}/self-service-link`, { Cookie: cookie }, "o-link", {});
+    const { selfServiceToken } = await link.json();
+    const guestKey = crypto.randomUUID();
+    const cancelled = await app.request("/v1/public/self-service/cancel", {
+      method: "POST",
+      headers: { "X-Self-Service-Token": selfServiceToken, "Idempotency-Key": guestKey },
+    });
+    expect(cancelled.status).toBe(200);
+
+    const body = await (await trace(venueId, id, { Cookie: cookie })).json();
+    const rows = origins(body);
+    expect(rows.map((r: any[]) => [r[0], r[1], r[3]])).toEqual([
+      ["created", "api", true],
+      ["modified", "staff", true],
+      ["cancelled", "widget", true],
+    ]);
+    expect(rows[0][2]).toMatch(/^key_[0-9a-f]{12}$/);
+    expect(rows[1][2]).toBe("Marta Chef");
+    expect(rows[2][2]).toBeNull();
+    // The guest's key shows as the guest sent it, without the engine's `public:` prefix, on a booking a key made.
+    expect(body.entries.map((e: any) => e.idempotencyKey)).toEqual(["o-create", "o-modify", guestKey]);
+    const text = JSON.stringify(body);
+    expect(text).not.toContain("trace-origin@example.com");
+    expect(text).not.toContain("ana-o@example.com");
+    expect(text).not.toContain("Ana");
+  });
+
+  it("tells an mcp-marked key from a plain one", async () => {
+    const cookie = await signUp("trace-mcp@example.com");
+    const venueId = await makeVenue(cookie);
+    await addKey(db, "mcp-key", "mcp-1", [venueId], "write");
+    const created = await write(venueId, "/reservations", { apikey: "mcp-key", "X-OpenCovers-Channel": "mcp" }, "m-create", {
+      date: DATE, time: "20:00", partySize: 2, guest: { name: "Eva" },
+    });
+    const { id } = await created.json();
+    await write(venueId, `/reservations/${id}/modify`, { apikey: "mcp-key" }, "m-modify", { partySize: 3 });
+    const body = await (await trace(venueId, id, { Cookie: cookie })).json();
+    expect(body.entries.map((e: any) => e.channel)).toEqual(["mcp", "api"]);
+    expect(body.entries[0].actor).toBe(body.entries[1].actor);
+  });
+
+  it("gives a staff member whose name looks like an email, or who left the venue, a null actor", async () => {
+    const owner = await signUp("trace-owner@example.com", "trace-owner@example.com");
+    const venueId = await makeVenue(owner);
+    const book = async (key: string) =>
+      (await (await write(venueId, "/reservations", { Cookie: owner }, key, {
+        date: DATE, time: "20:00", partySize: 2, guest: { name: "Luis" },
+      })).json()).id as string;
+    const emailNamed = await book("n-create-1");
+    const left = await signUp("trace-left@example.com", "Pedro Left");
+    const [leftUser] = (await db.execute(sql`SELECT id FROM "user" WHERE email = 'trace-left@example.com'`)).rows as { id: string }[];
+    await addMembership(db, leftUser.id, venueId, "write");
+    const leftId = (await (await write(venueId, "/reservations", { Cookie: left }, "n-create-2", {
+      date: DATE, time: "20:00", partySize: 2, guest: { name: "Eva" },
+    })).json()).id as string;
+    expect(origins(await (await trace(venueId, leftId, { Cookie: owner })).json())).toEqual([["created", "staff", "Pedro Left", true]]);
+    await db.execute(sql`DELETE FROM venue_memberships WHERE user_id = ${leftUser.id}`);
+    expect(origins(await (await trace(venueId, emailNamed, { Cookie: owner })).json())).toEqual([["created", "staff", null, true]]);
+    expect(origins(await (await trace(venueId, leftId, { Cookie: owner })).json())).toEqual([["created", "staff", null, true]]);
+  });
+
+  it("reads an event stored without an origin as derived or unknown, without failing", async () => {
+    const cookie = await signUp("trace-legacy@example.com");
+    const venueId = await makeVenue(cookie);
+    await addKey(db, "legacy-key", "legacy-1", [venueId], "write");
+    const created = await write(venueId, "/reservations", { apikey: "legacy-key" }, "l-create", {
+      date: DATE, time: "20:00", partySize: 2, guest: { name: "Eva" },
+    });
+    const { id } = await created.json();
+    await write(venueId, `/reservations/${id}/modify`, { apikey: "legacy-key" }, "l-modify", { partySize: 3 });
+    await db.update(events).set({ channel: null, actor: null }).where(eq(events.reservationId, id));
+    const res = await trace(venueId, id, { Cookie: cookie });
+    expect(res.status).toBe(200);
+    expect(origins(await res.json())).toEqual([
+      ["created", "api", null, false],
+      ["modified", null, null, false],
+    ]);
   });
 });

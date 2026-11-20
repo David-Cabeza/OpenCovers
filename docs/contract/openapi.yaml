@@ -376,11 +376,13 @@ paths:
       operationId: reservation.trace
       summary: Read how one reservation came to exist and what happened to it
       description: |
-        Needs any role. `source` is the channel that made the booking:
-        `widget` for the public channel, `staff` for a signed-in member and
-        `api` for an API key, the MCP server included. `actor` is the
-        principal the engine recorded as `bookedVia`. Each entry is one event
-        of the reservation from the feed, oldest first, with the
+        Needs any role. Each entry is one event of the reservation from the
+        feed, oldest first, with the `channel` and `actor` stored on that
+        event (`widget`, `staff`, `api` or `mcp`), so a later modify or cancel
+        shows its own origin. `mcp` is a label the key's holder sets, not
+        proof. An event stored without an origin has `recorded` false. The
+        top-level `source` and `actor` come from the booking's `bookedVia`
+        and are deprecated. Each entry has the
         `Idempotency-Key` of the write that produced it, or null when the
         write carried none (erasure). For a public booking it is the key the
         client sent. It holds no guest
@@ -3190,16 +3192,19 @@ components:
         source:
           type: string
           enum: [widget, staff, api]
+          deprecated: true
+          description: The booking's creator, derived from `bookedVia`. Read each entry's `channel` instead.
         actor:
           type: string
-          description: The principal recorded as `bookedVia`.
+          deprecated: true
+          description: The principal recorded as `bookedVia`. Read each entry's `actor` instead.
         entries:
           type: array
           items: { $ref: "#/components/schemas/TraceEntry" }
 
     TraceEntry:
       type: object
-      required: [eventId, type, version, occurredAt, idempotencyKey]
+      required: [eventId, type, version, occurredAt, idempotencyKey, channel, actor, recorded]
       properties:
         eventId:
           type: string
@@ -3214,6 +3219,25 @@ components:
         idempotencyKey:
           type: string
           nullable: true
+        channel:
+          type: string
+          nullable: true
+          enum: [widget, staff, api, mcp, null]
+          description: >
+            Where this change came from, read from the origin stored on the event. `mcp` is a label the key's
+            holder sets with `X-OpenCovers-Channel`, not proof. Null means unknown.
+        actor:
+          type: string
+          nullable: true
+          description: >
+            Who made this change, as a label and never an email or a user id. Null for `widget`. The member's
+            display name for `staff` (null when it is not known). The key reference `key_` plus 12 hex characters
+            for `api` and `mcp`.
+        recorded:
+          type: boolean
+          description: >
+            False when the event was stored without an origin. Then `actor` is null and `channel` is derived
+            from the booking's creator for a `created` entry, or null.
 
     Role:
       type: string

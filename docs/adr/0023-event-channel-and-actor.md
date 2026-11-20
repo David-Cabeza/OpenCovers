@@ -27,6 +27,10 @@ Rows written before this change, and events written by a system sweep (retention
 - A staff user id is personal data of staff, not of a guest. Erasing a user leaves their id in events. A key id is a prefix of a hash, not the key.
 - Migration `0041` may collide with another open pull request's. The one that merges second regenerates its migration with `pnpm db:generate`.
 
+## Amendment: the trace reads them
+
+The reservation trace (C65) now returns each entry's `channel`, an `actor` label and `recorded`. A staff user id is turned into the member's display name only for a member of the venue, and never when the name looks like an email. A key reference is returned as stored. The events feed and the webhook payload stay as they were. The `mcp` caveat above still holds and is repeated in the contract.
+
 ## Alternatives considered
 
 - The key's `principal` label as actor. It is free text an admin writes and may be an email.
