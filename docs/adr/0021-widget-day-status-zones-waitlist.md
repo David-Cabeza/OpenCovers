@@ -43,7 +43,7 @@ What exists today, read on `origin/main` at `6743865`:
 - PR #192 (branch `feat/widget-times-first`, open) adds `apps/widget/src/nearby.ts`: it opens on the first bookable day and offers up to 3 nearby free days, calling the availability route per day, in batches of 3, over at most 14 days. That is up to 14 extra requests. A 12-day strip with today's routes is 12 requests per view and per party change.
 - ADR-0020 keeps the widget free. Nothing here is paid.
 
-Next free conformance id: the highest case in `conformance.md` is C62, so new cases start at the next free number, C63.
+Next free conformance id when this record was written: the highest case in `conformance.md` was C62, so its first new case is C63. Later stages take the next free id when they are written.
 
 ## Decision drivers
 
@@ -204,7 +204,7 @@ Gift vouchers. Payments and deposits (Phase 12). Reserve with Google (Phase 14).
 
 ## What this adds to each public route
 
-New case ideas below start at the next free id, C63.
+New case ideas below take the next free id when their stage is written (C63, C64 and C66 so far).
 
 | Route | Request | Response | Case ideas | Rate rule |
 | --- | --- | --- | --- | --- |
@@ -261,12 +261,12 @@ The owner asked to keep wallet passes in view because they are trending and can 
 - **Q9. Waitlist email.** The join sends email, and the guest has to accept it when joining: an unticked `emailConsent` box, required to join. This replaces the earlier proposal of no email in v1. The consent wording stays under the legal review (Q11).
 - **Q10. Blocklist on the waitlist.** Applied to the public join, last, with the same answer a blocked public create gets, so the list does not reveal who is on it. C57's "adding to the waitlist is not checked" holds for staff adds only.
 - **Q6. Address.** Only with `publicProfileEnabled`, the narrower reading, and not "whenever set" like the phone. A venue that did not enable its public profile did not choose to publish its address, and widening later is easy where retracting published data is not. The phone keeps its current rule, and whether it should follow the same one stays open. C64 specifies it.
+- **Q3. Service names (2026-11-20).** Opt-in `showServiceNames`, default false: when on, public availability names the service of each slot; when off nothing about services appears, and C40 holds as before for that venue. C66 specifies it.
+- **Q5. Zone labels (2026-11-20).** The guest sees the stored zone names in v1. A public label per zone and locale is a possible later addition. C66 specifies it.
 
 ## Open questions for the owner
 
 - **Q1. Range.** 14 days per call with paging for the calendar, or up to 42 for a month in one call at 3 times the cost?
-- **Q3. Service names.** Opt-in `showServiceNames` to group times by service (recommended), or no grouping?
-- **Q5. Zone labels.** Show stored zone names, or add a public label per zone and locale?
 - **Q7. Waitlist caps.** 2 open public entries per contact, 1 per date, 50 per date per venue. Constants or settings?
 - **Q8. Booking from an entry.** Add a `booked` waitlist status that links the staff booking, or have staff remove the entry after booking?
 - **Q11. Legal review.** Placement of the notice link, whether a booking without `privacyNoticeUrl` is acceptable, consent wording, and confirmation that pre-ticked boxes are not valid consent under EU rules.

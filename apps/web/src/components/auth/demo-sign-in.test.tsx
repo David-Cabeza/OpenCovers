@@ -60,6 +60,8 @@ describe("the sign-in screen on a demo", () => {
     await user.type(await screen.findByLabelText("Email"), "ana@example.com");
     await user.click(screen.getByRole("button", { name: "Email me a sign-in link" }));
 
+    // The challenge request and its proof of work are asynchronous, so the link request follows the click later.
+    await waitFor(() => expect(magicLink).toHaveBeenCalled());
     const [body, options] = magicLink.mock.calls[0]!;
     expect(body.email).toBe("ana@example.com");
     const asked = requests.filter((r) => r.path === "/api/demo/magic-link-challenge");

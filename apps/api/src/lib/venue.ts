@@ -125,73 +125,77 @@ export async function setConfig(
     blockedDates?: DateRange[];
   },
 ): Promise<ConfigResult> {
-  const venue = (
-    await db.select().from(venues).where(eq(venues.id, venueId)).limit(1)
-  )[0];
-  if (!venue) return { ok: false, code: "venue_not_found" };
-  const enabled = input.enabled ?? venue.enabled;
-  const noticeAddress =
-    input.noticeAddress !== undefined ? input.noticeAddress : venue.noticeAddress;
-  if (enabled && noticeAddress === "") {
-    return { ok: false, code: "notice_address_required" };
-  }
-  const slotIntervalMinutes = input.slotIntervalMinutes ?? venue.slotIntervalMinutes;
-  const leadTimeMinutes = input.leadTimeMinutes ?? venue.leadTimeMinutes;
-  const lastSeatingOffsetMinutes =
-    input.lastSeatingOffsetMinutes ?? venue.lastSeatingOffsetMinutes;
-  const notificationsEnabled = input.notificationsEnabled ?? venue.notificationsEnabled;
-  const fromEmail = input.fromEmail !== undefined ? input.fromEmail : venue.fromEmail;
-  const phoneCountry = input.phoneCountry !== undefined ? input.phoneCountry : venue.phoneCountry;
-  const turnTimes = input.turnTimes ?? venue.turnTimes;
-  const overbookingCeiling = input.overbookingCeiling ?? venue.overbookingCeiling;
-  const maxAdvanceDays = input.maxAdvanceDays !== undefined ? input.maxAdvanceDays : venue.maxAdvanceDays;
-  const maxActivePerGuestPerDay =
-    input.maxActivePerGuestPerDay !== undefined ? input.maxActivePerGuestPerDay : venue.maxActivePerGuestPerDay;
-  const blockedDates = input.blockedDates ?? venue.blockedDates;
-  const resendApiKey =
-    input.resendApiKey !== undefined
-      ? input.resendApiKey === ""
-        ? null
-        : input.resendApiKey
-      : venue.resendApiKey;
-  await db
-    .update(venues)
-    .set({
-      enabled,
-      noticeAddress,
-      notificationsEnabled,
-      resendApiKey,
-      fromEmail,
-      slotIntervalMinutes,
-      leadTimeMinutes,
-      lastSeatingOffsetMinutes,
-      phoneCountry,
-      turnTimes,
-      overbookingCeiling,
-      maxAdvanceDays,
-      maxActivePerGuestPerDay,
-      blockedDates,
-    })
-    .where(eq(venues.id, venueId));
-  return {
-    ok: true,
-    config: {
-      enabled,
-      noticeAddress,
-      notificationsEnabled,
-      resendConfigured: resendApiKey != null,
-      fromEmail,
-      slotIntervalMinutes,
-      leadTimeMinutes,
-      lastSeatingOffsetMinutes,
-      phoneCountry,
-      ...turnTimesField(turnTimes),
-      overbookingCeiling,
-      maxAdvanceDays,
-      maxActivePerGuestPerDay,
-      blockedDates,
-    },
-  };
+  // The merge reads every column and writes every column back, so two updates to different fields would lose one.
+  // FOR NO KEY UPDATE serializes config writers and still lets bookings (plain reads, FOR KEY SHARE on inserts) through.
+  return db.transaction(async (tx) => {
+    const venue = (
+      await tx.select().from(venues).where(eq(venues.id, venueId)).for("no key update").limit(1)
+    )[0];
+    if (!venue) return { ok: false, code: "venue_not_found" };
+    const enabled = input.enabled ?? venue.enabled;
+    const noticeAddress =
+      input.noticeAddress !== undefined ? input.noticeAddress : venue.noticeAddress;
+    if (enabled && noticeAddress === "") {
+      return { ok: false, code: "notice_address_required" };
+    }
+    const slotIntervalMinutes = input.slotIntervalMinutes ?? venue.slotIntervalMinutes;
+    const leadTimeMinutes = input.leadTimeMinutes ?? venue.leadTimeMinutes;
+    const lastSeatingOffsetMinutes =
+      input.lastSeatingOffsetMinutes ?? venue.lastSeatingOffsetMinutes;
+    const notificationsEnabled = input.notificationsEnabled ?? venue.notificationsEnabled;
+    const fromEmail = input.fromEmail !== undefined ? input.fromEmail : venue.fromEmail;
+    const phoneCountry = input.phoneCountry !== undefined ? input.phoneCountry : venue.phoneCountry;
+    const turnTimes = input.turnTimes ?? venue.turnTimes;
+    const overbookingCeiling = input.overbookingCeiling ?? venue.overbookingCeiling;
+    const maxAdvanceDays = input.maxAdvanceDays !== undefined ? input.maxAdvanceDays : venue.maxAdvanceDays;
+    const maxActivePerGuestPerDay =
+      input.maxActivePerGuestPerDay !== undefined ? input.maxActivePerGuestPerDay : venue.maxActivePerGuestPerDay;
+    const blockedDates = input.blockedDates ?? venue.blockedDates;
+    const resendApiKey =
+      input.resendApiKey !== undefined
+        ? input.resendApiKey === ""
+          ? null
+          : input.resendApiKey
+        : venue.resendApiKey;
+    await tx
+      .update(venues)
+      .set({
+        enabled,
+        noticeAddress,
+        notificationsEnabled,
+        resendApiKey,
+        fromEmail,
+        slotIntervalMinutes,
+        leadTimeMinutes,
+        lastSeatingOffsetMinutes,
+        phoneCountry,
+        turnTimes,
+        overbookingCeiling,
+        maxAdvanceDays,
+        maxActivePerGuestPerDay,
+        blockedDates,
+      })
+      .where(eq(venues.id, venueId));
+    return {
+      ok: true,
+      config: {
+        enabled,
+        noticeAddress,
+        notificationsEnabled,
+        resendConfigured: resendApiKey != null,
+        fromEmail,
+        slotIntervalMinutes,
+        leadTimeMinutes,
+        lastSeatingOffsetMinutes,
+        phoneCountry,
+        ...turnTimesField(turnTimes),
+        overbookingCeiling,
+        maxAdvanceDays,
+        maxActivePerGuestPerDay,
+        blockedDates,
+      },
+    };
+  });
 }
 
 export async function erase(

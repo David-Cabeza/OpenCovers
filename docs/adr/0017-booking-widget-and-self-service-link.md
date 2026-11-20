@@ -548,3 +548,7 @@ Section 5's key set grows by two: `darkRadius` and `darkFont`. They complete the
 ## Amendment 2026-11-19: the public profile's address
 
 The widget config of decision 4, in the `GET /v1/public/{bookingKey}` row of section 2, says "No address". [ADR-0021](0021-widget-day-status-zones-waitlist.md), section 5, reverses that for the public profile's address only (street, postal code and locality), as `PublicVenue.address`, and only while `publicProfileEnabled` is on (C64). `noticeAddress` stays private, and the widget still collects no guest address. The same amendment adds the online booking setting `privacyNoticeUrl` to section 5.
+
+## Amendment 2026-11-20: public zones
+
+Section 2 says "No table or zone choice", and the availability row of its table says "no zones". [ADR-0021](0021-widget-day-status-zones-waitlist.md), section 2, reverses the zone part for a venue that publishes two or more zones in the online booking setting `publicZones`. The guest may then pick one of those zones, availability says which of them has a table at each time, and the create books a table in the chosen zone (C66). A venue with fewer than two public zones keeps the rule as written. Tables stay out of the public channel: the public create still refuses `tables`, and no public answer holds a table id or a count. The same amendment adds `publicZones` and `showServiceNames` to section 5.
