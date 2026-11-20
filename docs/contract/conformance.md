@@ -14,7 +14,7 @@ Replaying a create with the same idempotency key returns the original reservatio
 
 ## C3. Snapshot is not a hold
 
-Availability returns a free slot. A create for that slot then either fails with `slot_taken` or assigns a different eligible table. It never double-books, and a failed create writes nothing. A create with explicit tables that are no longer free fails with `slot_taken`.
+Availability returns a free slot. A create for that slot then either fails with `slot_taken` or assigns a different eligible table. It never double-books, and a failed create writes nothing. A create with explicit tables that are no longer free fails with `slot_taken`. Explicit tables must be distinct tables of the venue: an unknown id, an id of another venue, or a repeated id fails with `invalid_request` on create, walk-in and modify, and writes nothing.
 
 ## C4. Modify bumps the version
 
@@ -250,7 +250,7 @@ Create, walk-in, modify, cancel and status of a reservation, and add, seat and c
 
 ## C59. A waitlist entry is seated once
 
-Seat requests for one waitlist entry sent concurrently with different `Idempotency-Key` values seat it once: exactly one request succeeds with the walk-in reservation, and every other request fails with `invalid_transition` (409) and writes nothing, so the venue holds one reservation for the entry. The status of the entry and the walk-in booking change together or not at all, so a seat that fails, for example with `slot_taken`, leaves the entry `waiting`. Concurrent seats with one key still all return the one reservation (C58). A seat of an entry that is already `seated` or `cancelled` fails with `invalid_transition`, and a seat racing a cancel of the same entry ends with the entry either seated or cancelled, never both.
+Seat requests for one waitlist entry sent concurrently with different `Idempotency-Key` values seat it once: exactly one request succeeds with the walk-in reservation, and every other request fails with `invalid_transition` (409) and writes nothing, so the venue holds one reservation for the entry. The status of the entry and the walk-in booking change together or not at all, so a seat that fails, for example with `slot_taken`, leaves the entry `waiting`. Concurrent seats with one key still all return the one reservation (C58). A seat whose key already belongs to another write, such as an unrelated create, fails with `invalid_request`, leaves the entry `waiting` and writes no event. A seat of an entry that is already `seated` or `cancelled` fails with `invalid_transition`, and a seat racing a cancel of the same entry ends with the entry either seated or cancelled, never both.
 
 ## C60. Guest fields on the MCP write tools
 
