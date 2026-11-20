@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
-import { selfServiceUrl, type Created, type Failure, type PublicApi, type PublicConfig, type PublicDay } from "./api";
+import { selfServiceUrl, type Created, type Failure, type PublicApi, type PublicConfig, type PublicDay, type PublicSlot } from "./api";
 import { DayStrip } from "./DayStrip";
 import { addDays, formatDate, isoWeekday, todayLocal } from "./dates";
 import { explain, type Explanation } from "./errors";
@@ -10,6 +10,7 @@ import { dateAfterPartyChange, nextFreeDay, pageBounds, startFor, STRIP_DAYS, vi
 import { createSubmitter, createTicketSource } from "./submit";
 import { noticeHref, watchTheme } from "./theme";
 import { Field, inputClass, primaryButton, secondaryButton, Section, VenueHeader } from "./ui";
+import { groupSlots, hasZoneChoice, zonesToShow } from "./zones";
 import { checkDetails, withoutError, type DetailErrors } from "./validate";
 
 type Phase =
@@ -22,7 +23,7 @@ type Times =
   | { kind: "pick-date" }
   | { kind: "closed" }
   | { kind: "loading" }
-  | { kind: "loaded"; times: string[]; reason: "past_date" | "beyond_horizon" | null }
+  | { kind: "loaded"; times: string[]; slots: PublicSlot[] | null; reason: "past_date" | "beyond_horizon" | null }
   | { kind: "failed"; failure: Failure };
 
 // `hidden`: the days route failed or is limited, so the form works from the date field alone.
@@ -95,6 +96,9 @@ function BookingForm(props: {
   const [date, setDate] = useState("");
   const [party, setParty] = useState<number | "more">(Math.min(Math.max(2, config.minPartySize), config.maxPartySize));
   const [time, setTime] = useState("");
+  // The chosen public zone; "" is any zone and sends nothing.
+  const [zone, setZone] = useState("");
+  const zones = hasZoneChoice(config.zones) ? config.zones : [];
   // Until the first days answer arrives there is no date, and the times area says it is loading.
   const [starting, setStarting] = useState(true);
   const [times, setTimes] = useState<Times>({ kind: "loading" });
@@ -183,14 +187,19 @@ function BookingForm(props: {
     if (!config.weekdays.includes(isoWeekday(date))) return setTimes({ kind: "closed" });
     let live = true;
     setTimes({ kind: "loading" });
-    void api.availability(date, party).then((result) => {
+    void api.availability(date, party, zone || undefined).then((result) => {
       if (!live) return;
-      setTimes(result.ok ? { kind: "loaded", times: result.value.times, reason: result.value.reason ?? null } : { kind: "failed", failure: result.failure });
+      if (result.ok) {
+        const listed = result.value.times;
+        setTimes({ kind: "loaded", times: listed, slots: result.value.slots ?? null, reason: result.value.reason ?? null });
+        // A chosen time that this answer no longer lists (another zone) is cleared.
+        setTime((current) => (current && !listed.includes(current) ? "" : current));
+      } else setTimes({ kind: "failed", failure: result.failure });
     });
     return () => {
       live = false;
     };
-  }, [api, config, date, party, reload, step, starting]);
+  }, [api, config, date, party, zone, reload, step, starting]);
 
   const stripDays = strip.kind === "ready" ? strip.days : [];
   const noFreeDay =
@@ -226,7 +235,7 @@ function BookingForm(props: {
     if (found.contact) return contactRef.current?.focus();
     setNotice(null);
     setSending({ kind: "checking" });
-    const result = await submit({ date, time, partySize: party, name, contact, commentary: note, honeypot });
+    const result = await submit({ date, time, partySize: party, name, contact, commentary: note, honeypot, ...(zone ? { zone } : {}) });
     setSending(null);
     if (result.ok) return onDone(result.value);
     const explanation = explain(result.failure);
@@ -314,6 +323,27 @@ function BookingForm(props: {
                 : t("party.large", { n: config.maxPartySize })}
             </p>
           ) : (
+            <>
+            {zones.length > 0 && (
+              <fieldset className="space-y-2">
+                <legend className="font-medium">{t("zone.label")}</legend>
+                <div className="flex flex-wrap gap-2">
+                  {[{ value: "", label: t("zone.any") }, ...zones.map((name) => ({ value: name, label: name }))].map((option) => (
+                    <label key={option.value || "any"} className="relative">
+                      <input
+                        type="radio"
+                        name={`${ids}-zone`}
+                        value={option.value}
+                        checked={zone === option.value}
+                        onChange={() => setZone(option.value)}
+                        className="peer absolute inset-0 opacity-0"
+                      />
+                      <span className={chipClass + " [overflow-wrap:anywhere]"}>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
             <fieldset className="space-y-2" aria-describedby={errors.time ? `${ids}-time-error` : undefined}>
               <legend className="font-medium">{t("field.time")}</legend>
               <TimeList
@@ -322,6 +352,7 @@ function BookingForm(props: {
                 party={party}
                 name={`${ids}-time`}
                 value={time}
+                zone={zone}
                 onChange={(value) => {
                   setTime(value);
                   setErrors({});
@@ -339,6 +370,7 @@ function BookingForm(props: {
                 </p>
               )}
             </fieldset>
+            </>
           )}
 
           {party !== "more" && (
@@ -367,6 +399,7 @@ function BookingForm(props: {
       { label: t("field.date"), value: formatDate(date, locale) },
       { label: t("field.time"), value: time },
       { label: t("field.party"), value: partyLabel(partySize) },
+      ...(zone ? [{ label: t("zone.label"), value: zone }] : []),
     ];
     return (
       <Section title={t("step.summary")} focus>
@@ -380,7 +413,6 @@ function BookingForm(props: {
               {edit(row.label)}
             </li>
           ))}
-          {/* The zone line of ADR-0021 stage 6 goes here, in the same row shape, when zones exist. */}
           {config.venue.address && (
             <li className="px-3 py-2">
               <span className="block text-sm text-muted">{t("summary.address")}</span>
@@ -508,16 +540,23 @@ function BookingForm(props: {
   );
 }
 
+const chipClass =
+  "inline-flex min-h-11 min-w-16 flex-col items-center justify-center rounded-oc border border-border bg-surface " +
+  "px-3 py-1 peer-checked:border-primary peer-checked:bg-primary peer-checked:text-on-primary " +
+  "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary";
+
 export function TimeList(props: {
   times: Times;
   t: Translate;
   party: number;
   name: string;
   value: string;
+  zone?: string;
   onChange(value: string): void;
   explain(failure: Failure): string;
 }) {
   const { times, t } = props;
+  const chosenZone = props.zone ?? "";
   if (times.kind === "pick-date") return <p className="text-muted">{t("times.pickDate")}</p>;
   if (times.kind === "closed") return <p role="status">{t("times.closed")}</p>;
   if (times.kind === "loading") return <p role="status">{t("times.loading")}</p>;
@@ -527,28 +566,41 @@ export function TimeList(props: {
     if (times.reason === "beyond_horizon") return <p role="status">{t("times.tooFar")}</p>;
     return <p role="status">{t("times.none", { n: props.party })}</p>;
   }
-  return (
+  const slots: PublicSlot[] = times.slots ?? times.times.map((time) => ({ time }));
+  const groups = groupSlots(slots);
+  const chips = (list: PublicSlot[]) => (
     <div className="flex flex-wrap gap-2">
-      {times.times.map((time) => (
-        <label key={time} className="relative">
-          <input
-            type="radio"
-            name={props.name}
-            value={time}
-            checked={props.value === time}
-            onChange={() => props.onChange(time)}
-            className="peer absolute inset-0 opacity-0"
-          />
-          <span
-            className={
-              "inline-flex min-h-11 min-w-16 items-center justify-center rounded-oc border border-border bg-surface " +
-              "px-3 peer-checked:border-primary peer-checked:bg-primary peer-checked:text-on-primary " +
-              "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary"
-            }
-          >
-            {time}
-          </span>
-        </label>
+      {list.map((slot) => {
+        const shown = zonesToShow(slot, chosenZone);
+        const zoneText = shown.join(", ");
+        return (
+          <label key={slot.time} className="group relative">
+            <input
+              type="radio"
+              name={props.name}
+              value={slot.time}
+              checked={props.value === slot.time}
+              onChange={() => props.onChange(slot.time)}
+              aria-label={zoneText ? t("times.withZones", { time: slot.time, zones: zoneText }) : undefined}
+              className="peer absolute inset-0 opacity-0"
+            />
+            <span className={chipClass}>
+              <span>{slot.time}</span>
+              {zoneText && <span className="text-xs text-muted group-has-[:checked]:text-on-primary">{zoneText}</span>}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+  if (groups.length === 1 && groups[0].service === null) return chips(slots);
+  return (
+    <div className="space-y-3">
+      {groups.map((group, index) => (
+        <div key={`${index}-${group.service}`} role="group" aria-label={group.service || undefined} className="space-y-1">
+          {group.service && <p className="text-sm font-medium text-muted [overflow-wrap:anywhere]">{group.service}</p>}
+          {chips(group.slots)}
+        </div>
       ))}
     </div>
   );

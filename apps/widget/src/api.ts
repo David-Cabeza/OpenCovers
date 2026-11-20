@@ -27,9 +27,25 @@ export interface PublicConfig {
   askConsent: boolean;
   /** The venue's own privacy notice, an `https` URL or null (C64). Read through `noticeHref`, never rendered raw. */
   privacyNoticeUrl?: string | null;
+  /** The public zone names, in the venue's order, or `[]` (C66). Absent from an older API. Two or more offer a choice. */
+  zones?: string[];
   challenge: FormChallenge;
   /** Whether the venue can email a lost link. Without it the widget does not offer the resend. */
   linkResend: boolean;
+}
+
+/** One bookable time of the availability answer (C66). `zones` and `service` appear only when the venue opted in. */
+export interface PublicSlot {
+  time: string;
+  zones?: string[];
+  service?: string;
+}
+
+export interface PublicAvailability {
+  times: string[];
+  /** Present with two or more public zones or service names; its times are exactly `times`. */
+  slots?: PublicSlot[];
+  reason?: "past_date" | "beyond_horizon" | null;
 }
 
 /** The status of one date of the days route (C63). `selected` is a widget state, not an API status. */
@@ -82,6 +98,8 @@ export interface BookingFields {
   commentary: string;
   /** The hidden field. A person leaves it empty; the engine refuses any other value. */
   honeypot: string;
+  /** A public zone chosen by the guest. Absent means any table. */
+  zone?: string;
 }
 
 /**
@@ -126,10 +144,10 @@ export function publicApi(bookingKey: string, fetcher: Fetch = (input, init) => 
   const base = `/v1/public/${encodeURIComponent(bookingKey)}`;
   return {
     config: () => call<PublicConfig>(fetcher, base),
-    availability: (date: string, partySize: number) =>
-      call<{ times: string[]; reason?: "past_date" | "beyond_horizon" | null }>(
+    availability: (date: string, partySize: number, zone?: string) =>
+      call<PublicAvailability>(
         fetcher,
-        `${base}/availability?${new URLSearchParams({ date, partySize: String(partySize) })}`,
+        `${base}/availability?${new URLSearchParams({ date, partySize: String(partySize), ...(zone ? { zone } : {}) })}`,
       ),
     days: (from: string, days: number, partySize: number) =>
       call<PublicDays>(
@@ -144,6 +162,7 @@ export function publicApi(bookingKey: string, fetcher: Fetch = (input, init) => 
           date: fields.date,
           time: fields.time,
           partySize: fields.partySize,
+          ...(fields.zone ? { zone: fields.zone } : {}),
           guest: { name: fields.name.trim(), contact: fields.contact.trim() },
           ...(fields.commentary.trim() ? { commentary: fields.commentary.trim() } : {}),
           honeypot: fields.honeypot,
