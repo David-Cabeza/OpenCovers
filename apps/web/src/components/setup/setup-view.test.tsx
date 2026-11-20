@@ -30,29 +30,116 @@ function setup() {
   });
 }
 
-describe("SetupView", () => {
-  afterEach(resetApiMocks);
+const open = (section: string) => window.history.replaceState(null, "", `/?section=${section}`);
 
-  it("offers every section to an admin", async () => {
-    setup();
-    renderWithApp(<SetupView venueId="v1" role="admin" />);
-    const nav = await screen.findByRole("navigation", { name: "Settings sections" });
-    for (const label of ["General", "Online", "Dining room", "Developers"]) {
-      expect(within(nav).getByRole("button", { name: label })).toBeInTheDocument();
-    }
+describe("SetupView", () => {
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+    resetApiMocks();
   });
 
-  it("hides the admin-only sections from other roles", async () => {
+  it("offers every section to an admin as tabs, General first and selected", async () => {
+    setup();
+    renderWithApp(<SetupView venueId="v1" role="admin" />);
+    const bar = await screen.findByRole("tablist", { name: "Settings sections" });
+    const tabs = within(bar).getAllByRole("tab");
+    expect(tabs.map((t) => t.textContent)).toEqual(["General", "Online", "Dining room", "Developers"]);
+    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Online" })).toHaveAttribute("tabindex", "-1");
+    const panel = screen.getByRole("tabpanel", { name: "General" });
+    expect(panel).toBeVisible();
+    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("aria-controls", panel.id);
+    expect(screen.queryByText("Add table")).not.toBeInTheDocument();
+  });
+
+  it("hides the admin-only sections from other roles, even by the address", async () => {
+    open("developers");
     setup();
     renderWithApp(<SetupView venueId="v1" role="write" />);
-    const nav = await screen.findByRole("navigation", { name: "Settings sections" });
-    expect(within(nav).getByRole("button", { name: "Dining room" })).toBeInTheDocument();
-    expect(within(nav).queryByRole("button", { name: "Online" })).not.toBeInTheDocument();
-    expect(within(nav).queryByRole("button", { name: "Developers" })).not.toBeInTheDocument();
+    const bar = await screen.findByRole("tablist", { name: "Settings sections" });
+    expect(within(bar).getByRole("tab", { name: "Dining room" })).toBeInTheDocument();
+    expect(within(bar).queryByRole("tab", { name: "Online" })).not.toBeInTheDocument();
+    expect(within(bar).queryByRole("tab", { name: "Developers" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("heading", { name: "Developers" })).not.toBeInTheDocument();
   });
 
+  it("shows a section on click and records it in the address", async () => {
+    const user = userEvent.setup();
+    setup();
+    renderWithApp(<SetupView venueId="v1" role="admin" />);
+    await user.click(await screen.findByRole("tab", { name: "Dining room" }));
+    expect(window.location.search).toBe("?section=room");
+    expect(await screen.findByRole("button", { name: "Edit Mesa 1" })).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel", { name: "Dining room" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "General" })).not.toBeInTheDocument();
+  });
+
+  it("opens the section named in the address", async () => {
+    open("online");
+    setup();
+    renderWithApp(<SetupView venueId="v1" role="admin" />);
+    expect(await screen.findByRole("tab", { name: "Online", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel", { name: "Online" })).toBeVisible();
+  });
+
+  it("falls back to General for an unknown section", async () => {
+    open("nonsense");
+    setup();
+    renderWithApp(<SetupView venueId="v1" role="admin" />);
+    expect(await screen.findByRole("tab", { name: "General", selected: true })).toBeInTheDocument();
+  });
+
+  it("moves between tabs with the arrow, Home and End keys", async () => {
+    const user = userEvent.setup();
+    setup();
+    renderWithApp(<SetupView venueId="v1" role="admin" />);
+    const general = await screen.findByRole("tab", { name: "General" });
+    general.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: "Online" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Online" })).toHaveAttribute("aria-selected", "true");
+    await user.keyboard("{End}");
+    expect(screen.getByRole("tab", { name: "Developers" })).toHaveFocus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: "General" })).toHaveFocus();
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.getByRole("tab", { name: "Developers" })).toHaveFocus();
+    await user.keyboard("{Home}");
+    expect(screen.getByRole("tab", { name: "General" })).toHaveFocus();
+  });
+
+  it("keeps an unsaved edit in General when switching tabs and back", async () => {
+    const user = userEvent.setup();
+    mockApi({
+      "GET /v1/venues/v1/tables": { body: TABLES },
+      "GET /v1/venues/v1/services": { body: SERVICES },
+      "GET /v1/venues/v1/config": {
+        body: {
+          enabled: true, noticeAddress: "", notificationsEnabled: false, resendConfigured: false,
+          fromEmail: "", slotIntervalMinutes: 15, leadTimeMinutes: 0, lastSeatingOffsetMinutes: 0, overbookingCeiling: 0,
+        },
+      },
+    });
+    renderWithApp(<SetupView venueId="v1" role="admin" />);
+    const field = await screen.findByLabelText(/slot interval/i);
+    await user.clear(field);
+    await user.type(field, "30");
+    await user.click(screen.getByRole("tab", { name: "Dining room" }));
+    expect(document.getElementById("settings-venue")).not.toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "General" }));
+    expect(screen.getByLabelText(/slot interval/i)).toHaveValue(30);
+  });
+
+  it("does not fetch the data of a section that was never opened", async () => {
+    const api = setup();
+    renderWithApp(<SetupView venueId="v1" role="admin" />);
+    await screen.findByRole("tablist");
+    expect(api.requests.some((r) => r.path.includes("/tables"))).toBe(false);
+  });
+
   it("lists tables and services as rows with their details", async () => {
+    open("room");
     setup();
     renderWithApp(<SetupView venueId="v1" role="write" />);
     await screen.findByRole("button", { name: "Edit Mesa 1" });
@@ -68,6 +155,7 @@ describe("SetupView", () => {
 
   it("removes a table or a service from its row", async () => {
     const user = userEvent.setup();
+    open("room");
     const api = setup();
     renderWithApp(<SetupView venueId="v1" role="write" />);
     await user.click(await screen.findByRole("button", { name: "Remove Mesa 1" }));
@@ -82,6 +170,7 @@ describe("SetupView", () => {
 
   it("keeps the table when the confirmation is declined", async () => {
     const user = userEvent.setup();
+    open("room");
     const api = setup();
     renderWithApp(<SetupView venueId="v1" role="write" />);
     await user.click(await screen.findByRole("button", { name: "Remove Mesa 1" }));
@@ -93,6 +182,7 @@ describe("SetupView", () => {
 
   it("keeps the service when the confirmation is declined", async () => {
     const user = userEvent.setup();
+    open("room");
     const api = setup();
     renderWithApp(<SetupView venueId="v1" role="write" />);
     await user.click(await screen.findByRole("button", { name: "Remove dinner" }));
@@ -104,6 +194,7 @@ describe("SetupView", () => {
 
   it("opens the edit dialog from a table row", async () => {
     const user = userEvent.setup();
+    open("room");
     setup();
     renderWithApp(<SetupView venueId="v1" role="write" />);
     await user.click(await screen.findByRole("button", { name: "Edit Mesa 1" }));

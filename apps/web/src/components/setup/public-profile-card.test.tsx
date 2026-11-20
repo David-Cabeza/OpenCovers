@@ -145,6 +145,7 @@ describe("PublicProfileCard", () => {
 
   it("is only shown to an admin in the Setup view", async () => {
     setup();
+    window.history.replaceState(null, "", "/?section=online");
     const { unmount } = renderWithApp(<SetupView venueId="v1" role="write" />);
     await screen.findByText("Booking policy");
     expect(screen.queryByText("Public profile")).not.toBeInTheDocument();
@@ -152,5 +153,6 @@ describe("PublicProfileCard", () => {
 
     renderWithApp(<SetupView venueId="v1" role="admin" />);
     expect(await screen.findByText("Public profile")).toBeInTheDocument();
+    window.history.replaceState(null, "", "/");
   });
 });

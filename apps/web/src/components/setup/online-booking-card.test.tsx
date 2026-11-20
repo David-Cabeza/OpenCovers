@@ -718,8 +718,10 @@ describe("OnlineBookingCard", () => {
     expect(screen.queryByText("Online booking")).not.toBeInTheDocument();
     unmount();
 
+    window.history.replaceState(null, "", "/?section=online");
     renderWithApp(<SetupView venueId="v1" role="admin" />);
     expect(await screen.findByText("Online booking")).toBeInTheDocument();
+    window.history.replaceState(null, "", "/");
   });
 });
 

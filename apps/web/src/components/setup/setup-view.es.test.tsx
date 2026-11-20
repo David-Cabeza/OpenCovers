@@ -1,4 +1,5 @@
 import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mockApi, renderWithApp, resetApiMocks } from "@/test/mock-api";
 import { useUiStore } from "@/stores/ui-store";
@@ -18,6 +19,7 @@ describe("SetupView in Spanish", () => {
   beforeEach(() => useUiStore.setState({ locale: "es" }));
   afterEach(() => {
     useUiStore.setState({ locale: "en" });
+    window.history.replaceState(null, "", "/");
     resetApiMocks();
   });
 
@@ -27,11 +29,12 @@ describe("SetupView in Spanish", () => {
       "GET /v1/venues/v1/services": { body: SERVICES },
     });
     renderWithApp(<SetupView venueId="v1" role="admin" />);
-    const nav = await screen.findByRole("navigation", { name: "Secciones de ajustes" });
+    const nav = await screen.findByRole("tablist", { name: "Secciones de ajustes" });
     for (const label of ["General", "En línea", "Sala", "Desarrolladores"]) {
-      expect(within(nav).getByRole("button", { name: label })).toBeInTheDocument();
+      expect(within(nav).getByRole("tab", { name: label })).toBeInTheDocument();
     }
-    expect(within(nav).queryByRole("button", { name: "Dining room" })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole("tab", { name: "Dining room" })).not.toBeInTheDocument();
+    await userEvent.setup().click(within(nav).getByRole("tab", { name: "Sala" }));
     expect(screen.getByText("Ajustes")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Añadir mesa" })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Editar Mesa 1" })).toBeInTheDocument();
