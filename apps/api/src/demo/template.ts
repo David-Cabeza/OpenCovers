@@ -110,6 +110,9 @@ export const DEMO_TEMPLATE: DemoTemplate = {
     selfServiceCutoffMinutes: 120,
     locale: "es",
     privacyNoticeUrl: "https://opencovers.dev/privacidad.html",
+    // ADR-0021, section 2: the two zones of the tables above, and the service named on each time.
+    publicZones: ["Sala", "Terraza"],
+    showServiceNames: true,
   },
   guests: [
     { name: "Lucia Prado", local: "lucia.prado" },

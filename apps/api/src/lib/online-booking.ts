@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { services, venueOnlineBooking, venues } from "../db/schema";
+import { services, tables, venueOnlineBooking, venues } from "../db/schema";
 import type { Db, DbTx } from "./venue";
 import { isFrameAncestor } from "./widget-page";
 import { isSandboxVenue } from "../demo/limits";
@@ -10,6 +10,7 @@ export const FONTS = ["system", "serif", "rounded"] as const;
 export const COLOR_KEYS = ["primary", "onPrimary", "background", "surface", "text", "muted", "border"] as const;
 export const MAX_ORIGINS = 10;
 const MAX_LOGO_URL = 2048;
+const MAX_PUBLIC_ZONES = 10;
 /** The widget's built-in text and background colors (`apps/widget/src/styles.css`), used for a key a theme leaves out. */
 export const DEFAULT_TEXT = "#1c1b19";
 export const DEFAULT_BACKGROUND = "#ffffff";
@@ -49,6 +50,10 @@ export interface OnlineBooking {
   theme: Theme;
   /** The venue's own privacy notice, as stored, or null. OpenCovers writes no legal text (ADR-0021, section 5). */
   privacyNoticeUrl: string | null;
+  /** The table zones a guest may pick, as stored: none, or 2 to 10 names (ADR-0021, C66). See `effectivePublicZones`. */
+  publicZones: string[];
+  /** Whether availability names the service of each time (ADR-0021, C66). */
+  showServiceNames: boolean;
 }
 
 export interface Warning {
@@ -85,6 +90,8 @@ function defaults(): OnlineBooking {
     locale: "es",
     theme: {},
     privacyNoticeUrl: null,
+    publicZones: [],
+    showServiceNames: false,
   };
 }
 
@@ -107,6 +114,8 @@ function viewOf(r: Row | undefined): OnlineBooking {
     locale: r.locale,
     theme: r.theme as Theme,
     privacyNoticeUrl: r.privacyNoticeUrl,
+    publicZones: r.publicZones,
+    showServiceNames: r.showServiceNames,
   };
 }
 
@@ -204,7 +213,7 @@ const INT_FIELDS = [
 export function parseOnlineBookingInput(body: unknown): OnlineBookingInput | null {
   if (!isObject(body) || Object.keys(body).length === 0) return null;
   const out: OnlineBookingInput = {};
-  for (const key of ["enabled", "askConsent"] as const) {
+  for (const key of ["enabled", "askConsent", "showServiceNames"] as const) {
     if (body[key] === undefined) continue;
     if (typeof body[key] !== "boolean") return null;
     out[key] = body[key];
@@ -261,6 +270,12 @@ export function parseOnlineBookingInput(body: unknown): OnlineBookingInput | nul
     if (body.privacyNoticeUrl === null) out.privacyNoticeUrl = null;
     else if (isPrivacyNoticeUrl(body.privacyNoticeUrl)) out.privacyNoticeUrl = body.privacyNoticeUrl;
     else return null;
+  }
+  if (body.publicZones !== undefined) {
+    const z = body.publicZones;
+    if (!Array.isArray(z) || z.length > MAX_PUBLIC_ZONES || z.length === 1) return null;
+    if (!z.every((n) => typeof n === "string" && n !== "") || new Set(z).size !== z.length) return null;
+    out.publicZones = z as string[];
   }
   return out;
 }
@@ -358,6 +373,11 @@ export async function setOnlineBooking(
     if (merged.services?.some((n) => !rows.some((r) => r.name === n))) {
       return { ok: false, code: "invalid_request" };
     }
+    // Only a list sent now is checked against the tables; a stored one that has since lost a zone stays (C66).
+    if (rest.publicZones !== undefined && rest.publicZones.length > 0) {
+      const zones = new Set((await tx.select({ zone: tables.zone }).from(tables).where(eq(tables.venueId, venueId))).map((t) => t.zone));
+      if (!rest.publicZones.every((n) => zones.has(n))) return { ok: false, code: "invalid_request" };
+    }
     if (merged.enabled) {
       const bookable = rows.some(
         (r) =>
@@ -379,4 +399,17 @@ export async function rotateBookingKey(db: Db, venueId: string): Promise<OnlineB
     await store(tx, venueId, settings);
     return { ok: true, settings, warnings: [] };
   });
+}
+
+/**
+ * The stored public zones that are still the zone of at least one of the venue's tables, in the stored order, or
+ * `[]` with fewer than two of them: the channel then behaves as if none were set (C66). A venue with nothing stored
+ * costs no query.
+ */
+export async function effectivePublicZones(db: Db, venueId: string, stored: string[]): Promise<string[]> {
+  if (stored.length < 2) return [];
+  const rows = await db.selectDistinct({ zone: tables.zone }).from(tables).where(eq(tables.venueId, venueId));
+  const present = new Set(rows.map((r) => r.zone));
+  const effective = stored.filter((n) => present.has(n));
+  return effective.length >= 2 ? effective : [];
 }

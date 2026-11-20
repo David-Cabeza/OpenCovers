@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { reservations, services, venueOnlineBooking, venues } from "../db/schema";
 import { isCommentary } from "./commentary";
 import { normalizeContact, venueCountry } from "./contact";
-import { getOnlineBooking, type OnlineBooking, type Theme } from "./online-booking";
+import { effectivePublicZones, getOnlineBooking, type OnlineBooking, type Theme } from "./online-booking";
 import { isSolution, parseChallenge, type FormChallenge } from "./public-challenge";
 import { applyChannel, type OnlineRules } from "./reservations";
 import { linkExpiry } from "./self-service";
@@ -14,8 +14,9 @@ import type { Db } from "./venue";
 const BOOKING_KEY = /^pk_[A-Za-z0-9_-]{22}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TIME = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
-const REFUSED_FIELDS = ["tables", "zone", "rating", "reconfirmation"] as const;
-const MODIFY_REFUSED_FIELDS = ["date", "time", ...REFUSED_FIELDS] as const;
+// A create takes `zone` (C66), checked against the venue's effective public zones by the handler. A guest modify never does.
+const REFUSED_FIELDS = ["tables", "rating", "reconfirmation"] as const;
+const MODIFY_REFUSED_FIELDS = ["date", "time", "zone", ...REFUSED_FIELDS] as const;
 
 type VenueRow = typeof venues.$inferSelect;
 
@@ -37,6 +38,8 @@ export interface PublicVenue {
     | "locale"
     | "theme"
     | "privacyNoticeUrl"
+    | "publicZones"
+    | "showServiceNames"
   >;
 }
 
@@ -48,6 +51,8 @@ export interface PublicCreate {
   contact: string;
   consent: "unknown" | "granted";
   commentary: string;
+  /** As sent, a string. Not yet checked against the venue's effective public zones. */
+  zone?: string;
   challenge: FormChallenge;
   solution: string;
 }
@@ -125,6 +130,7 @@ export async function publicConfig(db: Db, target: PublicVenue, challenge: FormC
     captcha: null,
     linkResend,
     privacyNoticeUrl: settings.privacyNoticeUrl,
+    zones: await effectivePublicZones(db, venue.id, settings.publicZones),
   };
 }
 
@@ -146,6 +152,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 export function parsePublicCreate(body: unknown, target: PublicVenue): PublicCreate | null {
   if (!isObject(body) || !isObject(body.guest)) return null;
   if (REFUSED_FIELDS.some((field) => body[field] !== undefined)) return null;
+  if (body.zone !== undefined && typeof body.zone !== "string") return null;
   if (body.honeypot !== undefined && body.honeypot !== "") return null;
   if (!isDate(body.date) || typeof body.time !== "string" || !TIME.test(body.time)) return null;
   if (typeof body.partySize !== "number" || !Number.isInteger(body.partySize) || body.partySize < 1) return null;
@@ -165,6 +172,7 @@ export function parsePublicCreate(body: unknown, target: PublicVenue): PublicCre
     contact: contact.trim(),
     consent: target.settings.askConsent && consent === "granted" ? "granted" : "unknown",
     commentary: (body.commentary as string | undefined) ?? "",
+    ...(body.zone !== undefined ? { zone: body.zone as string } : {}),
     challenge,
     solution: body.solution,
   };
