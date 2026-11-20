@@ -313,6 +313,29 @@ function isExclusionViolation(error: unknown): boolean {
   return isExclusionViolation(e.cause);
 }
 
+/**
+ * Serializes table planning per venue until the transaction ends, so a planner reads the allocations the previous
+ * plan inserted. Without it concurrent auto-assigns choose the same free tables and the loser gets slot_taken while
+ * others are free. Every path that takes it does so before the overbooking lock, never after.
+ */
+async function lockPlanner(tx: DbTx, venueId: string) {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`planner:${venueId}`}, 0))`);
+}
+
+// A write that names its tables can still take a planned table between plan and insert. The database refuses it
+// (23P01), so a planned write replans a bounded number of times before it reports the conflict.
+const PLAN_ATTEMPTS = 3;
+
+async function replanOnConflict<T>(planned: boolean, run: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      if (!planned || attempt >= PLAN_ATTEMPTS || !isExclusionViolation(error)) throw error;
+    }
+  }
+}
+
 async function venueOf(db: Db, venueId: string) {
   return (
     await db.select().from(venues).where(eq(venues.id, venueId)).limit(1)
@@ -806,7 +829,7 @@ export async function createReservation(
   const id = crypto.randomUUID();
   const contactKey = input.guestContact != null ? normalizeContact(String(input.guestContact), venueCountry(venue)) : null;
   try {
-    const result = await db.transaction(async (tx) => {
+    const result = await replanOnConflict(autoAssign, () => db.transaction(async (tx) => {
       const existing = await claimKey(tx, venueId, key);
       if (existing) {
         if (existing.kind !== "create") throw new ReservationError("invalid_request");
@@ -873,6 +896,7 @@ export async function createReservation(
       }
       let tableIds = input.tableIds ?? [];
       if (autoAssign) {
+        await lockPlanner(tx, venueId);
         const fit = await tableReasons(tx, venueId, startsAt, endsAt, input.partySize, zone);
         if (fit.ok) {
           tableIds = fit.tableIds;
@@ -939,7 +963,7 @@ export async function createReservation(
         ...originColumns(input.origin),
       });
       return { id, version: 1, selfServiceToken: link?.token };
-    });
+    }));
     return { ok: true, ...result };
   } catch (error) {
     if (isExclusionViolation(error)) return { ok: false, code: "slot_taken" };
@@ -1018,6 +1042,7 @@ async function guestTables(tx: DbTx, venueId: string, current: ReservationRow, p
     .innerJoin(tables, eq(tables.id, tableAllocations.tableId))
     .where(eq(tableAllocations.reservationId, current.id));
   if (held.length > 0 && held.reduce((sum, t) => sum + t.seats, 0) >= partySize) return undefined;
+  await lockPlanner(tx, venueId);
   const fit = await tableReasons(tx, venueId, current.startsAt, current.endsAt, partySize, current.zone, current.id);
   if (!fit.ok) throw new ReservationError("no_suitable_table");
   return fit.tableIds;
@@ -1032,7 +1057,7 @@ export async function modifyReservation(
 ): Promise<WriteResult> {
   const guest = input.selfService;
   try {
-    const version = await db.transaction(async (tx) => {
+    const version = await replanOnConflict(guest !== undefined, () => db.transaction(async (tx) => {
       const existing = await claimKey(tx, venueId, key);
       if (guest) await lockForGuest(tx, venueId, id, guest.linkId);
       if (existing) {
@@ -1159,7 +1184,7 @@ export async function modifyReservation(
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "modify", version: nextVersion });
       await tx.insert(events).values({ venueId, type: "modified", reservationId: id, version: nextVersion, ...originColumns(input.origin) });
       return nextVersion;
-    });
+    }));
     return { ok: true, id, version };
   } catch (error) {
     // A guest's party never uses the ceiling, so a table taken by a concurrent write leaves no fitting table.
