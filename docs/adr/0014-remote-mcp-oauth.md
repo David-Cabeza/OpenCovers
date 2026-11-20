@@ -46,13 +46,13 @@ What the MCP specification asks. The current revision is 2026-07-28 ([authorizat
 
 The API process serves one MCP endpoint, `POST /mcp`, with the MCP SDK's web-standard Streamable HTTP transport in stateless mode. It answers `GET` and `DELETE` on `/mcp` with `405`. It issues no `MCP-Session-Id` and ignores one if sent, so a session id is never part of authentication. The canonical resource URI is the API's public base URL, `BETTER_AUTH_URL`, plus `/mcp`, for example `https://book.example.com/mcp`. The compose stack sets `BETTER_AUTH_URL` from `PUBLIC_URL`.
 
-The remote endpoint is off by default. An operator turns it on with `MCP_REMOTE=on`. With it off, `/mcp` and the OAuth metadata return `404`.
+The remote endpoint is off by default. An operator turns it on with `MCP_REMOTE=on`. With it off, `/mcp` and the OAuth metadata return `404`. With it on, the API refuses to start unless `BETTER_AUTH_URL` is `https` (plain `http` only on a loopback host outside production) and `BETTER_AUTH_SECRET` is set to a value other than the development fallback. It also refuses `DEMO_MODE=1`: any demo visitor could authorize an agent, and a magic link sign-in carries no authorization request to resume. Both compose files pass `MCP_REMOTE`, default `off`.
 
 The tool definitions stay in `apps/mcp`, defined once. `createServer` takes the request function and the list of tools to register. Stdio passes the HTTP client and every tool. The API passes an in-process dispatcher and the remote tool list below.
 
 The dispatcher calls the same Hono app in process (`app.request`) and never makes a network call. It does not forward the access token. It hands the venue middleware a resolved identity, `{ userId, clientId, grantId, scope }`, through a value that only the in-process call can set. A header cannot carry it, so an HTTP caller cannot forge it. The `/v1` routes keep accepting only `apikey` and a staff session, and never an OAuth access token.
 
-`apps/web/Caddyfile` gains `handle` blocks for `/mcp` and the `/.well-known/oauth-*` paths, all forwarded to the API. Everything else stays as it is.
+`apps/web/Caddyfile` gains a `handle` block for `/mcp` and the `/.well-known/oauth-*` paths, forwarded to the API only when `MCP_REMOTE=on`. With it off the proxy serves the staff app on those paths, as before, and the API answers `404` on its own. Everything else stays as it is.
 
 ### Authorization server
 
@@ -62,8 +62,9 @@ A person authenticates with the staff sign-in that exists today, email and passw
 
 ### Client registration
 
-- **Client ID Metadata Documents: yes.** A client identifies itself with an HTTPS URL that serves its metadata. The server fetches it under the same address rules as webhook targets in `apps/api/src/lib/webhook-target.ts`. It requires HTTPS, refuses private, loopback, link-local and multicast addresses, and applies a short timeout and a size cap. The fetched `client_id` must equal the URL, and the redirect URI in the request must match one in the document exactly.
-- **Pre-registered clients: yes.** An instance operator can register a client by hand for an agent that has no metadata document. The command or route for that is issue #67's to design, limited to the instance owner.
+- **Client ID Metadata Documents: yes.** A client identifies itself with an HTTPS URL that serves its metadata. The server fetches it with the plugin's own Node transport, `fetchClientMetadataResource` from `@better-auth/cimd/node`, and not with `apps/api/src/lib/webhook-target.ts`. That transport is stricter than the webhook rules: HTTPS only, every DNS answer must be a public-routable address, the socket is pinned to the checked address, redirects are not followed, and a fetch stops after 5 seconds or 5 KB. The fetched `client_id` must equal the URL. The redirect URI in the request must match one in the document exactly, with one exception from RFC 8252 section 7.3: for an `http` redirect URI on a loopback address or `localhost`, the port may differ, because a local client listens on whatever port is free. Scheme, host and path must still match, and PKCE keeps a listener on another port from redeeming the code. Pre-registered clients get no such exception.
+- **A document becomes a stored client.** The plugin stores an `oauth_client` row, with `client_discovery_id` `cimd`, the first time a request names a document it can fetch. Only a request with a staff session may do that. A request without one never fetches a new document: an authorization request is sent to the sign-in page with its query, and the page sends the person back to the same authorization URL after sign-in. A token or revocation request is answered as for an unknown client. An anonymous request therefore writes no row and spends none of the plugin's fetch budget (120 fetches a minute in all, 30 per origin). The plugin fetches a stored document again when its cache entry is older than 60 minutes, so a refresh can still cause a fetch. A stored client that never got a consent is kept until retention for the OAuth tables removes it, which is still to be built.
+- **Pre-registered clients: yes.** An instance operator can register a client by hand for an agent that has no metadata document. Only the instance owner may create one: the account that holds the first-user mark (`first_signup`), through the plugin's server-side `adminCreateOAuthClient`. Nobody can read, change or delete a client that way. Under `SIGNUP=open` no account holds the mark, so no client can be pre-registered. A client never switches PKCE or consent off: the API refuses `require_pkce: false` and `skip_consent: true`, and two CHECK constraints on `oauth_client` refuse such a row whatever code writes it. The operator command around this is still issue #67's to design.
 - **Dynamic Client Registration: no.** Open registration lets anyone write rows to the client table with no account. The spec deprecates it, and the two options above cover current clients. See the open questions.
 
 ### PKCE and the authorization code
@@ -81,7 +82,7 @@ PKCE is required for every client, with `S256` only. A request with no `code_cha
 
 Access tokens are opaque so that each call looks the token up in the database. That lookup is what makes revocation take effect on the next call. A JWT would stay valid until it expired.
 
-Every refresh issues a new refresh token and invalidates the old one. A rotated refresh token presented again is treated as theft. The whole grant is revoked, every token of it stops working, and an `agent_revoked` audit row is written. The reuse interval is 0. The plugin has no absolute limit, and each rotation sets the new refresh token to 30 days from now (verified in part 1 of #67). So the grant table stores the grant's expiry, `/mcp` refuses a token whose grant is past it, and a before hook on the token endpoint refuses a refresh after it. Refresh never extends the grant beyond 90 days from consent.
+Every refresh issues a new refresh token and invalidates the old one. A rotated refresh token presented again is treated as theft. The plugin deletes every refresh and access token that client holds for that person, which is wider than one grant. Part 2 also deletes the grant and writes an `agent_revoked` audit row. The plugin keeps its own consent row, so the consent screen, which is never skipped, is what stops the same client from getting a new code without the person. The reuse interval is 0. The plugin has no absolute limit, and each rotation sets the new refresh token to 30 days from now (verified in part 1 of #67). So the grant table stores the grant's expiry, `/mcp` refuses a token whose grant is past it, and a before hook on the token endpoint refuses a refresh after it. Refresh never extends the grant beyond 90 days from consent.
 
 The access token audience is the canonical resource URI. `/mcp` refuses a token whose audience differs, one that has expired, and one whose grant no longer exists, all with `401` and a `WWW-Authenticate` header that names the Protected Resource Metadata URL. Tokens are accepted only in the `Authorization: Bearer` header. A token in the query string is refused, and a Better Auth session cookie on `/mcp` grants nothing.
 
@@ -167,14 +168,15 @@ Last used is updated at most once a minute per grant, so reads do not become wri
 
 ### Rate limits
 
-Two rules are added to `apps/api/src/lib/rate-limit.ts`, with the same `429`, `rate_limited` and `Retry-After` answer and the same `RATE_LIMIT` switch.
+Three rules are added to `apps/api/src/lib/rate-limit.ts`, with the same `429`, `rate_limited` and `Retry-After` answer and the same `RATE_LIMIT` switch. They apply only with `MCP_REMOTE=on`. With it off, the OAuth paths are counted as before.
 
 | Rule | Matches | Key | Default |
 | --- | --- | --- | --- |
+| `oauth_authorize` | `GET` to the authorization endpoint | client address | 30 per 15 minutes |
 | `oauth_token` | `POST` to the token endpoint | client address | 60 per 15 minutes |
 | `mcp_call` | `POST /mcp` with a valid token | grant id | 300 per 5 minutes |
 
-The token endpoint gets its own budget so that agents refreshing every 15 minutes do not spend the `auth` budget that guards password guessing. The authorization and consent `POST`s stay in `auth`, because a person makes them. A `POST /mcp` that fails authentication counts on the `auth` budget for its address, so guessing tokens meets the same limit as guessing passwords. `mcp_call` is keyed by grant and not by address, because many agents share the egress addresses of one hosting service. The limits keep the caveats of ADR-0007: in memory, one process, cleared on restart.
+The authorization `GET` is limited because anyone can send it without an account. The token endpoint gets its own budget so that agents refreshing every 15 minutes do not spend the `auth` budget that guards password guessing. The authorization and consent `POST`s stay in `auth`, because a person makes them. A `POST /mcp` that fails authentication counts on the `auth` budget for its address, so guessing tokens meets the same limit as guessing passwords. `mcp_call` is keyed by grant and not by address, because many agents share the egress addresses of one hosting service. The limits keep the caveats of ADR-0007: in memory, one process, cleared on restart.
 
 ### Origin and host checks
 
@@ -205,7 +207,7 @@ A grant that spans several venues writes one row per venue. Rows hold ids, a rol
 | Stolen authorization code | PKCE `S256` binds it to the client that asked. Single use, 10 minutes, exact redirect URI match. |
 | Cross-venue access | The grant names venues explicitly and never `*`. Each call checks the venue in the grant and the person's membership, then the venue middleware runs as for any caller. Every failure is `venue_not_found`. Issue #67 tests isolation on the remote path. |
 | Replay | TLS stops replay on the wire. A replayed authorization code fails. A replayed rotated refresh token fails and revokes the grant. A token holder who repeats a write gets what stdio gives. A write that carries the same idempotency key returns the same result, and a call without a key is not deduplicated. `waitlist.add` and `waitlist.cancel` take the same optional `idempotencyKey` (C58), so a retry with the key adds one entry. |
-| Abuse | No anonymous client registration. A grant needs a staff account and a membership. The token endpoint, failed `/mcp` authentication and calls per grant are rate limited. Metadata document fetches follow the webhook address rules, so they cannot reach internal addresses. |
+| Abuse | No anonymous client registration: only a request with a staff session turns a metadata document into a client row, and only the instance owner pre-registers a client. A grant needs a staff account and a membership. The authorization page, the token endpoint, failed `/mcp` authentication and calls per grant are rate limited. Metadata document fetches go through the plugin's pinned HTTPS transport, which refuses every address that is not public, so they cannot reach internal addresses. |
 | Privilege escalation | No admin scope. The effective role is the lower of scope and membership, read per call. The dispatcher allowlist blocks routes outside the 16 tools. `staffSessionOnly` refuses the OAuth identity. |
 | Confused deputy | OpenCovers is both the authorization server and the resource server, and calls no third-party API with a user's token. The server holds no master credential to act with. A call runs with the grant's identity and never with more. Every authorization shows the consent screen. |
 | Client impersonation | A client that claims another client's metadata URL must also redirect to one of that document's URIs. The screen shows the redirect hostname and warns on `localhost`-only clients. |
@@ -269,3 +271,16 @@ The owner accepted this ADR with these answers.
 4. **Venue sets.** A grant may name several venues.
 5. **Off by default.** `MCP_REMOTE=on` is required.
 6. **Idempotency on remote writes.** Not part of issue #67, because it changes tool behavior. A separate flag covers it.
+
+## Amendment 2026-11-20: after the review of part 1
+
+A review of part 1 (#92) found this ADR and the code apart in six places. The code is brought in line in #279, and the text above is corrected where the ADR was wrong.
+
+- **`offline_access`.** The Scopes section already accepted it, but the code refused it, so no client got a refresh token. The code now accepts it and keeps it out of the advertised scopes.
+- **Anonymous registration.** The ADR did not say that a metadata document becomes a stored client row, and an anonymous authorization request wrote one. Decided: only a request with a staff session creates such a row (Client registration).
+- **PKCE and consent per client.** The plugin let a client carry `require_pkce: false` or `skip_consent: true`, and any signed-in person could register a client. Decided: only the instance owner registers, neither flag can be set, and the database refuses the row (Client registration).
+- **Loopback redirect ports.** The ADR said exact match. The plugin lets the port of a loopback `http` redirect URI vary for metadata-document clients, as RFC 8252 section 7.3 asks. The ADR was wrong.
+- **The metadata fetch.** The ADR named the webhook address rules. The plugin's own transport is used, and it is stricter. The ADR was wrong.
+- **Refresh token reuse.** The Tokens section said the grant is revoked with an audit row, the amendment after part 1 said every token of the client for that person is deleted. The Tokens section now says what the plugin does, what part 2 adds, and that the plugin keeps its consent row.
+
+It also adds the `oauth_authorize` rate rule, and refuses `MCP_REMOTE=on` without HTTPS and a real secret, or with demo mode (Shape). Refusing demo mode can be undone: allowing it needs a decision on magic link sign-in and the consent screen.
