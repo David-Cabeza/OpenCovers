@@ -202,11 +202,16 @@ export const reservations = pgTable(
     reconfirmationRecordedAt: timestamp("reconfirmation_recorded_at", { withTimezone: true }),
     commentary: text("commentary").notNull().default(""),
     erased: boolean("erased").notNull().default(false),
+    guestLocale: text("guest_locale"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [
+    check(
+      "reservations_guest_locale",
+      sql`${t.guestLocale} IS NULL OR ${t.guestLocale} IN ('es', 'en', 'ca', 'fr', 'de', 'it', 'pt')`,
+    ),
     check("reservations_commentary_length", sql`char_length(${t.commentary}) <= 500`),
     index("idx_reservations_venue_date").on(t.venueId, t.date),
     index("idx_reservations_venue_guest").on(t.venueId, t.guestId),

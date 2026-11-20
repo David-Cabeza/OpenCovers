@@ -456,6 +456,7 @@ app.post("/v1/public/:bookingKey/reservations", async (c) => {
       bookedVia: "widget",
       basis: "service",
       ownerPrincipal: "widget",
+      guestLocale: input.locale ?? null,
       channel: { kind: "public", rules: rulesOf(target.settings) },
       origin: WIDGET,
     },
@@ -1431,6 +1432,7 @@ function toApi(reservation: any, venueId: string) {
     commentary: reservation.commentary,
     reconfirmation: reservation.reconfirmation,
     reconfirmationRecordedAt: reservation.reconfirmationRecordedAt ?? null,
+    guestLocale: reservation.guestLocale ?? null,
     tables: reservation.tableIds,
   };
 }

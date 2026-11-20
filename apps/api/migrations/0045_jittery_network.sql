@@ -1,0 +1,2 @@
+ALTER TABLE "reservations" ADD COLUMN "guest_locale" text;--> statement-breakpoint
+ALTER TABLE "reservations" ADD CONSTRAINT "reservations_guest_locale" CHECK ("reservations"."guest_locale" IS NULL OR "reservations"."guest_locale" IN ('es', 'en', 'ca', 'fr', 'de', 'it', 'pt'));

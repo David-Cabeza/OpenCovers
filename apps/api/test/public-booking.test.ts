@@ -639,3 +639,124 @@ describe("C54 guest blocklist on the public create", () => {
     expect((await create(elsewhere.key, body(elsewhere.key, { guest: { name: "Bo", contact } }))).status).toBe(200);
   });
 });
+
+describe("C43 / C55 guest locale on the public create (ADR-0024)", () => {
+  const staffGet = (v: Venue, path: string) => app.request(`/v1/venues/${v.id}${path}`, { headers: { apikey: v.admin } });
+  const staffPost = (v: Venue, path: string, payload: unknown) =>
+    app.request(`/v1/venues/${v.id}${path}`, {
+      method: "POST",
+      headers: { apikey: v.admin, "content-type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify(payload),
+    });
+  const stored = async (id: string) =>
+    (await db.select({ l: reservations.guestLocale }).from(reservations).where(eq(reservations.id, id)))[0].l;
+
+  async function publicCreate(v: Venue, overrides: Record<string, unknown> = {}, key: string = crypto.randomUUID()) {
+    const res = await create(v.key, body(v.key, overrides), key);
+    const json = await res.json();
+    return { res, json, key };
+  }
+
+  async function staffId(v: Venue, token: string) {
+    const rows = await db.select().from(reservations).where(eq(reservations.venueId, v.id));
+    return rows.find((r) => r.guestContact === token)!.id;
+  }
+
+  it("stores each of the seven codes and shows it as guestLocale through get, list, search and agenda", async () => {
+    const v = await makeVenue({ seats: [4, 4, 4, 4, 4, 4, 4, 4] });
+    for (const code of ["es", "en", "ca", "fr", "de", "it", "pt"]) {
+      const contact = newContact();
+      const { res } = await publicCreate(v, { locale: code, guest: { name: "Ana", contact } });
+      expect(res.status).toBe(200);
+      const id = await staffId(v, contact);
+      expect(await stored(id)).toBe(code);
+      expect(((await (await staffGet(v, `/reservations/${id}`)).json()) as any).guestLocale).toBe(code);
+    }
+    const search = (await (await staffGet(v, `/reservations/search?dateStart=${SATURDAY}&dateEnd=${SUNDAY}`)).json()) as any;
+    const agenda = (await (await staffGet(v, `/agenda?date=${SATURDAY}`)).json()) as any;
+    for (const feed of [search, agenda]) {
+      expect(feed.reservations.map((r: any) => r.guestLocale).sort()).toEqual(["ca", "de", "en", "es", "fr", "it", "pt"]);
+    }
+  });
+
+  it("reads null without locale, and for staff creates and walk-ins; no staff write sets it", async () => {
+    const v = await makeVenue({ seats: [4, 4, 4, 4] });
+    const contact = newContact();
+    expect((await publicCreate(v, { guest: { name: "Ana", contact } })).res.status).toBe(200);
+    const publicId = await staffId(v, contact);
+    expect(await stored(publicId)).toBeNull();
+
+    const made = await staffPost(v, "/reservations", {
+      date: SATURDAY, time: "21:00", partySize: 2, guest: { name: "Staff", contact: "staff@example.com" }, guestLocale: "en", locale: "en",
+    });
+    expect(made.status).toBe(200);
+    const staffRes = (await made.json()) as any;
+    expect(staffRes.guestLocale).toBeNull();
+    expect(await stored(staffRes.id)).toBeNull();
+    // The list is the caller's own bookings (by principal), so it shows the staff one, with null.
+    const list = (await (await staffGet(v, "/reservations")).json()) as any;
+    expect(list.reservations.map((r: any) => r.guestLocale)).toEqual([null]);
+
+    const walk = await staffPost(v, "/reservations/walk-in", { partySize: 2, date: SATURDAY, time: "21:00", guestLocale: "fr" });
+    expect(walk.status).toBe(200);
+    expect(await stored(((await walk.json()) as any).id)).toBeNull();
+
+    const modified = await staffPost(v, `/reservations/${publicId}/modify`, { partySize: 3, guestLocale: "de" });
+    expect(modified.status).toBe(200);
+    expect(await stored(publicId)).toBeNull();
+  });
+
+  it("refuses anything but the seven lower-case codes and writes nothing", async () => {
+    const v = await makeVenue();
+    const before = await counts(v.id);
+    for (const bad of ["EN", "En", "en-GB", "xx", "", " en", "en ", null, 5, true, ["en"], { l: "en" }]) {
+      const { res } = await publicCreate(v, { locale: bad });
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+      expect(await res.text().catch(() => "")).toBe("");
+    }
+    expect(await counts(v.id)).toEqual(before);
+  });
+
+  it("keeps the first stored locale on a replay of the create key", async () => {
+    const v = await makeVenue();
+    const contact = newContact();
+    const payload = body(v.key, { locale: "en", guest: { name: "Ana", contact } });
+    const key = crypto.randomUUID();
+    expect((await create(v.key, payload, key)).status).toBe(200);
+    const id = await staffId(v, contact);
+    expect((await create(v.key, { ...payload, locale: "fr" }, key)).status).toBe(200);
+    expect((await create(v.key, { ...payload, locale: undefined }, key)).status).toBe(200);
+    expect(await stored(id)).toBe("en");
+    const [n] = await db.select({ n: count() }).from(reservations).where(eq(reservations.venueId, v.id));
+    expect(n.n).toBe(1);
+  });
+
+  it("keeps it through a guest modify and a staff modify", async () => {
+    const v = await makeVenue({ seats: [4, 6] });
+    const contact = newContact();
+    const { json } = await publicCreate(v, { locale: "pt", guest: { name: "Ana", contact } });
+    const id = await staffId(v, contact);
+    const ok = await app.request("/v1/public/self-service/modify", {
+      method: "POST",
+      headers: { "content-type": "application/json", "Idempotency-Key": crypto.randomUUID(), "X-Self-Service-Token": json.selfServiceToken },
+      body: JSON.stringify({ version: 1, partySize: 3, locale: "de" }),
+    });
+    expect(ok.status).toBe(200);
+    expect(await stored(id)).toBe("pt");
+    expect((await staffPost(v, `/reservations/${id}/modify`, { partySize: 2, guestLocale: "fr" })).status).toBe(200);
+    expect(await stored(id)).toBe("pt");
+  });
+
+  it("resets it to null on erasure, with the counts unchanged", async () => {
+    const v = await makeVenue();
+    const contact = newContact();
+    await publicCreate(v, { locale: "it", guest: { name: "Ana", contact } });
+    const id = await staffId(v, contact);
+    const res = await staffPost(v, "/erasure", { principal: "widget" });
+    expect(res.status).toBe(200);
+    const counts = (await res.json()) as any;
+    expect(counts.erasedReservations).toBe(1);
+    const [row] = await db.select().from(reservations).where(eq(reservations.id, id));
+    expect(row).toMatchObject({ erased: true, guestLocale: null });
+  });
+});

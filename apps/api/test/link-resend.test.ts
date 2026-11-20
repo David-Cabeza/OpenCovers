@@ -22,6 +22,7 @@ import { migrateDb } from "../src/db/migrate";
 import { events, reservations, selfServiceLinks, sentEmails, services, tables, venues } from "../src/db/schema";
 import { addKey } from "../src/lib/api-keys";
 import { LINK_RESEND, RESEND_KIND } from "../src/lib/link-resend";
+import { buildLinkEmail } from "../src/lib/mailer";
 import { challengeConfigFromEnv, issueChallenge, solve } from "../src/lib/public-challenge";
 import { addDays, localDateTime } from "../src/lib/time";
 
@@ -116,7 +117,7 @@ async function waitFor<T>(probe: () => T | Promise<T>, ok: (value: T) => boolean
   throw new Error("timed out");
 }
 
-const tokensIn = (text: string) => [...text.matchAll(/\/r\?lang=es#([0-9a-f-]{36}\.[A-Za-z0-9_-]{43})/g)].map((m) => m[1]);
+const tokensIn = (text: string) => [...text.matchAll(/\/r\?lang=[a-z]{2}#([0-9a-f-]{36}\.[A-Za-z0-9_-]{43})/g)].map((m) => m[1]);
 /** The link emails sent to an address. A booking's own confirmation goes there too and is left out. */
 const mailTo = (address: string) => mail.sent.filter((m) => m.to === address && tokensIn(m.text).length > 0);
 
@@ -430,5 +431,48 @@ describe("the public config says whether the resend can send", () => {
     const off = await makeVenue({ notificationsEnabled: false });
     expect((await (await app.request(`/v1/public/${on.key}`)).json()).linkResend).toBe(true);
     expect((await (await app.request(`/v1/public/${off.key}`)).json()).linkResend).toBe(false);
+  });
+});
+
+describe("the resend follows each booking's stored locale (ADR-0024, C51, C67)", () => {
+  const langs = (text: string) => [...text.matchAll(/\/r\?lang=([a-z]{2})#/g)].map((m) => m[1]);
+
+  async function bookIn(v: Venue, contact: string, date: string, locale?: string) {
+    const b = await book(v, contact, date);
+    if (locale) await db.update(reservations).set({ guestLocale: locale }).where(eq(reservations.id, b.id));
+    return b;
+  }
+
+  async function setLocale(v: Venue, locale: string) {
+    const res = await app.request(`/v1/venues/${v.id}/online-booking`, {
+      method: "PUT",
+      headers: { apikey: v.admin, "content-type": "application/json" },
+      body: JSON.stringify({ locale }),
+    });
+    expect(res.status).toBe(200);
+  }
+
+  it("gives each link its own booking's locale and writes the text of the earliest, falling back to es without a catalog", async () => {
+    const v = await makeVenue();
+    const contact = nextContact();
+    await bookIn(v, contact, ahead(30), "en");
+    await bookIn(v, contact, ahead(31), "fr");
+    await bookIn(v, contact, ahead(32));
+    expect((await resend(v.key, { email: contact }, { "accept-language": "de" })).status).toBe(202);
+    const [message] = await waitFor(() => mailTo(contact), (m) => m.length === 1);
+    expect(langs(message.text)).toEqual(["en", "fr", "es"]);
+    // Only the es catalog ships, so the en text falls back to es.
+    expect(message.subject).toBe(buildLinkEmail([], "es").subject);
+  });
+
+  it("uses the venue's locale for a booking with no stored locale, shipped catalog or not", async () => {
+    const v = await makeVenue();
+    await setLocale(v, "fr");
+    const contact = nextContact();
+    await bookIn(v, contact, ahead(30));
+    await bookIn(v, contact, ahead(31), "pt");
+    expect((await resend(v.key, { email: contact })).status).toBe(202);
+    const [message] = await waitFor(() => mailTo(contact), (m) => m.length === 1);
+    expect(langs(message.text)).toEqual(["fr", "pt"]);
   });
 });
