@@ -60,6 +60,8 @@ export interface CreateReservationInput {
   bookedVia?: string;
   basis?: string;
   ownerPrincipal?: string;
+  /** ADR-0024: set by the public create only. Stored once. */
+  guestLocale?: string | null;
   channel?: Channel;
   origin?: Origin | null;
 }
@@ -138,6 +140,7 @@ export interface Reservation {
   commentary: string;
   reconfirmation: Reconfirmation;
   reconfirmationRecordedAt: string | null;
+  guestLocale: string | null;
   tableIds: string[];
 }
 
@@ -752,6 +755,7 @@ function toReservation(
     commentary: row.commentary,
     reconfirmation: row.reconfirmation,
     reconfirmationRecordedAt: row.reconfirmationRecordedAt ? row.reconfirmationRecordedAt.toISOString() : null,
+    guestLocale: row.guestLocale,
     tableIds,
   };
 }
@@ -942,6 +946,7 @@ export async function createReservation(
         bookedVia: input.bookedVia ?? "",
         basis: input.basis ?? "",
         ownerPrincipal: input.ownerPrincipal ?? "",
+        guestLocale: input.guestLocale ?? null,
         guestName: input.guestName ?? "",
         guestContact: input.guestContact ?? "",
         guestId: guest?.id ?? null,

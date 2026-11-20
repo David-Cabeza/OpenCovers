@@ -64,6 +64,7 @@ export async function resendLinks(db: Db, { venue, settings }: PublicVenue, emai
           startsAt: reservations.startsAt,
           partySize: reservations.partySize,
           contact: reservations.guestContact,
+          guestLocale: reservations.guestLocale,
           sent: sql<number>`(select count(*)::int from ${sentEmails} where ${ledger})`,
           recent: sql<boolean>`exists (select 1 from ${sentEmails} where ${ledger} and ${sentEmails.createdAt} > now() - make_interval(mins => ${LINK_RESEND.intervalMinutes}))`,
         })
@@ -83,6 +84,7 @@ export async function resendLinks(db: Db, { venue, settings }: PublicVenue, emai
       if (matched.some((row) => row.recent)) return null;
       const lines: LinkLine[] = [];
       let to = "";
+      let textLocale: string | null = null;
       for (const row of matched.filter((r) => r.sent < LINK_RESEND.perReservation).slice(0, LINK_RESEND.perEmail)) {
         const link = await rotateLink(tx, venue.id, row.id);
         if (!link) continue;
@@ -93,15 +95,18 @@ export async function resendLinks(db: Db, { venue, settings }: PublicVenue, emai
           date: row.date,
           time: formatTime(row.startsAt, venue.timezone),
           partySize: row.partySize,
-          url: linkUrl(origin, link.token, settings.locale),
+          url: linkUrl(origin, link.token, row.guestLocale ?? settings.locale),
         });
-        to ||= row.contact.trim();
+        if (lines.length === 1) {
+          to = row.contact.trim();
+          textLocale = row.guestLocale;
+        }
       }
-      return lines.length > 0 ? { to, lines } : null;
+      return lines.length > 0 ? { to, lines, textLocale } : null;
     });
     if (!mail) return;
     if (!(await mayEmail(db, venue.id, mail.to))) return;
-    const { subject, text, html } = buildLinkEmail(mail.lines, resolveEmailLocale(null, settings.locale), venue.name);
+    const { subject, text, html } = buildLinkEmail(mail.lines, resolveEmailLocale(mail.textLocale, settings.locale), venue.name);
     const identity = await mailIdentity(db, venue.id, venue);
     await sendEmail(identity.apiKey, identity.from, mail.to, subject, text, html);
   } catch (err) {

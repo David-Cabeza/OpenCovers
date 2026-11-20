@@ -192,3 +192,17 @@ describe("unlinked reservation retention", () => {
     expect(await erasedCount("rr-clean")).toBe(3);
   });
 });
+
+describe("guest locale reset by retention (ADR-0024, C18)", () => {
+  it("resets guestLocale to null when retention blanks a reservation, and keeps it on a live one", async () => {
+    await seedVenue("rr-locale");
+    const old = await book("rr-locale", "2024-01-10", "Gala", "");
+    const recent = await book("rr-locale", "2026-06-01", "Hugo", "not a contact");
+    await db.update(reservations).set({ guestLocale: "fr" }).where(eq(reservations.venueId, "rr-locale"));
+
+    await runRetention(db, NOW);
+
+    expect(await row(old)).toMatchObject({ erased: true, guestLocale: null });
+    expect(await row(recent)).toMatchObject({ erased: false, guestLocale: "fr" });
+  });
+});

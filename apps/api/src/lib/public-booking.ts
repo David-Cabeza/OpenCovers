@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { reservations, services, venueOnlineBooking, venues } from "../db/schema";
 import { isCommentary } from "./commentary";
 import { normalizeContact, venueCountry } from "./contact";
-import { effectivePublicZones, getOnlineBooking, type OnlineBooking, type Theme } from "./online-booking";
+import { effectivePublicZones, getOnlineBooking, LOCALES, type OnlineBooking, type Theme } from "./online-booking";
 import { isSolution, parseChallenge, type FormChallenge } from "./public-challenge";
 import { applyChannel, type OnlineRules } from "./reservations";
 import { linkExpiry } from "./self-service";
@@ -53,6 +53,8 @@ export interface PublicCreate {
   commentary: string;
   /** As sent, a string. Not yet checked against the venue's effective public zones. */
   zone?: string;
+  /** ADR-0024: one of the seven lower-case codes, or absent. */
+  locale?: string;
   challenge: FormChallenge;
   solution: string;
 }
@@ -153,6 +155,9 @@ export function parsePublicCreate(body: unknown, target: PublicVenue): PublicCre
   if (!isObject(body) || !isObject(body.guest)) return null;
   if (REFUSED_FIELDS.some((field) => body[field] !== undefined)) return null;
   if (body.zone !== undefined && typeof body.zone !== "string") return null;
+  if (body.locale !== undefined && (typeof body.locale !== "string" || !(LOCALES as readonly string[]).includes(body.locale))) {
+    return null;
+  }
   if (body.honeypot !== undefined && body.honeypot !== "") return null;
   if (!isDate(body.date) || typeof body.time !== "string" || !TIME.test(body.time)) return null;
   if (typeof body.partySize !== "number" || !Number.isInteger(body.partySize) || body.partySize < 1) return null;
@@ -173,6 +178,7 @@ export function parsePublicCreate(body: unknown, target: PublicVenue): PublicCre
     consent: target.settings.askConsent && consent === "granted" ? "granted" : "unknown",
     commentary: (body.commentary as string | undefined) ?? "",
     ...(body.zone !== undefined ? { zone: body.zone as string } : {}),
+    ...(body.locale !== undefined ? { locale: body.locale as string } : {}),
     challenge,
     solution: body.solution,
   };
