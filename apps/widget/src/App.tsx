@@ -410,7 +410,7 @@ function BookingForm(props: {
             </>
           )}
 
-          {party !== "more" && (
+          {party !== "more" && !noFreeDay && (
             <button type="submit" className={primaryButton}>
               {t("action.continue")}
             </button>

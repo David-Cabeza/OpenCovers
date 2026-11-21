@@ -235,6 +235,18 @@ describe("the waitlist in the booking form", () => {
     expect(screen.getByText(t("waitlist.fullTitle"))).toBeTruthy();
   });
 
+  it("has no Continue button on a day with no times, and has one on a day with free times", async () => {
+    const user = userEvent.setup();
+    app();
+    await pickFull(user);
+    await screen.findByRole("button", { name: t("waitlist.join") });
+    expect(screen.queryByRole("button", { name: t("action.continue") })).toBeNull();
+    cleanup();
+    app({ fullOffset: 5 });
+    await screen.findByRole("radio", { name: "19:00" });
+    expect(screen.getByRole("button", { name: t("action.continue") })).toBeTruthy();
+  });
+
   it("does not offer it when the setting is off, and not on a day with free times", async () => {
     const user = userEvent.setup();
     app({ enabled: false });
