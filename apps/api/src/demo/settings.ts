@@ -5,12 +5,6 @@ type Env = Record<string, string | undefined>;
 /** Days a sandbox lives after its owner's last sign-in. */
 export const SANDBOX_TTL_DAYS = 14;
 
-/** Version of the consent text the sign-in form shows. `POST /api/demo/consent` accepts only this value. */
-export const CONSENT_TEXT_VERSION = "v1";
-
-/** Months a consented lead is kept after its last sign-in (ADR-0022, decision 7). */
-export const LEAD_RETENTION_MONTHS = 12;
-
 /**
  * What one sandbox may hold and how many sandboxes the demo hosts. Lower than a real venue's limits, so one visitor
  * cannot fill the demo database. Every number can be overridden with the variable named in `LIMIT_ENV`.

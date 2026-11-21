@@ -1,13 +1,12 @@
 // Sandbox lifecycle (ADR-0022, decision 9). A sandbox expires `SANDBOX_TTL_DAYS` after its owner's last sign-in.
 // Cleanup deletes the sandbox venue and the account in one transaction, deletes the accounts whose sandbox never got
-// built, and applies the lead retention (decision 7).
+// built.
 //
 // INVARIANTS: no venue without a `demo_sandbox` row is ever deleted (purgeVenue checks it), and no account that is a
 // member of such a venue is ever deleted (`deleteAccount` checks it).
 import { and, eq, lt, notExists, sql } from "drizzle-orm";
 import { demoSandboxes, session, user } from "../db/schema";
 import type { Db } from "../lib/venue";
-import { dropLeadsPastRetention } from "./leads";
 import { purgeVenue } from "./purge";
 import { SANDBOX_TTL_DAYS } from "./settings";
 
@@ -16,7 +15,6 @@ export interface CleanupResult {
   accounts: number;
   /** Accounts that had no sandbox: a build that failed, or never ran. */
   orphanAccounts: number;
-  leads: number;
 }
 
 /** Deletes an account, unless it belongs to a venue that is not a sandbox. Returns whether it was deleted. */
@@ -69,8 +67,7 @@ export async function cleanupExpiredSandboxes(
     if (await db.transaction((tx) => deleteAccount(tx as unknown as Db, id))) orphanAccounts += 1;
   }
 
-  const leads = await dropLeadsPastRetention(db, now);
-  return { sandboxes, accounts, orphanAccounts, leads };
+  return { sandboxes, accounts, orphanAccounts };
 }
 
 /**

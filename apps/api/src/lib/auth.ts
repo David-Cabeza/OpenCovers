@@ -10,7 +10,6 @@ import { betterAuthSchema, user } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { admissionFor, admissionForEmail, DemoRefusal, REFUSALS, type Refusal } from "../demo/admission";
 import { isDisposableEmail } from "../demo/disposable";
-import { touchLead } from "../demo/leads";
 import { normalizeEmail } from "../demo/normalize";
 import { magicLinkChallenges, type MagicLinkChallenges } from "../demo/magic-link-challenge";
 import { provisionSandbox } from "../demo/provision";
@@ -197,13 +196,11 @@ export function createAuth(settings: DemoSettings, deps: AuthDeps = {}) {
 
   async function onSession(session: { userId: string }) {
     const [account] = await db
-      .select({ email: user.email })
+      .select({ id: user.id })
       .from(user)
       .where(eq(user.id, session.userId))
       .limit(1);
     if (!account) return;
-    // Consent is never recorded here. A visitor who consented earlier keeps the 12 months running.
-    await touchLead(db, account.email);
     try {
       await provisionSandbox(db, session.userId);
     } catch (error) {
