@@ -98,7 +98,6 @@ export const DEMO_TEMPLATE: DemoTemplate = {
     region: "Madrid",
     country: "ES",
     cuisine: "Cocina mediterránea de mercado",
-    phone: "+34 910 555 010",
   },
   onlineBooking: {
     enabled: true,

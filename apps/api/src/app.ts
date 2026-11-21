@@ -131,7 +131,7 @@ import { isCommentary } from "./lib/commentary";
 import { isRating } from "./lib/rating";
 import { isReconfirmation } from "./lib/reconfirmation";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
-import { effectivePublicZones, getOnlineBooking, LOCALES, parseOnlineBookingInput, rotateBookingKey, setOnlineBooking } from "./lib/online-booking";
+import { effectivePublicZones, enabledLocales, getOnlineBooking, parseOnlineBookingInput, rotateBookingKey, setOnlineBooking } from "./lib/online-booking";
 import {
   etagMatches,
   etagOf,
@@ -572,7 +572,7 @@ app.get("/w/:bookingKey", async (c) => {
   if (!assets) return widgetNotBuilt(c);
   const lang = c.req.query("lang");
   const html = widgetHtml({
-    lang: lang && (LOCALES as readonly string[]).includes(lang) ? lang : target.settings.locale,
+    lang: lang && enabledLocales().includes(lang) ? lang : target.settings.locale,
     title: target.venue.name,
     assets,
   });
@@ -587,7 +587,7 @@ app.get("/r", (c) => {
   const assets = widgetAssets(widgetDist());
   if (!assets) return widgetNotBuilt(c);
   const query = c.req.query("lang");
-  const lang = query && Object.hasOwn(SELF_SERVICE_TITLES, query) ? query : "es";
+  const lang = query && Object.hasOwn(SELF_SERVICE_TITLES, query) && enabledLocales().includes(query) ? query : "es";
   return c.body(widgetHtml({ lang, title: SELF_SERVICE_TITLES[lang], assets }), 200, selfServiceHeaders());
 });
 
@@ -598,7 +598,7 @@ app.get("/r/waitlist", (c) => {
   const assets = widgetAssets(widgetDist());
   if (!assets) return widgetNotBuilt(c);
   const query = c.req.query("lang");
-  const lang = query && Object.hasOwn(WAITLIST_TITLES, query) ? query : "es";
+  const lang = query && Object.hasOwn(WAITLIST_TITLES, query) && enabledLocales().includes(query) ? query : "es";
   return c.body(widgetHtml({ lang, title: WAITLIST_TITLES[lang], assets }), 200, selfServiceHeaders());
 });
 

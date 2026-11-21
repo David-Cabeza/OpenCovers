@@ -33,6 +33,7 @@ import { useServices } from "@/hooks/use-services";
 import { useTables } from "@/hooks/use-tables";
 import { useVenues } from "@/hooks/use-venues";
 import { api } from "@/lib/api";
+import { useDemoStatus } from "@/lib/demo";
 import { errorMessage, isApiError } from "@/lib/error-message";
 import {
   COLOR_KEYS,
@@ -183,6 +184,9 @@ async function copyText(text: string, done: string, failed: string) {
 
 export function OnlineBookingCard({ venueId }: { venueId: string }) {
   const t = useT();
+  // The hosted demo offers only the reviewed languages (ADR-0022); the API refuses the others there too.
+  const demo = useDemoStatus();
+  const widgetLocales = demo?.enabled ? LOCALES.filter((l) => l === "es" || l === "en") : LOCALES;
   const queryClient = useQueryClient();
   const { data, isPending, isError, error: loadError, isRefetching, refetch } = useOnlineBooking(venueId);
   const { data: serviceData } = useServices(venueId);
@@ -472,7 +476,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     onChange={(e) => setForm({ ...form, locale: e.target.value })}
                     className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
                   >
-                    {LOCALES.map((l) => (
+                    {widgetLocales.map((l) => (
                       <option key={l} value={l}>
                         {LOCALE_NAMES[l]}
                       </option>

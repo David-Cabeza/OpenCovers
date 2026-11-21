@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { reservations, services, venueOnlineBooking, venues } from "../db/schema";
 import { isCommentary } from "./commentary";
 import { normalizeContact, venueCountry } from "./contact";
-import { effectivePublicZones, getOnlineBooking, LOCALES, type OnlineBooking, type Theme } from "./online-booking";
+import { effectivePublicZones, getOnlineBooking, enabledLocales, type OnlineBooking, type Theme } from "./online-booking";
 import { isSolution, parseChallenge, type FormChallenge } from "./public-challenge";
 import { applyChannel, type OnlineRules } from "./reservations";
 import { linkExpiry } from "./self-service";
@@ -161,7 +161,7 @@ export function parsePublicCreate(body: unknown, target: PublicVenue): PublicCre
   if (!isObject(body) || !isObject(body.guest)) return null;
   if (REFUSED_FIELDS.some((field) => body[field] !== undefined)) return null;
   if (body.zone !== undefined && typeof body.zone !== "string") return null;
-  if (body.locale !== undefined && (typeof body.locale !== "string" || !(LOCALES as readonly string[]).includes(body.locale))) {
+  if (body.locale !== undefined && (typeof body.locale !== "string" || !enabledLocales().includes(body.locale))) {
     return null;
   }
   if (body.honeypot !== undefined && body.honeypot !== "") return null;

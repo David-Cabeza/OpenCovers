@@ -39,6 +39,7 @@ import { provisionSandbox } from "../src/demo/provision";
 import { purgeVenue, VENUE_TABLES_IN_DELETE_ORDER } from "../src/demo/purge";
 import { demoSettings } from "../src/demo/settings";
 import { DEMO_TEMPLATE, dateInTz } from "../src/demo/template";
+import { enabledLocales, LOCALES } from "../src/lib/online-booking";
 import { notifyReservation } from "../src/lib/notifications";
 import {
   challengeConfigFromEnv,
@@ -153,6 +154,25 @@ describe("demo settings", () => {
   });
 });
 
+describe("languages in the demo", () => {
+  it("offers only the reviewed languages (ADR-0022)", () => {
+    expect(enabledLocales()).toEqual(["es", "en"]);
+    vi.stubEnv("DEMO_MODE", "0");
+    expect(enabledLocales()).toEqual(LOCALES);
+    vi.stubEnv("DEMO_MODE", "1");
+  });
+
+  it("refuses a venue language that is not reviewed, and accepts es and en", async () => {
+    const email = freshEmail();
+    const { cookie } = await signInWithMagicLink(email);
+    const sandbox = await sandboxOf(email);
+    const put = (locale: string) =>
+      app.request(`/v1/venues/${sandbox!.venueId}/online-booking`, json(cookie, { method: "PUT", body: JSON.stringify({ locale }) }));
+    expect((await put("ca")).status).toBe(400);
+    expect((await put("en")).status).toBe(200);
+  });
+});
+
 describe("sandbox provisioning", () => {
   it("builds every piece of the demo restaurant, and the diner side works", async () => {
     const email = freshEmail();
@@ -194,6 +214,10 @@ describe("sandbox provisioning", () => {
     expect(bookingKey).toBeTruthy();
     const widget = await app.request(`/v1/public/${bookingKey}`);
     expect(widget.status).toBe(200);
+    // The sample restaurant publishes no phone number, in the stored profile or on the public page.
+    expect(DEMO_TEMPLATE.publicProfile).not.toHaveProperty("phone");
+    expect(venue.publicPhone).toBeNull();
+    expect(JSON.stringify(await widget.clone().json())).not.toMatch(/910 ?555/);
 
     // The visitor books as a diner. The booking shows up on the restaurant side with its origin.
     const challenge = issueChallenge(challengeConfig, bookingKey, Date.now() - 10_000);
