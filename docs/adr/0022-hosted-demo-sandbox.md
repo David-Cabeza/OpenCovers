@@ -83,6 +83,12 @@ Decision 8(b) to (f) was implemented as written, with these clarifications and n
 
 The demo no longer collects leads. This supersedes decision 7, the consent route of the 2026-11-20 amendment, the lead rules of decision 9 and the lead row of the abuse-limits amendment. The `demo_lead` table, `POST /api/demo/consent`, `pnpm demo:leads` and the 12-month lead retention are removed (migration 0049), and so are the checkbox and the privacy and legal-basis questions that came with it. The sign-in form shows one line under the buttons, "By continuing you accept the terms of use and the privacy policy", with links to `/condiciones.html` and `/privacidad.html` on opencovers.dev. No click beyond the sign-in buttons is needed. Why: a smaller privacy surface. The demo now stores only the account and sandbox of a visitor, and both are deleted when the sandbox expires (decision 9). The terms page is a draft without lawyer review.
 
+## Amendment, 2026-11-21: only reviewed languages, and no phone in the sample restaurant
+
+With `DEMO_MODE=1` the demo offers Spanish and English only. The widget's `ca`, `fr`, `de`, `it` and `pt` texts are machine-assisted and not yet reviewed by a native speaker (ADR-0017, stage 15 amendment), and the demo is about to open to the public. `enabledLocales()` (`apps/api/src/lib/online-booking.ts`) returns all seven codes normally and `es` and `en` in the demo. It decides the widget page `?lang=`, the `/r` and `/r/waitlist` `?lang=`, the venue's `locale`, a guest's `locale` on a public booking or waitlist entry, and the language of the sign-in email. A code outside the list behaves as an unknown code does today: the page falls back to the venue's language, and a write is refused with the usual validation error. The Setup card lists the languages the demo status allows. Self-hosted installs keep seven languages. The five come back in the demo once they are reviewed (ROADMAP, localization).
+
+The sample restaurant also publishes no phone number. The number it had looked like a real Madrid landline. The widget already renders without a phone. Sandboxes created before this change keep the old number until they expire (14 days after the last sign-in, decision 9). No migration, because the demo is not public yet.
+
 ## Alternatives considered
 
 - **One shared demo venue.** Cheapest, but visitors overwrite each other's data and the venue looks broken after the first hour. A nightly reset would still break live sessions. Rejected.
