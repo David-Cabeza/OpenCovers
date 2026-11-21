@@ -62,7 +62,8 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
       setWait(RESEND_WINDOW_S);
     } catch (err) {
       if (err instanceof DemoRequestError) {
-        setError(authErrorMessage(err, fallback));
+        // The challenge takes only the address, so a 400 there means the address was refused, e.g. `foo@bar`.
+        setError(err.status === 400 ? t("demo.signIn.invalidEmail") : authErrorMessage(err, fallback));
         if (err.status === 429) setWait(err.retryAfter || RESEND_WINDOW_S);
       } else {
         setError(isServerUnreachable(err) ? t("errors.serverUnreachable") : fallback);

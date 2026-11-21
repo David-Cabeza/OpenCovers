@@ -110,9 +110,9 @@ describe("the sign-in screen on a demo", () => {
   });
 
   it.each([
-    ["en", "Some of the details are not valid"],
-    ["es", "Algunos datos no son válidos"],
-  ] as const)("shows the catalog message, not the raw code, when the challenge refuses the address (%s)", async (locale, text) => {
+    ["en", "That email address does not look right"],
+    ["es", "Ese correo no parece correcto"],
+  ] as const)("names the email, not the raw code, when the challenge refuses the address (%s)", async (locale, text) => {
     useUiStore.setState({ locale });
     demoOn(false, { status: 400, body: { code: "invalid_request" } });
     const user = userEvent.setup();
