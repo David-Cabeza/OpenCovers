@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ClipboardListIcon, MessageSquareTextIcon, PrinterIcon, StarIcon } from "lucide-react";
+import { ClipboardListIcon, MessageSquareTextIcon, PrinterIcon, StarIcon, UsersIcon } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { DayNav } from "@/components/day-nav";
@@ -69,7 +69,7 @@ export function PreShiftView({ venueId }: { venueId: string }) {
         actions={
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Select value={service} onValueChange={setService}>
-              <SelectTrigger className="w-[160px]" aria-label={t("preshift.service")}>
+              <SelectTrigger className="w-[200px]" aria-label={t("preshift.service")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -150,7 +150,7 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
     <li
       data-slot="preshift-row"
       className={cn(
-        "grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-l-4 border-l-transparent px-4 py-3 md:grid-cols-[4rem_minmax(0,13rem)_6rem_8rem_minmax(0,1fr)] md:items-start md:gap-x-4 print:break-inside-avoid print:py-2",
+        "grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-l-4 border-l-transparent px-4 py-3 md:grid-cols-[4rem_minmax(0,13rem)_9rem_8rem_minmax(0,1fr)] md:items-start md:gap-x-4 print:break-inside-avoid print:py-2",
         large && "border-l-warning",
       )}
     >
@@ -168,7 +168,8 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
               {t("preshift.large", { count: reservation.partySize })}
             </Pill>
           ) : (
-            <span className="text-sm tabular-nums">
+            <span className="inline-flex items-center gap-1 text-sm tabular-nums">
+              <UsersIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
               <span className="sr-only">{t("common.partyOf", { count: reservation.partySize })}</span>
               <span aria-hidden="true">{reservation.partySize}</span>
             </span>
@@ -183,9 +184,12 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
         </div>
         <div className="flex min-w-0 flex-col gap-2 md:basis-auto">
           <div className="flex flex-wrap items-center gap-2">
-            <Pill tone={reservation.guest.consent === "granted" ? "success" : "muted"}>
-              {t(`common.consent.${reservation.guest.consent ?? "unknown"}`)}
-            </Pill>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">{t("preshift.consent")}</span>
+              <Pill tone={reservation.guest.consent === "granted" ? "success" : "muted"}>
+                {t(`common.consent.${reservation.guest.consent ?? "unknown"}`)}
+              </Pill>
+            </span>
             <span data-slot="reconfirmation">
               <ReconfirmationPill value={reservation.reconfirmation} />
             </span>

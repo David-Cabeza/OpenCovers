@@ -282,7 +282,7 @@ function BookingForm(props: {
       <Section title={t("step.choose")} focus={moved}>
         {alert}
         <form className="space-y-4" onSubmit={choose} noValidate>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
             <div className="space-y-1">
               <label htmlFor={`${ids}-date`} className="block font-medium">
                 {t("field.date")}
