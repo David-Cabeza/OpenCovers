@@ -17,7 +17,6 @@
     "check:publication": "bash scripts/check-publication.sh",
     "db:seed-demo": "pnpm --filter @opencovers/api db:seed-demo",
     "demo:seed": "pnpm --filter @opencovers/api demo:seed",
-    "demo:cleanup": "pnpm --filter @opencovers/api demo:cleanup",
-    "demo:leads": "pnpm --filter @opencovers/api demo:leads"
+    "demo:cleanup": "pnpm --filter @opencovers/api demo:cleanup"
   }
 }

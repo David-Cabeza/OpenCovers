@@ -1,5 +1,5 @@
-// pnpm demo:cleanup. Deletes sandboxes whose owner last signed in more than 14 days ago, and their accounts, and
-// applies the lead retention. Refuses to run unless DEMO_MODE=1 and the database passes the demo guard, so it can
+// pnpm demo:cleanup. Deletes sandboxes whose owner last signed in more than 14 days ago, and their accounts.
+// Refuses to run unless DEMO_MODE=1 and the database passes the demo guard, so it can
 // never touch a real instance. Safe to run daily from cron.
 import { db } from "../db/client";
 import { cleanupExpiredSandboxes } from "./cleanup";
@@ -13,6 +13,6 @@ if (!demoMode()) {
 await assertDemoDatabase(db, true);
 const result = await cleanupExpiredSandboxes(db);
 console.log(
-  `demo cleanup: ${result.sandboxes} sandboxes and ${result.accounts} accounts deleted, ${result.orphanAccounts} accounts without a sandbox, ${result.leads} leads past retention`,
+  `demo cleanup: ${result.sandboxes} sandboxes and ${result.accounts} accounts deleted, ${result.orphanAccounts} accounts without a sandbox`,
 );
 process.exit(0);

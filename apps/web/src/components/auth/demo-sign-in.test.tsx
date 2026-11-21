@@ -35,14 +35,23 @@ beforeEach(() => {
 afterEach(resetApiMocks);
 
 describe("the sign-in screen on a demo", () => {
-  it("offers a magic link, hides the password forms, and leaves the consent box unticked", async () => {
+  it("offers a magic link, hides the password forms, and shows the acceptance line with no checkbox", async () => {
     demoOn();
     renderWithApp(<AuthScreen />);
     expect(await screen.findByRole("button", { name: "Email me a sign-in link" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Sign up" })).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox")).not.toBeChecked();
-    expect(screen.getByRole("link", { name: "Privacy notice" })).toHaveAttribute("href");
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    for (const [name, href] of [
+      ["terms of use", "https://opencovers.dev/condiciones.html"],
+      ["privacy policy", "https://opencovers.dev/privacidad.html"],
+    ]) {
+      const link = screen.getByRole("link", { name });
+      expect(link).toHaveAttribute("href", href);
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+    }
+    expect(screen.getByText(/By continuing you accept the/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Continue with Google" })).not.toBeInTheDocument();
   });
 
@@ -73,33 +82,8 @@ describe("the sign-in screen on a demo", () => {
     expect(digest[0]! >> 2).toBe(0);
     expect(options.headers["Accept-Language"]).toBe("en");
     expect(options.headers).not.toHaveProperty("X-Demo-Consent");
-    expect(window.localStorage.getItem("oc-demo-consent")).toBeNull();
     expect(await screen.findByRole("heading", { name: "Check your email" })).toBeInTheDocument();
     expect(screen.getByText(/ana@example\.com/)).toBeInTheDocument();
-  });
-
-  it("remembers the tick for after sign-in, and sends no consent with the request", async () => {
-    demoOn();
-    magicLink.mockResolvedValue({ error: null });
-    const user = userEvent.setup();
-    renderWithApp(<AuthScreen />);
-    await user.type(await screen.findByLabelText("Email"), "ana@example.com");
-    await user.click(screen.getByRole("checkbox"));
-    await user.click(screen.getByRole("button", { name: "Email me a sign-in link" }));
-    await screen.findByRole("heading", { name: "Check your email" });
-    expect(magicLink.mock.calls[0]![1].headers).not.toHaveProperty("X-Demo-Consent");
-    expect(JSON.parse(window.localStorage.getItem("oc-demo-consent")!)).toEqual({ version: "v1" });
-  });
-
-  it("remembers the tick before Google sign-in too", async () => {
-    demoOn(true);
-    social.mockResolvedValue({ error: null });
-    const user = userEvent.setup();
-    renderWithApp(<AuthScreen />);
-    await user.click(await screen.findByRole("checkbox"));
-    await user.click(screen.getByRole("button", { name: "Continue with Google" }));
-    expect(social.mock.calls[0]![0]).toMatchObject({ provider: "google" });
-    expect(JSON.parse(window.localStorage.getItem("oc-demo-consent")!)).toEqual({ version: "v1" });
   });
 
   it("shows Preparing your link while the challenge is on its way", async () => {
@@ -158,6 +142,8 @@ describe("the sign-in screen on a demo", () => {
     magicLink.mockResolvedValue({ error: null });
     const user = userEvent.setup();
     renderWithApp(<AuthScreen />);
+    expect(await screen.findByRole("link", { name: "condiciones de uso" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "política de privacidad" })).toBeInTheDocument();
     await user.type(await screen.findByLabelText("Email"), "ana@example.com");
     await user.click(await screen.findByRole("button", { name: "Envíame un enlace de acceso" }));
     expect(await screen.findByRole("heading", { name: "Revisa tu email" })).toBeInTheDocument();

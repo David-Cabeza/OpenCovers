@@ -737,6 +737,7 @@ function Footer() {
         <ul>
           <li><a href={`${REPO}/blob/main/LICENSE`}>Apache-2.0</a></li>
           <li><a href="/privacidad.html">Privacidad</a></li>
+          <li><a href="/condiciones.html">Condiciones</a></li>
           <li><a href="/en/" hrefLang="en" lang="en">English</a></li>
         </ul>
         <p className="who">Motor de reservas open source para restaurantes. Pre-alfa.</p>

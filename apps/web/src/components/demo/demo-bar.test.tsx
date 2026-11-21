@@ -100,19 +100,6 @@ describe("the demo bar", () => {
     expect(JSON.parse(window.localStorage.getItem("oc-demo-checklist:v1")!)).toEqual(["trace"]);
   });
 
-  it("sends a remembered consent once the visitor has a sandbox, then forgets it", async () => {
-    window.localStorage.setItem("oc-demo-consent", JSON.stringify({ version: "v1" }));
-    const api = mockApi({
-      "GET /v1/venues/v1/reservations/search": { body: { reservations: [] } },
-      // The API answers 204; the test mock cannot send an empty body, and the code treats any answer but 401 alike.
-      "POST /api/demo/consent": { status: 200 },
-    });
-    renderWithApp(<DemoBar status={status} />);
-    await waitFor(() => expect(api.writes()).toHaveLength(1));
-    expect(api.writes()[0]!.body).toEqual({ version: "v1", locale: "en" });
-    await waitFor(() => expect(window.localStorage.getItem("oc-demo-consent")).toBeNull());
-  });
-
   it("speaks Spanish", async () => {
     search([]);
     useUiStore.setState({ locale: "es" });

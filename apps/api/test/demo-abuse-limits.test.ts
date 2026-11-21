@@ -24,10 +24,9 @@ vi.mock("../src/lib/mailer", async (original) => ({
 import app from "../src/app";
 import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
-import { demoLeads, demoSandboxes, selfServiceLinks, user, venueMemberships, webhookEndpoints } from "../src/db/schema";
+import { demoSandboxes, selfServiceLinks, user, venueMemberships, webhookEndpoints } from "../src/db/schema";
 import { cleanupExpiredSandboxes } from "../src/demo/cleanup";
 import { isDisposableEmail } from "../src/demo/disposable";
-import { eraseLead, recordConsent, touchLead } from "../src/demo/leads";
 import { mayEmail } from "../src/demo/limits";
 import { CHALLENGE_HEADER, SOLUTION_HEADER, magicLinkChallenges } from "../src/demo/magic-link-challenge";
 import { normalizeEmail } from "../src/demo/normalize";
@@ -59,7 +58,7 @@ beforeEach(async () => {
   mail.sent.length = 0;
   vi.stubEnv("DEMO_MODE", "1");
   await db.execute(
-    sql`TRUNCATE TABLE demo_lead, demo_sandbox, account, session, verification, "user", venue_memberships, sent_emails, waitlist, events, tombstones, idempotency_keys, table_allocations, reservations, guests, guest_audit, self_service_links, grants, api_keys, services, tables, floor_items, webhook_endpoints, venue_online_booking, venues, invitations, guest_blocklist RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE demo_sandbox, account, session, verification, "user", venue_memberships, sent_emails, waitlist, events, tombstones, idempotency_keys, table_allocations, reservations, guests, guest_audit, self_service_links, grants, api_keys, services, tables, floor_items, webhook_endpoints, venue_online_booking, venues, invitations, guest_blocklist RESTART IDENTITY CASCADE`,
   );
 });
 
@@ -85,7 +84,7 @@ async function signIn(email: string) {
   await demoAuth.api.magicLinkVerify({ query: { token }, headers: new Headers(), asResponse: true });
 }
 
-const count_ = async (table: typeof user | typeof demoSandboxes | typeof demoLeads) =>
+const count_ = async (table: typeof user | typeof demoSandboxes) =>
   (await db.select({ n: count() }).from(table))[0]!.n;
 
 async function makeUser(email: string, verified = true) {
@@ -93,8 +92,6 @@ async function makeUser(email: string, verified = true) {
   await db.insert(user).values({ id, name: "V", email, emailVerified: verified, createdAt: new Date(), updatedAt: new Date() });
   return { id, email };
 }
-
-const consent = { version: "v1", locale: "en", name: null } as const;
 
 describe("one spelling of an address (decision 8b)", () => {
   it("folds Gmail spellings, Unicode, a trailing dot and IDN domains to one value", () => {
@@ -131,32 +128,6 @@ describe("one sandbox per person (decision 8b)", () => {
     const settled = await Promise.allSettled([provisionSandbox(db, a.id), provisionSandbox(db, b.id)]);
     expect(settled.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect(await count_(demoSandboxes)).toBe(1);
-  });
-});
-
-describe("one lead per person (decision 8b, leads)", () => {
-  it("keeps one row for every spelling, with the latest verified address, and erases under any spelling", async () => {
-    await recordConsent(db, { email: "lead.person@gmail.com", source: "magic-link", consent });
-    await recordConsent(db, { email: "leadperson+news@googlemail.com", source: "google", consent: { ...consent, name: "Lead" } });
-    const rows = await db.select().from(demoLeads);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ email: "leadperson+news@googlemail.com", normalizedEmail: "leadperson@gmail.com", name: "Lead" });
-
-    await db.update(demoLeads).set({ lastSeenAt: new Date(0) });
-    await touchLead(db, "l.eadperson@gmail.com");
-    expect((await db.select().from(demoLeads))[0]!.lastSeenAt.getTime()).toBeGreaterThan(0);
-
-    expect(await eraseLead(db, "LEADPERSON@gmail.com")).toBe(1);
-    expect(await count_(demoLeads)).toBe(0);
-  });
-
-  it("does not merge different people, and a sign-in alone creates no lead", async () => {
-    await recordConsent(db, { email: "x+a@example.com", source: "magic-link", consent });
-    await recordConsent(db, { email: "x+b@example.com", source: "magic-link", consent });
-    expect(await count_(demoLeads)).toBe(2);
-    await db.delete(demoLeads);
-    await signIn(freshEmail());
-    expect(await count_(demoLeads)).toBe(0);
   });
 });
 

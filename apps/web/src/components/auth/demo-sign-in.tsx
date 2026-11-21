@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
 import { useT, currentLocale, type Translate } from "@/i18n";
-import { DEMO_PRIVACY_URL, DemoRequestError, rememberConsent, solvedChallengeHeaders } from "@/lib/demo";
+import { DEMO_PRIVACY_URL, DEMO_TERMS_URL, DemoRequestError, solvedChallengeHeaders } from "@/lib/demo";
 import { authErrorMessage } from "@/lib/error-message";
 import { isServerUnreachable } from "@/lib/server-status";
 
@@ -15,7 +15,6 @@ const RESEND_WINDOW_S = 60;
 export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
   const t = useT();
   const [email, setEmail] = useState("");
-  const [consent, setConsent] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +40,6 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
     try {
       // A challenge is single use and lives 5 minutes, so every send, a resend included, asks for a new one.
       const challengeHeaders = await solvedChallengeHeaders(address);
-      rememberConsent(consent);
       const { error: failure } = await authClient.signIn.magicLink(
         { email: address, callbackURL: `${window.location.origin}/` },
         {
@@ -78,7 +76,6 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
     setBusy(true);
     setError(null);
     try {
-      rememberConsent(consent);
       const { error: failure } = await authClient.signIn.social({
         provider: "google",
         callbackURL: `${window.location.origin}/`,
@@ -149,8 +146,6 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
           />
         </div>
 
-        <Consent checked={consent} onChange={setConsent} t={t} />
-
         {error && (
           <p id="demo-signin-error" role="alert" className="text-sm text-destructive">
             <LinkedText text={error} />
@@ -170,30 +165,25 @@ export function DemoSignIn({ googleEnabled }: { googleEnabled: boolean }) {
           </Button>
         </>
       )}
+
+      <Acceptance t={t} />
     </div>
   );
 }
 
-function Consent({ checked, onChange, t }: { checked: boolean; onChange: (next: boolean) => void; t: Translate }) {
+function Acceptance({ t }: { t: Translate }) {
+  const link = "rounded-sm underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
   return (
-    <div className="space-y-1">
-      <label className="flex items-start gap-2 text-sm">
-        <input
-          type="checkbox"
-          className="mt-0.5 size-4 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-        <span>{t("demo.consent.text")}</span>
-      </label>
-      <p className="pl-6 text-xs text-muted-foreground">
-        {t("demo.consent.optional")}{" "}
-        <a href={DEMO_PRIVACY_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-          {t("demo.consent.privacy")}
-        </a>
-        .
-      </p>
-    </div>
+    <p className="text-center text-xs text-muted-foreground">
+      {t("demo.accept.lead")}{" "}
+      <a href={DEMO_TERMS_URL} target="_blank" rel="noopener noreferrer" className={link}>
+        {t("demo.accept.terms")}
+      </a>{" "}
+      {t("demo.accept.and")}{" "}
+      <a href={DEMO_PRIVACY_URL} target="_blank" rel="noopener noreferrer" className={link}>
+        {t("demo.accept.privacy")}
+      </a>
+    </p>
   );
 }
 

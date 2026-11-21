@@ -45,7 +45,7 @@ describe("public site", () => {
     const paths = [...container.querySelectorAll("a, img, source")]
       .map((el) => el.getAttribute("href") ?? el.getAttribute("src") ?? "")
       .filter((p) => p.startsWith("/") && p !== "/"); // "/" is the page itself (the brand link)
-    expect(paths).toEqual(expect.arrayContaining(["/privacidad.html", "/en/"]));
+    expect(paths).toEqual(expect.arrayContaining(["/privacidad.html", "/condiciones.html", "/en/"]));
     for (const p of paths) {
       const file = p.endsWith("/") ? `${p}index.html` : p;
       expect(existsSync(resolve(process.cwd(), "public", file.slice(1))), p).toBe(true);

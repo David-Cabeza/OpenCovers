@@ -79,6 +79,10 @@ Decision 8(b) to (f) was implemented as written, with these clarifications and n
 - **Webhooks (e).** Creation is refused, and a delivery to a sandbox's endpoint is skipped and switches the endpoint off.
 - **Values for the owner to confirm (c, f).** 500 live sandboxes, 100 new per 24 hours, 150 reservations and 100 guests per sandbox, and the other per-sandbox caps listed in the deployment guide. Each is an environment variable with a default.
 
+## Amendment, 2026-11-21: leads and consent dropped
+
+The demo no longer collects leads. This supersedes decision 7, the consent route of the 2026-11-20 amendment, the lead rules of decision 9 and the lead row of the abuse-limits amendment. The `demo_lead` table, `POST /api/demo/consent`, `pnpm demo:leads` and the 12-month lead retention are removed (migration 0049), and so are the checkbox and the privacy and legal-basis questions that came with it. The sign-in form shows one line under the buttons, "By continuing you accept the terms of use and the privacy policy", with links to `/condiciones.html` and `/privacidad.html` on opencovers.dev. No click beyond the sign-in buttons is needed. Why: a smaller privacy surface. The demo now stores only the account and sandbox of a visitor, and both are deleted when the sandbox expires (decision 9). The terms page is a draft without lawyer review.
+
 ## Alternatives considered
 
 - **One shared demo venue.** Cheapest, but visitors overwrite each other's data and the venue looks broken after the first hour. A nightly reset would still break live sessions. Rejected.

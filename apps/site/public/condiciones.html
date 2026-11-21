@@ -1,0 +1,120 @@
+<!doctype html>
+<!--
+  Borrador redactado por el equipo para una demo, sin revisión de un abogado. Los datos del responsable salen de los
+  secretos del despliegue (LEGAL_TAX_ID, LEGAL_ADDRESS), no del repositorio.
+-->
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Condiciones de uso de la demo — OpenCovers</title>
+    <meta
+      name="description"
+      content="Condiciones de uso de la demo de OpenCovers en demo.opencovers.dev: es un entorno de prueba, con datos inventados, que se borra a los 14 días sin uso."
+    />
+    <link rel="canonical" href="https://opencovers.dev/condiciones.html" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#0e7c5a" />
+    <style>
+      :root { --bg: #f7f7f5; --ink: #000; --muted: #55554f; --accent: #0e7c5a; --mark: #fff1b8; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #111210; --ink: #f2f2ee; --muted: #a8a8a0; --accent: #4fd1a5; --mark: #4a3f10; }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 1.0625rem;
+        line-height: 1.6;
+      }
+      main { max-width: 42rem; margin: 0 auto; padding: 48px 16px 96px; }
+      h1, h2, h3 { font-family: "League Spartan", "Helvetica Neue", Arial, sans-serif; letter-spacing: -0.03em; line-height: 1.05; }
+      h1 { font-size: clamp(2.25rem, 8vw, 3.5rem); margin: 0 0 8px; }
+      h2 { font-size: 1.5rem; margin: 40px 0 8px; }
+      h3 { font-size: 1.1875rem; margin: 28px 0 8px; }
+      p, ul { margin: 0 0 16px; }
+      ul { padding-left: 1.25rem; }
+      a { color: var(--accent); overflow-wrap: anywhere; }
+      code { font-size: 0.9em; overflow-wrap: anywhere; }
+      .muted { color: var(--muted); }
+      .todo { background: var(--mark); color: var(--ink); padding: 0 4px; border-radius: 3px; }
+      :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a href="/">← OpenCovers</a></p>
+      <h1>Condiciones de uso de la demo</h1>
+      <p class="muted">Última actualización: 21 de noviembre de 2026.</p>
+
+      <p>
+        Estas condiciones se aplican a la demo de OpenCovers en demo.opencovers.dev. Al entrar y
+        usarla las aceptas. Si no estás de acuerdo, no la uses. El tratamiento de tus datos se explica
+        en la <a href="/privacidad.html">política de privacidad</a>.
+      </p>
+
+      <h2>Quién ofrece la demo</h2>
+      <p>
+        David Cabeza, autónomo, NIF {{LEGAL_TAX_ID}}.<br />
+        {{LEGAL_ADDRESS}}.<br />
+        Contacto: <a href="mailto:privacidad@opencovers.dev">privacidad@opencovers.dev</a>.
+      </p>
+
+      <h2>Qué es</h2>
+      <p>
+        Un restaurante de prueba para que veas cómo funciona OpenCovers, con datos inventados. No es un
+        servicio para gestionar un restaurante real.
+      </p>
+
+      <h2>Qué puedes hacer</h2>
+      <ul>
+        <li>Probar la aplicación del personal y el widget de reservas con tus propios datos de prueba.</li>
+        <li>Compartir el enlace del widget de tu restaurante de prueba con quien quieras probarlo.</li>
+      </ul>
+
+      <h2>Qué no puedes hacer</h2>
+      <ul>
+        <li>
+          Introducir datos reales de clientes ni datos sensibles (salud, creencias, menores). Es un
+          entorno de prueba, no lo uses para reservas reales.
+        </li>
+        <li>Usar la demo para enviar correo no deseado o para molestar a otras personas.</li>
+        <li>
+          Automatizar el registro, saltarte los límites de uso o intentar atacar el servicio o a otros
+          usuarios.
+        </li>
+        <li>Crear varias cuentas para tener más de un restaurante de prueba.</li>
+      </ul>
+      <p>Podemos suspender o borrar una cuenta que incumpla estas condiciones.</p>
+
+      <h2>Tus datos y su borrado</h2>
+      <p>
+        Tu restaurante de prueba y tu cuenta se borran cuando pasan 14 días desde tu último acceso. La
+        demo no tiene copias de seguridad: lo borrado no se puede recuperar. Si te importa algo de lo que
+        escribas, guárdalo tú aparte.
+      </p>
+
+      <h2>Sin garantías</h2>
+      <p>
+        La demo se ofrece tal cual, gratis y sin compromiso de disponibilidad. Puede fallar, cambiar o
+        cerrarse sin aviso. En la medida que permite la ley, no respondemos de pérdidas derivadas de su
+        uso. Esto no limita los derechos que la ley te reconozca como consumidor.
+      </p>
+
+      <h2>El software</h2>
+      <p>
+        OpenCovers es software libre con licencia Apache-2.0 (consulta
+        <a href="https://github.com/David-Cabeza/OpenCovers">el repositorio</a>). Esa licencia rige el
+        código. Estas condiciones rigen solo el uso de la demo alojada.
+      </p>
+
+      <h2>Cambios y ley aplicable</h2>
+      <p>
+        Podemos actualizar estas condiciones. Indicaremos la fecha de la última versión arriba, y seguir
+        usando la demo después de un cambio supone aceptarlo. Se rigen por la ley española.
+      </p>
+    </main>
+  </body>
+</html>

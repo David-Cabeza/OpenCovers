@@ -4,11 +4,7 @@ import { solveInBackground } from "./demo-pow";
 
 // The hosted demo (ADR-0022). A self-hosted instance answers `enabled: false` and the app is what it always was.
 
-/**
- * The consent text version the API accepts (`CONSENT_TEXT_VERSION` in apps/api/src/demo/settings.ts). The wording is
- * `demo.consent.text` in the catalog. Changing either means changing both and the privacy notice.
- */
-export const DEMO_CONSENT_VERSION = "v1";
+export const DEMO_TERMS_URL = "https://opencovers.dev/condiciones.html";
 export const DEMO_PRIVACY_URL = "https://opencovers.dev/privacidad.html";
 export const DEPLOY_YOURSELF_URL = "https://github.com/David-Cabeza/OpenCovers/blob/main/docs/deploy.md";
 
@@ -90,46 +86,6 @@ export async function solvedChallengeHeaders(email: string): Promise<Record<stri
   const { challenge } = await fetchMagicLinkChallenge(email);
   const solution = await solveInBackground(challenge);
   return { "X-Demo-Challenge": JSON.stringify(challenge), "X-Demo-Solution": solution };
-}
-
-const CONSENT_KEY = "oc-demo-consent";
-
-/**
- * The consent box is ticked before sign-in, and the API records consent only from a signed-in session (ADR-0022,
- * amendment of 2026-11-20). So the tick waits in this browser until the dashboard sends it. The magic link may open
- * in a new tab, hence localStorage.
- */
-export function rememberConsent(consented: boolean): void {
-  try {
-    if (consented) window.localStorage.setItem(CONSENT_KEY, JSON.stringify({ version: DEMO_CONSENT_VERSION }));
-    else window.localStorage.removeItem(CONSENT_KEY);
-  } catch {
-    // Storage can be blocked. Consent is then not recorded, which is the safe side.
-  }
-}
-
-/** Sends a remembered consent once, with the session cookie. Forgets it on an answer, keeps it if the network failed. */
-export async function sendPendingConsent(): Promise<void> {
-  let pending: string | null = null;
-  try {
-    pending = window.localStorage.getItem(CONSENT_KEY);
-  } catch {
-    return;
-  }
-  if (!pending) return;
-  try {
-    const { version } = JSON.parse(pending) as { version?: string };
-    const res = await fetch("/api/demo/consent", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version, locale: currentLocale() }),
-    });
-    if (res.status === 401) return; // not signed in yet
-    window.localStorage.removeItem(CONSENT_KEY);
-  } catch {
-    // Offline: try again on the next visit.
-  }
 }
 
 export function formatExpiry(iso: string): string {
