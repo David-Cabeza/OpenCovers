@@ -308,9 +308,9 @@ $dc up -d --build --wait
 
 **What the repository checks do not cover.** A real deploy to a server, Let's Encrypt, Resend delivery and Google sign-in need your accounts. The repository checks cover the compose file, the Caddy host rules (`STAFF_HOST=demo.opencovers.dev WIDGET_HOST=book.demo.opencovers.dev bash scripts/check-caddy-widget.sh`) and the workflow's syntax.
 
-#### Privacy notice wording for the demo
+#### Privacy notice for the demo
 
-`apps/site/public/privacidad.html` does not mention the demo yet, and the demo stores visitor data. Before opening the demo, add wording like this and have it reviewed. It is a draft, not legal advice.
+The demo's privacy notice is the "La demo" section of [`apps/site/public/privacidad.html`](../apps/site/public/privacidad.html) (live at `https://opencovers.dev/privacidad.html#demo`). It is the one source of truth: change the page, not a copy here. It is a draft for legal review, not legal advice. Its open points (controller, privacy mailbox, legal basis, international transfers, Resend region, log rotation) are listed in a comment at the top of the file and as `[...]` placeholders in the text.
 
 > **Demo alojada.** Si pruebas la demo en demo.opencovers.dev guardamos tu dirección de correo (o la que verifica Google) para crear tu restaurante de prueba y enviarte el enlace de acceso. Tu restaurante de prueba y tu cuenta se borran tras 14 días sin acceso. Puedes pedir el borrado escribiendo a [contacto].
 >
@@ -321,7 +321,7 @@ Resend (email) and Google (sign-in) process that data, so the privacy page shoul
 #### Launch checklist
 
 - [ ] Legal review of the terms of use (`condiciones.html`) and of the privacy notice above, including who the controller is. Do not open the demo to the public before this.
-- [ ] `privacidad.html` carries the demo wording, with a real contact address.
+- [x] `privacidad.html` carries the demo wording, a working privacy address (`privacidad@opencovers.dev`), the legal bases, the transfers, the Resend region and the log rotation. The controller's tax id and address come from the `LEGAL_TAX_ID` and `LEGAL_ADDRESS` secrets at build time.
 - [ ] DNS records resolve, and ports 80 and 443 are open on the server and nothing else.
 - [ ] Resend domain verified, and a test magic link reaches a real inbox (check spam too).
 - [ ] Google client created, its redirect URI added, and a test sign-in works (or both Google variables left empty).
