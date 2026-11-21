@@ -265,7 +265,10 @@ function Nav() {
           <li><a href="#brigada">La Brigada</a></li>
           <li><a href="#faq">Preguntas</a></li>
         </ul>
-        <GithubButton />
+        <div className="navacts">
+          {DEMO_URL && <a className="btn accent navdemo" href={DEMO_URL}>Probar la demo</a>}
+          <GithubButton />
+        </div>
       </div>
     </header>
   );
