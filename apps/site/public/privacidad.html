@@ -1,22 +1,19 @@
 <!doctype html>
 <!--
-  BORRADOR PARA REVISIÓN LEGAL. No es asesoramiento jurídico y nada de esta página es definitivo.
+  Redactado por el equipo sin revisión de un abogado. No es asesoramiento jurídico. Quien quiera revisarlo puede partir de los puntos abiertos de abajo.
   Los hechos sobre la demo salen del código; cada afirmación lleva su fuente en la descripción del PR que añadió esta versión.
 
   Puntos abiertos para quien revise:
   1. Responsable del tratamiento: David Cabeza, autónomo, con domicilio en Madrid. El NIF y la dirección no están en el repositorio público: el despliegue los pone desde los secretos LEGAL_TAX_ID y LEGAL_ADDRESS.
   2. Buzón de privacidad: privacidad@opencovers.dev, activo con Cloudflare Email Routing hacia el buzón del propietario (prueba de recepción correcta).
-  3. Base jurídica de cada finalidad. Propuesta del equipo, sin validar:
+  3. Base jurídica de cada finalidad. Propuesta del equipo, sin validar (ya puestas en la página, sin revisión de abogado; sin casilla de novedades, la demo no guarda contactos):
      - cuenta, sesión y restaurante de prueba: ejecución de un contrato o medidas precontractuales a petición del visitante;
-     - novedades sobre OpenCovers: consentimiento (casilla, texto v1);
      - prevención de abuso (límites por IP y por correo, registro de sesión): interés legítimo.
   4. Transferencias internacionales: Resend, Google, Cloudflare y GitHub pueden tratar datos fuera del EEE. No hemos verificado sus garantías (cláusulas tipo, marco UE-EE. UU.).
   5. Región de Resend: el propietario confirma en el panel que el dominio está en la región UE (Irlanda). No consta en el repositorio.
   6. Rotación de los registros de Docker en el servidor: 10 MB por archivo y 3 archivos, según lo configurado en el servidor. docs/deploy.md solo la recomienda.
-  7. Retirada del consentimiento: todavía no hay enlace de baja; hoy se atiende por correo y el operador borra la fila a mano.
-  8. Herramienta con la que se enviarán las novedades a quien consiente: no está decidida.
-  9. Datos de terceros en el restaurante de prueba: si el visitante comparte su widget, otra persona puede escribir sus datos. Revisar quién es responsable de esos datos y si basta este aviso.
-  10. Autoridad de control: se ha puesto la AEPD porque el responsable está establecido en Madrid. Confirmar.
+  7. Datos de terceros en el restaurante de prueba: si el visitante comparte su widget, otra persona puede escribir sus datos. Revisar quién es responsable de esos datos y si basta este aviso.
+  8. Autoridad de control: se ha puesto la AEPD porque el responsable está establecido en Madrid. Confirmar.
 -->
 <html lang="es">
   <head>
@@ -62,8 +59,7 @@
     <main>
       <p><a href="/">← OpenCovers</a></p>
       <h1>Política de privacidad</h1>
-      <p class="muted">Última actualización: 20 de noviembre de 2026.</p>
-      <p class="muted">Borrador en revisión. Lo que aparece entre corchetes está por confirmar.</p>
+      <p class="muted">Última actualización: 21 de noviembre de 2026.</p>
 
       <h2>Resumen</h2>
       <p>Esta política cubre tres cosas distintas:</p>
@@ -74,8 +70,8 @@
         </li>
         <li>
           <strong>La demo en demo.opencovers.dev</strong> sí trata datos: tu correo, tu sesión y lo
-          que escribas en tu restaurante de prueba. Todo eso se borra a los 14 días sin entrar. Si
-          aceptas recibir novedades, guardamos tu correo hasta 12 meses desde tu último acceso.
+          que escribas en tu restaurante de prueba. Todo eso se borra a los 14 días sin entrar. No
+          enviamos novedades ni publicidad.
         </li>
         <li>
           <strong>El software OpenCovers</strong>, instalado por un restaurante en su propia
@@ -181,21 +177,6 @@
       </ul>
       <p>La demo no envía correos a nadie más ni invitaciones del equipo.</p>
 
-      <h3>Si aceptas recibir novedades</h3>
-      <p>
-        La casilla «Acepto recibir novedades sobre OpenCovers» es opcional y la demo funciona igual
-        sin ella. Si la marcas, guardamos tu correo (tal como entras y normalizado), cómo entraste
-        (enlace o Google), el idioma, la fecha de alta, la de tu último acceso y la versión del texto
-        que aceptaste (<code>v1</code>). El formulario no pide nombre. Este registro no depende de
-        tu restaurante de prueba: sigue después de que se borre, hasta 12 meses desde tu último
-        acceso, y entonces se elimina.
-      </p>
-      <p>
-        Puedes retirar el consentimiento o pedir que lo borremos en cualquier momento escribiendo a
-        <a href="mailto:privacidad@opencovers.dev">privacidad@opencovers.dev</a>. Todavía no hay enlace de
-        baja automático.
-      </p>
-
       <h3>Prevención de abuso</h3>
       <ul>
         <li>
@@ -232,8 +213,7 @@
         <li>
           En el almacenamiento local: <code>opencovers-ui</code> (restaurante elegido, idioma, aspecto
           del plano y menú lateral), <code>theme</code> (modo claro u oscuro),
-          <code>oc-demo-checklist:…</code> (la lista de la visita guiada) y
-          <code>oc-demo-consent</code> (tu casilla de novedades, hasta que se envía al entrar).
+          <code>oc-demo-checklist:…</code> (la lista de la visita guiada).
         </li>
       </ul>
       <p>
@@ -270,23 +250,22 @@
         </li>
       </ul>
       <p>
-        Transferencias fuera del Espacio Económico Europeo y sus garantías:
-        <span class="todo">[por confirmar en la revisión]</span>.
+        Transferencias fuera del Espacio Económico Europeo: Resend, Google, Cloudflare y GitHub son
+        empresas con vínculos en Estados Unidos y pueden tratar datos fuera del EEE. Cada una
+        indica en su política las garantías que aplica (cláusulas contractuales tipo o el Marco de
+        Privacidad de Datos UE-EE. UU.). Puedes consultarlas en los enlaces de arriba.
       </p>
 
       <h3>Para qué y con qué base</h3>
       <ul>
         <li>
-          Darte la cuenta y el restaurante de prueba:
-          <span class="todo">[BASE JURÍDICA POR CONFIRMAR]</span>.
+          Darte la cuenta y el restaurante de prueba: es necesario para prestarte el servicio que
+          aceptas al entrar, según las <a href="/condiciones.html">condiciones de uso</a> (art. 6.1.b
+          RGPD).
         </li>
         <li>
-          Enviarte novedades sobre OpenCovers: tu consentimiento
-          <span class="todo">[POR CONFIRMAR]</span>.
-        </li>
-        <li>
-          Frenar el abuso de la demo:
-          <span class="todo">[BASE JURÍDICA POR CONFIRMAR]</span>.
+          Frenar el abuso de la demo: nuestro interés legítimo en proteger el servicio de registros
+          automáticos y usos indebidos (art. 6.1.f RGPD).
         </li>
       </ul>
 
