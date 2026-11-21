@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { sql } from "drizzle-orm";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import app from "../src/app";
 import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
@@ -161,6 +161,23 @@ describe("GET /w/{bookingKey} (C41)", () => {
     expect(await lang(es.key, '?lang="><script>')).toBe("es");
     expect(await lang(en.key)).toBe("en");
     expect(await lang(en.key, "?lang=es")).toBe("es");
+  });
+
+  it("in the demo offers only es and en, and falls back to the venue's language for the rest", async () => {
+    const es = await makeVenue();
+    vi.stubEnv("DEMO_MODE", "1");
+    try {
+      const lang = async (query: string) => /<html lang="([^"]*)">/.exec(await (await page(`${es.key}${query}`)).text())?.[1];
+      expect(await lang("?lang=en")).toBe("en");
+      expect(await lang("?lang=ca")).toBe("es");
+      expect(await lang("?lang=pt")).toBe("es");
+      for (const path of ["/r", "/r/waitlist"]) {
+        const html = await (await app.request(`${path}?lang=fr`)).text();
+        expect(html).toContain('<html lang="es">');
+      }
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("escapes the venue name it puts in the title", async () => {

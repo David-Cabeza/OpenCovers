@@ -707,6 +707,17 @@ describe("C43 / C55 guest locale on the public create (ADR-0024)", () => {
     expect(await stored(publicId)).toBeNull();
   });
 
+  it("in the demo refuses the five unreviewed codes and still takes es and en", async () => {
+    const v = await makeVenue({ seats: [4, 4] });
+    vi.stubEnv("DEMO_MODE", "1");
+    try {
+      expect((await publicCreate(v, { locale: "ca", guest: { name: "Ana", contact: newContact() } })).res.status).toBe(400);
+      expect((await publicCreate(v, { locale: "en", guest: { name: "Ana", contact: newContact() } })).res.status).toBe(200);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("refuses anything but the seven lower-case codes and writes nothing", async () => {
     const v = await makeVenue();
     const before = await counts(v.id);

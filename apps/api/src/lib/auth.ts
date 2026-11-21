@@ -31,7 +31,7 @@ import {
   mcpResourceUri,
 } from "./mcp-remote";
 import { buildMagicLinkEmail, sendEmail } from "./mailer";
-import { LOCALES } from "./online-booking";
+import { enabledLocales } from "./online-booking";
 import { decideSignup, isCreator, signupMode } from "./signup";
 
 function invitationToken(
@@ -147,7 +147,7 @@ export function magicLinkEmail(locale: string, url: string): { subject: string; 
 /** The language of the mail: the first supported language of Accept-Language, else English. */
 function mailLocale(headers: Headers | undefined): string {
   const first = headers?.get("accept-language")?.split(",")[0]?.split(";")[0]?.trim().toLowerCase().slice(0, 2) ?? "";
-  return (LOCALES as readonly string[]).includes(first) ? first : "en";
+  return enabledLocales().includes(first) ? first : "en";
 }
 
 /** Google's `email_verified` claim must be true: an unverified address proves nothing about who holds the inbox. */

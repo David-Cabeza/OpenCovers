@@ -4,9 +4,16 @@ import { services, tables, venueOnlineBooking, venues } from "../db/schema";
 import type { Db, DbTx } from "./venue";
 import { isFrameAncestor } from "./widget-page";
 import { isSandboxVenue } from "../demo/limits";
+import { demoMode } from "../demo/settings";
 import { contrast } from "./contrast";
 
 export const LOCALES = ["es", "en", "ca", "fr", "de", "it", "pt"] as const;
+/** The languages reviewed by a native speaker. The hosted demo offers only these (ADR-0022). */
+const REVIEWED_LOCALES: readonly string[] = ["es", "en"];
+/** The languages a visitor or a venue can pick: all of `LOCALES`, or only the reviewed ones in the hosted demo. */
+export function enabledLocales(): readonly string[] {
+  return demoMode() ? REVIEWED_LOCALES : LOCALES;
+}
 export const FONTS = ["system", "serif", "rounded"] as const;
 export const COLOR_KEYS = ["primary", "onPrimary", "background", "surface", "text", "muted", "border"] as const;
 export const MAX_ORIGINS = 10;
@@ -260,7 +267,7 @@ export function parseOnlineBookingInput(body: unknown): OnlineBookingInput | nul
     out.confirmationMode = "auto";
   }
   if (body.locale !== undefined) {
-    if (typeof body.locale !== "string" || !(LOCALES as readonly string[]).includes(body.locale)) return null;
+    if (typeof body.locale !== "string" || !enabledLocales().includes(body.locale)) return null;
     out.locale = body.locale;
   }
   if (body.theme !== undefined) {

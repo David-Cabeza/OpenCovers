@@ -9,7 +9,7 @@ import { emailVenue } from "./email-venue";
 import { claimKey } from "./idempotency";
 import { canResend } from "./link-resend";
 import { buildWaitlistJoinEmail, sendEmail } from "./mailer";
-import { LOCALES } from "./online-booking";
+import { enabledLocales } from "./online-booking";
 import { isSolution, parseChallenge, type FormChallenge } from "./public-challenge";
 import { maskContact, rulesOf, venueView, type PublicVenue } from "./public-booking";
 import { publicDays } from "./reservations";
@@ -84,7 +84,7 @@ export function parseWaitlistJoin(body: unknown, target: PublicVenue): WaitlistJ
   if (body.honeypot !== undefined && body.honeypot !== "") return null;
   // PUBLIC_CAPTCHA is not implemented, so the config's `captcha` is always null and a token is never verified.
   if (body.captchaToken !== undefined && typeof body.captchaToken !== "string") return null;
-  if (body.locale !== undefined && (typeof body.locale !== "string" || !(LOCALES as readonly string[]).includes(body.locale))) {
+  if (body.locale !== undefined && (typeof body.locale !== "string" || !enabledLocales().includes(body.locale))) {
     return null;
   }
   if (!isCalendarDate(body.date)) return null;

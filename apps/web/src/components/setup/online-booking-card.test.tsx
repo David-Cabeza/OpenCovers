@@ -849,3 +849,24 @@ describe("OnlineBookingCard public zones and service names", () => {
     expect(api.calls("PUT", PATH)).toHaveLength(0);
   });
 });
+
+describe("OnlineBookingCard widget language", () => {
+  afterEach(resetApiMocks);
+
+  const options = async () => {
+    await loaded();
+    return within(screen.getByLabelText("Language")).getAllByRole("option").map((o) => (o as HTMLOptionElement).value);
+  };
+
+  it("lists all seven languages on a normal instance", async () => {
+    setup({}, { "GET /api/demo/status": { body: { enabled: false, googleEnabled: false } } });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    expect(await options()).toEqual(["es", "en", "ca", "fr", "de", "it", "pt"]);
+  });
+
+  it("lists only Spanish and English in the hosted demo", async () => {
+    setup({}, { "GET /api/demo/status": { body: { enabled: true, googleEnabled: false } } });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await waitFor(async () => expect(await options()).toEqual(["es", "en"]));
+  });
+});
