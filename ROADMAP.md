@@ -1,6 +1,6 @@
 # Roadmap
 
-OpenCovers is pre-alpha. The engine, the staff app, and the MCP server run locally and pass their tests. The public site is deployed, and a hosted demo runs at demo.opencovers.dev. The demo redeploys on pushes to `main` and is not yet open to the public, pending legal review. This roadmap has two jobs. It records where the project stands, and it lays out the road to the product depth that mature restaurant reservation platforms offer, so contributors can choose a place to work.
+OpenCovers is pre-alpha. The engine, the staff app, and the MCP server run locally and pass their tests. The public site is deployed, and a hosted demo is open to the public at demo.opencovers.dev. The demo redeploys on pushes to `main`. This roadmap has two jobs. It records where the project stands, and it lays out the road to the product depth that mature restaurant reservation platforms offer, so contributors can choose a place to work.
 
 Phases are a sequence, not a promise of dates. There is no Phase 1 or Phase 9. Numbering started at the contract in Phase 2, and the first-venue phase was dropped, so its route is a decision below. Phase 0 is a track that runs alongside the others, listed last under Now. It covers the publication of the repository, which is now public. Each phase has an exit criterion. Flags are the unit of work. Read [CONTRIBUTING.md](CONTRIBUTING.md) to claim one. Sizes (S, M, L) on the items below are first estimates. A maintainer refines them when the flag is opened, and splits any L.
 
@@ -96,7 +96,7 @@ Status: every item below is done.
 - Done: the React warning about an inline script, fixed by dropping the theme library.
 - Done: a hardening guide for self-hosters, in [docs/hardening.md](docs/hardening.md).
 - Done: automated tests for the staff app and the public site, run with Vitest.
-- Done: a hosted demo with one sandbox per visitor ([ADR-0022](docs/adr/0022-hosted-demo-sandbox.md)). `compose.demo.yaml` runs the same Docker images and Caddyfile at demo.opencovers.dev, with HTTPS from Caddy, and `.github/workflows/deploy-demo.yml` redeploys it on pushes to `main`. It is not yet open to the public, pending legal review.
+- Done: a hosted demo with one sandbox per visitor ([ADR-0022](docs/adr/0022-hosted-demo-sandbox.md)). `compose.demo.yaml` runs the same Docker images and Caddyfile at demo.opencovers.dev, with HTTPS from Caddy, and `.github/workflows/deploy-demo.yml` redeploys it on pushes to `main`. It is open to the public, with terms of use and a privacy notice written without a lawyer's review.
 
 Exit criterion: the staff app signs in and books a table against an API running from the Docker image.
 

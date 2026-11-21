@@ -116,7 +116,7 @@ const faqs = [
   {
     t: "Estado",
     q: "¿En qué estado está?",
-    a: "Pre-alfa. El motor, la app de sala y el servidor MCP funcionan en local y pasan sus tests. El widget de reservas para la web del local está en curso. Hay una demo alojada para pruebas internas, que se abrirá al público tras la revisión legal. Todavía no hay un servicio gestionado en producción.",
+    a: "Pre-alfa. El motor, la app de sala y el servidor MCP funcionan en local y pasan sus tests. El widget de reservas para la web del local está en curso. Hay una demo abierta en demo.opencovers.dev, donde cada visitante recibe un restaurante de prueba. Todavía no hay un servicio gestionado en producción.",
   },
   {
     t: "Hosting",

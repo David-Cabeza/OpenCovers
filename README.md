@@ -6,7 +6,7 @@
 
 **The open-source reservations engine for restaurants — availability, bookings, tables, and the event feed, with an API and an MCP server.**
 
-<sub>Pre-alpha: it runs locally with tests. Public site: <a href="https://opencovers.dev">opencovers.dev</a>. A hosted demo runs for internal testing and opens to the public after legal review.</sub>
+<sub>Pre-alpha: it runs locally with tests. Public site: <a href="https://opencovers.dev">opencovers.dev</a>. A hosted demo is open at <a href="https://demo.opencovers.dev">demo.opencovers.dev</a>.</sub>
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=node.js&logoColor=white)
@@ -244,7 +244,7 @@ docs/        the contract, ADRs, and requirements
 
 ## Hosted demo
 
-A hosted demo runs for internal testing. It opens to the public after legal review of its terms of use and privacy notice. With `DEMO_MODE=1` one deployment becomes a public demo where each visitor signs in with an emailed magic link, after a proof-of-work challenge, and gets a sandbox restaurant of their own, with caps on what it can hold and a sandbox bar and guided tour in the staff app. It runs on its own host and database, never next to real data, and it is off by default. See [ADR-0022](docs/adr/0022-hosted-demo-sandbox.md) and the [deploy guide](docs/deploy.md#hosted-demo). The public site links to it only once an address is set.
+A hosted demo is open to the public at [demo.opencovers.dev](https://demo.opencovers.dev), with its [terms of use](https://opencovers.dev/condiciones.html) and [privacy notice](https://opencovers.dev/privacidad.html). With `DEMO_MODE=1` one deployment becomes a public demo where each visitor signs in with an emailed magic link, after a proof-of-work challenge, and gets a sandbox restaurant of their own, with caps on what it can hold and a sandbox bar and guided tour in the staff app. It runs on its own host and database, never next to real data, and it is off by default. See [ADR-0022](docs/adr/0022-hosted-demo-sandbox.md) and the [deploy guide](docs/deploy.md#hosted-demo). The public site links to it from the hero.
 
 ## Deploy
 
