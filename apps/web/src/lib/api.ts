@@ -117,6 +117,12 @@ export interface WaitlistEntry {
   status: string;
   reservationId: string | null;
   createdAt: string;
+  /** The date a guest asked for through the public waitlist, or null for the same-day queue (ADR-0021). */
+  date?: string | null;
+  /** The guest's time window as `HH:MM`, or null. */
+  windowStart?: string | null;
+  windowEnd?: string | null;
+  source?: "staff" | "widget";
 }
 
 export interface FloorTable {
@@ -549,8 +555,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  listWaitlist: (venueId: string) =>
-    request<{ entries: WaitlistEntry[] }>(`/v1/venues/${venueId}/waitlist`),
+  listWaitlist: (venueId: string, date?: string) =>
+    request<{ entries: WaitlistEntry[] }>(
+      `/v1/venues/${venueId}/waitlist${date ? `?${new URLSearchParams({ date })}` : ""}`,
+    ),
 
   addWaitlist: (
     venueId: string,
