@@ -78,10 +78,22 @@ async function expireGuests(db: Db, venueId: string, cutoff: Date, limit: number
       .for("update", { skipLocked: true });
     if (roots.length === 0) return 0;
 
-    const ids = (await withMerged(tx, venueId, roots)).map((g) => g.id);
+    // A booking locks a merged guest before its root (linkGuest), and erasure and merge lock a guest's reservations
+    // before the guest (ADR-0026). This holds the roots already, so waiting on either could close a cycle: a merged
+    // guest or a reservation another write holds leaves the batch to the next run. The held roots keep the chains
+    // still: merging into a root or unmerging from it needs the root's lock.
+    const rootIds = new Set(roots.map((g) => g.id));
+    const ids = (await withMerged(tx, venueId, roots, false)).map((g) => g.id);
+    const absorbed = ids.filter((id) => !rootIds.has(id));
+    if (absorbed.length > 0) {
+      const held = await tx
+        .select({ id: guests.id })
+        .from(guests)
+        .where(and(eq(guests.venueId, venueId), inArray(guests.id, absorbed)))
+        .for("update", { skipLocked: true });
+      if (held.length < absorbed.length) return 0;
+    }
     const owned = and(eq(reservations.venueId, venueId), inArray(reservations.guestId, ids), eq(reservations.erased, false));
-    // Erasure and merge lock a guest's reservations before the guest (ADR-0026). This holds the guests already, so
-    // waiting on a reservation could close a cycle: a reservation another write holds leaves the batch to the next run.
     const visits = await tx
       .select({ id: reservations.id, version: reservations.version })
       .from(reservations)

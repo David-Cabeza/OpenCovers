@@ -212,8 +212,8 @@ export async function erase(
   }
   return db.transaction(async (tx) => {
     // Lock order, shared with the other writers: reservation rows (by id), then their links, then the waitlist
-    // entry, then the guests. A first pass reads without locks to learn what to lock; the second pass repeats
-    // the reads under the guest locks and so also sees what committed in between.
+    // entry, then the guests, a merged guest before its root (lockChains). A first pass reads without locks to learn
+    // what to lock; the second pass repeats the reads under the guest locks and so also sees what committed in between.
     const first = await resolveTargets(tx, venue, venueId, guestId, principal, false);
     await lockReservations(tx, venueId, first.matches.map((m) => m.id));
     await deleteLinks(tx, venueId, first.matches.map((m) => m.id));
@@ -223,6 +223,7 @@ export async function erase(
           first.contactKey?.value ?? null,
         ])
       : 0;
+    await lockChains(tx, venueId, first.byGuest);
     const { contact, contactKey, byGuest, matches } = await resolveTargets(
       tx,
       venue,
@@ -234,6 +235,13 @@ export async function erase(
     const linked = guestId
       ? []
       : [...new Set(matches.flatMap((m) => (m.guestId ? [m.guestId] : [])))];
+    if (linked.length > 0) {
+      const unlocked = await tx
+        .select()
+        .from(guests)
+        .where(and(eq(guests.venueId, venueId), inArray(guests.id, linked)));
+      await lockChains(tx, venueId, await withMerged(tx, venueId, unlocked, false));
+    }
     const linkedGuests =
       linked.length > 0
         ? await tx
@@ -384,6 +392,32 @@ export async function withMerged(tx: DbTx, venueId: string, roots: Guest[], lock
     for (const g of absorbed) found.set(g.id, g);
   }
   return [...found.values()];
+}
+
+/**
+ * Row-locks the guests of `family` (what `withMerged` read) in the order a booking locks a merged chain: a merged
+ * guest before the guest it was merged into, since linkGuest locks the guest its contact matched and then the root.
+ * The deepest guests go first and the roots last, each depth in id order.
+ */
+async function lockChains(tx: DbTx, venueId: string, family: Guest[]): Promise<void> {
+  const byId = new Map(family.map((g) => [g.id, g]));
+  const depth = (g: Guest): number => {
+    const parent = g.mergedInto ? byId.get(g.mergedInto) : undefined;
+    return parent ? depth(parent) + 1 : 0;
+  };
+  const levels = new Map<number, string[]>();
+  for (const g of family) {
+    const d = depth(g);
+    levels.set(d, [...(levels.get(d) ?? []), g.id]);
+  }
+  for (const level of [...levels.keys()].sort((a, b) => b - a)) {
+    await tx
+      .select({ id: guests.id })
+      .from(guests)
+      .where(and(eq(guests.venueId, venueId), inArray(guests.id, levels.get(level) as string[])))
+      .orderBy(guests.id)
+      .for("update");
+  }
 }
 
 async function unreferenced(tx: DbTx, venueId: string, family: Guest[]): Promise<Guest[]> {
