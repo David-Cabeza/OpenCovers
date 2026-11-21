@@ -29,6 +29,8 @@ export interface PublicConfig {
   privacyNoticeUrl?: string | null;
   /** The public zone names, in the venue's order, or `[]` (C66). Absent from an older API. Two or more offer a choice. */
   zones?: string[];
+  /** Whether a guest can join the public waitlist (ADR-0021, C68). Absent from an older API, read as false. */
+  waitlistEnabled?: boolean;
   challenge: FormChallenge;
   /** Whether the venue can email a lost link. Without it the widget does not offer the resend. */
   linkResend: boolean;
@@ -100,6 +102,37 @@ export interface BookingFields {
   honeypot: string;
   /** A public zone chosen by the guest. Absent means any table. */
   zone?: string;
+}
+
+/** The fields of the public waitlist join (ADR-0021 section 3). No phone, no note, no marketing field. */
+export interface WaitlistFields {
+  date: string;
+  partySize: number;
+  name: string;
+  /** One email. The engine refuses a phone. */
+  email: string;
+  /** Both ends as `HH:MM`, or null for any time. */
+  window: { from: string; to: string } | null;
+  /** The consent box. The widget sends the join only with `true`; it is never pre-ticked. */
+  emailConsent: boolean;
+  honeypot: string;
+}
+
+/** The guest view of a waitlist entry (`PublicWaitlistEntry`). The contact is masked. */
+export interface PublicWaitlistEntry {
+  venue: PublicVenue;
+  date: string;
+  window: { from: string; to: string } | null;
+  partySize: number;
+  status: "waiting" | "seated" | "cancelled";
+  guest: { contact: string };
+  linkExpiresAt: string;
+}
+
+export interface Joined {
+  entry: PublicWaitlistEntry;
+  /** Null on a repeat of the join's key, which mints no token. */
+  waitlistToken: string | null;
 }
 
 /**
@@ -176,6 +209,22 @@ export function publicApi(
           solution,
         }),
       }),
+    joinWaitlist: (idempotencyKey: string, fields: WaitlistFields, challenge: FormChallenge, solution: string) =>
+      call<Joined>(fetcher, `${base}/waitlist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({
+          date: fields.date,
+          partySize: fields.partySize,
+          ...(fields.window ? { window: { from: fields.window.from, to: fields.window.to } } : {}),
+          ...(locale ? { locale } : {}),
+          guest: { name: fields.name.trim(), contact: fields.email.trim() },
+          emailConsent: fields.emailConsent,
+          honeypot: fields.honeypot,
+          challenge,
+          solution,
+        }),
+      }),
     resendLink: (email: string) =>
       call<{ accepted: true }>(fetcher, `${base}/self-service/resend`, {
         method: "POST",
@@ -227,6 +276,49 @@ export function takeToken(
   if (location.hash) history.replaceState(null, "", location.pathname + location.search);
   return token;
 }
+
+/** The page of a waitlist leave link, `/r/waitlist`, with the token in the fragment like a booking link's. */
+export function waitlistEntryUrl(origin: string, token: string, lang?: string): string {
+  const url = new URL("/r/waitlist", origin);
+  if (lang) url.searchParams.set("lang", lang);
+  url.hash = token;
+  return url.href;
+}
+
+/** Which guest page a path is: `/r` for a booking, `/r/waitlist` for a waitlist entry, with or without a trailing slash. */
+export function guestPageOf(pathname: string): "booking" | "waitlist" | null {
+  const path = pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname;
+  if (path === "/r") return "booking";
+  if (path === "/r/waitlist") return "waitlist";
+  return null;
+}
+
+/** A waitlist token. A separate type from `SelfServiceToken`, so a booking token cannot be handed to a waitlist call. */
+export type WaitlistToken = string & { readonly __brand: "WaitlistToken" };
+
+/** Like `takeToken`, for the waitlist page. The token is the same format, and goes only to the waitlist routes. */
+export function takeWaitlistToken(
+  location: { hash: string; pathname: string; search: string },
+  history: { replaceState(data: unknown, unused: string, url: string): void },
+): WaitlistToken | null {
+  return takeToken(location, history) as string | null as WaitlistToken | null;
+}
+
+/** The waitlist entry routes. The token goes only in `X-Self-Service-Token`, never in a path or a query. */
+export function waitlistApi(token: WaitlistToken, fetcher: Fetch = (input, init) => fetch(input, init)) {
+  const base = "/v1/public/waitlist-entry";
+  const auth = { "X-Self-Service-Token": token };
+  return {
+    read: () => call<PublicWaitlistEntry>(fetcher, base, { headers: auth }),
+    leave: (idempotencyKey: string) =>
+      call<PublicWaitlistEntry>(fetcher, `${base}/leave`, {
+        method: "POST",
+        headers: { ...auth, "Idempotency-Key": idempotencyKey },
+      }),
+  };
+}
+
+export type WaitlistApi = ReturnType<typeof waitlistApi>;
 
 export interface GuestChanges {
   partySize?: number;

@@ -25,15 +25,20 @@ export function mayRetry(failure: Failure): boolean {
 const fingerprintOf = (f: BookingFields) =>
   JSON.stringify([f.date, f.time, f.partySize, f.name.trim(), f.contact.trim(), f.commentary.trim(), f.honeypot, f.zone ?? ""]);
 
-export function createSubmitter(deps: {
-  send(key: string, fields: BookingFields, ticket: Ticket): Promise<Result<Created>>;
+/**
+ * The one-attempt rule above for any payload. The booking create and the waitlist join (ADR-0021) both use it;
+ * a waitlist join passes its own `fingerprint`, which must cover every field the guest can change.
+ */
+export function createSubmitter<F = BookingFields, T = Created>(deps: {
+  send(key: string, fields: F, ticket: Ticket): Promise<Result<T>>;
   takeTicket(): Promise<Ticket | null>;
   newKey(): string;
+  fingerprint?: (fields: F) => string;
 }) {
   let attempt: Attempt | null = null;
 
-  return async function submit(fields: BookingFields): Promise<Result<Created>> {
-    const fingerprint = fingerprintOf(fields);
+  return async function submit(fields: F): Promise<Result<T>> {
+    const fingerprint = deps.fingerprint ? deps.fingerprint(fields) : fingerprintOf(fields as unknown as BookingFields);
     if (attempt?.fingerprint !== fingerprint) {
       let ticket: Ticket | null;
       try {
