@@ -89,7 +89,10 @@ describe("hosted demo link", () => {
 
   it("shows the Spanish button with the demo URL when the switch is set", async () => {
     await renderWith(live);
-    expect(screen.getByRole("link", { name: "Probar la demo" })).toHaveAttribute("href", live);
+    const links = screen.getAllByRole("link", { name: "Probar la demo" });
+    // One in the header and one in the hero.
+    expect(links).toHaveLength(2);
+    for (const link of links) expect(link).toHaveAttribute("href", live);
   });
 
   it("keeps a marker in the English page for the build to fill", () => {
