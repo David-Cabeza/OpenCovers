@@ -14,7 +14,6 @@ import app from "../src/app";
 import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
 import {
-  demoLeads,
   demoSandboxes,
   guests,
   reservations,
@@ -29,7 +28,6 @@ import {
 import { createAuth, requireVerifiedGoogleEmail } from "../src/lib/auth";
 import { cleanupExpiredSandboxes } from "../src/demo/cleanup";
 import { isDisposableEmail } from "../src/demo/disposable";
-import { consentedLeadsCsv, recordConsent } from "../src/demo/leads";
 import {
   CHALLENGE_HEADER,
   CHALLENGE_MAX_AGE_MS,
@@ -72,7 +70,7 @@ beforeEach(async () => {
   // No test mails anyone: a stray send would otherwise reach the network.
   vi.stubGlobal("fetch", async () => new Response("{}", { status: 200 }));
   await db.execute(
-    sql`TRUNCATE TABLE demo_lead, demo_sandbox, account, session, verification, "user", venue_memberships, sent_emails, waitlist, events, tombstones, idempotency_keys, table_allocations, reservations, guests, guest_audit, self_service_links, grants, api_keys, services, tables, floor_items, webhook_endpoints, venue_online_booking, venues RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE demo_sandbox, account, session, verification, "user", venue_memberships, sent_emails, waitlist, events, tombstones, idempotency_keys, table_allocations, reservations, guests, guest_audit, self_service_links, grants, api_keys, services, tables, floor_items, webhook_endpoints, venue_online_booking, venues RESTART IDENTITY CASCADE`,
   );
 });
 
@@ -560,38 +558,6 @@ describe("magic-link challenge (ADR-0022, decision 8a)", () => {
   });
 });
 
-describe("leads", () => {
-  it("a sign-in alone creates no lead", async () => {
-    await signInWithMagicLink(freshEmail(), { "x-demo-consent": "v1" });
-    expect((await db.select().from(demoLeads)).length).toBe(0);
-  });
-
-  it("exports only consented, not withdrawn leads as CSV, and no route returns leads", async () => {
-    const consent = { version: "v1", locale: "es", name: null };
-    await recordConsent(db, { email: "yes@example.com", source: "magic-link", consent });
-    await recordConsent(db, { email: "gone@example.com", source: "magic-link", consent });
-    await db.update(demoLeads).set({ withdrawnAt: new Date() }).where(eq(demoLeads.email, "gone@example.com"));
-    const csv = await consentedLeadsCsv(db);
-    const lines = csv.trim().split("\n");
-    expect(lines[0]).toBe("email,name,source,locale,created_at,last_seen_at,consent_text_version");
-    expect(lines).toHaveLength(2);
-    expect(lines[1]).toMatch(/^yes@example\.com,/);
-    expect(app.routes.some((r) => /lead/i.test(r.path) && r.method === "GET")).toBe(false);
-  });
-
-  it("neutralizes spreadsheet formulas in the export", async () => {
-    await db.insert(demoLeads).values({
-      email: "f@example.com",
-      normalizedEmail: "f@example.com",
-      name: '=HYPERLINK("x")',
-      source: "google",
-      contactConsent: true,
-      consentTextVersion: "v1",
-    });
-    expect(await consentedLeadsCsv(db)).toContain(`"'=HYPERLINK(""x"")"`);
-  });
-});
-
 describe("abuse limits", () => {
   it("stops a sandbox at its cap, and a replayed request still replays", async () => {
     const { account } = await signInWithMagicLink(freshEmail());
@@ -663,9 +629,8 @@ describe("abuse limits", () => {
 });
 
 describe("lifecycle", () => {
-  it("deletes expired sandboxes and their accounts, keeps live ones and every lead", async () => {
+  it("deletes expired sandboxes and their accounts, keeps live ones", async () => {
     const old = await signInWithMagicLink(freshEmail());
-    await recordConsent(db, { email: old.account.email, source: "magic-link", consent: { version: "v1", locale: "en", name: null } });
     const fresh = await signInWithMagicLink(freshEmail());
     const oldBox = (await sandboxOf(old.account.email))!;
     const freshBox = (await sandboxOf(fresh.account.email))!;
@@ -684,7 +649,7 @@ describe("lifecycle", () => {
       .where(eq(demoSandboxes.userId, justInside.account.id));
 
     const result = await cleanupExpiredSandboxes(db);
-    expect(result).toMatchObject({ sandboxes: 1, accounts: 1, orphanAccounts: 0, leads: 0 });
+    expect(result).toMatchObject({ sandboxes: 1, accounts: 1, orphanAccounts: 0 });
 
     expect(await sandboxOf(old.account.email)).toBeUndefined();
     expect((await db.select().from(user).where(eq(user.id, old.account.id))).length).toBe(0);
@@ -698,11 +663,6 @@ describe("lifecycle", () => {
     expect(await sandboxOf(fresh.account.email)).toBeDefined();
     expect(await sandboxOf(justInside.account.email)).toBeDefined();
     expect((await db.select({ n: count() }).from(reservations).where(eq(reservations.venueId, freshBox.venueId)))[0]!.n).toBeGreaterThan(0);
-
-    // The consented lead stays after its account went: it is the one thing that outlives it (12 months).
-    const leads = await db.select().from(demoLeads);
-    expect(leads).toHaveLength(1);
-    expect(leads[0]!.email).toBe(old.account.email);
 
     // Signing in again after deletion builds a fresh sandbox.
     await signInWithMagicLink(old.account.email);

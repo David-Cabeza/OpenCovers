@@ -15,7 +15,6 @@ import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
 import {
   account as authAccount,
-  demoLeads,
   demoSandboxes,
   guests,
   reservations,
@@ -28,7 +27,6 @@ import { createAuth } from "../src/lib/auth";
 import { admissionFor } from "../src/demo/admission";
 import { cleanupExpiredSandboxes } from "../src/demo/cleanup";
 import { assertDemoDatabase } from "../src/demo/guard";
-import { consentedLeadsCsv, eraseLead, recordConsent } from "../src/demo/leads";
 import { enforceSandboxCap, isSandboxVenue, DemoLimitError } from "../src/demo/limits";
 import { normalizeEmail } from "../src/demo/normalize";
 import { provisionSandbox } from "../src/demo/provision";
@@ -64,7 +62,7 @@ beforeEach(async () => {
   vi.stubEnv("DEMO_MODE", "1");
   vi.stubGlobal("fetch", async () => new Response("{}", { status: 200 }));
   await db.execute(
-    sql`TRUNCATE TABLE demo_lead, demo_sandbox, account, session, verification, "user", venue_memberships, sent_emails, waitlist, events, tombstones, idempotency_keys, table_allocations, reservations, guests, guest_audit, self_service_links, grants, api_keys, services, tables, floor_items, webhook_endpoints, venue_online_booking, venues, invitations, guest_blocklist RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE demo_sandbox, account, session, verification, "user", venue_memberships, sent_emails, waitlist, events, tombstones, idempotency_keys, table_allocations, reservations, guests, guest_audit, self_service_links, grants, api_keys, services, tables, floor_items, webhook_endpoints, venue_online_booking, venues, invitations, guest_blocklist RESTART IDENTITY CASCADE`,
   );
 });
 
@@ -570,101 +568,6 @@ describe("F6: caps count inside the transaction", () => {
     await addWaitlist(db, realVenue, { partySize: 2 });
     await addWaitlist(db, realVenue, { partySize: 2 });
     await expect(enforceSandboxCap(db, realVenue, "tables")).resolves.toBeUndefined();
-  });
-});
-
-describe("F7 and F8: consent is recorded by the signed-in account", () => {
-  const consent = (cookie: string, body: unknown, extra: Record<string, string> = {}) =>
-    app.request("/api/demo/consent", json(cookie, { method: "POST", body: JSON.stringify(body), headers: extra }));
-
-  it("needs a session", async () => {
-    const res = await app.request("/api/demo/consent", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ version: "v1", locale: "en" }),
-    });
-    expect(res.status).toBe(401);
-  });
-
-  it("records the lead for the account's own verified address, and only then", async () => {
-    const email = freshEmail();
-    const { cookie } = await signIn(email);
-    expect((await db.select().from(demoLeads)).length).toBe(0);
-    const res = await consent(cookie, { version: "v1", locale: "es", name: "  Ana  " });
-    expect(res.status).toBe(204);
-    const [lead] = await db.select().from(demoLeads);
-    expect(lead).toMatchObject({ email, name: "Ana", locale: "es", contactConsent: true, consentTextVersion: "v1", source: "magic-link", withdrawnAt: null });
-  });
-
-  it("validates the body strictly", async () => {
-    const { cookie } = await signIn(freshEmail());
-    const bad: unknown[] = [
-      { version: "v2", locale: "en" },
-      { version: "v1", locale: "zz" },
-      { version: "v1" },
-      { version: "v1", locale: "en", name: "x".repeat(121) },
-      { version: "v1", locale: "en", name: 5 },
-      { version: "v1", locale: "en", name: "a\nb" },
-      { version: "v1", locale: "en", email: "victim@example.org" },
-      [],
-      "v1",
-    ];
-    for (const body of bad) expect((await consent(cookie, body)).status).toBe(400);
-    expect((await db.select().from(demoLeads)).length).toBe(0);
-  });
-
-  it("ignores the old consent headers and a forged claim cookie: nobody consents for another inbox", async () => {
-    const victim = freshEmail();
-    await demoAuth.api.signInMagicLink({
-      body: { email: victim, name: "Evil" } as never,
-      headers: signInHeaders(victim, { "x-demo-consent": "v1", "x-demo-locale": "es" }),
-    });
-    const mail = sent.pop()!;
-    const token = new URL(mail.text.match(/https?:\/\/\S+/)![0]).searchParams.get("token")!;
-    await demoAuth.api.magicLinkVerify({ query: { token }, headers: new Headers(), asResponse: true });
-    expect((await db.select().from(demoLeads)).length).toBe(0);
-
-    const { cookie } = await signIn(freshEmail());
-    const forged = Buffer.from(JSON.stringify({ consentVersion: "v1", locale: "zz", name: "x".repeat(500) })).toString("base64url");
-    await app.request("/v1/venues", json(cookie, { headers: { cookie: `${cookie}; oc_demo_claim=${forged}` } }));
-    expect((await db.select().from(demoLeads)).length).toBe(0);
-  });
-
-  it("is absent when DEMO_MODE is off", async () => {
-    const { cookie } = await signIn(freshEmail());
-    vi.stubEnv("DEMO_MODE", "");
-    expect((await consent(cookie, { version: "v1", locale: "en" })).status).toBe(404);
-  });
-
-  it("a withdrawn lead is excluded from the export and --erase deletes the row", async () => {
-    const input = { version: "v1", locale: "en", name: null };
-    await recordConsent(db, { email: "keep@example.com", source: "google", consent: input });
-    await recordConsent(db, { email: "gone@example.com", source: "google", consent: input });
-    await db.update(demoLeads).set({ withdrawnAt: new Date() }).where(eq(demoLeads.email, "gone@example.com"));
-    expect(await consentedLeadsCsv(db)).not.toContain("gone@example.com");
-    expect(await eraseLead(db, " Gone@Example.com ")).toBe(1);
-    expect((await db.select().from(demoLeads)).map((l) => l.email)).toEqual(["keep@example.com"]);
-  });
-
-  it("cleanup deletes consented leads 12 months after last_seen_at, and never keeps a row without consent", async () => {
-    const input = { version: "v1", locale: "en", name: null };
-    await recordConsent(db, { email: "old@example.com", source: "google", consent: input });
-    await recordConsent(db, { email: "new@example.com", source: "google", consent: input });
-    await db.update(demoLeads).set({ lastSeenAt: new Date(Date.now() - 400 * 864e5) }).where(eq(demoLeads.email, "old@example.com"));
-    await db.insert(demoLeads).values({ email: "stray@example.com", normalizedEmail: "stray@example.com", source: "google", contactConsent: false });
-    const result = await cleanupExpiredSandboxes(db);
-    expect(result.leads).toBe(2);
-    expect((await db.select().from(demoLeads)).map((l) => l.email)).toEqual(["new@example.com"]);
-  });
-
-  it("a consented lead who signs in again keeps their 12 months running", async () => {
-    const email = freshEmail();
-    const { cookie } = await signIn(email);
-    await consent(cookie, { version: "v1", locale: "en" });
-    await db.update(demoLeads).set({ lastSeenAt: new Date(Date.now() - 300 * 864e5) });
-    await signIn(email);
-    const [lead] = await db.select().from(demoLeads);
-    expect(Date.now() - lead!.lastSeenAt.getTime()).toBeLessThan(60_000);
   });
 });
 

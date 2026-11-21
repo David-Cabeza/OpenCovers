@@ -220,7 +220,6 @@ What changes under `DEMO_MODE=1`:
 - Google sign-in turns on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are both set. The account must report a verified email. Set both or neither.
 - The first verified sign-in builds a sandbox from `apps/api/src/demo/template.ts` and makes the visitor its `admin`, with online booking on, so `/w/{bookingKey}` works at once. Venue, membership, template and the sandbox row are one database transaction, so an interrupted build leaves nothing. At most `DEMO_PROVISION_CONCURRENCY` (default 3) sandboxes build at once; up to `DEMO_PROVISION_QUEUE` (50) wait, and further sign-ins get `DEMO_BUSY`. Keep the concurrency at least 3 below `DATABASE_POOL_MAX` (default 10). `DATABASE_CONNECTION_TIMEOUT_MS` (default 10000) makes a request that cannot get a connection fail instead of hanging. A later sign-in returns the same sandbox. `POST /v1/venues` is refused: a visitor has the one.
 - **Sandbox caps**, per sandbox, counted inside the write's transaction under a per-venue lock: reservations 150 and guests 100 (`DEMO_MAX_RESERVATIONS`, `DEMO_MAX_GUESTS`; a booking over them answers `guest_booking_limit`), and waitlist entries 60, tables 40, services 8, floor items 40, invitations 20, API keys 10, blocklist entries 50 (`DEMO_MAX_WAITLIST`, `DEMO_MAX_TABLES`, `DEMO_MAX_SERVICES`, `DEMO_MAX_FLOOR_ITEMS`, `DEMO_MAX_INVITATIONS`, `DEMO_MAX_API_KEYS`, `DEMO_MAX_BLOCKLIST`). Over them the API answers `409 demo_limit_reached` (the blocklist keeps its `blocklist_limit_reached`). A sandbox cannot create webhooks, its widget's allowed origins are fixed when it is built (the demo host's origin when `BETTER_AUTH_URL` is https, otherwise none), and its mail always uses the operator's `RESEND_API_KEY` and `RESEND_FROM_EMAIL`, whatever the visitor stores in the venue config. Email goes only to the verified address of the account that owns the sandbox (the `demo_sandbox` row), whatever a guest types in a booking, the lost-link form or the notice address, and not to another admin who joined through an invitation. An invitation made in a sandbox is not mailed. Webhook deliveries are also skipped for a sandbox, and an endpoint found on one is switched off.
-- **Leads and consent.** Signing in creates no lead. A signed-in visitor who ticked the contact box makes the sign-in form call `POST /api/demo/consent` with their session cookie and `{ "version": "v1", "locale": "es", "name": "optional" }`. `version` must equal the current consent text version, `locale` one of `es en ca fr de it pt`, `name` at most 120 characters, and nothing else is accepted. The row is written for the verified address of the signed-in account, so nobody can consent for another inbox. The old `X-Demo-Consent` and `X-Demo-Locale` headers and the claim cookie are gone. No HTTP route returns leads. The unsubscribe route is a later change.
 
 Asking for a magic link, as a sign-in form does it (outside `docs/contract`, demo mode only; with `DEMO_MODE` off both routes answer 404):
 
@@ -230,15 +229,13 @@ Asking for a magic link, as a sign-in form does it (outside `docs/contract`, dem
 
 Refusals, all `400` with a body `{ "code", "message" }` and no email sent: `CHALLENGE_REQUIRED` (a header is missing), `CHALLENGE_INVALID` (wrong solution, bad signature, expired, already used, issued for another address or for a booking), `DISPOSABLE_EMAIL`. A refused request does not spend the address's or the IP's link budget, so a bot cannot lock a visitor out by posting without a challenge. A body with no usable address answers `400 invalid_request` before any limit is charged. `429` with `Retry-After` means a limit tripped: ask again with a new challenge once the wait is over. The answer to a valid request for an address is the same whether or not it already has an account. Another spelling of an address that already has a sandbox answers `403 DEMO_ADDRESS_IN_USE`. Whoever solves a challenge for an address can still send that address up to 5 links a day, by design of decision 8a.
 
-Housekeeping, run both from the repository root with the API's `DATABASE_URL`:
+Housekeeping, run from the repository root with the API's `DATABASE_URL`:
 
 ```sh
 pnpm demo:cleanup             # needs DEMO_MODE=1 and passes the startup guard; see below
-pnpm demo:leads               # print consented, not withdrawn visitors, as CSV
-pnpm demo:leads --erase EMAIL # delete one person's lead row, under any spelling of the address (an erasure request)
 ```
 
-`demo:cleanup` deletes sandboxes whose owner last signed in over 14 days ago, with their accounts, one transaction per sandbox, so a failure is retried by the next run. It also deletes accounts with no sandbox that are older than 14 days with no recent session (a refused or failed first sign-in), and consented leads 12 months after `last_seen_at`. It never keeps a lead row without consent. It never deletes a venue that has no `demo_sandbox` row, nor an account that is a member of such a venue, and it refuses to run unless `DEMO_MODE=1` and the database passes the startup guard. Schedule it daily; `compose.demo.yaml` does (see the runbook below). Both commands also run inside the API container with `pnpm --filter @opencovers/api demo:cleanup`.
+`demo:cleanup` deletes sandboxes whose owner last signed in over 14 days ago, with their accounts, one transaction per sandbox, so a failure is retried by the next run. It also deletes accounts with no sandbox that are older than 14 days with no recent session (a refused or failed first sign-in). It never deletes a venue that has no `demo_sandbox` row, nor an account that is a member of such a venue, and it refuses to run unless `DEMO_MODE=1` and the database passes the startup guard. Schedule it daily; `compose.demo.yaml` does (see the runbook below). It also runs inside the API container with `pnpm --filter @opencovers/api demo:cleanup`.
 
 ### Runbook: put the demo online
 
@@ -294,30 +291,20 @@ The API migrates the database when it starts. Never point `.env.demo` at a datab
 
 Optional repository variables: `DEMO_DIR` (the clone's path under the user's home, default `opencovers`) and `DEMO_URL` (default `https://demo.opencovers.dev`). A deploy fetches `main`, checks out the pushed commit, runs `docker compose ... up -d --build --wait --remove-orphans` and `pnpm db:migrate`, then checks the staff app, `/health` and `/api/demo/status` (it reports `enabled:true` only under `DEMO_MODE=1`) from the runner. Deploys never overlap. Run one by hand from Actions, `deploy-demo`, Run workflow. Add a required reviewer to the `demo` environment if you want a pause before each deploy.
 
-**7. Read the leads.** On the server, in the clone (`$dc` stands for this Compose command in the steps that follow):
+**7. Housekeeping.** The `cleanup` service runs `pnpm demo:cleanup` when the stack starts and every 24 hours after. To run it now: `$dc exec -T api pnpm demo:cleanup`. Its log is `$dc logs cleanup`.
 
-```sh
-dc="docker compose --env-file .env.demo -f compose.demo.yaml"
-$dc exec -T api pnpm --silent demo:leads > leads.csv
-$dc exec -T api pnpm --silent demo:leads --erase visitor@example.com
-```
-
-The CSV has `email,name,source,locale,created_at,last_seen_at,consent_text_version`, only for visitors who ticked the contact box and have not withdrawn. Handle it as personal data: keep it off shared drives and delete it when you are done. The `--erase` form answers an erasure request.
-
-**8. Housekeeping.** The `cleanup` service runs `pnpm demo:cleanup` when the stack starts and every 24 hours after. To run it now: `$dc exec -T api pnpm demo:cleanup`. Its log is `$dc logs cleanup`.
-
-**9. Reset the demo.** This deletes every sandbox, account and lead. Export the leads first if you want them.
+**8. Reset the demo.** This deletes every sandbox and account.
 
 ```sh
 $dc down -v
 $dc up -d --build --wait
 ```
 
-`down -v` removes only this project's volumes. To drop sandboxes and keep the leads, there is no shortcut: let `demo:cleanup` age the sandboxes out.
+`down -v` removes only this project's volumes.
 
-**10. Take the demo down.** Set `url` in `apps/site/demo.json` back to `""` and merge, so the site stops linking to it. Then on the server `$dc down` stops it and keeps the data, and `$dc down -v` deletes the data too. To stop automatic deploys, remove `DEMO_SSH_HOST` from the `demo` environment.
+**9. Take the demo down.** Set `url` in `apps/site/demo.json` back to `""` and merge, so the site stops linking to it. Then on the server `$dc down` stops it and keeps the data, and `$dc down -v` deletes the data too. To stop automatic deploys, remove `DEMO_SSH_HOST` from the `demo` environment.
 
-**Backups.** The stack does not back up the database. A demo can be rebuilt and sandboxes expire in 14 days. The exception is the leads: export them (step 7) on a schedule you choose. A `pg_dump` cron on the host is the next step if you want more.
+**Backups.** The stack does not back up the database. A demo can be rebuilt and sandboxes expire in 14 days. A `pg_dump` cron on the host is the next step if you want more.
 
 **What the repository checks do not cover.** A real deploy to a server, Let's Encrypt, Resend delivery and Google sign-in need your accounts. The repository checks cover the compose file, the Caddy host rules (`STAFF_HOST=demo.opencovers.dev WIDGET_HOST=book.demo.opencovers.dev bash scripts/check-caddy-widget.sh`) and the workflow's syntax.
 
@@ -325,12 +312,16 @@ $dc up -d --build --wait
 
 The demo's privacy notice is the "La demo" section of [`apps/site/public/privacidad.html`](../apps/site/public/privacidad.html) (live at `https://opencovers.dev/privacidad.html#demo`). It is the one source of truth: change the page, not a copy here. It is a draft for legal review, not legal advice. Its open points (controller, privacy mailbox, legal basis, international transfers, Resend region, log rotation) are listed in a comment at the top of the file and as `[...]` placeholders in the text.
 
-The consent text version is `v1` (`CONSENT_TEXT_VERSION` in `apps/api/src/demo/settings.ts`). A new wording needs a new version, which the sign-in form and `POST /api/demo/consent` must send together, and the page's "Si aceptas recibir novedades" paragraph must name it.
+> **Demo alojada.** Si pruebas la demo en demo.opencovers.dev guardamos tu dirección de correo (o la que verifica Google) para crear tu restaurante de prueba y enviarte el enlace de acceso. Tu restaurante de prueba y tu cuenta se borran tras 14 días sin acceso. Puedes pedir el borrado escribiendo a [contacto].
+>
+> **Hosted demo.** If you try the demo at demo.opencovers.dev we store your email address (or the one Google verifies) to create your sandbox restaurant and send you the sign-in link. The sandbox and your account are deleted after 14 days without sign-in. You can ask for erasure by writing to [contact].
+
+Resend (email) and Google (sign-in) process that data, so the privacy page should name them. The sign-in form shows "By continuing you accept the terms of use and the privacy policy" with links to `apps/site/public/condiciones.html` and `privacidad.html`. The terms page is a draft without lawyer review.
 
 #### Launch checklist
 
-- [ ] Legal review of the consent text (`v1`) and of the privacy notice (`privacidad.html`, section "La demo"), including the legal basis for storing leads and for sending news, and who the controller is. Do not open the demo to the public before this.
-- [ ] `privacidad.html` describes the demo (done), and its `[...]` placeholders are filled: the controller, a working privacy address, the legal basis, the transfers, the Resend region and the log rotation.
+- [ ] Legal review of the terms of use (`condiciones.html`) and of the privacy notice above, including who the controller is. Do not open the demo to the public before this.
+- [x] `privacidad.html` carries the demo wording, a working privacy address (`privacidad@opencovers.dev`), the legal bases, the transfers, the Resend region and the log rotation. The controller's tax id and address come from the `LEGAL_TAX_ID` and `LEGAL_ADDRESS` secrets at build time.
 - [ ] DNS records resolve, and ports 80 and 443 are open on the server and nothing else.
 - [ ] Resend domain verified, and a test magic link reaches a real inbox (check spam too).
 - [ ] Google client created, its redirect URI added, and a test sign-in works (or both Google variables left empty).

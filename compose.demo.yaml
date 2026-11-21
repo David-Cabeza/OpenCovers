@@ -86,7 +86,7 @@ services:
       retries: 5
       start_period: 30s
 
-  # Housekeeping, daily: deletes sandboxes idle for 14 days and leads past retention. The first run is at start-up,
+  # Housekeeping, daily: deletes sandboxes idle for 14 days. The first run is at start-up,
   # so a deploy also runs it. It shares the API image and its environment, and the CLI refuses to run unless DEMO_MODE=1.
   cleanup:
     image: opencovers-demo-api:local

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { shiftIso, todayIso } from "@/lib/date";
 import { useT } from "@/i18n";
-import { DEPLOY_YOURSELF_URL, dinerLink, formatExpiry, sendPendingConsent, type DemoStatus } from "@/lib/demo";
+import { DEPLOY_YOURSELF_URL, dinerLink, formatExpiry, type DemoStatus } from "@/lib/demo";
 import { cn } from "cn";
 import { useNavigation } from "@/components/layout/navigation";
 
@@ -13,10 +13,6 @@ import { useNavigation } from "@/components/layout/navigation";
 export function DemoBar({ status }: { status: DemoStatus }) {
   const t = useT();
   const { venueId, bookingKey, expiresAt, widgetOrigin } = status;
-  // The consent ticked on the sign-in form is recorded now that there is a session (ADR-0022, amendment of 2026-11-20).
-  useEffect(() => {
-    if (venueId) void sendPendingConsent();
-  }, [venueId]);
   if (!venueId) return null;
   return (
     <div role="region" aria-label={t("demo.bar.label")} className="print:hidden border-b border-primary/30 bg-primary/10 text-sm">
