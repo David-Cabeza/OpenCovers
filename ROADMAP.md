@@ -245,7 +245,7 @@ Exit criterion: a third party writes an adapter against the contract and passes 
 - CSV export and a scheduled report by email. [M]
 - A group entity above venues, with group roles and a group dashboard. [L, split it]
 - Shared guests across a group by opt-in, built on the Phase 10 decision. [M]
-- Cross-venue alternatives when a venue is full. [M]
+- Cross-venue alternatives when a venue is full. [M] First step: the owner links sibling venues and the widget offers their public availability on a full day, so venue isolation stays intact. Distance ordering needs venue coordinates and comes later. Needs an ADR first (guest data shared with the other venue changes the consent text).
 
 Exit criterion: a group of venues sees one dashboard and shares a guest book by choice.
 

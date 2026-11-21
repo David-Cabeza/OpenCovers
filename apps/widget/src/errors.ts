@@ -80,3 +80,44 @@ export function explainSelfService(failure: Failure): SelfServiceOutcome {
   if (failure.kind === "local") return SELF_SERVICE_UNEXPECTED;
   return SELF_SERVICE_BY_CODE[failure.code] ?? SELF_SERVICE_UNEXPECTED;
 }
+
+/**
+ * What the guest reads when the waitlist join fails. `booking_declined` reads as any unexpected failure, as on the
+ * booking (ADR-0018, C72): the join answers a blocked contact like the create, so the widget must not reveal it.
+ * `waitlist_unavailable` is one answer for every cause (closed day, waitlist or email off, a cap), and says no more.
+ */
+const WAITLIST_BY_CODE: Record<string, Explanation> = {
+  waitlist_unavailable: { message: "waitlist.error.unavailable" },
+  rate_limited: { message: "error.rateLimited" },
+  invalid_request: { message: "waitlist.error.invalid" },
+  venue_not_found: { message: "error.unavailable" },
+};
+
+const WAITLIST_UNEXPECTED: Explanation = { message: "waitlist.error.generic", phone: true };
+
+export function explainWaitlist(failure: Failure): Explanation {
+  if (failure.kind === "network") return { message: "error.network" };
+  if (failure.kind === "local") return WAITLIST_UNEXPECTED;
+  return WAITLIST_BY_CODE[failure.code] ?? WAITLIST_UNEXPECTED;
+}
+
+/**
+ * What the waitlist page does with a failed read or leave. `invalid`: the link does not work, for a reason the page
+ * never tells (C74). `changed`: staff seated or cancelled the entry, so the page reads it again.
+ */
+export type WaitlistOutcome = { kind: "invalid" } | { kind: "changed" } | { kind: "notice"; notice: Explanation };
+
+const WAITLIST_PAGE_UNEXPECTED: WaitlistOutcome = {
+  kind: "notice",
+  notice: { message: "waitlist.manage.error.generic", phone: true },
+};
+
+export function explainWaitlistPage(failure: Failure): WaitlistOutcome {
+  if (failure.kind === "network") return { kind: "notice", notice: { message: "error.network" } };
+  if (failure.kind === "local") return WAITLIST_PAGE_UNEXPECTED;
+  if (failure.code === "self_service_link_invalid") return { kind: "invalid" };
+  if (failure.code === "invalid_transition") return { kind: "changed" };
+  if (failure.code === "rate_limited") return { kind: "notice", notice: { message: "error.rateLimited" } };
+  if (failure.code === "invalid_request") return { kind: "notice", notice: { message: "waitlist.manage.error.generic" } };
+  return WAITLIST_PAGE_UNEXPECTED;
+}

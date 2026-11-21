@@ -40,3 +40,30 @@ export function checkDetails(name: string, contact: string): DetailErrors {
   if (!contactLooksValid(contact)) errors.contact = "validate.contact";
   return errors;
 }
+
+export interface WaitlistErrors {
+  name?: MessageId;
+  email?: MessageId;
+  window?: MessageId;
+}
+
+/** `HH:MM`, 24 hours, as `<input type="time">` gives it and the contract's `window` writes it. */
+const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * The waitlist form's first check (ADR-0021 section 3). The contact is an email only: a phone gets its own message,
+ * because the join sends an email. The window is both ends or neither, `from` before `to`, so it never crosses midnight.
+ */
+export function checkWaitlist(name: string, email: string, from: string, to: string): WaitlistErrors {
+  const errors: WaitlistErrors = {};
+  const trimmed = name.trim();
+  if (trimmed.length < 1 || trimmed.length > 100) errors.name = "validate.name";
+  if (!emailLooksValid(email)) {
+    errors.email = email.trim() !== "" && !email.includes("@") && contactLooksValid(email) ? "waitlist.phoneRefused" : "validate.email";
+  }
+  if (from || to) {
+    if (!from || !to || !CLOCK.test(from) || !CLOCK.test(to)) errors.window = "waitlist.window.pair";
+    else if (from >= to) errors.window = "waitlist.window.order";
+  }
+  return errors;
+}

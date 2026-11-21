@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
-import { selfServiceUrl, type Created, type Failure, type PublicApi, type PublicConfig, type PublicDay, type PublicSlot } from "./api";
+import { selfServiceUrl, type Created, type Joined, type Failure, type PublicApi, type PublicConfig, type PublicDay, type PublicSlot } from "./api";
 import { DayStrip } from "./DayStrip";
 import { addDays, formatDate, isoWeekday, todayLocal } from "./dates";
 import { explain, type Explanation } from "./errors";
@@ -11,6 +11,7 @@ import { createSubmitter, createTicketSource } from "./submit";
 import { noticeHref, watchTheme } from "./theme";
 import { Field, inputClass, primaryButton, secondaryButton, Section, VenueHeader } from "./ui";
 import { groupSlots, hasZoneChoice, zonesToShow } from "./zones";
+import { WaitlistJoin, WaitlistJoined, WaitlistOffer } from "./WaitlistJoin";
 import { checkDetails, withoutError, type DetailErrors } from "./validate";
 
 type Phase =
@@ -18,7 +19,8 @@ type Phase =
   | { kind: "unavailable" }
   | { kind: "load-failed" }
   | { kind: "booking"; config: PublicConfig }
-  | { kind: "done"; config: PublicConfig; created: Created };
+  | { kind: "done"; config: PublicConfig; created: Created }
+  | { kind: "waitlisted"; joined: Joined };
 
 type Times =
   | { kind: "pick-date" }
@@ -30,7 +32,10 @@ type Times =
 // `hidden`: the days route failed or is limited, so the form works from the date field alone.
 type Strip = { kind: "loading" } | { kind: "ready"; days: PublicDay[] } | { kind: "hidden" };
 
-type Step = "choose" | "summary" | "details";
+type Step = "choose" | "summary" | "details" | "waitlist";
+
+// A stable function, so the waitlist form keeps its idempotency key across renders.
+const newKey = () => crypto.randomUUID();
 
 type Sending = null | { kind: "checking" } | { kind: "sending" };
 
@@ -89,9 +94,11 @@ export function App({ api, t, locale }: { api: PublicApi; t: Translate; locale: 
           locale={locale}
           config={phase.config}
           onDone={(created) => setPhase({ kind: "done", config: phase.config, created })}
+          onWaitlisted={(joined) => setPhase({ kind: "waitlisted", joined })}
         />
       )}
       {phase.kind === "booking" && phase.config.linkResend && <LostLink api={api} t={t} />}
+      {phase.kind === "waitlisted" && <WaitlistJoined t={t} locale={locale} joined={phase.joined} />}
       {phase.kind === "done" && <Confirmation t={t} locale={locale} created={phase.created} />}
     </main>
   );
@@ -103,8 +110,9 @@ function BookingForm(props: {
   locale: string;
   config: PublicConfig;
   onDone(created: Created): void;
+  onWaitlisted(joined: Joined): void;
 }) {
-  const { api, t, locale, config, onDone } = props;
+  const { api, t, locale, config, onDone, onWaitlisted } = props;
   const ids = useId();
   const today = todayLocal();
   const maxDate = config.maxAdvanceDays === null ? undefined : addDays(today, config.maxAdvanceDays);
@@ -141,7 +149,7 @@ function BookingForm(props: {
   const nameRef = useRef<HTMLInputElement>(null);
   const contactRef = useRef<HTMLInputElement>(null);
 
-  const submit = useMemo(() => {
+  const { submit, takeTicket } = useMemo(() => {
     const tickets = createTicketSource({
       fetchChallenge: async () => {
         const result = await api.config();
@@ -153,14 +161,16 @@ function BookingForm(props: {
       },
     });
     tickets.offer(config.challenge);
-    return createSubmitter({
+    // One ticket source serves the booking and the waitlist join: a challenge is spent once, whichever uses it.
+    const submit = createSubmitter({
       takeTicket: tickets.take,
-      newKey: () => crypto.randomUUID(),
+      newKey,
       send: (key, fields, ticket) => {
         setSending({ kind: "sending" });
         return api.create(key, fields, ticket.challenge, ticket.solution);
       },
     });
+    return { submit, takeTicket: tickets.take };
   }, [api, config]);
 
   // The strip and the first date. A guest who already picked a date keeps it, and so does a changed party while
@@ -226,6 +236,9 @@ function BookingForm(props: {
   const stripDays = strip.kind === "ready" ? strip.days : [];
   const noFreeDay =
     party !== "more" && (times.kind === "closed" || (times.kind === "loaded" && times.times.length === 0 && !times.reason));
+  // The waitlist is offered only on a day the strip reports `full` for this party (ADR-0021 section 5).
+  const selectedDay = stripDays.find((day) => day.date === date);
+  const offerWaitlist = config.waitlistEnabled === true && party !== "more" && selectedDay?.status === "full";
   const freeDay = noFreeDay && date ? nextFreeDay(stripDays, date) : null;
   const bounds = pageBounds({ from: stripFrom, today, last: maxDate });
   const pick = (day: string) => {
@@ -382,6 +395,7 @@ function BookingForm(props: {
                 explain={(failure) => noticeText(explain(failure))}
                 onRetry={() => setReload((n) => n + 1)}
               />
+              {offerWaitlist && <WaitlistOffer t={t} party={party} onJoin={() => setStep("waitlist")} />}
               {freeDay && (
                 <button type="button" className={secondaryButton} onClick={() => pick(freeDay)}>
                   {t("strip.nextFree")}
@@ -396,7 +410,7 @@ function BookingForm(props: {
             </>
           )}
 
-          {party !== "more" && (
+          {party !== "more" && !noFreeDay && (
             <button type="submit" className={primaryButton}>
               {t("action.continue")}
             </button>
@@ -407,6 +421,23 @@ function BookingForm(props: {
   }
 
   const partySize = party === "more" ? 0 : party;
+  if (step === "waitlist" && party !== "more") {
+    return (
+      <WaitlistJoin
+        api={api}
+        t={t}
+        locale={locale}
+        config={config}
+        date={date}
+        party={party}
+        takeTicket={takeTicket}
+        tries={tries}
+        newKey={newKey}
+        onBack={() => setStep("choose")}
+        onJoined={onWaitlisted}
+      />
+    );
+  }
   if (step === "summary") {
     const edit = (field: string) => (
       <button
