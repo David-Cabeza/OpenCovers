@@ -32,7 +32,10 @@ export function formatDay(date: string, locale: string): string {
   );
 }
 
-/** An instant, such as `changeableUntil`, on the guest's own clock. */
+/**
+ * An instant, such as `changeableUntil`, on the guest's own clock. It is always 24-hour: the booking's own time
+ * comes from the API as `HH:MM`, so the two read alike. `es`, `ca`, `fr`, `de`, `it` and `pt` are 24-hour already.
+ */
 export function formatInstant(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, {
     weekday: "long",
@@ -40,6 +43,7 @@ export function formatInstant(iso: string, locale: string): string {
     month: "long",
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   }).format(new Date(iso));
 }
 
