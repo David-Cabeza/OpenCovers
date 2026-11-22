@@ -77,7 +77,7 @@ Franjas libres por servicio, reserva sobre mesas concretas, mover, cancelar o se
 Restricción de exclusión GiST en PostgreSQL que rechaza solapamientos de mesa para cualquier número de escritores concurrentes.
 
 ### 6.3 App de sala (staff)
-- **Agenda** — reservas del día con estado, atribución y la traza de cada reserva (por qué canal entró y quién la cambió).
+- **Agenda** — reservas del día con estado, atribución y la traza de cada reserva (por qué canal entró y quién o qué la cambió).
 - **Disponibilidad** — franjas por servicio.
 - **Plano visual** — ver abajo.
 - **Lista de espera y walk-ins** — los dos flujos físicos más comunes en sala.
@@ -115,10 +115,10 @@ Borrado de datos del cliente por ficha de cliente o por principal, con recuentos
 
 ### 6.11 Lista de espera pública, bloqueados y traza
 - **Lista de espera pública** — apuntarse, consultar y salirse, solo por API; la página en el widget aún no está en `main` (#293), y su texto es provisional.
-- **Lista de bloqueados** — el administrador impide reservar a un contacto concreto; la reserva se rechaza sin dejar rastro.
-- **Traza por canal** — cada reserva guarda por qué canal entró y quién la cambió.
+- **Lista de bloqueados** — el administrador impide reservar a un contacto concreto; la reserva nueva se rechaza con el error `booking_declined`. La lista guarda un hash del contacto, no el contacto.
+- **Traza por canal** — cada reserva guarda por qué canal entró (ADR-0023, C65) y quién o qué actuó en cada cambio; el nombre solo se muestra si es miembro del local.
 
-**Límite (no es una función):** el MCP remoto con OAuth es la parte 1 de 3, está apagado por defecto y todavía no hay endpoint `/mcp`.
+**Límite (no es una función):** el MCP remoto con OAuth es la parte 1 del issue #67, está apagado por defecto y todavía no hay endpoint `/mcp`.
 
 ---
 
