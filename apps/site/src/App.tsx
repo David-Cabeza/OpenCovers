@@ -369,7 +369,7 @@ function Intro() {
           <i style={{ background: "#28c840" }} />
           <b>OpenCovers — La Taberna del Faro</b>
         </div>
-        <video ref={videoRef} autoPlay muted loop playsInline preload="metadata" poster="/media/opencovers-demo-poster.webp" aria-label="Demo de OpenCovers: agenda del día, reservas desde el widget y el servidor MCP rechazando una doble reserva">
+        <video ref={videoRef} autoPlay muted loop playsInline preload="metadata" poster="/media/opencovers-demo-poster.webp" aria-label="Demo de OpenCovers: la agenda del día, una reserva hecha desde el widget que aparece en la agenda, el rechazo de una doble reserva en la misma mesa y hora, y un agente de IA que choca con la misma regla">
           <source src="/media/opencovers-demo.mp4" type="video/mp4" />
         </video>
         <button type="button" className="vtoggle" onClick={toggle}>
