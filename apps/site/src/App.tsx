@@ -235,12 +235,16 @@ function useStars() {
 
 const fmtStars = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
 
+/* Below this the count reads as a weak signal, so only the label shows. */
+const STARS_MIN = 50;
+
 function GithubButton() {
   const stars = useStars();
+  const showStars = stars !== null && stars >= STARS_MIN;
   return (
-    <a className="btn gh" href={REPO} aria-label={stars === null ? "GitHub" : `GitHub, ${stars} estrellas`}>
+    <a className="btn gh" href={REPO} aria-label={showStars ? `GitHub, ${stars} estrellas` : "GitHub"}>
       GitHub
-      {stars !== null && (
+      {showStars && (
         <span className="stars">
           <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden>
             <path d="M12 2.5l2.95 6.2 6.8.9-4.95 4.7 1.25 6.7L12 17.7l-6.05 3.3 1.25-6.7L2.25 9.6l6.8-.9z" />
