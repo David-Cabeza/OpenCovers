@@ -184,7 +184,7 @@ It creates the invented venue "La Taberna del Faro" through the HTTP API: two se
 
 ## Demo
 
-A quick walkthrough of the agenda and the floor plan.
+The GIF shows the engine refusing a second booking of the same table. The MP4 is a 30-second walkthrough in Spanish: the agenda, a booking from the widget, the same refusal in the staff app, and an MCP client hitting the same rule. The MCP scene is the real output of an `@opencovers/mcp` run, replayed in an animated terminal window, not a screen recording.
 
 <p align="center">
   <img src="docs/assets/opencovers-demo.gif" alt="OpenCovers demo: the engine refuses a second booking of the same table (Spanish captions)" width="720">
@@ -207,7 +207,7 @@ The staff app in action: the agenda, the floor plan, the floor editor, the waitl
   <img src="docs/assets/waitlist.webp" alt="Waitlist: two parties waiting for a table, each with a Seat button" width="700">
 </p>
 <p align="center">
-  <img src="docs/assets/online-booking.webp" alt="Setup, Online booking card: rules for online bookings, theme controls with a live preview, the public booking key and the embed code" width="560">
+  <img src="docs/assets/online-booking.webp" alt="Setup, Online booking card: rules for online bookings, theme controls with a live preview, and the waitlist switch" width="560">
 </p>
 <p align="center">
   <img src="docs/assets/team.webp" alt="Team screen: members with their roles, invitations and the audit log" width="700">
