@@ -97,7 +97,7 @@ export const notPlanned: string[] = [
 ];
 
 export const today: Today[] = [
-  { area: "Reservas y disponibilidad", now: "Crear, modificar, cancelar y sentar, sin dobles reservas, y saber por qué un hueco está cerrado.", target: "Reglas por capas y por canal.", phase: "10" },
+  { area: "Reservas y disponibilidad", now: "Crear, modificar, cancelar y sentar, sin dobles reservas, y saber por qué un hueco está cerrado. Política de reserva por local (antelación, límite por cliente y día, fechas bloqueadas) y vista previa al servicio en la app de sala.", target: "Reglas por capas y por canal.", phase: "10" },
   { area: "Mesas y sala", now: "Zonas, combinaciones, asignación automática y editor visual.", target: "Planos por servicio y estado en vivo.", phase: "10" },
   { area: "Clientes", now: "Una ficha por local, emparejada por email o teléfono, con fusión y lista de bloqueados por API. Aún sin pantalla en la app de sala.", target: "Ficha con historial, notas, alergias y etiquetas.", phase: "10" },
   { area: "Lista de espera", now: "Existe en la app de sala. La parte del cliente está construida: se apunta desde el widget en un día completo, con la casilla de consentimiento sin marcar, y consulta o sale desde una página propia. Viene apagada por defecto (un interruptor en Setup), con textos provisionales pendientes de revisión legal, la demo no la tiene activada y está probada con simulaciones, aún no de punta a punta en un navegador.", target: "Página con QR y aviso de mesa lista.", phase: "11" },
@@ -105,9 +105,9 @@ export const today: Today[] = [
   { area: "No-shows y pagos", now: "Cambios de estado y estado de reconfirmación.", target: "Depósitos, garantías y reembolsos.", phase: "12" },
   { area: "Mensajes", now: "Emails de confirmación, cambio, cancelación y reenvío del enlace, con la marca del local y desactivados por defecto. Los tres primeros llevan un archivo de calendario. Por ahora solo en español.", target: "Email, SMS y WhatsApp con automatizaciones.", phase: "13" },
   { area: "Opiniones", now: "Ninguna.", target: "Encuesta tras la visita con consentimiento.", phase: "13" },
-  { area: "Integraciones", now: "API, webhooks firmados, feed de eventos y MCP.", target: "Contrato de TPV, adaptadores y kit de conformidad.", phase: "14" },
+  { area: "Integraciones", now: "API, webhooks firmados con reintentos, feed de eventos y MCP. El local puede publicar, si quiere, su perfil público como JSON-LD de schema.org.", target: "Contrato de TPV, adaptadores y kit de conformidad.", phase: "14" },
   { area: "Informes", now: "Una vista de ritmo.", target: "Cubiertos, no-shows, origen y exportaciones.", phase: "15" },
-  { area: "Varios locales", now: "Locales aislados.", target: "Grupos, clientes compartidos por opt-in y roles.", phase: "15" },
+  { area: "Varios locales", now: "Locales aislados. Equipo con invitaciones, roles y registro de auditoría.", target: "Grupos, clientes compartidos por opt-in y roles.", phase: "15" },
   { area: "Eventos y ecosistema", now: "Ninguno.", target: "Consultas, menús prepagados y registro de plugins.", phase: "16" },
   { area: "Privacidad", now: "Borrado por un admin con recuento, retención, consentimiento y guía de refuerzo.", target: "Exportación de datos y ajustes de retención.", phase: "7, 10, 13" },
 ];
