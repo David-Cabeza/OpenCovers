@@ -87,6 +87,15 @@ describe("hosted demo link", () => {
     expect(screen.getByRole("link", { name: "Empieza ahora" })).toBeInTheDocument();
   });
 
+  it("explains the demo in the hero only when the switch is set", async () => {
+    const line = /^La demo te da un restaurante de prueba con datos inventados/;
+    const off = await renderWith("");
+    expect(screen.queryByText(line)).toBeNull();
+    off.unmount();
+    await renderWith(live);
+    expect(screen.getByText(line)).toHaveTextContent("con Google y se borra a los 14 días sin uso");
+  });
+
   it("shows the Spanish button with the demo URL when the switch is set", async () => {
     await renderWith(live);
     const links = screen.getAllByRole("link", { name: "Probar la demo" });

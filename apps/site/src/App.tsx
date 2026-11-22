@@ -28,16 +28,19 @@ const bands = [
     s: "Tu agente de IA puede reservar.",
     c: "El servidor MCP expone 18 herramientas (reservation.*, waitlist.* y venue.*) a Claude, Cursor y otros hosts. Se instala con npx.",
     on: "var(--f4)",
+    start: true,
   },
   {
     s: "Dibujas tu sala y la usas.",
     c: "Mesas redondas, ovaladas, cuadradas, rectangulares y largas con sillas, y elementos de sala como barra, cocina, columnas o chimenea. Arrastra, rota y redimensiona con ajuste a rejilla. La app de sala está en español e inglés, con modo claro y oscuro.",
     on: "var(--f3)",
+    start: true,
   },
   {
     s: "Es tuyo: código abierto, Apache-2.0.",
     c: "Auditable, extensible y sin lock-in. Se arranca con Node.js, pnpm y Docker.",
     on: "var(--f1)",
+    start: true,
   },
 ];
 
@@ -101,7 +104,7 @@ const modules = [
 
 const challenges = [
   { title: "Ficha de cliente en sala", tag: "producto", body: "Una pantalla con la ficha y el historial de visitas. El motor ya guarda un cliente por local." },
-  { title: "Revisar o añadir idiomas del widget", tag: "producto", body: "El widget habla siete idiomas: español, inglés, catalán, francés, alemán, italiano y portugués. Revisar una traducción o añadir otro idioma es una tarea pequeña y sin dependencias." },
+  { title: "Revisar o añadir idiomas del widget", tag: "producto", body: "El widget habla siete idiomas: español, inglés, catalán, francés, alemán, italiano y portugués. Los cinco últimos son traducción asistida por máquina y nadie nativo los ha revisado. Revisar una traducción o añadir otro idioma es una tarea pequeña y sin dependencias." },
   { title: "Temas declarativos", tag: "producto", body: "Paquetes de tema solo de datos que se puedan compartir. El local ya cambia colores, fuente y logo desde Setup." },
   { title: "Primer adaptador de TPV", tag: "integración", body: "Leer la reserva de una mesa, enviar la cuenta y liberar la mesa." },
   { title: "Pagos con Stripe y Redsys", tag: "motor", body: "Depósitos y garantías con la cuenta de pago de cada local." },
@@ -116,7 +119,7 @@ const faqs = [
   {
     t: "Estado",
     q: "¿En qué estado está?",
-    a: "Pre-alfa. El motor, la app de sala y el servidor MCP funcionan en local y pasan sus tests. El widget de reservas para la web del local está en curso. Hay una demo abierta en demo.opencovers.dev, donde cada visitante recibe un restaurante de prueba. Todavía no hay un servicio gestionado en producción.",
+    a: "Pre-alfa. El motor, la app de sala y el servidor MCP funcionan en local y pasan sus tests. El widget de reservas para la web del local está en curso. Hay una demo abierta en demo.opencovers.dev, donde cada visitante recibe un restaurante de prueba con datos inventados. Todavía no hay un servicio gestionado en producción y aún no recomendamos usarlo para las reservas de un restaurante real. Los textos legales de la demo no los ha revisado un abogado.",
   },
   {
     t: "Hosting",
@@ -310,13 +313,18 @@ function Hero() {
       <div className="copy">
         <h1 className="rv" style={d(0)}>Tu libro de reservas es tuyo</h1>
         <p className="lead rv" style={d(90)}>
-          Motor de reservas open source para restaurantes. El local lo usa con una app de sala y un widget de reserva; las plataformas y los agentes, por la API y el servidor MCP.
+          Motor de reservas open source para restaurantes. Sala trabaja con una app de agenda y plano; los clientes reservan desde tu web con un widget, hoy en pruebas; las plataformas y los agentes de IA entran por la API y el servidor MCP.
         </p>
         <div className="acts rv" style={d(180)}>
           {DEMO_URL && <a className="btn accent" href={DEMO_URL}>Probar la demo</a>}
           <a className={DEMO_URL ? "btn" : "btn accent"} href={`${REPO}#quick-start`}>Empieza ahora</a>
           <a className="btn ghost" href={REPO}>Ver en GitHub</a>
         </div>
+        {DEMO_URL && (
+          <p className="status rv" style={{ ...d(220), marginTop: 20 }}>
+            La demo te da un restaurante de prueba con datos inventados. Entras con tu correo o con Google y se borra a los 14 días sin uso.
+          </p>
+        )}
         <p className="status rv" style={d(260)}>Pre-alfa · Apache-2.0 · 18 herramientas MCP</p>
       </div>
     </section>
@@ -408,7 +416,7 @@ const SLOTS = [18, 19, 20, 21, 22];
 type Booking = { start: number; who: string };
 const fmt = (h: number) => `${h}:00`;
 const overlaps = (a: number, b: number) => Math.abs(a - b) < 2;
-const START_MSG = "Marta ya tiene la mesa de 20:00 a 22:00. Elige una hora que se solape y pulsa reservar.";
+const START_MSG = "Marta ya tiene la mesa de 20:00 a 22:00. Elige una hora que se solape y pulsa reservar. Es una simulación en tu navegador de la regla que aplica PostgreSQL.";
 
 function Showcase() {
   const initial: Booking[] = [{ start: 20, who: "Marta · 4" }];
@@ -423,7 +431,7 @@ function Showcase() {
     const clash = bookings.find((b) => overlaps(b.start, sel));
     if (clash) {
       setState("no");
-      setMsg(`Rechazada: la mesa 4 ya está ocupada de ${fmt(clash.start)} a ${fmt(clash.start + 2)}. Lo decide PostgreSQL, no la aplicación.`);
+      setMsg(`Rechazada: la mesa 4 ya está ocupada de ${fmt(clash.start)} a ${fmt(clash.start + 2)}. En el motor real lo decide PostgreSQL, no la aplicación.`);
     } else {
       setBookings((b) => [...b, { start: sel, who: "Tú · 2" }]);
       setState("ok");

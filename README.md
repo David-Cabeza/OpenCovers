@@ -6,7 +6,7 @@
 
 **The open-source reservations engine for restaurants — availability, bookings, tables, and the event feed, with an API and an MCP server.**
 
-<sub>Pre-alpha: it runs locally with tests. Public site: <a href="https://opencovers.dev">opencovers.dev</a>. A hosted demo is open at <a href="https://demo.opencovers.dev">demo.opencovers.dev</a>.</sub>
+<sub>Pre-alpha: it runs locally with tests and is not ready for a real venue. Public site: <a href="https://opencovers.dev">opencovers.dev</a>. A hosted demo, a sandbox with invented data, is open at <a href="https://demo.opencovers.dev">demo.opencovers.dev</a>.</sub>
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=node.js&logoColor=white)
@@ -58,7 +58,7 @@ The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over s
 
 ### 🧭 The room, covered
 
-Walk-ins, a waitlist, zones, and automatic table assignment. The engine seats guests now, holds them in a queue, and assigns tables so platforms and agents never think about floor plans. A waitlist entry is seated once, even when two requests try to seat it at the same time.
+Walk-ins, a waitlist, zones, and automatic table assignment. The engine seats guests now, holds them in a queue, and assigns tables so platforms and agents never think about floor plans. A waitlist entry is seated once, even when two requests try to seat it at the same time. The API also lets a guest join, read and leave a venue's waitlist through public routes; the widget page for it is not built yet.
 
 ### 🙋 Guests
 
@@ -244,7 +244,7 @@ docs/        the contract, ADRs, and requirements
 
 ## Hosted demo
 
-A hosted demo is open to the public at [demo.opencovers.dev](https://demo.opencovers.dev), with its [terms of use](https://opencovers.dev/condiciones.html) and [privacy notice](https://opencovers.dev/privacidad.html). With `DEMO_MODE=1` one deployment becomes a public demo where each visitor signs in with an emailed magic link, after a proof-of-work challenge, and gets a sandbox restaurant of their own, with caps on what it can hold and a sandbox bar and guided tour in the staff app. It runs on its own host and database, never next to real data, and it is off by default. See [ADR-0022](docs/adr/0022-hosted-demo-sandbox.md) and the [deploy guide](docs/deploy.md#hosted-demo). The public site links to it from the hero.
+A hosted demo is open to the public at [demo.opencovers.dev](https://demo.opencovers.dev), with its [terms of use](https://opencovers.dev/condiciones.html) and [privacy notice](https://opencovers.dev/privacidad.html). With `DEMO_MODE=1` one deployment becomes a public demo where each visitor signs in with an emailed magic link (after a proof-of-work challenge) or with Google, and gets a sandbox restaurant of their own, with caps on what it can hold and a sandbox bar and guided tour in the staff app. The terms and the privacy notice were written without a lawyer's review, and a sandbox is deleted after 14 days without a sign-in. It runs on its own host and database, never next to real data, and it is off by default. See [ADR-0022](docs/adr/0022-hosted-demo-sandbox.md) and the [deploy guide](docs/deploy.md#hosted-demo). The public site links to it from the hero.
 
 ## Deploy
 
@@ -252,11 +252,11 @@ OpenCovers has no hosting vendor dependency. It needs PostgreSQL and a Node.js p
 
 ## Status
 
-Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally. Of the 78 conformance cases, 54 pass (C1 to C4, C6 to C17, C19 to C39, C41, C42, C46 to C49, C53, C54, C56 and C59 to C66), signed webhooks included. 13 are partial (C5, C18, C40, C43 to C45, C50 to C52, C55, C57, C58 and C67). The other 11 (C68 to C78) specify the public waitlist of ADR-0021, which is not built yet. 17 cases (C39 to C55) specify the booking widget and self-service link, whose contract is written. Stages 2 to 7, 9, 10, 12 and 15 of ADR-0017 are built. They are the online booking settings, the public booking API for config, availability and create, the guest self-service link to read, change and cancel a booking, the booking widget with its framed page, the guest's self-service page, the Online booking card in Setup, the venue's theme (colors, corner radius, font and logo) in the widget and in Setup, the `embed.js` script that sizes the iframe and passes the host page's language, a "lost your link?" form that emails a new link when the venue has email on (placeholder email text), and the widget in seven languages, five of them waiting for native review. ADR-0021 adds the day strip, the zone choice and the summary step (stages 3, 6 and 9). Of those 17 cases, nine pass and eight are partial (C40, C43, C44, C45, C50, C51, C52, C55). The production stack is ready (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook), and the same images run the hosted demo, which is open only for internal testing until legal review. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
+Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally. Of the 78 conformance cases, 69 pass and 9 are partial (C43 to C45, C50, C51, C55, C67, C70 and C74), signed webhooks included. None is a gap. 17 cases (C39 to C55) specify the booking widget and self-service link: 11 pass and 6 are partial (C43 to C45, C50, C51 and C55). Stages 2 to 7, 9, 10, 12 and 15 of ADR-0017 are built. They are the online booking settings, the public booking API for config, availability and create, the guest self-service link to read, change and cancel a booking, the booking widget with its framed page, the guest's self-service page, the Online booking card in Setup, the venue's theme (colors, corner radius, font and logo) in the widget and in Setup, the `embed.js` script that sizes the iframe and passes the host page's language, a "lost your link?" form that emails a new link when the venue has email on (placeholder email text), and the widget in seven languages, five of them machine-assisted and waiting for native review. Stages 8, 11 and 13 wait on a legal review or an optional CAPTCHA, and stage 14 is deferred. ADR-0021 adds the day strip, the zone choice and the summary step to the widget. Its public waitlist is built in the API (C68 to C78: join, read, leave and the join email, migration 0047), but the widget page that lets a guest join is not built and the hosted demo does not turn it on. A production deployment is prepared (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook), and the same images run the [hosted demo](#hosted-demo), which is open to the public. Its terms of use and privacy notice were drafted without a lawyer's review. Do not rely on OpenCovers for a real venue's bookings yet. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
 
 ## Contributing
 
-OpenCovers uses flags — scoped tasks with acceptance criteria, dependencies, and a size. Anyone can propose or claim one. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [flag issue form](.github/ISSUE_TEMPLATE/flag.yml).
+OpenCovers uses flags — scoped tasks with acceptance criteria, dependencies, and a size. Anyone can propose or claim one. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [flag issue form](.github/ISSUE_TEMPLATE/flag.yml). Small tasks for newcomers carry the [good first issue](https://github.com/David-Cabeza/OpenCovers/labels/good%20first%20issue) label. Most of the code here is written by AI agents under the maintainer's review. An agent may contribute too, as long as the pull request says so (see [docs/collaboration-security.md](docs/collaboration-security.md)).
 
 ## Governance and security
 

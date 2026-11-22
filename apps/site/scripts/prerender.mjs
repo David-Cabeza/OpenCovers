@@ -29,7 +29,7 @@ const enMarker = "<!--demo-link-->";
 const en = await readFile(enPath, "utf8");
 if (!en.includes(enMarker)) throw new Error(`prerender: ${enMarker} not found in dist/en/index.html`);
 const enLink = demoUrl
-  ? `<p><a class="demo" href="${demoUrl}">Try the demo</a> <span class="muted">Sign in with your email and get a sandbox restaurant of your own.</span></p>`
+  ? `<p><a class="demo" href="${demoUrl}">Try the demo</a> <span class="muted">Sign in with an email link or with Google and get a sandbox restaurant of your own. It is deleted after 14 days without a visit.</span></p>`
   : "";
 await writeFile(enPath, en.replace(enMarker, () => enLink));
 if (demoUrl) {
