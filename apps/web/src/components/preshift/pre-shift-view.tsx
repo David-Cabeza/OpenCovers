@@ -22,7 +22,8 @@ import { useTables } from "@/hooks/use-tables";
 import { useWaitlist } from "@/hooks/use-waitlist";
 import { useT, type MessageKey } from "@/i18n";
 import type { Reconfirmation, WaitlistEntry } from "@/lib/api";
-import { longDate, todayIso } from "@/lib/date";
+import { longDate } from "@/lib/date";
+import { useDayParam } from "@/lib/day-param";
 import { buildPreShift, LARGE_PARTY_MIN, totalCovers, type PreShiftRow } from "@/lib/pre-shift";
 
 const ALL_SERVICES = "all";
@@ -36,7 +37,7 @@ const RECONFIRMATION: Record<Exclude<Reconfirmation, "none">, { labelKey: Messag
 
 export function PreShiftView({ venueId }: { venueId: string }) {
   const t = useT();
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useDayParam();
   const [service, setService] = useState(ALL_SERVICES);
   const agenda = useAgenda(venueId, date);
   const tables = useTables(venueId);

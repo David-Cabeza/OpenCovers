@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { GaugeIcon } from "lucide-react";
 import { cn } from "cn";
 import { DayNav } from "@/components/day-nav";
@@ -11,7 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePacing } from "@/hooks/use-pacing";
 import type { PacingSlot } from "@/lib/api";
 import { useT } from "@/i18n";
-import { longDate, todayIso } from "@/lib/date";
+import { longDate } from "@/lib/date";
+import { useDayParam } from "@/lib/day-param";
 import {
   HIGH_FROM,
   MEDIUM_FROM,
@@ -31,7 +31,7 @@ const LEVEL: Record<PacingLevel, { bar: string; text: string; swatch: string }> 
 export function PacingView({ venueId }: { venueId: string }) {
   const t = useT();
   const nav = useNavigation();
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useDayParam();
   const { data, isPending, isError, error, isRefetching, refetch } = usePacing(venueId, date);
 
   const pacing = data?.pacing ?? [];

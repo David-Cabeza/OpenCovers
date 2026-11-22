@@ -18,11 +18,12 @@ import { useFloorItems } from "@/hooks/use-floor-items";
 import { api, type FloorTable } from "@/lib/api";
 import { useT } from "@/i18n";
 import { nowTime, todayIso } from "@/lib/date";
+import { useDayParam } from "@/lib/day-param";
 
 export function FloorView({ venueId }: { venueId: string }) {
   const t = useT();
   const nav = useNavigation();
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useDayParam();
   const [time, setTime] = useState(nowTime());
   const [seatTable, setSeatTable] = useState<FloorTable | null>(null);
   const [moveFrom, setMoveFrom] = useState<FloorTable | null>(null);
