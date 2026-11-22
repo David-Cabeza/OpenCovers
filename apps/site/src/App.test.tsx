@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
@@ -169,5 +169,32 @@ describe("discoverability", () => {
     for (const [, path] of links) {
       expect(existsSync(resolve(process.cwd(), "../..", path)), base + path).toBe(true);
     }
+  });
+});
+
+describe("GitHub star count", () => {
+  const stubStars = (n: number) =>
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ stargazers_count: n }))));
+
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("hides the count and the number in the aria-label below 50 stars", async () => {
+    stubStars(2);
+    render(<App />);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
+    const buttons = screen.getAllByRole("link", { name: "GitHub" });
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const b of buttons) expect(b.querySelector(".stars")).toBeNull();
+    expect(screen.queryByRole("link", { name: /estrellas/ })).toBeNull();
+  });
+
+  it("shows the count and a matching aria-label from 50 stars", async () => {
+    stubStars(50);
+    render(<App />);
+    const buttons = await screen.findAllByRole("link", { name: "GitHub, 50 estrellas" });
+    for (const b of buttons) expect(b.querySelector(".stars")).toHaveTextContent("50");
   });
 });
