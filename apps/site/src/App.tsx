@@ -110,7 +110,7 @@ const challenges = [
   { title: "Medir el widget en PageSpeed Insights", tag: "rendimiento", body: "Una medición en móvil del widget incrustado, guardada en docs.", href: `${REPO}/issues/154` },
 ];
 
-const faqs = [
+export const faqs = [
   {
     t: "Alcance",
     q: "¿Es un CRM o un TPV?",

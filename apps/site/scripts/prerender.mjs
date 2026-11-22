@@ -9,12 +9,19 @@ const htmlPath = path.join(root, "dist/index.html");
 const ssrDir = path.join(root, "dist-ssr");
 const marker = '<div id="root"></div>';
 
-const { render } = await import(pathToFileURL(path.join(ssrDir, "entry-server.js")).href);
+const { render, renderFaqJsonLd } = await import(pathToFileURL(path.join(ssrDir, "entry-server.js")).href);
 const html = await readFile(htmlPath, "utf8");
 if (!html.includes(marker)) {
   throw new Error(`prerender: ${marker} not found in dist/index.html`);
 }
-await writeFile(htmlPath, html.replace(marker, () => `<div id="root">${render()}</div>`));
+// FAQPage structured data comes from the same `faqs` array as the visible FAQ.
+if (!html.includes("</head>")) throw new Error("prerender: </head> not found in dist/index.html");
+await writeFile(
+  htmlPath,
+  html
+    .replace(marker, () => `<div id="root">${render()}</div>`)
+    .replace("</head>", () => `${renderFaqJsonLd()}\n</head>`),
+);
 await rm(ssrDir, { recursive: true, force: true });
 
 // The demo link of the English page and llms.txt. apps/site/demo.json holds the one switch: empty, no page links
