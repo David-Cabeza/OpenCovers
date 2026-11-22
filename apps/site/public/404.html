@@ -7,6 +7,9 @@
     <title>Página no encontrada — OpenCovers</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#0e7c5a" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@700&family=Figtree:wght@400;600&display=swap" rel="stylesheet" />
     <style>
       :root { --bg: #f7f7f5; --ink: #000; --muted: #55554f; --accent: #0e7c5a; }
       @media (prefers-color-scheme: dark) {
@@ -17,6 +20,8 @@
       main { max-width: 36rem; margin: 0 auto; padding: 64px 16px 96px; }
       h1 { font-family: "League Spartan", "Helvetica Neue", Arial, sans-serif; letter-spacing: -0.03em; line-height: 1.05; font-size: clamp(2rem, 8vw, 3rem); margin: 0 0 16px; }
       p { margin: 0 0 16px; }
+      .brand { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 48px; color: var(--ink); text-decoration: none; font-family: "League Spartan", "Helvetica Neue", Arial, sans-serif; letter-spacing: -0.03em; font-size: 1.0625rem; }
+      .brand img { width: 30px; height: 30px; }
       a { color: var(--accent); overflow-wrap: anywhere; }
       .muted { color: var(--muted); }
       :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
@@ -24,6 +29,7 @@
   </head>
   <body>
     <main>
+      <a class="brand" href="/" aria-label="OpenCovers, inicio"><img src="/mark.svg" alt="" width="30" height="30" />OpenCovers</a>
       <h1>Esta página no existe</h1>
       <p>La dirección no es correcta o la página ya no está. <a href="/">Volver al inicio</a>.</p>
       <p class="muted" lang="en">This page does not exist. <a href="/en/">Go to the English page</a>.</p>
