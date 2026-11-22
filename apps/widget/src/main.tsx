@@ -28,7 +28,7 @@ if (guestPage === "waitlist") {
   root.render(
     <WaitlistPage
       api={token ? waitlistApi(token) : null}
-      fixedLocale={supportedLocale(new URLSearchParams(window.location.search).get("lang"))}
+      fixedLocale={servedLocale(new URLSearchParams(window.location.search).get("lang"), locale)}
       initialLocale={locale}
       newKey={() => crypto.randomUUID()}
     />,
