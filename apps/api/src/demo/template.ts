@@ -112,7 +112,8 @@ export const DEMO_TEMPLATE: DemoTemplate = {
     // ADR-0021, section 2: the two zones of the tables above, and the service named on each time.
     publicZones: ["Sala", "Terraza"],
     showServiceNames: true,
-    // ADR-0021, section 3: the public waitlist. The sandbox's email goes to its owner only (limits.ts mayEmail).
+    // ADR-0021, section 3: the public waitlist (`waitlistEnabled`) stays off here, at its default, until the legal
+    // review of its email and consent wording (Q9, Q11, docs/legal-review-waitlist.md).
   },
   guests: [
     { name: "Lucía Prado", local: "lucia.prado" },
