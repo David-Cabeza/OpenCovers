@@ -265,6 +265,10 @@ OpenCovers uses flags — scoped tasks with acceptance criteria, dependencies, a
 - [docs/collaboration-security.md](docs/collaboration-security.md) sets the rules for contributions, dependencies, and AI agents.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) applies to every project space.
 
+## Sponsors
+
+OpenCovers is free and open source, and it will stay that way. Sponsoring is optional. The money covers the running costs of the project, which today are about €37 a month: the server that hosts the [demo](#hosted-demo), Cloudflare, GitHub Pro and the opencovers.dev domain. Sponsors do not get a say in the roadmap or in how decisions are made, which are set out in [GOVERNANCE.md](GOVERNANCE.md). You can sponsor through [GitHub Sponsors](https://github.com/sponsors/David-Cabeza).
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
