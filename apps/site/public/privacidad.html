@@ -9,8 +9,8 @@
   3. Base jurídica de cada finalidad. Propuesta del equipo, sin validar (ya puestas en la página, sin revisión de abogado; sin casilla de novedades, la demo no guarda contactos):
      - cuenta, sesión y restaurante de prueba: ejecución de un contrato o medidas precontractuales a petición del visitante;
      - prevención de abuso (límites por IP y por correo, registro de sesión): interés legítimo.
-  4. Transferencias internacionales: Resend, Google, Cloudflare y GitHub pueden tratar datos fuera del EEE. No hemos verificado sus garantías (cláusulas tipo, marco UE-EE. UU.).
-  5. Región de Resend: el propietario confirma en el panel que el dominio está en la región UE (Irlanda). No consta en el repositorio.
+  4. Transferencias internacionales: verificado el 22 de noviembre de 2026 en las páginas oficiales de Resend, Google, Cloudflare, GitHub y Hetzner (DPF y cláusulas tipo; Resend guarda los datos de su cuenta en EE. UU. aunque se envíe desde Irlanda). Pendiente: el propietario debe concluir el contrato de encargo de tratamiento en su cuenta de Hetzner.
+  5. Región de Resend: el dominio envía desde la región UE (Irlanda), según el propietario, pero los datos de la cuenta de Resend están en EE. UU. (su página de regiones).
   6. Rotación de los registros de Docker en el servidor: 10 MB por archivo y 3 archivos, según lo configurado en el servidor. docs/deploy.md solo la recomienda.
   7. Datos de terceros en el restaurante de prueba: si el visitante comparte su widget, otra persona puede escribir sus datos. Revisar quién es responsable de esos datos y si basta este aviso.
   8. Autoridad de control: se ha puesto la AEPD porque el responsable está establecido en Madrid. Confirmar.
@@ -230,8 +230,9 @@
         </li>
         <li>
           <strong>Resend</strong> envía los correos, así que recibe la dirección de destino y el
-          contenido. Región de envío:
-          UE (Irlanda). Consulta la
+          contenido. Los correos salen desde la región UE (Irlanda), pero Resend es una empresa
+          estadounidense, tiene los datos de su cuenta en Estados Unidos y allí trata principalmente
+          los datos, con las garantías que se indican abajo. Consulta la
           <a href="https://resend.com/legal/privacy-policy">política de privacidad de Resend</a>.
         </li>
         <li>
@@ -241,8 +242,10 @@
           <a href="https://policies.google.com/privacy?hl=es">política de privacidad de Google</a>.
         </li>
         <li>
-          <strong>Cloudflare</strong> da el servicio de DNS del dominio. Los nombres de la demo
-          apuntan directamente al servidor, así que tu tráfico no pasa por Cloudflare. Consulta la
+          <strong>Cloudflare</strong> da el servicio de DNS del dominio y reenvía a mi buzón los
+          mensajes que envíes a privacidad@opencovers.dev, por lo que ese correo pasa por sus
+          servidores. Los nombres de la demo apuntan directamente al servidor, así que el tráfico de
+          la demo no pasa por Cloudflare. Consulta la
           <a href="https://www.cloudflare.com/es-es/privacypolicy/">política de privacidad de Cloudflare</a>.
         </li>
         <li>
@@ -250,10 +253,13 @@
         </li>
       </ul>
       <p>
-        Transferencias fuera del Espacio Económico Europeo: Resend, Google, Cloudflare y GitHub son
-        empresas con vínculos en Estados Unidos y pueden tratar datos fuera del EEE. Cada una
-        indica en su política las garantías que aplica (cláusulas contractuales tipo o el Marco de
-        Privacidad de Datos UE-EE. UU.). Puedes consultarlas en los enlaces de arriba.
+        Transferencias fuera del Espacio Económico Europeo: Resend, Google, Cloudflare y GitHub
+        tratan datos en Estados Unidos. Las cuatro declaran en sus textos oficiales que están
+        adheridas al Marco de Privacidad de Datos UE-EE. UU. y que, si ese marco dejara de valer,
+        aplican las cláusulas contractuales tipo de la Comisión Europea. Con Resend, el contrato de
+        encargo de tratamiento forma parte de sus condiciones, y con Cloudflare y GitHub también.
+        Hetzner trata los datos en la UE (Finlandia) y no hace transferencias de este tipo. Puedes
+        consultar cada garantía en los enlaces de arriba.
       </p>
 
       <h3>Para qué y con qué base</h3>
