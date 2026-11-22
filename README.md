@@ -54,7 +54,7 @@ A venue admin invites staff, changes their roles, and removes members from the s
 
 ### 🤖 An MCP server
 
-The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly. It is published on npm as [`@opencovers/mcp`](https://www.npmjs.com/package/@opencovers/mcp) and listed in the official MCP registry as `io.github.David-Cabeza/opencovers`. Run it with `npx -y @opencovers/mcp`. Every reservation and waitlist write tool except `reservation.erasure` takes an idempotency key, so an agent that retries after a timeout does not book twice. A repeated erasure erases nothing more. Each error tells the agent whether a retry can succeed.
+The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over stdio, so Claude, Cursor, and other MCP hosts can operate a venue directly. It is published on npm as [`@opencovers/mcp`](https://www.npmjs.com/package/@opencovers/mcp) and listed in the official MCP registry as `io.github.David-Cabeza/opencovers`. Run it with `npx -y @opencovers/mcp`. Every reservation and waitlist write tool except `reservation.erasure` takes an optional idempotency key. An agent that retries after a timeout sends the same key and does not book twice. A call without a key is a new write, so the server generates a fresh key for it. A repeated erasure erases nothing more. Each error tells the agent whether a retry can succeed. OAuth 2.1 authorization server behind `MCP_REMOTE`, off by default, part 1 of the remote MCP work (issue #67); no `/mcp` endpoint yet.
 
 ### 🧭 The room, covered
 
@@ -80,7 +80,7 @@ Every reservation event records which channel made the change (`widget`, `staff`
 
 ### 📧 Guest emails
 
-Through Resend, a guest gets an email when a booking is confirmed, changed or cancelled (by the guest or by the venue), and when they ask for a new self-service link. The venue gets a notice of each new booking. Booking emails go out once per reservation version, never duplicated. The confirmation, change and cancellation emails carry a calendar file. Each email shows the venue's logo and its primary colors, and falls back to the OpenCovers colors when the venue's pair is hard to read. The text follows the guest's booking language, then the venue's, and only the Spanish catalog ships so far ([ADR-0024](docs/adr/0024-guest-email-language.md)). A venue uses its own Resend account or the instance's, and email is off until the venue turns it on. The email text is a placeholder pending legal review.
+Through Resend, a guest gets an email when a booking is confirmed, changed or cancelled (by the guest or by the venue), and when they ask for a new self-service link. The venue gets a notice of each new booking. Booking emails go out once per reservation version, never duplicated. The confirmation, change and cancellation emails carry a calendar file. Each email shows the venue's logo and its primary colors, and falls back to the OpenCovers colors when the venue's pair is hard to read. The text follows the guest's booking language, then the venue's, and only the Spanish catalog ships so far ([ADR-0024](docs/adr/0024-guest-email-language.md)). A venue uses its own Resend account or the instance's, and email is off until the venue turns it on. Joining the public waitlist also sends the guest an email with a link to leave it, when the venue has email on (provisional text). The email text is a placeholder pending legal review.
 
 ### 🔔 Signed webhooks
 
@@ -95,7 +95,7 @@ An admin erases a guest's data by guest record or by principal, and gets back co
 ```mermaid
 flowchart LR
     subgraph web["Staff app · React + Tailwind (5173)"]
-        UI[Agenda · Availability · Setup]
+        UI[Agenda · Availability · Floor plan · Waitlist · Team · Setup]
     end
     subgraph api["API · Node.js + Hono (3000)"]
         AUTH[Better Auth · sessions]
@@ -187,7 +187,7 @@ It creates the invented venue "La Taberna del Faro" through the HTTP API: two se
 A quick walkthrough of the agenda and the floor plan.
 
 <p align="center">
-  <img src="docs/assets/opencovers-demo.gif" alt="OpenCovers demo: agenda, availability, double-booking protection, waitlist, floor editor, team and the booking widget (Spanish captions)" width="720">
+  <img src="docs/assets/opencovers-demo.gif" alt="OpenCovers demo: the engine refuses a second booking of the same table (Spanish captions)" width="720">
 </p>
 
 > [Download the full-resolution demo (MP4)](https://raw.githubusercontent.com/David-Cabeza/OpenCovers/main/docs/assets/opencovers-demo.mp4)
