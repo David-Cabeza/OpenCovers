@@ -129,7 +129,7 @@ const faqs = [
   {
     t: "Agentes",
     q: "¿Cómo lo opera un agente de IA?",
-    a: "Con el servidor MCP incluido: el mismo catálogo de 18 herramientas que la API, expuesto por stdio. Está publicado en npm: npx -y @opencovers/mcp.",
+    a: "Con el servidor MCP incluido: el mismo catálogo de 18 herramientas que la API, expuesto por stdio. Está publicado en npm y en el registro oficial de MCP: npx -y @opencovers/mcp.",
   },
   {
     t: "Pagos",
