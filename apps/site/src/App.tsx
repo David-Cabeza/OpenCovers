@@ -408,7 +408,7 @@ const SLOTS = [18, 19, 20, 21, 22];
 type Booking = { start: number; who: string };
 const fmt = (h: number) => `${h}:00`;
 const overlaps = (a: number, b: number) => Math.abs(a - b) < 2;
-const START_MSG = "Marta ya tiene la mesa de 20:00 a 22:00. Elige una hora que se solape y pulsa reservar.";
+const START_MSG = "Marta ya tiene la mesa de 20:00 a 22:00. Elige una hora que se solape y pulsa reservar. Es una simulación en tu navegador de la regla que aplica PostgreSQL.";
 
 function Showcase() {
   const initial: Booking[] = [{ start: 20, who: "Marta · 4" }];
@@ -423,7 +423,7 @@ function Showcase() {
     const clash = bookings.find((b) => overlaps(b.start, sel));
     if (clash) {
       setState("no");
-      setMsg(`Rechazada: la mesa 4 ya está ocupada de ${fmt(clash.start)} a ${fmt(clash.start + 2)}. Lo decide PostgreSQL, no la aplicación.`);
+      setMsg(`Rechazada: la mesa 4 ya está ocupada de ${fmt(clash.start)} a ${fmt(clash.start + 2)}. En el motor real lo decide PostgreSQL, no la aplicación.`);
     } else {
       setBookings((b) => [...b, { start: sel, who: "Tú · 2" }]);
       setState("ok");
