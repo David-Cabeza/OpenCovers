@@ -28,16 +28,19 @@ const bands = [
     s: "Tu agente de IA puede reservar.",
     c: "El servidor MCP expone 18 herramientas (reservation.*, waitlist.* y venue.*) a Claude, Cursor y otros hosts. Se instala con npx.",
     on: "var(--f4)",
+    start: true,
   },
   {
     s: "Dibujas tu sala y la usas.",
     c: "Mesas redondas, ovaladas, cuadradas, rectangulares y largas con sillas, y elementos de sala como barra, cocina, columnas o chimenea. Arrastra, rota y redimensiona con ajuste a rejilla. La app de sala está en español e inglés, con modo claro y oscuro.",
     on: "var(--f3)",
+    start: true,
   },
   {
     s: "Es tuyo: código abierto, Apache-2.0.",
     c: "Auditable, extensible y sin lock-in. Se arranca con Node.js, pnpm y Docker.",
     on: "var(--f1)",
+    start: true,
   },
 ];
 
@@ -101,7 +104,7 @@ const modules = [
 
 const challenges = [
   { title: "Ficha de cliente en sala", tag: "producto", body: "Una pantalla con la ficha y el historial de visitas. El motor ya guarda un cliente por local." },
-  { title: "Revisar o añadir idiomas del widget", tag: "producto", body: "El widget habla siete idiomas: español, inglés, catalán, francés, alemán, italiano y portugués. Revisar una traducción o añadir otro idioma es una tarea pequeña y sin dependencias." },
+  { title: "Revisar o añadir idiomas del widget", tag: "producto", body: "El widget habla siete idiomas: español, inglés, catalán, francés, alemán, italiano y portugués. Los cinco últimos son traducción asistida por máquina y nadie nativo los ha revisado. Revisar una traducción o añadir otro idioma es una tarea pequeña y sin dependencias." },
   { title: "Temas declarativos", tag: "producto", body: "Paquetes de tema solo de datos que se puedan compartir. El local ya cambia colores, fuente y logo desde Setup." },
   { title: "Primer adaptador de TPV", tag: "integración", body: "Leer la reserva de una mesa, enviar la cuenta y liberar la mesa." },
   { title: "Pagos con Stripe y Redsys", tag: "motor", body: "Depósitos y garantías con la cuenta de pago de cada local." },
@@ -116,7 +119,7 @@ const faqs = [
   {
     t: "Estado",
     q: "¿En qué estado está?",
-    a: "Pre-alfa. El motor, la app de sala y el servidor MCP funcionan en local y pasan sus tests. El widget de reservas para la web del local está en curso. Hay una demo abierta en demo.opencovers.dev, donde cada visitante recibe un restaurante de prueba. Todavía no hay un servicio gestionado en producción.",
+    a: "Pre-alfa. El motor, la app de sala y el servidor MCP funcionan en local y pasan sus tests. El widget de reservas para la web del local está en curso. Hay una demo abierta en demo.opencovers.dev, donde cada visitante recibe un restaurante de prueba con datos inventados. Todavía no hay un servicio gestionado en producción y aún no recomendamos usarlo para las reservas de un restaurante real. Los textos legales de la demo no los ha revisado un abogado.",
   },
   {
     t: "Hosting",
