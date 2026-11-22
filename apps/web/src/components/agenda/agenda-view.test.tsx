@@ -364,3 +364,25 @@ describe("AgendaView overview", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Today" })).not.toBeInTheDocument());
   });
 });
+
+describe("AgendaView day in the address", () => {
+  afterEach(() => {
+    resetApiMocks();
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("opens the day in ?date and writes the new day when navigating", async () => {
+    window.history.replaceState(null, "", "/?date=2026-12-06");
+    const api = mockApi({ [AGENDA]: () => ({ body: { reservations: [] } }) });
+    const user = userEvent.setup();
+    renderWithApp(<AgendaView venueId="v1" />);
+
+    await waitFor(() => expect(api.calls("GET", "/v1/venues/v1/agenda")).toHaveLength(1));
+    expect(api.calls("GET", "/v1/venues/v1/agenda")[0].path).toContain("date=2026-12-06");
+
+    await user.click(screen.getByRole("button", { name: "Next day" }));
+
+    await waitFor(() => expect(window.location.search).toBe("?date=2026-12-07"));
+    await waitFor(() => expect(api.calls("GET", "/v1/venues/v1/agenda").at(-1)?.path).toContain("date=2026-12-07"));
+  });
+});

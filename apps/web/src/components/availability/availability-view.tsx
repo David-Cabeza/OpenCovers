@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAvailability } from "@/hooks/use-availability";
 import { useT } from "@/i18n";
-import { longDate, todayIso } from "@/lib/date";
+import { longDate } from "@/lib/date";
+import { useDayParam } from "@/lib/day-param";
 import type { AvailabilitySlot } from "@/lib/api";
 import { SlotExplanation } from "@/components/availability/slot-explanation";
 import { NewReservationDialog } from "@/components/reservation/new-reservation-dialog";
@@ -18,7 +19,7 @@ import { NewReservationDialog } from "@/components/reservation/new-reservation-d
 export function AvailabilityView({ venueId }: { venueId: string }) {
   const t = useT();
   const nav = useNavigation();
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useDayParam();
   const [partySize, setPartySize] = useState(2);
   const [slot, setSlot] = useState<{ time: string } | null>(null);
   const { data, isPending, isError, error, isRefetching, refetch } = useAvailability(venueId, date, partySize);
