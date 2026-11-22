@@ -11,7 +11,7 @@ staff=${STAFF_HOST:-staff.test}
 widget=${WIDGET_HOST:-book.test}
 name="oc-caddy-check-$$"
 cleanup() {
-  docker rm -f "$name-api" "$name-caddy" >/dev/null 2>&1 || true
+  docker rm -f "$name-api" "$name-caddy" "$name-caddy-demo" >/dev/null 2>&1 || true
   docker network rm "$name" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -43,17 +43,22 @@ require("http").createServer((req, res) => {
 docker run -d --name "$name-caddy" --network "$name" --network-alias caddy \
   -e "SITE_ADDRESS=http://$staff" -e "WIDGET_ADDRESS=http://$widget" \
   -v "$caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine >/dev/null
+# The same file with NOINDEX=on, as compose.demo.yaml sets it for the demo hosts.
+docker run -d --name "$name-caddy-demo" --network "$name" --network-alias caddy-demo \
+  -e "SITE_ADDRESS=http://$staff" -e "WIDGET_ADDRESS=http://$widget" -e NOINDEX=on \
+  -v "$caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine >/dev/null
 sleep 2
 
 # Prints the status line, the headers and the body of one request through Caddy, a 404 included. With a third
 # argument it POSTs that many bytes, with a Content-Length, or chunked when the fourth argument is "chunked".
 get() {
-  docker exec "$name-api" node -e '
+  docker exec -e "TARGET=${TARGET:-caddy}" "$name-api" node -e '
 const [host, path, size, mode] = process.argv.slice(1);
+const target = process.env.TARGET || "caddy";
 const headers = { Host: host, "X-Forwarded-For": "203.0.113.9" };
 const body = size ? Buffer.alloc(Number(size), 32) : null;
 if (body && mode !== "chunked") headers["Content-Length"] = body.length;
-const req = require("http").request({ host: "caddy", port: 80, path, method: body ? "POST" : "GET", headers }, (res) => {
+const req = require("http").request({ host: target, port: 80, path, method: body ? "POST" : "GET", headers }, (res) => {
   let text = "";
   res.on("data", (chunk) => (text += chunk));
   res.on("end", () => {
@@ -137,5 +142,26 @@ for path in / /r/ /api/auth/get-session /v1/venues/x/reservations /index.html; d
   out=$(get "$widget" "$path")
   check "widget $path: 404, not proxied" "HTTP/1.1 404" "$out" yes
 done
+
+# Search engines (hosted demo). Default Caddy: no header, /robots.txt is the staff app's, not ours. NOINDEX=on: both hosts.
+for host in "$staff" "$widget"; do
+  for path in /robots.txt /w/pk_AAAAAAAAAAAAAAAAAAAAAA /nothing; do
+    out=$(get "$host" "$path")
+    check "default $host $path: no X-Robots-Tag" "X-Robots-Tag" "$out" no
+  done
+  out=$(get "$host" /robots.txt)
+  check "default $host /robots.txt: no Disallow" "Disallow" "$out" no
+  for path in /robots.txt /w/pk_AAAAAAAAAAAAAAAAAAAAAA /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA /r /nothing; do
+    out=$(TARGET=caddy-demo get "$host" "$path")
+    check "demo $host $path: X-Robots-Tag noindex, nofollow" "X-Robots-Tag: noindex, nofollow" "$out" yes
+  done
+  out=$(TARGET=caddy-demo get "$host" /robots.txt)
+  check "demo $host /robots.txt: 200" "HTTP/1.1 200" "$out" yes
+  check "demo $host /robots.txt: text/plain" "Content-Type: text/plain" "$out" yes
+  check "demo $host /robots.txt: Disallow: /" "^Disallow: /$" "$out" yes
+  check "demo $host /robots.txt: never reaches the API" "upstream" "$out" no
+done
+out=$(TARGET=caddy-demo get "$staff" /api/auth/get-session)
+check "demo staff /api/*: X-Robots-Tag on proxied answers" "X-Robots-Tag: noindex, nofollow" "$out" yes
 
 [ "$failures" -eq 0 ] && echo "all checks passed" || { echo "$failures check(s) failed"; exit 1; }

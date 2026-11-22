@@ -17,6 +17,20 @@
 	@https protocol https
 	header @https Strict-Transport-Security "max-age=31536000"
 
+	# The hosted demo only (NOINDEX=on in compose.demo.yaml): fake data, kept out of search engines. Off, nothing changes.
+	@noindex expression `"{$NOINDEX:off}" == "on"`
+	header @noindex X-Robots-Tag "noindex, nofollow"
+	@noindex_robots {
+		expression `"{$NOINDEX:off}" == "on"`
+		path /robots.txt
+	}
+	handle @noindex_robots {
+		header Content-Type "text/plain; charset=utf-8"
+		respond `User-agent: *
+Disallow: /
+` 200
+	}
+
 	handle /health {
 		reverse_proxy {$API_UPSTREAM:api:3000}
 	}
@@ -76,6 +90,20 @@
 
 	@https protocol https
 	header @https Strict-Transport-Security "max-age=31536000"
+
+	# The hosted demo only (NOINDEX=on in compose.demo.yaml): fake data, kept out of search engines. Off, nothing changes.
+	@noindex expression `"{$NOINDEX:off}" == "on"`
+	header @noindex X-Robots-Tag "noindex, nofollow"
+	@noindex_robots {
+		expression `"{$NOINDEX:off}" == "on"`
+		path /robots.txt
+	}
+	handle @noindex_robots {
+		header Content-Type "text/plain; charset=utf-8"
+		respond `User-agent: *
+Disallow: /
+` 200
+	}
 
 	handle /w/* {
 		reverse_proxy {$API_UPSTREAM:api:3000}

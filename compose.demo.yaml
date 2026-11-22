@@ -112,6 +112,8 @@ services:
       # The demo always has a widget host: the sandbox's booking page is half of the story.
       WIDGET_ADDRESS: ${WIDGET_ADDRESS:-book.demo.opencovers.dev}
       MCP_REMOTE: ${MCP_REMOTE:-off}
+      # The demo hosts hold fake data: Caddy sends X-Robots-Tag and answers /robots.txt with Disallow: / on both.
+      NOINDEX: "on"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
       interval: 10s

@@ -237,6 +237,8 @@ pnpm demo:cleanup             # needs DEMO_MODE=1 and passes the startup guard; 
 
 `demo:cleanup` deletes sandboxes whose owner last signed in over 14 days ago, with their accounts, one transaction per sandbox, so a failure is retried by the next run. It also deletes accounts with no sandbox that are older than 14 days with no recent session (a refused or failed first sign-in). It never deletes a venue that has no `demo_sandbox` row, nor an account that is a member of such a venue, and it refuses to run unless `DEMO_MODE=1` and the database passes the startup guard. Schedule it daily; `compose.demo.yaml` does (see the runbook below). It also runs inside the API container with `pnpm --filter @opencovers/api demo:cleanup`.
 
+**Search engines.** `compose.demo.yaml` sets `NOINDEX=on` on the `web` service, so Caddy adds `X-Robots-Tag: noindex, nofollow` to every answer of the staff and widget hosts and serves `/robots.txt` as `Disallow: /` on both; with `NOINDEX` unset, as in `compose.prod.yaml`, the Caddyfile behaves as before.
+
 ### Runbook: put the demo online
 
 The repository ships the pieces. The project's own demo is `demo.opencovers.dev`, with the booking widget at `book.demo.opencovers.dev`, on one VPS with Docker. These are defaults. Change them in `.env.demo` and in the repository variables below.
