@@ -15,7 +15,8 @@
 }
 
 /* Dark defaults, only on the widget's own pages or an embed that asked for them (`main.tsx` sets data-scheme) and only while the venue's theme sets no
-   color, so a venue's palette is never mixed with these. The primary and its text are chosen as a pair. */
+   color, so a venue's palette is never mixed with these. The primary and its text are chosen as a pair.
+   `system` follows the visitor's setting. `dark` is the demo's Client link, which carries the staff app's look; keep both blocks equal. */
 @media (prefers-color-scheme: dark) {
   :root[data-scheme="system"] {
     color-scheme: dark;
@@ -28,6 +29,18 @@
     --oc-border: #4a4640;
     --oc-danger: #ff8f80;
   }
+}
+
+:root[data-scheme="dark"] {
+  color-scheme: dark;
+  --oc-primary: #6fcf9f;
+  --oc-on-primary: #0d2018;
+  --oc-background: #181715;
+  --oc-surface: #262420;
+  --oc-text: #f1eee8;
+  --oc-muted: #a8a39b;
+  --oc-border: #4a4640;
+  --oc-danger: #ff8f80;
 }
 
 @theme inline {

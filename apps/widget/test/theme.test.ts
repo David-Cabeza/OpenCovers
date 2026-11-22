@@ -3,7 +3,7 @@ import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { applyTheme, applyThemeToDocument, followsSystemScheme, FONT_STACKS, isFramed, logoSrc, setsColors, offersDarkLook, themeVars, watchTheme } from "../src/theme";
+import { applyTheme, applyThemeToDocument, followsSystemScheme, forcedScheme, FONT_STACKS, isFramed, logoSrc, setsColors, offersDarkLook, themeVars, watchTheme } from "../src/theme";
 import { Logo, VenueHeader } from "../src/ui";
 
 const css = readFileSync(path.resolve(import.meta.dirname, "../src/styles.css"), "utf8");
@@ -142,6 +142,15 @@ describe("dark mode", () => {
     expect(darkBlock).toContain("color-scheme: dark");
   });
 
+  it("holds the same dark values for a forced dark page as for the system one", () => {
+    const values = (selector: string) => {
+      const at = css.indexOf(selector);
+      return css.slice(css.indexOf("{", at) + 1, css.indexOf("}", at)).replace(/\s+/g, " ").trim();
+    };
+    expect(values(':root[data-scheme="dark"]')).toBe(values(':root[data-scheme="system"]'));
+    expect(css).toMatch(/@media \(prefers-color-scheme: dark\) \{\s*:root\[data-scheme="system"\]/);
+  });
+
   it("counts a theme as setting colors only when it sets a valid color", () => {
     expect(setsColors(undefined)).toBe(false);
     expect(setsColors({})).toBe(false);
@@ -172,6 +181,16 @@ describe("dark mode", () => {
     expect(followsSystemScheme({ ...frame, location: { search: "?lang=en&scheme=auto" } as Location })).toBe(true);
   });
 
+  it("forces a look from ?scheme=dark|light on the page's own address only", () => {
+    const own = { self: 1, top: 1 } as unknown as Window;
+    const at = (search: string, win = own) => ({ ...win, location: { search } as Location });
+    expect(forcedScheme(at("?scheme=dark"))).toBe("dark");
+    expect(forcedScheme(at("?lang=en&scheme=light"))).toBe("light");
+    for (const search of ["", "?scheme=auto", "?scheme=DARK", "?scheme=", "?scheme=blue"]) expect(forcedScheme(at(search)), search).toBeNull();
+    const frame = { self: 1, top: 2 } as unknown as Window;
+    expect(forcedScheme(at("?scheme=dark", frame))).toBeNull();
+  });
+
   function docFor(scheme: string | undefined) {
     const set: Record<string, string> = {};
     const dataset: DOMStringMap = scheme ? { scheme } : {};
@@ -188,6 +207,23 @@ describe("dark mode", () => {
     };
     return { doc: { documentElement }, set, dataset };
   }
+
+  it("shows the dark palette of a forced dark page whatever the system says, and light for a forced light one", () => {
+    const theme = { darkColors: { background: "#000000" }, colors: { background: "#ffffff" } };
+    const forcedDark = docFor("dark");
+    applyThemeToDocument(theme, forcedDark.doc, false);
+    expect(forcedDark.set["--oc-background"]).toBe("#000000");
+    const forcedLight = docFor("light");
+    applyThemeToDocument(theme, forcedLight.doc, true);
+    expect(forcedLight.set["--oc-background"]).toBe("#ffffff");
+  });
+
+  it("keeps a forced dark page light when the venue sets colors and no dark look", () => {
+    const { doc, set, dataset } = docFor("dark");
+    applyThemeToDocument({ colors: { background: "#ffffff" } }, doc);
+    expect(set["--oc-background"]).toBe("#ffffff");
+    expect(dataset.scheme).toBeUndefined();
+  });
 
   it("keeps following the system when the theme sets no color", () => {
     const { doc, set, dataset } = docFor("system");

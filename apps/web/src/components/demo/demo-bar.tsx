@@ -7,6 +7,7 @@ import { shiftIso, todayIso } from "@/lib/date";
 import { useT } from "@/i18n";
 import { DEPLOY_YOURSELF_URL, dinerLink, formatExpiry, type DemoStatus } from "@/lib/demo";
 import { cn } from "cn";
+import { useTheme } from "@/lib/theme";
 import { useNavigation } from "@/components/layout/navigation";
 
 /** The fixed bar of a demo sandbox (ADR-0022, decisions 2, 3 and 9): expiry, the Restaurant | Diner switch, the tour. */
@@ -38,6 +39,7 @@ export function DemoBar({ status }: { status: DemoStatus }) {
 
 function ViewSwitch({ bookingKey, widgetOrigin }: { bookingKey: string | null; widgetOrigin: string | null }) {
   const t = useT();
+  const { resolvedTheme } = useTheme();
   const base = "inline-flex h-8 items-center gap-1.5 px-3 text-sm font-medium";
   return (
     <div role="group" aria-label={t("demo.bar.view")} className="inline-flex overflow-hidden rounded-md border bg-background">
@@ -46,7 +48,7 @@ function ViewSwitch({ bookingKey, widgetOrigin }: { bookingKey: string | null; w
       </span>
       {bookingKey ? (
         <a
-          href={dinerLink(bookingKey, widgetOrigin)}
+          href={dinerLink(bookingKey, widgetOrigin, resolvedTheme)}
           target="_blank"
           rel="noreferrer"
           className={cn(base, "hover:bg-accent")}

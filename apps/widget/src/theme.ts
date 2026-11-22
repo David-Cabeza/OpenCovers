@@ -85,6 +85,16 @@ export function followsSystemScheme(win: Pick<Window, "self" | "top" | "location
   return !isFramed(win) || new URLSearchParams(win.location.search).get("scheme") === "auto";
 }
 
+/**
+ * The look a visitor's link forces on the widget's own page: `?scheme=dark` or `?scheme=light`, which the demo's
+ * Client link carries from the staff app. Never in an iframe, where the embedding site decides. Any other value is ignored.
+ */
+export function forcedScheme(win: Pick<Window, "self" | "top" | "location">): "dark" | "light" | null {
+  if (isFramed(win)) return null;
+  const value = new URLSearchParams(win.location.search).get("scheme");
+  return value === "dark" || value === "light" ? value : null;
+}
+
 type ThemeStyle = Pick<CSSStyleDeclaration, "setProperty" | "removeProperty">;
 type ThemeDocument = { documentElement: Pick<HTMLElement, "dataset"> & { style: ThemeStyle } };
 
@@ -101,7 +111,8 @@ type ThemeDocument = { documentElement: Pick<HTMLElement, "dataset"> & { style: 
  */
 export function applyThemeToDocument(theme: unknown, doc: ThemeDocument, dark = false): void {
   const root = doc.documentElement;
-  const palette = dark && root.dataset.scheme === "system" && offersDarkLook(theme) ? "dark" : "light";
+  const scheme = root.dataset.scheme;
+  const palette = (scheme === "dark" || (dark && scheme === "system")) && offersDarkLook(theme) ? "dark" : "light";
   for (const name of [...Object.values(COLOR_VARS), "--oc-radius", "--oc-font"]) root.style.removeProperty(name);
   for (const [name, value] of themeVars(theme, palette)) root.style.setProperty(name, value);
   if (setsColors(theme) && !offersDarkLook(theme)) delete root.dataset.scheme;
