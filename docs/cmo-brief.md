@@ -1,6 +1,6 @@
 # OpenCovers — Brief para el CMO
 
-> Documento interno para coordinar la difusión de OpenCovers: qué es, qué hace hoy, a quién se dirige, qué mensajes usar, qué activos hay y cómo contarlo. Fecha de redacción: noviembre de 2026; revisado el 21 de noviembre de 2026.
+> Documento interno para coordinar la difusión de OpenCovers: qué es, qué hace hoy, a quién se dirige, qué mensajes usar, qué activos hay y cómo contarlo. Fecha de redacción: noviembre de 2026; revisado el 22 de noviembre de 2026.
 
 ---
 
@@ -10,7 +10,7 @@ OpenCovers es el **motor de reservas open source para restaurantes**: disponibil
 
 La idea central es una sola: **el libro de reservas debe ser independiente**. Hoy la mayoría de sistemas de reservas están atados a un CRM, a un TPV o a un único proveedor. Si el restaurante cambia de front, de proveedor de mensajería o de plataforma, arriesga perder su libro de reservas. OpenCovers separa el motor de todo lo demás.
 
-Estado actual: **pre-alfa**. Funciona en local, con casi 90 ficheros de test de la API, tests del MCP y un contrato con casos de conformidad (`docs/contract/conformance-status.md`). El sitio público está en `opencovers.dev`. Hay una demo alojada que funciona pero sigue interna hasta la revisión legal del aviso y el consentimiento; todavía no hay despliegue público de la API para terceros.
+Estado actual: **pre-alfa**. Funciona en local, con casi 90 ficheros de test de la API, tests del MCP y un contrato con casos de conformidad (`docs/contract/conformance-status.md`). El sitio público está en `opencovers.dev`. Hay una demo alojada abierta al público en `demo.opencovers.dev`, con condiciones y aviso de privacidad redactados sin abogado; todavía no hay despliegue público de la API para terceros.
 
 ---
 
@@ -20,7 +20,7 @@ OpenCovers tiene cuatro piezas que comparten un mismo contrato:
 
 1. **El motor (API)** — disponibilidad, reservas, modificaciones, cancelaciones, agenda, eventos y borrado. La regla de no-doble-reserva la impone la base de datos (PostgreSQL), no el código de aplicación.
 2. **La app de sala (staff)** — interfaz web para el equipo del restaurante, en español e inglés y con modo claro y oscuro: agenda, disponibilidad, plano visual, lista de espera, walk-ins, previo al servicio, ritmo de servicio, equipo con invitaciones y configuración.
-3. **El widget de reserva** — la página que el local pone en su web para que el comensal reserve: tira de días con el estado de cada día, siete idiomas (es, en, ca, fr, de, it, pt), modo oscuro opcional y colores, tipografía y logo del local. Además, un enlace de autoservicio para que el comensal vea, cambie o cancele su reserva.
+3. **El widget de reserva** — la página que el local pone en su web para que el comensal reserve: tira de días con el estado de cada día, siete idiomas (es, en, ca, fr, de, it, pt; catalán, francés, alemán, italiano y portugués esperan revisión de un hablante nativo), modo oscuro opcional y colores, tipografía y logo del local. Además, un enlace de autoservicio para que el comensal vea, cambie o cancele su reserva.
 4. **El servidor MCP** — el mismo catálogo de operaciones, por stdio, para que asistentes de IA (Claude, Cursor y otros) operen un local directamente. Está publicado en npm y en el registro de MCP.
 
 Todo es **open source** (Apache-2.0). Cualquier plataforma, agente o desarrollador lee la disponibilidad, crea una reserva, la mueve o la cancela por el mismo camino.
@@ -44,7 +44,7 @@ Tres públicos, por orden de madurez:
 2. **Plataformas y agregadores** (reservas, delivery, conserjería, hoteles) que quieren integrar un motor de reservas sin construirlo.
 3. **Desarrolladores y builders de agentes de IA** que necesitan un backend de reservas listo para operar por API o MCP.
 
-En la fase actual (pre-alfa, con demo interna), el público realista para la difusión es el **3 y el 2**: comunidad técnica y early adopters. El público 1 llega cuando la demo se abra al público y haya un despliegue de referencia.
+En la fase actual (pre-alfa, con demo abierta), el público realista para la difusión es el **3 y el 2**: comunidad técnica y early adopters. El público 1 llega cuando haya un despliegue de referencia.
 
 ---
 
@@ -88,8 +88,8 @@ Restricción de exclusión GiST en PostgreSQL que rechaza solapamientos de mesa 
 
 ### 6.4 Plano visual (el activo más "mostrable")
 El plano de sala es visual y manipulable:
-- Mesas redondas, cuadradas y rectangulares **con sillas dibujadas**.
-- Elementos de sala dibujados como **símbolos arquitectónicos** (barra, cocina, pared, ventana, puerta, planta, mostrador, entrada).
+- Mesas en cinco formas (redonda, cuadrada, rectangular, ovalada y larga) **con sillas dibujadas**.
+- Veinte tipos de elemento de sala dibujados como **símbolos arquitectónicos** (barra, cocina, pared, ventana, puerta, planta, mostrador, entrada, sofá, columna, escalera, alfombra, chimenea, baños y más).
 - **Arrastrar, rotar (90°) y redimensionar** con ajuste a rejilla (snap).
 - Suelo de **madera clara** para dar ambiente.
 
@@ -102,7 +102,7 @@ Disponibilidad por zona (terraza, salón…) y asignación automática de mesa c
 Antelación mínima (lead time), rejilla de franjas (slot grid) y último pase (last seating), configurables por local.
 
 ### 6.7 Correo de confirmación
-Confirmaciones, cancelaciones y avisos vía Resend, uno por versión de reserva (nunca duplicados). Cada local trae su propia cuenta; desactivado hasta que se habilite.
+Confirmaciones, cancelaciones, cambios y avisos vía Resend, uno por versión de reserva (nunca duplicados), con la marca del local (logo y color) y un fichero de calendario (.ics) adjunto. El texto existe solo en español (catálogo `es`); cualquier otro idioma cae a español. Cada local trae su propia cuenta; desactivado hasta que se habilite.
 
 ### 6.8 Servidor MCP
 Catálogo de **18 herramientas** (`reservation.*`, `waitlist.*`, `venue.*`) por stdio.
@@ -111,7 +111,14 @@ Catálogo de **18 herramientas** (`reservation.*`, `waitlist.*`, `venue.*`) por 
 El administrador del local acuña y revoca claves (`read`/`write`/`admin`) desde la app.
 
 ### 6.10 Borrado (erasure)
-Borrado de datos del cliente por contacto o por principal, con recuentos. Las lápidas guardan hashes, nunca valores personales.
+Borrado de datos del cliente por ficha de cliente o por principal, con recuentos. Las lápidas guardan hashes, nunca valores personales.
+
+### 6.11 Lista de espera pública, bloqueados y traza
+- **Lista de espera pública** — apuntarse, consultar y salirse, solo por API; la página en el widget aún no está en `main` (#293), y su texto es provisional.
+- **Lista de bloqueados** — el administrador impide reservar a un contacto concreto; la reserva se rechaza sin dejar rastro.
+- **Traza por canal** — cada reserva guarda por qué canal entró y quién la cambió.
+
+**Límite (no es una función):** el MCP remoto con OAuth es la parte 1 de 3, está apagado por defecto y todavía no hay endpoint `/mcp`.
 
 ---
 
@@ -119,7 +126,7 @@ Borrado de datos del cliente por contacto o por principal, con recuentos. Las l�
 
 - **Fase:** pre-alfa. Funciona y se prueba en local.
 - **Calidad:** casos de conformidad en `docs/contract/conformance-status.md`; casi 90 ficheros de test de la API más los del MCP; typecheck en todos los paquetes.
-- **Despliegue:** `compose.prod.yaml` y `docs/deploy.md` para instalarlo; el sitio público está en `opencovers.dev` y la demo alojada (`demo.opencovers.dev`) está en pruebas internas hasta la revisión legal.
+- **Despliegue:** `compose.prod.yaml` y `docs/deploy.md` para instalarlo; el sitio público está en `opencovers.dev` y la demo alojada (`demo.opencovers.dev`) está abierta al público; sus condiciones y su aviso de privacidad se redactaron sin abogado y no tienen revisión legal.
 - **Correo:** cableado vía Resend; plantillas pendientes de revisión legal (texto y base de consentimiento).
 
 ---
@@ -154,10 +161,10 @@ Objetivo de esta fase: **construir señal en la comunidad técnica y captar earl
 
 1. **GitHub (repositorio público)** — README pulido, releases notes por hito, issues etiquetados como "cubiertos" (tareas acotadas) para invitar contribuciones.
 2. **X / LinkedIn / Bluesky / Threads** — hilos cortos mostrando el plano visual (GIF), el no-doble-reserva, y el MCP operando un local.
-3. **Comunidades dev** — Hacker News ("Show HN" cuando la demo esté abierta al público), r/SideProject, Indie Hackers, r/selfhosted.
+3. **Comunidades dev** — Hacker News ("Show HN" cuando el vídeo nuevo esté en la web, el runbook de despliegue deje de decir que la demo no se abre y esté decidida la lista de espera en el widget, #293), r/SideProject, Indie Hackers, r/selfhosted.
 4. **Product Hunt** — cuando haya un despliegue real y una demo usable.
 5. **Blog / dev.to / newsletter** — artículos técnicos ("cómo garantizamos no-doble-reserva con una restricción GiST", "reservas para agentes de IA con MCP").
-6. **Vídeo** — el GIF de 16 s ya cubre el "cómo funciona"; ampliar a un vídeo de 60–90 s cuando la demo esté abierta al público.
+6. **Vídeo** — el GIF de 16 s ya cubre el "cómo funciona"; ampliar a un vídeo de 60–90 s, ahora que la demo está abierta al público.
 
 **Piezas de contenido sugeridas por hito:**
 - *"Un motor de reservas que los agentes de IA pueden operar"* (MCP).
@@ -170,7 +177,7 @@ Objetivo de esta fase: **construir señal en la comunidad técnica y captar earl
 
 Orden sugerido (sin fechas comprometidas):
 
-1. **Despliegue de referencia** — el primer "corre en un sitio real" con Postgres, sin depender de un proveedor concreto.
+1. **Despliegue de referencia** — el primer "corre en un sitio real" con Postgres, sin depender de un proveedor concreto. La demo alojada ya corre en un servidor real, pero no hay ningún local real detrás.
 2. **Webhooks firmados** — hecho. Push con firma HMAC encima del feed con cursor.
 3. **Depósitos y tarjetas** — tipos de reserva (libre vs. con depósito) en el contrato.
 4. **App móvil / más superficie de sala** — posterior.
@@ -181,7 +188,7 @@ Orden sugerido (sin fechas comprometidas):
 
 1. **Dominio.** Resuelto: **`opencovers.dev`** (`.io` descartado por precio), ya sirve el sitio público desde GitHub Pages.
 2. **Legal del correo.** Plantillas pendientes de revisión de texto y base de consentimiento.
-3. **Demo todavía interna.** La demo alojada ya funciona, pero no se abre al público hasta cerrar la revisión legal del aviso de privacidad y del consentimiento. Hasta entonces, el "pruébalo tú" es instalarlo en local; el vídeo/GIF cubre el "cómo funciona".
+3. **Demo abierta con textos legales sin revisar.** La demo alojada está abierta al público, pero su aviso de privacidad y sus condiciones se redactaron sin abogado y siguen sin revisión legal. Los datos son inventados y no es un local real.
 4. **Nombre provisional.** El nombre "OpenCovers" está pendiente de revisión de marca. Conviene no invertir en piezas de marca de pago hasta cerrarla.
 
 ---
@@ -191,7 +198,7 @@ Orden sugerido (sin fechas comprometidas):
 1. ~~Dominio~~ — `opencovers.dev` ya sirve el sitio público.
 2. Validar el **plan de canales** (§10) y priorizar los 2–3 primeros.
 3. Aprobar los **mensajes clave** (§5) antes de publicar.
-4. Coordinar la **secuencia de publicación**: README → logo/capturas → hilo X/LinkedIn con el GIF → HN/PH cuando la demo esté abierta al público.
+4. Coordinar la **secuencia de publicación**: README → logo/capturas → hilo X/LinkedIn con el GIF → HN/PH cuando se cumplan las condiciones de §10 (HN) y haya un despliegue real (PH).
 
 ---
 
