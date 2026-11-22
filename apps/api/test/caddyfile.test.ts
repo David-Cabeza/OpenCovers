@@ -57,8 +57,9 @@ describe("production Caddyfile", () => {
     const headers = staff.slice(staff.indexOf("header {"), staff.indexOf("}", staff.indexOf("header {")));
     expect(headers).toContain('X-Frame-Options "DENY"');
     expect(headers).toMatch(/Content-Security-Policy "[^"]*frame-ancestors 'none'[^"]*"/);
-    // The global header block, the HSTS line, and the Content-Type of the two 404 pages (/w/* and /r).
-    expect(staff.match(/^\s*header\b/gm)).toHaveLength(4);
+    // The global header block, the HSTS line, the Content-Type of the two 404 pages (/w/* and /r), the demo's
+    // X-Robots-Tag and the Content-Type of its robots.txt.
+    expect(staff.match(/^\s*header\b/gm)).toHaveLength(6);
     expect(staff).toMatch(/header @https Strict-Transport-Security/);
     expect(handle(staff, "/w/*")).toMatch(/respond ".*" 404/);
     expect(handle(staff, "/w/*")).not.toContain("reverse_proxy");
@@ -97,5 +98,26 @@ describe("production Caddyfile", () => {
     expect(handle(widget, "/r")).toMatch(/^handle \/r \{\s*reverse_proxy \{\$API_UPSTREAM:api:3000\}\s*$/);
     expect(handle(staff, "/r")).toMatch(/^handle \/r \{[\s\S]*respond ".*" 404$/);
     expect(staff.indexOf("handle /r {")).toBeLessThan(staff.indexOf("handle {"));
+  });
+
+  it("keeps the hosts out of search engines only when NOINDEX=on, and changes nothing otherwise", () => {
+    for (const block of [staff, widget]) {
+      expect(block).toContain('@noindex expression `"{$NOINDEX:off}" == "on"`');
+      expect(block).toContain('header @noindex X-Robots-Tag "noindex, nofollow"');
+      // Nothing sets the header without the matcher.
+      expect(block.match(/X-Robots-Tag/g)).toHaveLength(1);
+      const robots = handle(block, "@noindex_robots")!;
+      expect(robots).toContain("respond `User-agent: *\nDisallow: /\n` 200");
+      expect(robots).not.toContain("reverse_proxy");
+      expect(block).toMatch(/@noindex_robots \{\s*expression `"\{\$NOINDEX:off\}" == "on"`\s*path \/robots\.txt\s*\}/);
+      // robots.txt is answered before the staff app's catch-all and the 404 fallback.
+      expect(block.indexOf("handle @noindex_robots")).toBeLessThan(block.indexOf("handle /w/*"));
+    }
+  });
+
+  it("is switched on by the demo compose file and by no other", () => {
+    const read = (file: string) => readFileSync(path.resolve(import.meta.dirname, "../../../", file), "utf8");
+    expect(read("compose.demo.yaml")).toMatch(/^\s*NOINDEX: "on"$/m);
+    expect(read("compose.prod.yaml")).not.toContain("NOINDEX");
   });
 });
