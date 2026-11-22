@@ -2,6 +2,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { errorMessage } from "@/lib/error-message";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
 import { ArmchairIcon, PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -15,14 +16,16 @@ import { Stat } from "@/components/stat";
 import { useWaitlist } from "@/hooks/use-waitlist";
 import { useT } from "@/i18n";
 import { api, type WaitlistEntry } from "@/lib/api";
-import { elapsed } from "@/lib/date";
+import { elapsed, longDate } from "@/lib/date";
 import { guestInitials } from "@/lib/format";
 import { AddWaitlistDialog } from "./add-waitlist-dialog";
 
 export function WaitlistView({ venueId }: { venueId: string }) {
   const t = useT();
   const queryClient = useQueryClient();
-  const { data, isPending, isError, error, isRefetching, refetch } = useWaitlist(venueId);
+  // "" is the default list: today and the entries with no date. A date shows the entries guests asked for that day.
+  const [filterDate, setFilterDate] = useState("");
+  const { data, isPending, isError, error, isRefetching, refetch } = useWaitlist(venueId, filterDate || undefined);
   const [addOpen, setAddOpen] = useState(false);
   const [removing, setRemoving] = useState<WaitlistEntry | null>(null);
   // First come, first seated: the queue is shown oldest first.
@@ -64,6 +67,21 @@ export function WaitlistView({ venueId }: { venueId: string }) {
           </Button>
         }
       />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          type="date"
+          aria-label={t("waitlist.filter.date")}
+          value={filterDate}
+          onChange={(e) => setFilterDate(e.target.value)}
+          className="w-fit"
+        />
+        {filterDate && (
+          <Button variant="ghost" onClick={() => setFilterDate("")}>
+            {t("waitlist.filter.clear")}
+          </Button>
+        )}
+      </div>
 
       {isPending ? (
         <div className="space-y-3">
@@ -176,6 +194,13 @@ function WaitlistRow({
         <span className="text-sm text-muted-foreground tabular-nums">
           {t("waitlist.waiting")} <span className="font-medium text-foreground">{elapsed(entry.createdAt)}</span>
         </span>
+        {entry.date && (
+          <span data-slot="waitlist-date" className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{longDate(entry.date)}</span>
+            {entry.windowStart && entry.windowEnd ? ` · ${entry.windowStart}–${entry.windowEnd}` : ""}
+          </span>
+        )}
+        {entry.source === "widget" && <Pill tone="muted">{t("waitlist.source.widget")}</Pill>}
         {entry.zone ? (
           <Pill tone="muted">{entry.zone}</Pill>
         ) : (

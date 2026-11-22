@@ -535,6 +535,21 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                   onCheckedChange={(v) => setForm({ ...form, showServiceNames: v })}
                 />
               </div>
+
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <Label htmlFor="ob-waitlist">{t("onlinebooking.waitlist.label")}</Label>
+                  <p id="ob-waitlist-help" className="text-sm text-muted-foreground">
+                    {t("onlinebooking.waitlist.help")}
+                  </p>
+                </div>
+                <Switch
+                  id="ob-waitlist"
+                  aria-describedby="ob-waitlist-help"
+                  checked={form.waitlistEnabled}
+                  onCheckedChange={(v) => setForm({ ...form, waitlistEnabled: v })}
+                />
+              </div>
             </Group>
 
             <Group title={t("onlinebooking.privacy.title")} description={t("onlinebooking.privacy.description")}>
