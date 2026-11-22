@@ -88,7 +88,7 @@ describe("hosted demo link", () => {
   });
 
   it("explains the demo in the hero only when the switch is set", async () => {
-    const line = /restaurante de prueba con datos inventados/;
+    const line = /^La demo te da un restaurante de prueba con datos inventados/;
     const off = await renderWith("");
     expect(screen.queryByText(line)).toBeNull();
     off.unmount();
