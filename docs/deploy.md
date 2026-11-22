@@ -320,7 +320,7 @@ Resend (email) and Google (sign-in) process that data, so the privacy page shoul
 
 #### Launch checklist
 
-- [ ] Legal review of the terms of use (`condiciones.html`) and of the privacy notice above, including who the controller is. Do not open the demo to the public before this.
+- [ ] Legal review of the terms of use (`condiciones.html`) and of the privacy notice above, including who the controller is. Pending and optional. Both texts were written without a lawyer's review, and the demo opened on 2026-11-21 without it, by the owner's decision.
 - [x] `privacidad.html` carries the demo wording, a working privacy address (`privacidad@opencovers.dev`), the legal bases, the transfers, the Resend region and the log rotation. The controller's tax id and address come from the `LEGAL_TAX_ID` and `LEGAL_ADDRESS` secrets at build time.
 - [ ] DNS records resolve, and ports 80 and 443 are open on the server and nothing else.
 - [ ] Resend domain verified, and a test magic link reaches a real inbox (check spam too).
@@ -329,7 +329,7 @@ Resend (email) and Google (sign-in) process that data, so the privacy page shoul
 - [ ] `https://demo.opencovers.dev/health` answers, and a new visitor reaches a sandbox whose `/w/{bookingKey}` page opens on `book.demo.opencovers.dev`.
 - [ ] The caps (`DEMO_MAX_SANDBOXES`, `DEMO_MAX_NEW_PER_DAY`) fit the server and your email plan.
 - [ ] `DEMO_SSH_*` secrets set on the `demo` environment, and one manual run of `deploy-demo` is green.
-- [ ] Last: set `url` in `apps/site/demo.json` to `https://demo.opencovers.dev` and merge. Ship the button only once the demo is live. The site then links to it from the Spanish hero, the English page and `llms.txt`.
+- [x] Last: `url` in `apps/site/demo.json` is `https://demo.opencovers.dev` (PR #260), so the site links to the demo from the Spanish hero, the English page and `llms.txt`. A fork leaves it empty until its own demo is live.
 
 ## Public site
 
@@ -354,7 +354,7 @@ The API reads these variables regardless of host:
 | `RATE_LIMIT` | no | `on` or `off`. Default `on` in `compose.prod.yaml`. See Rate limiting. |
 | `TRUST_PROXY` | no | `false` (default) or `true`. See Rate limiting. |
 | `RATE_LIMIT_AUTH`, `RATE_LIMIT_SIGNUP`, `RATE_LIMIT_INVITATION`, `RATE_LIMIT_VENUE_CREATION`, `RATE_LIMIT_PUBLIC_READ`, `RATE_LIMIT_PUBLIC_BOOKING`, `RATE_LIMIT_PUBLIC_VENUE`, `RATE_LIMIT_PUBLIC_SELF_SERVICE`, `RATE_LIMIT_PUBLIC_DAYS` | no | Budgets as `max/window`, such as `30/15m`. See Rate limiting. |
-| `MCP_REMOTE` | no | `on` or `off` (default). On, the API is an OAuth authorization server for remote MCP clients (ADR-0014), and Caddy forwards `/mcp` and the OAuth metadata to it. The API then refuses to start unless `BETTER_AUTH_URL` is `https` and `BETTER_AUTH_SECRET` is set, and refuses `DEMO_MODE=1`. Set it for the `web` service too. |
+| `MCP_REMOTE` | no | `on` or `off` (default). On, the API runs the OAuth authorization server only (ADR-0014), and Caddy forwards `/mcp` and the OAuth metadata to it. The `/mcp` endpoint does not exist yet (issue #67, parts 2 and 3), so a remote MCP client cannot connect. The API then refuses to start unless `BETTER_AUTH_URL` is `https` and `BETTER_AUTH_SECRET` is set, and refuses `DEMO_MODE=1`. Set it for the `web` service too. |
 | `RATE_LIMIT_OAUTH_AUTHORIZE`, `RATE_LIMIT_OAUTH_TOKEN` | no | With `MCP_REMOTE=on` only. Budgets as `max/window`. See Rate limiting. |
 | `DEMO_MODE` | no | `1` runs the hosted demo, `0` or unset does not. See Hosted demo. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | Demo mode only. Both or neither. See Hosted demo. |
