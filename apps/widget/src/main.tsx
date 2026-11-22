@@ -4,7 +4,7 @@ import { bookingKeyFrom, publicApi, selfServiceApi, takeToken } from "./api";
 import { reportHeight } from "./height";
 import { ManagePage } from "./Manage";
 import { followsSystemScheme, forcedScheme } from "./theme";
-import { localeOf, supportedLocale, translator } from "./messages";
+import { localeOf, servedLocale, translator } from "./messages";
 import "./styles.css";
 
 // The API set <html lang> from `?lang=` or the venue's locale when it wrote this page.
@@ -26,7 +26,7 @@ if (window.location.pathname === "/r") {
   root.render(
     <ManagePage
       api={token ? selfServiceApi(token) : null}
-      fixedLocale={supportedLocale(new URLSearchParams(window.location.search).get("lang"))}
+      fixedLocale={servedLocale(new URLSearchParams(window.location.search).get("lang"), locale)}
       initialLocale={locale}
       newKey={() => crypto.randomUUID()}
     />,

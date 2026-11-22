@@ -45,7 +45,7 @@ export function Topbar({ email, onMenu }: { email?: string; onMenu?: () => void 
           </Button>
           {venues.length > 0 && (
             <Select value={venueId ?? ""} onValueChange={setVenue}>
-              <SelectTrigger className="w-full min-w-0 sm:w-[220px]" aria-label={t("layout.topbar.venue")}>
+              <SelectTrigger className="w-full min-w-0 sm:w-[220px] *:data-[slot=select-value]:block *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate" aria-label={t("layout.topbar.venue")}>
                 <SelectValue placeholder={t("layout.topbar.venue")} />
               </SelectTrigger>
               <SelectContent>

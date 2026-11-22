@@ -206,7 +206,7 @@ const en: Record<MessageId, string> = {
   "error.rateLimited": "Too many attempts in a row. Wait a few minutes and try again.",
   "error.slotTaken": "That time was just taken. Choose another.",
   "error.timeUnavailable": "That time can no longer be booked online. Choose another.",
-  "error.partySize": "We cannot book that party size at that time. Try another time or call the venue.",
+  "error.partySize": "We cannot book that party size at that time. Try another time or contact the venue.",
   "error.contactLimit": "You already hold the most bookings allowed that day for this contact. If you need another, contact the venue.",
   "error.invalid": "Some detail is not valid. Check your name and contact and try again.",
   "error.unavailable": "Online booking is not available right now.",
@@ -957,6 +957,16 @@ export type Locale = keyof typeof CATALOGS;
 export function supportedLocale(lang: string | null | undefined): Locale | null {
   const base = (lang ?? "").toLowerCase().split("-")[0];
   return Object.hasOwn(CATALOGS, base) ? (base as Locale) : null;
+}
+
+/**
+ * The `?lang=` of the self-service page, only when the server accepted it. The server writes the page's language from
+ * the same parameter but leaves out the locales a deployment has not enabled (the demo offers Spanish and English), so
+ * the client does not bring back a language the page was not served in.
+ */
+export function servedLocale(lang: string | null, served: Locale): Locale | null {
+  const asked = supportedLocale(lang);
+  return asked === served ? asked : null;
 }
 
 export function localeOf(lang: string | null | undefined): Locale {
