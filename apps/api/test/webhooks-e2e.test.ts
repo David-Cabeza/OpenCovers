@@ -46,7 +46,7 @@ describe("webhook end to end", () => {
     await db.insert(venues).values({ id: venueId, timezone: "Europe/Madrid" });
     await db.insert(services).values({ venueId, name: "dinner", openStart: "19:00", openEnd: "23:00" });
     await db.insert(tables).values({ id: "1", venueId, name: "T1", seats: 4 });
-    await addKey(db, "e2e-key", "widdot", [venueId], "write");
+    await addKey(db, "e2e-key", "integration", [venueId], "write");
     const headers = { apikey: "e2e-key", "Content-Type": "application/json" };
 
     const registered = await app.request(`/v1/venues/${venueId}/webhooks`, {
