@@ -13,13 +13,13 @@ David Cabeza is the initial maintainer. The maintainer reviews flags, merges pul
 
 ## Flags
 
-Anyone can propose a flag. A flag is ready when it states the what, the why, the scope, the acceptance criteria, the dependencies, and a size. A maintainer applies the `status:ready` label. A contributor claims a flag by commenting on the issue. The maintainer assigns the contributor and moves the label to `status:claimed`.
+Anyone can propose a flag. A flag is ready when it states the what, the why, the scope, the acceptance criteria, the dependencies, and a size. New issues carry `status:needs-triage`. When a flag is ready, a maintainer removes `status:needs-triage` and applies the `flag` label, plus `good first issue` when it suits newcomers. A contributor claims a flag by commenting on the issue. The maintainer assigns the issue to the contributor.
 
-If a claimed flag has no draft pull request after seven days and no update, it returns to `status:ready`.
+If an assigned flag has no draft pull request after seven days and no update, the maintainer unassigns it and it is open to claim again.
 
 ## Pull requests
 
-A pull request needs one maintainer approval before it merges. Once CI exists, it also needs a green CI run. Security-sensitive changes need a second review. The reviewer checks the acceptance criteria, the evidence, and the absence of confidential material.
+A pull request needs one maintainer approval before it merges. It also needs a green CI run. Security-sensitive changes need a second review. The reviewer checks the acceptance criteria, the evidence, and the absence of confidential material.
 
 ## Releases
 
