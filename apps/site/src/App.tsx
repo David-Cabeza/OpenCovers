@@ -313,13 +313,18 @@ function Hero() {
       <div className="copy">
         <h1 className="rv" style={d(0)}>Tu libro de reservas es tuyo</h1>
         <p className="lead rv" style={d(90)}>
-          Motor de reservas open source para restaurantes. El local lo usa con una app de sala y un widget de reserva; las plataformas y los agentes, por la API y el servidor MCP.
+          Motor de reservas open source para restaurantes. Sala trabaja con una app de agenda y plano; los clientes reservan desde tu web con un widget, hoy en pruebas; las plataformas y los agentes de IA entran por la API y el servidor MCP.
         </p>
         <div className="acts rv" style={d(180)}>
           {DEMO_URL && <a className="btn accent" href={DEMO_URL}>Probar la demo</a>}
           <a className={DEMO_URL ? "btn" : "btn accent"} href={`${REPO}#quick-start`}>Empieza ahora</a>
           <a className="btn ghost" href={REPO}>Ver en GitHub</a>
         </div>
+        {DEMO_URL && (
+          <p className="status rv" style={{ ...d(220), marginTop: 20 }}>
+            La demo te da un restaurante de prueba con datos inventados. Entras con tu correo o con Google y se borra a los 14 días sin uso.
+          </p>
+        )}
         <p className="status rv" style={d(260)}>Pre-alfa · Apache-2.0 · 18 herramientas MCP</p>
       </div>
     </section>
