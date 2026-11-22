@@ -103,11 +103,11 @@ const modules = [
 ];
 
 const challenges = [
-  { title: "Ficha de cliente en sala", tag: "producto", body: "Una pantalla con la ficha y el historial de visitas. El motor ya guarda un cliente por local." },
-  { title: "Revisar o añadir idiomas del widget", tag: "producto", body: "El widget habla siete idiomas: español, inglés, catalán, francés, alemán, italiano y portugués. Los cinco últimos son traducción asistida por máquina y nadie nativo los ha revisado. Revisar una traducción o añadir otro idioma es una tarea pequeña y sin dependencias." },
-  { title: "Temas declarativos", tag: "producto", body: "Paquetes de tema solo de datos que se puedan compartir. El local ya cambia colores, fuente y logo desde Setup." },
-  { title: "Primer adaptador de TPV", tag: "integración", body: "Leer la reserva de una mesa, enviar la cuenta y liberar la mesa." },
-  { title: "Pagos con Stripe y Redsys", tag: "motor", body: "Depósitos y garantías con la cuenta de pago de cada local." },
+  { title: "Revisar las traducciones del widget", tag: "producto", body: "Catalán, francés, alemán, italiano y portugués esperan a un hablante nativo.", href: `${REPO}/issues/172` },
+  { title: "Probar el widget en Safari y Firefox", tag: "calidad", body: "Reservar de principio a fin en los dos navegadores y anotar lo que falle.", href: `${REPO}/issues/175` },
+  { title: "Encabezado y regiones en el acceso", tag: "accesibilidad", body: "Las pantallas de entrada y registro necesitan un título y landmarks.", href: `${REPO}/issues/174` },
+  { title: "Guía para Google Business Profile", tag: "documentación", body: "Poner el enlace de reserva en una ficha real y documentar los pasos.", href: `${REPO}/issues/156` },
+  { title: "Medir el widget en PageSpeed Insights", tag: "rendimiento", body: "Una medición en móvil del widget incrustado, guardada en docs.", href: `${REPO}/issues/154` },
 ];
 
 const faqs = [
@@ -645,13 +645,13 @@ function Brigada() {
       <div className="top">
         <h2 className="rv">La Brigada</h2>
         <p className="rv" style={d(90)}>
-          Cada tarea acotada es un cubierto. Reclama uno, resuélvelo y súbelo como PR.
+          Cada tarea acotada es un cubierto. Reclama uno, resuélvelo y súbelo como PR. <a href={GOOD_FIRST_ISSUES}>Ver todas las tareas abiertas</a>.
         </p>
       </div>
       <ul>
         {challenges.map((c, i) => (
           <li key={c.title} className="rv" style={d((i % 2) * 80)}>
-            <a href={GOOD_FIRST_ISSUES}>
+            <a href={c.href}>
               <span className="n"><i />{c.title}</span>
               <small>{c.tag}</small>
               <p>{c.body}</p>

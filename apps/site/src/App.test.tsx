@@ -25,6 +25,15 @@ describe("public site", () => {
     );
   });
 
+  it("links each Brigada card to its own open issue and keeps one link to the full list", () => {
+    const { container } = render(<App />);
+    const repo = "https://github.com/David-Cabeza/OpenCovers";
+    const hrefs = [...container.querySelectorAll("#brigada li a")].map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual([172, 175, 174, 156, 154].map((n) => `${repo}/issues/${n}`));
+    const all = screen.getByRole("link", { name: "Ver todas las tareas abiertas" });
+    expect(all.getAttribute("href")).toContain("label%3A%22good+first+issue%22");
+  });
+
   it("points every README anchor at a heading the README has", () => {
     const { container } = render(<App />);
     const readme = readFileSync(resolve(process.cwd(), "../../README.md"), "utf8");
