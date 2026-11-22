@@ -24,7 +24,8 @@ describe("reservation dialogs in Spanish", () => {
       <NewReservationDialog venueId="v1" date="2026-11-20" time="20:30" partySize={2} open onOpenChange={vi.fn()} />,
     );
     expect(await screen.findByText("Nueva reserva")).toBeInTheDocument();
-    expect(screen.getByText("2026-11-20 a las 20:30")).toBeInTheDocument();
+    expect(screen.getByText("viernes, 20 de noviembre a las 20:30")).toBeInTheDocument();
+    expect(screen.queryByText(/2026-11-20/)).toBeNull();
     expect(screen.getByText("Seleccionado: 0 plazas para 2 comensales.")).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "Mesa 2 · 4" }));
     expect(screen.getByText("Seleccionado: 4 plazas para 2 comensales.")).toBeInTheDocument();

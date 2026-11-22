@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useTables } from "@/hooks/use-tables";
 import { useT } from "@/i18n";
 import { api, COMMENTARY_MAX } from "@/lib/api";
+import { longDate } from "@/lib/date";
 
 interface FormValues {
   partySize: number;
@@ -118,7 +119,7 @@ export function NewReservationDialog({
         <DialogHeader>
           <DialogTitle>{t("reservation.new.title")}</DialogTitle>
           <DialogDescription>
-            {t("reservation.new.description", { date, time })}
+            {t("reservation.new.description", { date: longDate(date), time })}
           </DialogDescription>
         </DialogHeader>
 
