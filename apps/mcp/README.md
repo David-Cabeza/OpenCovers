@@ -4,7 +4,7 @@ An MCP server that exposes the OpenCovers reservation API to MCP hosts such as C
 
 ## Run
 
-From npm (once published):
+From npm:
 
 ```bash
 OPENCOVERS_API_KEY=... npx -y @opencovers/mcp
@@ -66,7 +66,11 @@ Or from a clone of the repository:
 
 ## Tools
 
-See [docs/contract/mcp.md](../../docs/contract/mcp.md) for the full catalog: availability, agenda, list, search, get, create, modify, cancel, status, events, erasure (admin key only), and venue config.
+The server has 18 tools. See [docs/contract/mcp.md](../../docs/contract/mcp.md) for the full catalog, with the API route, hints and arguments of each.
+
+- Reservations (12): `reservation.availability`, `reservation.agenda`, `reservation.list`, `reservation.search`, `reservation.get`, `reservation.create`, `reservation.walk_in`, `reservation.modify`, `reservation.cancel`, `reservation.status`, `reservation.events` and `reservation.erasure` (admin key only).
+- Waitlist (4): `waitlist.list`, `waitlist.add`, `waitlist.seat` and `waitlist.cancel`.
+- Venue (2): `venue.getConfig` and `venue.setConfig`.
 
 Every write that books, changes a booking or touches the waitlist takes an optional `idempotencyKey`. To retry after a timeout or an error, send the same key as the first call, and the engine returns the first result instead of writing twice. Without a key each call is a new write.
 
