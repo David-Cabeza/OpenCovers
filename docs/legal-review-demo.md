@@ -1,6 +1,6 @@
 # Legal review brief: hosted demo privacy notice and terms (ADR-0022)
 
-Status: draft for a lawyer's review. Nothing here is legal advice or approved text. The notice under review is [`apps/site/public/privacidad.html`](../apps/site/public/privacidad.html) (pull request #262, not merged). Its yellow brackets mark what the reviewer decides. The terms of use are [`apps/site/public/condiciones.html`](../apps/site/public/condiciones.html), drafted without lawyer review. The sign-in form says "By continuing you accept the terms of use and the privacy policy" and links both. The demo collects no newsletter leads and has no consent box (ADR-0022, amendment of 2026-11-21). The demo runs at `demo.opencovers.dev` and is not public: the site button that points to it (pull request #260) stays unmerged until this review is done.
+Status: the demo opened to the public on 2026-11-21 by the owner's decision, before any legal review. The privacy notice ([`apps/site/public/privacidad.html`](../apps/site/public/privacidad.html), pull request #262) and the site button (#260) are merged, and the Google sign-in app is published. The terms of use ([`apps/site/public/condiciones.html`](../apps/site/public/condiciones.html)) and the notice were drafted without a lawyer, and nobody has reviewed them. The review is pending and optional. Nothing here is legal advice or approved text. The notice's yellow brackets mark what a reviewer would decide. The sign-in form says "By continuing you accept the terms of use and the privacy policy" and links both. The demo collects no newsletter leads and has no consent box (ADR-0022, amendment of 2026-11-21). The demo runs at `demo.opencovers.dev`.
 
 ## Who and what
 
@@ -48,4 +48,4 @@ Hetzner Cloud (server and database, Helsinki). Resend (email sending; the owner 
 
 ## What changes after the review
 
-The reviewer's text replaces the marked bases and the transfers paragraph in the notice, and any change to the terms goes into `condiciones.html`. Then pull request #262 merges, the Google sign-in app is published, and last the site button (#260). The same review should cover the waitlist wording in [`legal-review-waitlist.md`](legal-review-waitlist.md).
+If a review happens, the reviewer's text replaces the marked bases and the transfers paragraph in the notice, and any change to the terms goes into `condiciones.html`. The same review should cover the waitlist wording in [`legal-review-waitlist.md`](legal-review-waitlist.md).
