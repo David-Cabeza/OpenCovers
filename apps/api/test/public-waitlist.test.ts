@@ -116,6 +116,22 @@ async function expectInvalid(res: Response) {
   expect(await res.json()).toEqual({ code: "invalid_request", message: "invalid_request", retryable: false });
 }
 
+
+/**
+ * The join's answer carries `waitlistToken`, a UUID and 43 random base64url characters. A leak scan for a short string,
+ * such as the table name "T0", matches that randomness about once in a hundred runs, so the scan reads the answer
+ * without the token. Everything else in the answer is still scanned.
+ */
+function withoutToken(text: string): string {
+  try {
+    const body = JSON.parse(text);
+    if (body && typeof body === "object") delete body.waitlistToken;
+    return JSON.stringify(body);
+  } catch {
+    return text;
+  }
+}
+
 describe("C68 public waitlist setting and config", () => {
   it("reads false for a venue that never set it, and only an admin changes it", async () => {
     const v = await makeVenue({ settings: { waitlistEnabled: false } });
@@ -427,11 +443,23 @@ describe("C69 public waitlist join", () => {
       await (await join(v.key, joinBody(v, { date: addDays(today(), -3) }))).text(),
       await (await readEntry(answer.waitlistToken)).text(),
     ];
-    for (const text of answers) {
+    expect(answer.waitlistToken).toMatch(/^[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/);
+    for (const raw of answers) {
+      const text = withoutToken(raw);
       for (const leak of [entryId, v.id, "widget", "Zebulon", contact, "T0", "dinner", "consent", "source", "zone", "reservationId"]) {
         expect(text).not.toContain(leak);
       }
     }
+  });
+
+  it("scans an answer for leaks without the join's random token, which can hold any short string", () => {
+    const answer = JSON.stringify({ waitlistToken: "00000000-0000-0000-0000-00000000000T0.zoneAAAAT0QMdinner", entry: { status: "waiting" } });
+    expect(answer).toContain("T0");
+    expect(withoutToken(answer)).not.toContain("T0");
+    expect(withoutToken(answer)).not.toContain("zone");
+    expect(withoutToken(answer)).toContain("waiting");
+    expect(withoutToken(JSON.stringify({ error: { code: "T0" } }))).toContain("T0");
+    expect(withoutToken("not json")).toBe("not json");
   });
 
   it("refuses a body over 16 KB with invalid_request", async () => {
