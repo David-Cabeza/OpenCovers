@@ -1,3 +1,4 @@
+import { ThemeProvider } from "@/lib/theme";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
@@ -69,10 +70,12 @@ export function renderWithApp(ui: ReactElement) {
   });
   return Object.assign(
     render(
-      <QueryClientProvider client={client}>
-        {ui}
-        <Toaster />
-      </QueryClientProvider>,
+      <ThemeProvider>
+        <QueryClientProvider client={client}>
+          {ui}
+          <Toaster />
+        </QueryClientProvider>
+      </ThemeProvider>,
     ),
     { queryClient: client },
   );

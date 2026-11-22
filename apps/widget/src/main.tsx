@@ -3,14 +3,17 @@ import { App } from "./App";
 import { bookingKeyFrom, publicApi, selfServiceApi, takeToken } from "./api";
 import { reportHeight } from "./height";
 import { ManagePage } from "./Manage";
-import { followsSystemScheme } from "./theme";
+import { followsSystemScheme, forcedScheme } from "./theme";
 import { localeOf, supportedLocale, translator } from "./messages";
 import "./styles.css";
 
 // The API set <html lang> from `?lang=` or the venue's locale when it wrote this page.
 // On its own page, or in an iframe whose embed asked for it, the widget follows the visitor's light or dark setting,
 // until a venue theme with colors says otherwise.
-if (followsSystemScheme(window)) document.documentElement.dataset.scheme = "system";
+// A `?scheme=dark|light` on the page's own address forces that look (the demo's Client link).
+const forced = forcedScheme(window);
+if (forced) document.documentElement.dataset.scheme = forced;
+else if (followsSystemScheme(window)) document.documentElement.dataset.scheme = "system";
 
 const locale = localeOf(document.documentElement.lang);
 const root = createRoot(document.getElementById("root")!);

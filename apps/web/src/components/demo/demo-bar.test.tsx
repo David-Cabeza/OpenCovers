@@ -49,7 +49,7 @@ describe("the demo bar", () => {
     expect(screen.getByText(/deleted on December 3, 2026/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Deploy it yourself" })).toHaveAttribute("href", expect.stringContaining("deploy"));
     const diner = screen.getByRole("link", { name: /Diner/ });
-    expect(diner).toHaveAttribute("href", "/w/pk_abcdefghijklmnopqrstuv");
+    expect(diner).toHaveAttribute("href", "/w/pk_abcdefghijklmnopqrstuv?scheme=light");
     expect(diner).toHaveAttribute("target", "_blank");
     expect(screen.getByText("Restaurant")).toHaveAttribute("aria-current", "true");
   });
@@ -59,8 +59,22 @@ describe("the demo bar", () => {
     renderWithApp(<DemoBar status={{ ...status, widgetOrigin: "https://book.demo.opencovers.dev" }} />);
     expect(screen.getByRole("link", { name: /Diner/ })).toHaveAttribute(
       "href",
-      "https://book.demo.opencovers.dev/w/pk_abcdefghijklmnopqrstuv",
+      "https://book.demo.opencovers.dev/w/pk_abcdefghijklmnopqrstuv?scheme=light",
     );
+  });
+
+  it("opens the widget in the staff app's current look", () => {
+    search([]);
+    const origin = "https://book.demo.opencovers.dev";
+    const link = () => screen.getByRole("link", { name: /Diner/ });
+    document.documentElement.classList.remove("dark");
+    const light = renderWithApp(<DemoBar status={{ ...status, widgetOrigin: origin }} />);
+    expect(link()).toHaveAttribute("href", `${origin}/w/pk_abcdefghijklmnopqrstuv?scheme=light`);
+    light.unmount();
+    document.documentElement.classList.add("dark");
+    renderWithApp(<DemoBar status={{ ...status, widgetOrigin: origin }} />);
+    expect(link()).toHaveAttribute("href", `${origin}/w/pk_abcdefghijklmnopqrstuv?scheme=dark`);
+    document.documentElement.classList.remove("dark");
   });
 
   it("lists the tour with a trace step, and ticks steps from real bookings", async () => {

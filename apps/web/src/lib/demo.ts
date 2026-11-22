@@ -18,9 +18,10 @@ export interface DemoStatus {
   widgetOrigin?: string;
 }
 
-/** The guest widget link. The staff host answers 404 on `/w/*`, so with a widget origin the link is absolute. */
-export function dinerLink(bookingKey: string, widgetOrigin?: string | null): string {
-  return `${widgetOrigin ? widgetOrigin.replace(/\/+$/, "") : ""}/w/${bookingKey}`;
+/** The guest widget link, in the staff app's current look. The staff host answers 404 on `/w/*`, so with a widget origin the link is absolute. */
+export function dinerLink(bookingKey: string, widgetOrigin?: string | null, scheme?: "light" | "dark"): string {
+  // The widget is on another origin and cannot read the staff app's stored choice, so the link carries it.
+  return `${widgetOrigin ? widgetOrigin.replace(/\/+$/, "") : ""}/w/${bookingKey}${scheme ? `?scheme=${scheme}` : ""}`;
 }
 
 const OFF: DemoStatus = { enabled: false, googleEnabled: false };

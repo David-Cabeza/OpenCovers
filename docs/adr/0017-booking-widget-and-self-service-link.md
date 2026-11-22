@@ -522,6 +522,14 @@ The dark mode of the amendment above stays off inside an iframe by default. An e
 - **Setup.** The embed section has a switch, "Follow my visitors' dark mode", that adds the option to both embed codes. It is not stored: it only changes the code shown.
 - **Not done.** A dark palette chosen by the venue in Setup, which would need a theme key.
 
+## Amendment 2026-11-22: a forced look from the demo's Client link
+
+The staff app keeps its light or dark choice in its own origin, and the hosted demo opens the widget on another one, so the widget opened light for a visitor in dark mode.
+
+- **How.** The Client link of the demo bar adds `?scheme=dark` or `?scheme=light`, the staff app's current look. On its own page, the widget reads exactly those two values and marks the page `data-scheme="dark"` or `"light"`. `styles.css` has a second dark block for `dark` that does not depend on the system setting. Any other value is ignored, and a page without the query follows the system as before.
+- **What stays.** In an iframe the query is not read, so `?scheme=auto` keeps its meaning and the embedding site still decides. A theme with colors and no dark look still keeps the page light, forced or not. A theme with a dark look shows it on a forced dark page.
+- **Not done.** A forced look is not stored, and no contract case changes.
+
 ## Amendment 2026-11-19: a dark palette in the theme
 
 Section 5's key set grows by one: `darkColors`. A venue can now choose the colors a visitor sees in dark mode.
