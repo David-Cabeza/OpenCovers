@@ -20,7 +20,7 @@ export const phases: Phase[] = [
     items: [
       "En curso: un widget de reservas para incrustar, sin marca de OpenCovers.",
       "En curso: un enlace para ver, cambiar o cancelar la reserva. Falta enviarlo en el email de confirmación.",
-      "En curso: la lista de espera pública. La API está hecha; faltan la página con QR y el aviso de mesa lista.",
+      "En curso: la lista de espera pública. El cliente puede apuntarse desde el widget en un día completo y salir desde su enlace; viene apagada por defecto, con textos provisionales hasta la revisión legal. Falta el aviso de mesa lista.",
       "Temas declarativos, solo datos y sin código ejecutable.",
     ],
     exit: "Un local pone una página de reservas con su marca en su web sin escribir código.",
@@ -100,7 +100,7 @@ export const today: Today[] = [
   { area: "Reservas y disponibilidad", now: "Crear, modificar, cancelar y sentar, sin dobles reservas, y saber por qué un hueco está cerrado.", target: "Reglas por capas y por canal.", phase: "10" },
   { area: "Mesas y sala", now: "Zonas, combinaciones, asignación automática y editor visual.", target: "Planos por servicio y estado en vivo.", phase: "10" },
   { area: "Clientes", now: "Una ficha por local, emparejada por email o teléfono, con fusión y lista de bloqueados por API. Aún sin pantalla en la app de sala.", target: "Ficha con historial, notas, alergias y etiquetas.", phase: "10" },
-  { area: "Lista de espera", now: "Existe en la app de sala. La API para que un cliente se apunte, la consulte y salga de la lista ya está hecha; la página del widget aún no.", target: "Página con QR y aviso de mesa lista.", phase: "11" },
+  { area: "Lista de espera", now: "Existe en la app de sala. La parte del cliente está construida: se apunta desde el widget en un día completo, con la casilla de consentimiento sin marcar, y consulta o sale desde una página propia. Viene apagada por defecto (un interruptor en Setup), con textos provisionales pendientes de revisión legal, la demo no la tiene activada y está probada con simulaciones, aún no de punta a punta en un navegador.", target: "Página con QR y aviso de mesa lista.", phase: "11" },
   { area: "Cara al cliente", now: "En curso: widget de reservas, rutas públicas y enlace para ver, cambiar o cancelar. El widget muestra una franja de días, deja elegir zona y enseña un resumen antes de pedir los datos, en siete idiomas. Cinco de ellos (catalán, francés, alemán, italiano y portugués) están traducidos con ayuda automática y esperan la revisión de un hablante nativo; la demo ofrece solo español e inglés. Lleva los colores, la fuente y el logo del local, y un script opcional ajusta la altura del iframe y le pasa el idioma de la página. Aún sin enlace en el email.", target: "Widget, enlace de autogestión y temas.", phase: "11" },
   { area: "No-shows y pagos", now: "Cambios de estado y estado de reconfirmación.", target: "Depósitos, garantías y reembolsos.", phase: "12" },
   { area: "Mensajes", now: "Emails de confirmación, cambio, cancelación y reenvío del enlace, con la marca del local y desactivados por defecto. Los tres primeros llevan un archivo de calendario. Por ahora solo en español.", target: "Email, SMS y WhatsApp con automatizaciones.", phase: "13" },

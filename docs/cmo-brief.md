@@ -114,7 +114,7 @@ El administrador del local acuña y revoca claves (`read`/`write`/`admin`) desde
 Borrado de datos del cliente por ficha de cliente o por principal, con recuentos. Las lápidas guardan hashes, nunca valores personales.
 
 ### 6.11 Lista de espera pública, bloqueados y traza
-- **Lista de espera pública** — apuntarse, consultar y salirse, solo por API; la página en el widget aún no está en `main` (#293), y su texto es provisional.
+- **Lista de espera pública** — el cliente se apunta desde el widget en un día completo (casilla de consentimiento sin marcar), y consulta o sale desde la página `/r/waitlist`. Está construida (#293) pero apagada por defecto, con un interruptor en Setup; los textos son provisionales hasta la revisión legal, la demo no la tiene activada y está probada con simulaciones, aún no de punta a punta en un navegador (C70 es parcial). No se anuncia como disponible.
 - **Lista de bloqueados** — el administrador impide reservar a un contacto concreto; la reserva nueva se rechaza con el error `booking_declined`. La lista guarda un hash del contacto, no el contacto.
 - **Traza por canal** — cada reserva guarda por qué canal entró (ADR-0023, C65) y quién o qué actuó en cada cambio; el nombre solo se muestra si es miembro del local.
 
