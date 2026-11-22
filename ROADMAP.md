@@ -106,7 +106,7 @@ Status: the repository is public. Two checks remain.
 
 - Done: Apache-2.0 license, README, contribution guide, code of conduct, security policy, governance, and the flag and pull request templates.
 - Done: private vulnerability reporting through GitHub, as [SECURITY.md](SECURITY.md) describes.
-- Pending: confirm the repository history holds no private reference material. `scripts/check-publication.sh` checks the files in the working tree, not the history.
+- Done: the repository history was checked on 2026-11-22. All 825 commits on every ref hold no secrets or key files, no `.env` file, no owner personal data and no client reference material. Phone numbers in it are test fixtures. `scripts/check-publication.sh` still checks only the working tree, so repeat the history check before a release.
 - Pending: a monitored private contact for the code of conduct.
 
 Exit criterion: the public repository holds no confidential or proprietary material, and every reporting channel is live.
