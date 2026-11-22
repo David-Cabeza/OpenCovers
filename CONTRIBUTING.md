@@ -10,7 +10,7 @@ Read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [GOVERNANCE.md](GOVERNANCE.md), a
 
 A flag is a scoped task that one person can claim. Every flag has a what, a why, a scope, acceptance criteria, dependencies, and a size.
 
-1. Find an open issue with the `flag` label.
+1. Find an open issue with the `good first issue` label for a first task, or the `flag` label for a scoped task.
 2. Comment that you want to claim it.
 3. Wait for a maintainer to assign it to you.
 4. Open a draft pull request within seven days. If you need more time, say so in the issue.
@@ -27,11 +27,11 @@ If a flag is too large, ask a maintainer to split it. Do not expand a flag into 
 
 ## Current phase
 
-The contract is defined in `docs/contract/`. The engine runs against PostgreSQL with CI. Code flags are open.
+The contract is defined in `docs/contract/`. The engine runs against PostgreSQL with CI. Code flags are opened as the work is scoped, so there may be none open when you look. If you want to help and see nothing to claim, open an issue to propose one.
 
 ## Development setup
 
-You need Node.js 22 or newer, pnpm, and Docker.
+You need Node.js 22.9 or newer, pnpm, and Docker.
 
 ```
 docker compose up -d
@@ -41,9 +41,16 @@ pnpm test
 pnpm dev
 ```
 
-`docker compose up -d` starts a local PostgreSQL with two databases: `opencovers` (dev) and `opencovers_test` (tests). `pnpm db:migrate` applies the schema to the dev database. `pnpm test` runs the integration tests against `opencovers_test`, so it never wipes your dev data. `pnpm dev` starts both the API on port 3000 and the staff app on port 5173. With `pnpm dev` running, `pnpm demo:seed` loads an invented demo venue with reservations, a waitlist, a second team member and keys (local only; details in the README).
+`docker compose up -d` starts a local PostgreSQL with two databases: `opencovers` (dev) and `opencovers_test` (tests). `pnpm db:migrate` applies the schema to the dev database. `pnpm test` runs the integration tests against `opencovers_test`, so it never wipes your dev data. `pnpm dev` starts the API on port 3000, the staff app on port 5173 and the site on port 5174. With `pnpm dev` running, `pnpm demo:seed` loads an invented demo venue with reservations, a waitlist, a second team member and keys (local only; details in the README).
 
 The API lives in `apps/api`. The staff frontend lives in `apps/web`; run `pnpm --filter @opencovers/web dev` to start only the frontend.
+
+## Other parts to know
+
+- **Widget.** The guest booking widget lives in `apps/widget`. The API serves its build at `/w/{bookingKey}`, and in development the staff app's server proxies that path, so it opens at `http://localhost:5173/w/{bookingKey}`.
+- **Staff app languages.** The staff app speaks Spanish and English. Its texts live in one catalog per area under `apps/web/src/i18n/`; see the [README there](apps/web/src/i18n/README.md) before you add a string.
+- **Demo template.** A feature that adds a screen or a setting also adds it to the demo template, `apps/api/src/demo/template.ts`, so the hosted demo shows it ([ADR-0022](docs/adr/0022-hosted-demo-sandbox.md)).
+- **Agent-authored pull requests.** If an AI agent wrote the pull request, tick the "Agent-authored" box in the pull request template. See [docs/collaboration-security.md](docs/collaboration-security.md).
 
 ## Pull requests
 
