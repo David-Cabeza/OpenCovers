@@ -122,10 +122,12 @@
         </li>
         <li>
           <strong>Con Google</strong> pedimos los permisos básicos (<code>openid</code>,
-          <code>email</code>, <code>profile</code>). Google nos da tu correo verificado, tu nombre,
-          la dirección de tu foto de perfil y los identificadores y tokens de ese inicio de sesión.
-          Guardamos todo ello con tu cuenta. Si Google no confirma que tu correo está verificado, no
-          entras.
+          <code>email</code>, <code>profile</code>). Google nos da tu identificador de usuario, tu
+          correo verificado, tu nombre y, si la tiene, la dirección de tu foto de perfil. Guardamos
+          con tu cuenta esos datos de identificación, que necesitamos para gestionarla. Los tokens
+          que Google entrega durante el inicio de sesión no se conservan una vez completado. No
+          accedemos a tu correo de Google, a tus archivos ni a ningún otro servicio de Google. Si
+          Google no confirma que tu correo está verificado, no entras.
         </li>
         <li>
           <strong>Cada sesión</strong> guarda la fecha, la dirección IP y el navegador
