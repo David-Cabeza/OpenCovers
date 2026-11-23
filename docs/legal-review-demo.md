@@ -13,7 +13,7 @@ The demo gives each visitor a sandbox restaurant of their own, filled with inven
 | Data | Why | Kept |
 | --- | --- | --- |
 | Email address, normalized email (lowercase, Gmail dots and `+tag` removed) | Account, one sandbox per person | Until deletion, 14 days after the last visit |
-| With Google: name, photo URL, verified-email flag, provider ids and tokens (scopes `openid email profile`) | Sign in | Same |
+| With Google: Google user id, name, photo URL, verified-email flag (scopes `openid email profile`). The tokens Google returns are not stored (PR #392) | Sign in | Same |
 | Pending magic link: address and a hash of the link, never the link | Sign in; the link expires in 5 minutes and works once | Until it expires |
 | Session: date, IP address, user agent | Session security; 7 days, renewed on use | Until the session or the account is deleted |
 | Whatever the visitor adds to the sandbox: bookings, guests, notes, blocks, API keys; and what anyone types into its guest widget (name, email or phone, comment, the venue-communications box) | The product working | Until deletion, 14 days after the last visit |
