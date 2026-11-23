@@ -31,7 +31,7 @@ const Lede = ({ Title }: { Title: "h1" | "h2" }) => (
 /* The home keeps the hook: the lede, the ten-minute route and a way in. The page has the whole Brigada. */
 export function BrigadaTeaser() {
   return (
-    <section id="brigada" className="brig" aria-labelledby="brigada-t">
+    <section id="brigada" className="brig teaser" aria-labelledby="brigada-t">
       <Lede Title="h2" />
       <RouteOfTen />
       <div className="sub acts">
