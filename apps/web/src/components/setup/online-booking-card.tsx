@@ -540,13 +540,14 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                 <div>
                   <Label htmlFor="ob-waitlist">{t("onlinebooking.waitlist.label")}</Label>
                   <p id="ob-waitlist-help" className="text-sm text-muted-foreground">
-                    {t("onlinebooking.waitlist.help")}
+                    {demo?.enabled ? t("onlinebooking.waitlist.demo") : t("onlinebooking.waitlist.help")}
                   </p>
                 </div>
                 <Switch
                   id="ob-waitlist"
                   aria-describedby="ob-waitlist-help"
-                  checked={form.waitlistEnabled}
+                  checked={form.waitlistEnabled && !demo?.enabled}
+                  disabled={demo?.enabled === true}
                   onCheckedChange={(v) => setForm({ ...form, waitlistEnabled: v })}
                 />
               </div>
