@@ -4,7 +4,7 @@
 - Date: 2026-11-17
 - Deciders: David Cabeza
 
-Nothing in this record is built. It decides the design so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow it, in that order. The maintainer accepted decisions 1 to 14 and answered Q1 to Q4 on 2026-11-17. The other open questions are answered before the stage that needs them.
+Built so far: stages 0 to 7, 9, 10, 12 and 15 of the staged table in section 7 (stages 8 and 11 wait on the legal review, stage 13 is not built, and stage 14 is deferred by Q2). The record decided the design so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow it, in that order. The maintainer accepted decisions 1 to 14 and answered Q1 to Q4 on 2026-11-17. The other open questions are answered before the stage that needs them.
 
 ## Decisions at a glance
 

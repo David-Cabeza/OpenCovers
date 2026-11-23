@@ -4,7 +4,7 @@
 - Date: 2026-11-21
 - Deciders: David Cabeza
 
-Nothing in this record is built. It proposes how guest emails follow the language the guest booked in, so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow, in that order. It changes rules of [ADR-0017](0017-booking-widget-and-self-service-link.md) and [ADR-0021](0021-widget-day-status-zones-waitlist.md), listed under Consequences. Open questions for the owner are marked `Q1` to `Q7`. All seven are decided, see "Open questions for the owner" (now answered).
+Built so far: stages 1 to 4 of section 5 (contract, email catalogs, the stored `locale` and the widget sending it), plus the waitlist join email of stage 6. Stage 5 is optional and not scheduled. The record proposed how guest emails follow the language the guest booked in, so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow, in that order. It changes rules of [ADR-0017](0017-booking-widget-and-self-service-link.md) and [ADR-0021](0021-widget-day-status-zones-waitlist.md), listed under Consequences. Open questions for the owner are marked `Q1` to `Q7`. All seven are decided, see "Open questions for the owner" (now answered).
 
 ## Decisions at a glance
 

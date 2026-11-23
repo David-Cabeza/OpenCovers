@@ -1,6 +1,6 @@
 # ADR-0013: Booking policy: horizon, per-guest cap, blocked dates
 
-- Status: Proposed
+- Status: Accepted (owner, 2026-11-23). Built: C35 and `booking-policy.test.ts`.
 - Date: 2026-11-16
 - Deciders: David Cabeza
 

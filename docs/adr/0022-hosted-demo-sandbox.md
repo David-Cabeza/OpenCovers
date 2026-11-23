@@ -89,6 +89,14 @@ With `DEMO_MODE=1` the demo offers Spanish and English only. The widget's `ca`, 
 
 The sample restaurant also publishes no phone number. The number it had looked like a real Madrid landline. The widget already renders without a phone. Sandboxes created before this change keep the old number until they expire (14 days after the last sign-in, decision 9). No migration, because the demo is not public yet.
 
+## Amendment, 2026-11-23: what is built
+
+Facts only. The status stays Proposed until the owner accepts the record.
+
+- **The "Reset my demo" button of decision 5 is not built.** A search of `apps/api/src` and `apps/web/src` finds no such route or control. A sandbox expires 14 days after its owner's last sign-in (`SANDBOX_TTL_DAYS`).
+- **Sandbox caps as built** (`apps/api/src/demo/settings.ts`, each overridable by a `DEMO_MAX_*` variable): 150 reservations, 100 guests, 60 waitlist entries, 40 tables, 8 services, 40 floor items, 20 invitations, 10 API keys and 50 blocklist entries per sandbox. The demo hosts at most 500 live sandboxes and 100 new ones per 24 hours. At most 3 sandboxes build at once, with 50 sign-ins allowed to wait.
+- **The demo opened to the public on 2026-11-21.** It collects no leads. The visitor accepts the terms by continuing, and the demo offers Spanish and English only.
+
 ## Alternatives considered
 
 - **One shared demo venue.** Cheapest, but visitors overwrite each other's data and the venue looks broken after the first hour. A nightly reset would still break live sessions. Rejected.
