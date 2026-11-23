@@ -1,0 +1,44 @@
+name: uptime
+
+# Probes the hosted demo and the public site every 15 minutes. A failed run is the alert: GitHub emails the
+# repository owner when a scheduled workflow fails. Each probe is tried 3 times, 20 seconds apart, so one blip
+# does not alert. Needs no secrets. Notes: docs/deploy.md#monitoring.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  probe:
+    # Forks do not monitor the project's hosts.
+    if: github.repository == 'David-Cabeza/OpenCovers'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      DEMO_URL: https://demo.opencovers.dev
+      SITE_URL: https://opencovers.dev
+    steps:
+      - name: Probe the demo and the site
+        run: |
+          fail=0
+          # probe <url> <expected substring, or "-" for status only>
+          probe() {
+            url=$1 want=$2
+            for try in 1 2 3; do
+              if body=$(curl -fsS --max-time 10 "$url") && { [ "$want" = "-" ] || [[ $body == *"$want"* ]]; }; then
+                echo "ok   $url"
+                return 0
+              fi
+              echo "try $try failed: $url"
+              [ "$try" -lt 3 ] && sleep 20
+            done
+            echo "::error::$url is down or did not answer $want"
+            return 1
+          }
+          probe "$DEMO_URL/health" '"ok":true' || fail=1
+          probe "$DEMO_URL/api/demo/status" '"enabled":true' || fail=1
+          probe "$SITE_URL/" - || fail=1
+          exit "$fail"

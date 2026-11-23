@@ -330,6 +330,10 @@ Run through these steps before you publish your demo. The project's own status i
 8. Set the `DEMO_SSH_*` secrets on the `demo` environment, and run `deploy-demo` once by hand until it is green.
 9. Last, set `url` in `apps/site/demo.json` to your demo's address, so the site links to it from the Spanish hero, the English page and `llms.txt`. Leave it empty until the demo is live.
 
+### Monitoring
+
+`.github/workflows/uptime.yml` runs every 15 minutes and on demand. It requests `https://demo.opencovers.dev/health` (expects `"ok":true`), `/api/demo/status` (expects `"enabled":true`) and `https://opencovers.dev/`, three tries each, 20 seconds apart. A probe that still fails fails the run, and GitHub emails the repository owner about the failed run. GitHub documents that scheduled runs can be delayed under load, so expect alerts several minutes late, and that scheduled workflows in a public repository are disabled after 60 days without repository activity. It reports up or down only. It keeps no metrics and no logs, and it does not look inside the API. A fork probes nothing, because the job runs only in the project's repository.
+
 ## Public site
 
 The project's site is built by `.github/workflows/deploy-site.yml` and published to GitHub Pages at **opencovers.dev**. The `CNAME` file in `apps/site/public/` pins the custom domain. A fork has no need for this workflow. Build with `pnpm --filter @opencovers/site build` and serve `apps/site/dist` wherever you like.
