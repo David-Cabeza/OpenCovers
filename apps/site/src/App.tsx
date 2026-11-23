@@ -218,7 +218,7 @@ function Hero() {
       <div className="copy">
         <h1 className="rv" style={d(0)}>Tu libro de reservas es tuyo</h1>
         <p className="lead rv" style={d(90)}>
-          Motor de reservas open source para restaurantes. Sala trabaja con una app de agenda y plano; los clientes reservan desde tu web con un widget, hoy en pruebas; las plataformas y los agentes de IA entran por la API y el servidor MCP.
+          Motor de reservas open source para restaurantes, con API y servidor MCP.
         </p>
         <div className="acts rv" style={d(180)}>
           {DEMO_URL && <a className="btn accent" href={DEMO_URL}>Probar la demo</a>}
