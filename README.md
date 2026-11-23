@@ -4,7 +4,9 @@
 
 # OpenCovers
 
-**The open-source reservations engine for restaurants — availability, bookings, tables, and the event feed, with an API and an MCP server.**
+**The open-source reservations engine for restaurants. An open base for developers, shaped by people with years in hospitality, where the venue owns its data.**
+
+<sub>Availability, bookings, tables and the event feed, with an HTTP API and an MCP server.</sub>
 
 <sub>Pre-alpha: it runs locally with tests and is not ready for a real venue. Public site: <a href="https://opencovers.dev">opencovers.dev</a>. A hosted demo, a sandbox with invented data, is open at <a href="https://demo.opencovers.dev">demo.opencovers.dev</a>.</sub>
 
@@ -26,9 +28,15 @@
 
 ## Why
 
-Most booking systems are tied to a CRM, a point-of-sale system, or a single vendor. A venue that changes its front end or its messaging provider risks losing its reservation book.
+Venues have asked their reservation vendor for the same missing feature for years. The answer is always the same: it went to the product team, it has no return, and there are other priorities right now. The venue waits, or works around it, and has no way to build it.
 
-OpenCovers keeps the book independent. Any platform or AI agent reads availability, creates a booking, modifies it, or cancels it through the same contract — and the no-double-booking rule is enforced by the database, not by application code.
+OpenCovers is an open base that answers that. Any developer can build on it, and it is shaped by people with years in hospitality, so it follows what venues need and not what a vendor's roadmap can justify.
+
+- **The venue owns its book.** The data stays with the venue, in a database it controls. No CRM, point-of-sale system or single vendor holds it, so changing a front end or a messaging provider does not put the reservation book at risk.
+- **If a feature is missing, build it.** Contribute it, or fork the project and take it your own way. No one has to agree first that it pays.
+- **One contract for everything.** Any platform or AI agent reads availability, creates a booking, modifies it, or cancels it through the same contract. The no-double-booking rule is enforced by the database, not by application code.
+
+**Where it stands.** Pre-alpha. It already has the booking engine, the staff app, a guest booking widget, a waitlist and an MCP server, a public [roadmap](ROADMAP.md) for what comes next, and a hosted demo you can try now. It needs collaborators and [sponsors](#sponsors) to stay maintained and keep growing.
 
 **Who it is for.** Developers and agencies building a booking front end or an agent, and restaurants with technical help that want to own their book. Not yet for a venue that needs a supported service: this is pre-alpha.
 
