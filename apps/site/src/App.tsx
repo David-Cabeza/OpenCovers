@@ -217,33 +217,29 @@ export default function App() {
   );
 }
 
-/* Live star count from the public GitHub API. Cached for 10 minutes; the button
-   still works as a plain link if the request fails or is rate-limited. */
+/* Live star count from the public GitHub API. Nothing is stored in the visitor's browser:
+   the buttons that mount together share one request, and the count lives in memory only.
+   The button still works as a plain link if the request fails or is rate-limited. */
+let starsInFlight: Promise<number | null> | null = null;
+
+function fetchStars(): Promise<number | null> {
+  starsInFlight ??= fetch(REPO_API, { headers: { Accept: "application/vnd.github+json" } })
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((j) => (typeof j.stargazers_count === "number" ? (j.stargazers_count as number) : null))
+    .catch(() => null)
+    .finally(() => {
+      starsInFlight = null;
+    });
+  return starsInFlight;
+}
+
 function useStars() {
   const [stars, setStars] = useState<number | null>(null);
   useEffect(() => {
     let alive = true;
-    try {
-      const cached = JSON.parse(sessionStorage.getItem("oc-stars") ?? "null");
-      if (cached && Date.now() - cached.t < 600_000) {
-        setStars(cached.n);
-        return;
-      }
-    } catch {
-      /* storage unavailable */
-    }
-    fetch(REPO_API, { headers: { Accept: "application/vnd.github+json" } })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j) => {
-        if (!alive || typeof j.stargazers_count !== "number") return;
-        setStars(j.stargazers_count);
-        try {
-          sessionStorage.setItem("oc-stars", JSON.stringify({ n: j.stargazers_count, t: Date.now() }));
-        } catch {
-          /* ignore */
-        }
-      })
-      .catch(() => {});
+    fetchStars().then((n) => {
+      if (alive) setStars(n);
+    });
     return () => {
       alive = false;
     };

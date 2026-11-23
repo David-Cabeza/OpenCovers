@@ -176,8 +176,13 @@ describe("GitHub star count", () => {
   const stubStars = (n: number) =>
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ stargazers_count: n }))));
 
-  beforeEach(() => {
-    sessionStorage.clear();
+  it("makes one request for both buttons and stores nothing in the browser", async () => {
+    stubStars(80);
+    render(<App />);
+    await waitFor(() => expect(screen.getAllByRole("link", { name: /GitHub, 80/ }).length).toBe(2));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.length).toBe(0);
+    expect(localStorage.length).toBe(0);
   });
 
   it("hides the count and the number in the aria-label below 50 stars", async () => {
