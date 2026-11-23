@@ -931,6 +931,172 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/services/{name}:
+    delete:
+      operationId: venue.deleteService
+      summary: Delete a service by name
+      description: |
+        Removes the service with that name from this venue and answers with
+        the services that remain. The name is matched exactly and must be
+        URL-encoded in the path. A name that no service of the venue has, and
+        a name that belongs only to another venue, change nothing and still
+        answer `200`. The call takes no body and no `Idempotency-Key`, and it
+        ignores both. Repeating it is harmless.
+
+        A delete is never refused because the service is in use. Reservations
+        keep the service name they were booked under, so they read back
+        unchanged and stay in the agenda. Nothing else is rewritten: a
+        `services` list in the online booking settings that names the service
+        keeps the name. After the delete the service no longer covers any
+        time, so availability omits it and a create or walk-in for a time only
+        that service covered fails with `outside_hours`.
+
+        Admin only. A `read` or `write` key or role fails with `forbidden`.
+        Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The service name, as `venue.upsertService` stored it.
+      responses:
+        "200":
+          description: The venue's services after the delete, by opening time
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [services]
+                properties:
+                  services:
+                    type: array
+                    items: { $ref: "#/components/schemas/Service" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/tables:
+    get:
+      operationId: venue.listTables
+      summary: List the venue's tables
+      description: |
+        Every table of the venue, ordered by `name` (ties in no fixed order).
+        Any role may read it, `read` included. Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The tables
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TableList" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: venue.upsertTable
+      summary: Create or replace a table by id
+      description: |
+        Creates the table, or replaces the one with the same `id` in this
+        venue. The replace sets `name`, `seats`, `zone` and `shape`, and a
+        `zone` or `shape` left out goes back to its default (`""` and
+        `round`), it does not keep the stored value. The layout (`posX`,
+        `posY`, `rotation`) is never touched by this call, so a replace keeps
+        it. It answers `200`, new table or not, with the venue's tables.
+
+        `id` and `name` must be strings and `id` must not be empty. `seats`
+        must be an integer of at least 1. Anything else fails with
+        `invalid_request` and changes nothing. `name` may be empty. A `zone`
+        or `shape` that is not a string is ignored, as if left out, and
+        `shape` is not checked against a list. A table `id` is unique per
+        venue, and the same `id` in another venue is another table.
+
+        The call takes no `Idempotency-Key` and ignores one. The same body
+        gives the same state, so a retry is safe. Admin only. A `read` or
+        `write` key or role fails with `forbidden`. Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TableUpsert" }
+      responses:
+        "200":
+          description: The venue's tables after the write
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TableList" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/tables/{tableId}:
+    patch:
+      operationId: venue.updateTableLayout
+      summary: Move or rotate a table on the floor plan
+      description: |
+        Sets the position and rotation of one table. Only `x`, `y` and
+        `rotation` are read, each only when it is a JSON number, and they
+        write `posX`, `posY` and `rotation`. Any other field, `name` and
+        `seats` included, and a value that is not a number, is ignored. A
+        body with none of the three, an empty one included, changes nothing.
+        The values are stored as given, with no range or unit check.
+
+        A `tableId` that is not a table of this venue changes nothing and
+        still answers `200`, as does the id of a table of another venue. The
+        call takes no `Idempotency-Key` and ignores one. Admin only. A `read`
+        or `write` key or role fails with `forbidden`. Not exposed through
+        MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/tableId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TableLayout" }
+      responses:
+        "200":
+          description: The venue's tables after the write
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TableList" }
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: venue.deleteTable
+      summary: Delete a table
+      description: |
+        Removes the table from this venue and answers with the tables that
+        remain. A `tableId` that is not a table of the venue, or that belongs
+        only to another venue, changes nothing and still answers `200`. The
+        call takes no body and no `Idempotency-Key`, and it ignores both.
+
+        A delete is never refused because the table is in use, and it does
+        not cancel or move any reservation. The table stops being a table of
+        the venue at once: a create, modify or walk-in that names its id in
+        `tables` fails with `invalid_request`, and auto-assignment, `capacity`
+        in pacing and the floor plan no longer count it. The reservations
+        that held it read back with that table left out of `tables`, so a
+        reservation that held only this table reads `tables: []`. The hold
+        itself is not released. It stays for its time window, so a table
+        created later with the same `id` is taken for that window and a
+        create on it fails with `slot_taken`. The hold ends when the
+        reservation is cancelled or its window passes.
+
+        Admin only. A `read` or `write` key or role fails with `forbidden`.
+        Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/tableId"
+      responses:
+        "200":
+          description: The venue's tables after the delete
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TableList" }
+        default:
+          $ref: "#/components/responses/Error"
+
   /venues/{venueId}/events:
     get:
       operationId: reservation.events
@@ -3015,6 +3181,12 @@ components:
         The same key as `idempotencyKey`, with the same semantics. Optional
         here because these routes took no key before and existing callers
         send none. A call without it is not deduplicated.
+    tableId:
+      name: tableId
+      in: path
+      required: true
+      schema: { type: string }
+      description: The table id.
     entryId:
       name: entryId
       in: path
@@ -4166,6 +4338,50 @@ components:
           type: integer
           minimum: 1
           description: The largest party the service takes. Absent when there is no maximum.
+
+    Table:
+      type: object
+      required: [id, name, seats, zone, shape, posX, posY, rotation]
+      properties:
+        id: { type: string, description: The table id, unique per venue. }
+        name: { type: string }
+        seats: { type: integer, minimum: 1 }
+        zone:
+          type: string
+          description: The zone the table sits in. Empty when it has none.
+        shape:
+          type: string
+          description: A free string for the floor plan. `round` unless set.
+          example: round
+        posX: { type: integer, description: "Floor plan position, 0 until set." }
+        posY: { type: integer, description: "Floor plan position, 0 until set." }
+        rotation: { type: integer, description: "Floor plan rotation, 0 until set." }
+
+    TableList:
+      type: object
+      required: [tables]
+      properties:
+        tables:
+          type: array
+          items: { $ref: "#/components/schemas/Table" }
+
+    TableUpsert:
+      type: object
+      required: [id, name, seats]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string }
+        seats: { type: integer, minimum: 1 }
+        zone: { type: string, description: Defaults to the empty string. }
+        shape: { type: string, description: Defaults to `round`. }
+
+    TableLayout:
+      type: object
+      description: Each field is read only when it is a number. Others are ignored.
+      properties:
+        x: { type: integer, description: Written to `posX`. }
+        y: { type: integer, description: Written to `posY`. }
+        rotation: { type: integer }
 
     ErasureResult:
       type: object
