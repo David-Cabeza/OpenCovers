@@ -199,8 +199,9 @@ export default function App() {
 
   return (
     <>
+      <a className="skip" href="#contenido">Saltar al contenido</a>
       <Nav />
-      <main>
+      <main id="contenido" tabIndex={-1}>
         <Hero />
         <Intro />
         <Features />
@@ -270,7 +271,18 @@ function GithubButton() {
   );
 }
 
+const SECTIONS = [
+  { href: "#features", label: "Por qué" },
+  { href: "#prueba", label: "Pruébalo" },
+  { href: "#motor", label: "Dentro" },
+  { href: "#hoja-de-ruta", label: "Hoja de ruta" },
+  { href: "#brigada", label: "La Brigada" },
+  { href: "#faq", label: "Preguntas" },
+];
+
 function Nav() {
+  const [open, setOpen] = useState(false);
+  const btn = useRef<HTMLButtonElement>(null);
   return (
     <header className="nav">
       <div className="in">
@@ -278,14 +290,30 @@ function Nav() {
           <img src="/mark.svg" alt="" />
           OpenCovers
         </a>
-        <ul>
-          <li><a href="#features">Por qué</a></li>
-          <li><a href="#prueba">Pruébalo</a></li>
-          <li><a href="#motor">Dentro</a></li>
-          <li><a href="#hoja-de-ruta">Hoja de ruta</a></li>
-          <li><a href="#brigada">La Brigada</a></li>
-          <li><a href="#faq">Preguntas</a></li>
-        </ul>
+        <nav
+          className="sections"
+          aria-label="Secciones"
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && open) {
+              setOpen(false);
+              btn.current?.focus();
+            }
+          }}
+        >
+          <ul className="links">
+            {SECTIONS.map((x) => (
+              <li key={x.href}><a href={x.href}>{x.label}</a></li>
+            ))}
+          </ul>
+          <button ref={btn} type="button" className="menubtn" aria-expanded={open} aria-controls="menu" onClick={() => setOpen(!open)}>
+            Menú
+          </button>
+          <ul id="menu" className="menu" hidden={!open}>
+            {SECTIONS.map((x) => (
+              <li key={x.href}><a href={x.href} onClick={() => setOpen(false)}>{x.label}</a></li>
+            ))}
+          </ul>
+        </nav>
         <div className="navacts">
           {DEMO_URL && <a className="btn accent navdemo" href={DEMO_URL}>Probar la demo</a>}
           <GithubButton />
