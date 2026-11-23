@@ -1,0 +1,7 @@
+# Report vulnerabilities privately. Policy: SECURITY.md in the repository.
+# Renew Expires at least once a year; the site tests fail 30 days before it.
+Contact: https://github.com/David-Cabeza/OpenCovers/security/advisories/new
+Expires: 2027-11-01T00:00:00.000Z
+Preferred-Languages: es, en
+Policy: https://github.com/David-Cabeza/OpenCovers/blob/main/SECURITY.md
+Canonical: https://opencovers.dev/.well-known/security.txt

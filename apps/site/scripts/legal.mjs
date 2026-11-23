@@ -12,3 +12,6 @@ export function injectLegal(html, env) {
   const out = html.replace(pattern, (token) => (values[token] !== "" ? escapeHtml(values[token]) : token));
   return { html: out, missing: Object.keys(TOKENS).filter((token) => out.includes(token) && values[token] === "") };
 }
+
+/** Drops HTML comments. The source pages keep open review notes in comments, which must not reach the live page. */
+export const stripComments = (html) => html.replace(/<!--[\s\S]*?-->/g, "");
