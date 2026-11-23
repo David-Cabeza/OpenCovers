@@ -19,6 +19,9 @@ describe("public site", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Tu libro de reservas es tuyo" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText("Motor de reservas open source para restaurantes, con API y servidor MCP."),
+    ).toHaveClass("lead");
     const start = screen.getByRole("link", { name: "Empieza ahora" });
     expect(start).toHaveAttribute(
       "href",
