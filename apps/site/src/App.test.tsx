@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { commitments } from "./roadmap";
+import { siteFileExists } from "./test-site";
+import { counters } from "./roadmap";
 
 describe("public site", () => {
   beforeEach(() => {
@@ -88,55 +89,32 @@ describe("public site", () => {
     const paths = [...container.querySelectorAll("a, img, source")]
       .map((el) => el.getAttribute("href") ?? el.getAttribute("src") ?? "")
       .filter((p) => p.startsWith("/") && p !== "/"); // "/" is the page itself (the brand link)
-    expect(paths).toEqual(expect.arrayContaining(["/privacidad.html", "/condiciones.html", "/en/"]));
-    for (const p of paths) {
-      const file = p.endsWith("/") ? `${p}index.html` : p;
-      expect(existsSync(resolve(process.cwd(), "public", file.slice(1))), p).toBe(true);
-    }
+    expect(paths).toEqual(expect.arrayContaining(["/privacidad.html", "/condiciones.html", "/en/", "/hoja-de-ruta/"]));
+    for (const p of paths) expect(siteFileExists(p), p).toBe(true);
   });
 
-  it("renders the roadmap, the FAQ and the closing call to action", () => {
+  it("renders the FAQ, the closing call to action and a roadmap summary that links to the page", () => {
     const { container } = render(<App />);
 
     expect(screen.getByRole("heading", { name: "Hoja de ruta 2027" })).toBeInTheDocument();
-    for (const id of ["features", "motor", "hoja-de-ruta", "faq", "empezar", "locales-fundadores"]) {
+    for (const id of ["features", "motor", "hoja-de-ruta", "faq", "empezar"]) {
       expect(container.querySelector(`#${id}`), id).not.toBeNull();
     }
-    for (const name of ["La Prueba del Doble", "Primer Servicio", "Sin el Autor"]) {
-      expect(screen.getByRole("heading", { name }), name).toBeInTheDocument();
-    }
+    const roadmap = container.querySelector("#hoja-de-ruta")!;
+    expect(roadmap.querySelectorAll("a[href='/hoja-de-ruta/']")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Ver la hoja de ruta 2027" })).toHaveAttribute("href", "/hoja-de-ruta/");
   });
 
-  it("shows every 2027 commitment, the counters at zero and the rule that failures stay", () => {
+  it("keeps the three counters, with their floor and notes, and none of the commitment table on the home", () => {
     const { container } = render(<App />);
-    const rows = [...container.querySelectorAll("table.commit tbody tr")];
-    expect(rows.map((r) => r.id)).toEqual(commitments.map((c) => c.id.toLowerCase()));
-    expect(commitments.map((c) => c.id)).toEqual(Array.from({ length: 10 }, (_, i) => `C${i + 1}`));
-    for (const c of commitments) {
-      const row = container.querySelector(`#${c.id.toLowerCase()}`)!;
-      expect(row.textContent).toContain(c.title);
-      expect(row.textContent).toContain(c.state);
-      expect(row.textContent).toContain(c.ifMissed);
+    expect(container.querySelector("table.commit")).toBeNull();
+    expect(container.querySelector("#locales-fundadores")).toBeNull();
+    const counts = [...container.querySelectorAll("#hoja-de-ruta .counters li")];
+    expect(counts.map((li) => li.querySelector(".v")?.textContent)).toEqual(["0", "0", "0"]);
+    for (const [i, c] of counters.entries()) {
+      expect(counts[i].textContent).toContain(`objetivo ${c.goal} · suelo ${c.floor}`);
+      if (c.note) expect(counts[i].textContent).toContain(c.note);
     }
-    const counts = [...container.querySelectorAll(".counters li")].map((li) => li.querySelector(".v")?.textContent);
-    expect(counts).toEqual(["0", "0", "0"]);
-    expect(screen.getByText(/0 de 10/)).toBeInTheDocument();
-    expect(screen.getByText(/Un compromiso fallado se queda en el cuadro/)).toBeInTheDocument();
-    expect(container.querySelector("table.commit caption")).not.toBeNull();
-    for (const th of container.querySelectorAll("table.commit thead th")) expect(th).toHaveAttribute("scope", "col");
-  });
-
-  it("marks a commitment as done only with proof, and never drops a commitment", () => {
-    for (const c of commitments.filter((x) => x.state === "cumplido")) {
-      expect(c.evidence.length, c.id).toBeGreaterThan(0);
-      for (const e of c.evidence) expect(e.href, c.id).toMatch(/^https:\/\//);
-    }
-  });
-
-  it("collects no personal data in the founding venues section", () => {
-    const { container } = render(<App />);
-    const section = container.querySelector("#locales-fundadores")!;
-    expect(section.querySelector("form, input, textarea, a[href^='mailto:']")).toBeNull();
   });
 });
 

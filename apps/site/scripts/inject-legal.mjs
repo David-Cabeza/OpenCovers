@@ -3,6 +3,7 @@
 // A local build leaves the tokens visible. The values are never printed.
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { prerendered } from "./pages.mjs";
 import { injectLegal, stripComments } from "./legal.mjs";
 
 const dist = path.resolve(import.meta.dirname, "../dist");
@@ -18,9 +19,9 @@ async function* htmlFiles(dir) {
 const problems = [];
 for await (const file of htmlFiles(dist)) {
   const before = await readFile(file, "utf8");
-  // The home page is rendered by React, whose `<!-- -->` markers separate adjacent text nodes, so it keeps its comments.
+  // Pages rendered by React keep their `<!-- -->` markers: they separate adjacent text nodes, and hydration fails without them.
   const { html: injected, missing } = injectLegal(before, process.env);
-  const html = path.relative(dist, file) === "index.html" ? injected : stripComments(injected);
+  const html = prerendered.some((p) => p.file === path.relative(dist, file).split(path.sep).join("/")) ? injected : stripComments(injected);
   if (html !== before) await writeFile(file, html);
   if (missing.length > 0) problems.push(`${path.relative(dist, file)}: ${missing.join(", ")}`);
 }

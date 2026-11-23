@@ -13,6 +13,14 @@ export default defineConfig({
     setupFiles: ["./src/test-setup.ts"],
     css: false,
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(import.meta.dirname, "index.html"),
+        roadmap: path.resolve(import.meta.dirname, "hoja-de-ruta/index.html"),
+      },
+    },
+  },
   server: {
     port: 5174,
   },

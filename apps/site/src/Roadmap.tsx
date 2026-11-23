@@ -6,6 +6,9 @@ import {
   type CommitmentState, type Gate, type Quarter, type Today,
 } from "./roadmap";
 
+export const ROAD_LEDE =
+  "Pre-alpha. Hoy ningún restaurante usa OpenCovers. Esto es lo que nos hemos comprometido a hacer en 2027, con fecha, con medida y con la prueba a la vista.";
+
 const ROADMAP_URL = `${REPO}/blob/main/ROADMAP.md`;
 
 const STATE_ICON: Record<CommitmentState, string> = {
@@ -49,20 +52,26 @@ function Manifesto() {
   );
 }
 
+function Counters() {
+  return (
+    <ul className="counters">
+      {counters.map((c) => (
+        <li key={c.label}>
+          <span className="v">{c.value}</span>
+          <span className="l">{c.label}</span>
+          <span className="o">{c.value} de {c.goal} · objetivo {c.goal} · suelo {c.floor}</span>
+          {c.note && <span className="o">{c.note}</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Board() {
   return (
     <div className="board">
       <h3>El cuadro · actualizado el {updatedAt}</h3>
-      <ul className="counters">
-        {counters.map((c) => (
-          <li key={c.label}>
-            <span className="v">{c.value}</span>
-            <span className="l">{c.label}</span>
-            <span className="o">{c.value} de {c.goal} · objetivo {c.goal} · suelo {c.floor}</span>
-            {c.note && <span className="o">{c.note}</span>}
-          </li>
-        ))}
-      </ul>
+      <Counters />
       <p className="fine">{countersNote}</p>
       <p className="rule"><b>La regla del cuadro.</b> {boardRule}</p>
       <table className="commit">
@@ -230,14 +239,13 @@ function FoundingVenues() {
   );
 }
 
-export function Roadmap() {
+export function Roadmap({ pageTitle = false }: { pageTitle?: boolean }) {
+  const Title = pageTitle ? "h1" : "h2";
   return (
     <section id="hoja-de-ruta" className="road" aria-labelledby="road-h">
       <div className="top">
-        <h2 id="road-h" className="rv">Hoja de ruta 2027</h2>
-        <p className="rv" style={d(90)}>
-          Pre-alpha. Hoy ningún restaurante usa OpenCovers. Esto es lo que nos hemos comprometido a hacer en 2027, con fecha, con medida y con la prueba a la vista.
-        </p>
+        <Title id="road-h" className="rv">Hoja de ruta 2027</Title>
+        <p className="rv" style={d(90)}>{ROAD_LEDE}</p>
       </div>
       <Manifesto />
       <Board />
@@ -284,6 +292,28 @@ export function Roadmap() {
       <div className="acts rv">
         <a className="btn accent" href={ROADMAP_URL}>Ver la hoja de ruta completa</a>
         <a className="btn ghost" href={allTasksHref}>Ver tareas abiertas</a>
+      </div>
+    </section>
+  );
+}
+
+/* The home shows the same counters as the page, then sends the reader on. */
+export function RoadmapTeaser() {
+  return (
+    <section id="hoja-de-ruta" className="road teaser" aria-labelledby="road-h">
+      <div className="top">
+        <h2 id="road-h" className="rv">Hoja de ruta 2027</h2>
+        <p className="rv" style={d(90)}>{ROAD_LEDE}</p>
+      </div>
+      <div className="manifesto">
+        <p className="star">{northStar}</p>
+      </div>
+      <div className="board">
+        <h3>El cuadro · actualizado el {updatedAt}</h3>
+        <Counters />
+      </div>
+      <div className="acts rv">
+        <a className="btn accent" href="/hoja-de-ruta/">Ver la hoja de ruta 2027</a>
       </div>
     </section>
   );

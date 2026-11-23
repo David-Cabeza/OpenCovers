@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as 
 import { REPO } from "./brigada";
 import { Brigada } from "./Brigada";
 import { DEMO_URL, Footer, GithubButton, Nav, d, useReveal } from "./chrome";
-import { Roadmap } from "./Roadmap";
+import { RoadmapTeaser } from "./Roadmap";
 
 /* ------------------------------------------------------------------ data */
 
@@ -173,7 +173,7 @@ export default function App() {
         <Showcase />
         <How />
         <Modules />
-        <Roadmap />
+        <RoadmapTeaser />
         <Brigada />
         <Faq />
         <Cta />
