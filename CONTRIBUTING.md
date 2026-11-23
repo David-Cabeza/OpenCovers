@@ -41,6 +41,8 @@ pnpm test
 pnpm dev
 ```
 
+Checks: `pnpm typecheck`, `pnpm check:docs` (the counts the docs restate, such as conformance cases, MCP tools and widget languages, must match their sources) and `pnpm check:publication`. CI runs all of them.
+
 `docker compose up -d` starts a local PostgreSQL with two databases: `opencovers` (dev) and `opencovers_test` (tests). `pnpm db:migrate` applies the schema to the dev database. `pnpm test` runs the integration tests against `opencovers_test`, so it never wipes your dev data. `pnpm dev` starts the API on port 3000, the staff app on port 5173 and the site on port 5174. With `pnpm dev` running, `pnpm demo:seed` loads an invented demo venue with reservations, a waitlist, a second team member and keys (local only; details in the README).
 
 The API lives in `apps/api`. The staff frontend lives in `apps/web`; run `pnpm --filter @opencovers/web dev` to start only the frontend.
