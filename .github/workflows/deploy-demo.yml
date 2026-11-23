@@ -2,7 +2,8 @@ name: deploy-demo
 
 # Redeploys the hosted demo (ADR-0022, decision 10) on every change that reaches it. Nothing runs until the owner
 # sets the DEMO_SSH_HOST secret on the `demo` environment: without it every step is skipped and the run is green.
-# CI already runs typecheck and tests on the same commit, so this workflow does not repeat them.
+# CI runs typecheck and tests on the same commit, so this workflow does not repeat them. It waits for the `test` check
+# of the ci workflow on this commit and deploys only when that check succeeded.
 # Setup and runbook: docs/deploy.md#hosted-demo.
 
 on:
@@ -21,6 +22,7 @@ on:
 
 permissions:
   contents: read
+  checks: read
 
 # One deploy at a time. A newer push waits for the running one instead of cancelling it half way.
 concurrency:
@@ -54,6 +56,35 @@ jobs:
           else
             echo "go=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # Waits for the `test` job of the ci workflow on this commit. Success deploys, any other result stops the run.
+      # Runs only when the demo is configured, so an unconfigured repository stays instantly green.
+      - name: Wait for the test check of this commit
+        if: steps.cfg.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          deadline=$((SECONDS + 20 * 60))
+          while true; do
+            row=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=test&filter=latest" \
+              --jq '.check_runs | sort_by(.id) | last | select(. != null) | "\(.status) \(.conclusion // "none")"') || row=""
+            case "$row" in
+              "completed success")
+                echo "The test check passed on $SHA. Deploying."
+                break ;;
+              "completed "*)
+                echo "::error::The test check on $SHA ended as '${row#completed }'. Not deploying. Fix CI or re-run it, then run deploy-demo again."
+                exit 1 ;;
+            esac
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::The test check on $SHA did not finish within 20 minutes (last state: ${row:-not found}). Not deploying."
+              exit 1
+            fi
+            echo "Test check on $SHA: ${row:-not started}. Waiting."
+            sleep 20
+          done
 
       - name: Prepare SSH
         if: steps.cfg.outputs.go == 'true'
