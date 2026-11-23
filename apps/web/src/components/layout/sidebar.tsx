@@ -44,6 +44,12 @@ const NAV: {
   { id: "team", labelKey: "layout.nav.team", icon: UserCogIcon, adminOnly: true },
 ];
 
+export const VIEW_IDS: readonly ViewId[] = NAV.map((n) => n.id);
+
+/** Whether the sidebar offers this screen to the role. */
+export const canSeeView = (id: ViewId, role?: Role): boolean =>
+  !NAV.find((n) => n.id === id)?.adminOnly || role === "admin";
+
 /** The name of a screen, as the sidebar shows it. */
 export const viewLabel = (id: ViewId): string => {
   const item = NAV.find((n) => n.id === id);
@@ -64,7 +70,7 @@ function NavList({
   const t = useT();
   return (
     <nav aria-label={t("layout.nav.main")} className="flex-1 space-y-1 overflow-y-auto p-3">
-      {NAV.filter((item) => !item.adminOnly || role === "admin").map((item) => {
+      {NAV.filter((item) => canSeeView(item.id, role)).map((item) => {
         const isActive = active === item.id;
         return (
           <button
