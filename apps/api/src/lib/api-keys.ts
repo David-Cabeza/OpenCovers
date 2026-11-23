@@ -70,6 +70,7 @@ export async function authenticate(
   return { ok: true, principal: row.principal, role: row.role as Role, keyId: keyIdOf(hash) };
 }
 
+/** The instance-wide key routes act on every venue, so they need an `admin` key that holds the all-venues grant. */
 export async function authenticateAdmin(db: Db, key: string): Promise<AdminResult> {
   const hash = await sha256Hex(key);
   const row = (
@@ -77,6 +78,14 @@ export async function authenticateAdmin(db: Db, key: string): Promise<AdminResul
   )[0];
   if (!row) return { ok: false, reason: "unauthorized" };
   if (row.role !== "admin") return { ok: false, reason: "forbidden" };
+  const allVenues = (
+    await db
+      .select()
+      .from(grants)
+      .where(and(eq(grants.keyHash, hash), eq(grants.venueId, "*")))
+      .limit(1)
+  )[0];
+  if (!allVenues) return { ok: false, reason: "forbidden" };
   return { ok: true, principal: row.principal };
 }
 

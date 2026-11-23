@@ -1268,15 +1268,19 @@ paths:
       operationId: auth.listKeys
       summary: List every API key of the instance
       description: |
-        The account-level key routes, not scoped to a venue. They need an
-        `apikey` header with an `admin` key, and a staff session is never
-        accepted, with or without a cookie: a request with no `apikey` fails
-        with `unauthorized`. A key of any other role fails with `forbidden`,
-        an unknown key with `unauthorized`. The venue the admin key is
-        granted does not matter: any `admin` key lists, makes and revokes
-        keys for every venue of the instance. An `admin` key cannot be made
-        through `POST /venues/{venueId}/keys`, only through `POST /auth/keys`
-        or by the operator in the database.
+        The account-level key routes, not scoped to a venue. They list, make
+        and revoke keys for every venue of the instance, so they need an
+        `apikey` header with an `admin` key that holds the all-venues grant
+        (`*`). A staff session is never accepted, with or without a cookie:
+        a request with no `apikey` fails with `unauthorized`. An `admin` key
+        granted only named venues fails with `forbidden`, even when it names
+        every venue there is, and so does a key of any other role. An
+        unknown key fails with `unauthorized`. A refused call reads and
+        writes nothing. A venue-limited `admin` key manages the keys of its
+        own venues through `/venues/{venueId}/keys`. An `admin` key cannot be
+        made through `POST /venues/{venueId}/keys`, only through
+        `POST /auth/keys` or by the operator in the database, which is how
+        the first all-venues `admin` key of an instance is made.
 
         Lists every registered key, whichever venue it is granted, ordered by
         `principal` (ties in no fixed order). An entry holds the `principal`
@@ -1304,7 +1308,8 @@ paths:
       description: |
         Registers a key the caller chose and grants it the listed venues,
         with `read`, `write` or `admin`. Same auth as `GET /auth/keys`: an
-        `admin` key in the `apikey` header, never a session. The engine does
+        all-venues `admin` key in the `apikey` header, never a session, and
+        a venue-limited `admin` key fails with `forbidden`. The engine does
         not generate the key and does not return it. The answer is `{ ok:
         true }` and holds no key value, so the caller keeps the key it chose.
         The engine stores only its SHA-256 hash.
@@ -1355,8 +1360,9 @@ paths:
 
         The next request that sends the revoked key fails with
         `unauthorized`, on any venue, with no cache and no delay. An `admin`
-        key may revoke itself. Same auth as `GET /auth/keys`: an `admin` key
-        in the `apikey` header, never a session. It takes no
+        key may revoke itself. Same auth as `GET /auth/keys`: an all-venues
+        `admin` key in the `apikey` header, never a session, and a
+        venue-limited `admin` key fails with `forbidden`. It takes no
         `Idempotency-Key` and ignores one, and a repeat gives the same state.
         Not exposed through MCP.
       requestBody:
@@ -3538,8 +3544,9 @@ components:
         guest merges need `admin`. Any other role fails with `forbidden`.
         Members, invitations, and the guest blocklist need an `admin` staff
         session, and refuse every key with `forbidden`.
-        `/auth/keys` is the reverse: it needs an `admin` key and refuses a
-        session with `unauthorized`.
+        `/auth/keys` is the reverse: it needs an `admin` key that holds the
+        all-venues grant (`*`), refuses an `admin` key limited to named
+        venues with `forbidden`, and refuses a session with `unauthorized`.
 
   parameters:
     venueId:
