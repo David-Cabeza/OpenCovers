@@ -117,6 +117,11 @@ export const faqs = [
     a: "No. OpenCovers es el motor de reservas: disponibilidad, reservas, mesas y eventos. No sustituye a tu TPV ni a tu CRM. Guarda una ficha mínima de cliente por local y más adelante se conectará con tu propia cuenta de pago, siempre abierto a combinarse con lo que ya usas.",
   },
   {
+    t: "Privacidad",
+    q: "¿Qué datos de clientes guarda?",
+    a: "Lo mínimo que necesita una reserva: nombre, un contacto, personas, fecha y hora, y una nota opcional de hasta 500 caracteres. Hay una ficha de cliente por local. Un administrador puede borrar los datos de un cliente y recibe un recuento, y el motor conserva huellas en lugar de los valores personales. Un trabajo cada hora borra los datos de clientes que superan el plazo de retención del local. Describe lo que hace el motor, no es asesoramiento legal.",
+  },
+  {
     t: "Estado",
     q: "¿En qué estado está?",
     a: "Pre-alfa. El motor, la app de sala y el servidor MCP funcionan en local y pasan sus tests. El widget de reservas para la web del local está en curso. Hay una demo abierta en demo.opencovers.dev, donde cada visitante recibe un restaurante de prueba con datos inventados. Todavía no hay un servicio gestionado en producción y aún no recomendamos usarlo para las reservas de un restaurante real. Los textos legales de la demo no los ha revisado un abogado.",
