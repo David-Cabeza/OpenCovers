@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { commitments } from "./roadmap";
 
 describe("public site", () => {
   beforeEach(() => {
@@ -64,10 +65,45 @@ describe("public site", () => {
   it("renders the roadmap, the FAQ and the closing call to action", () => {
     const { container } = render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Hoja de ruta" })).toBeInTheDocument();
-    for (const id of ["features", "motor", "hoja-de-ruta", "faq", "empezar"]) {
+    expect(screen.getByRole("heading", { name: "Hoja de ruta 2027" })).toBeInTheDocument();
+    for (const id of ["features", "motor", "hoja-de-ruta", "faq", "empezar", "locales-fundadores"]) {
       expect(container.querySelector(`#${id}`), id).not.toBeNull();
     }
+    for (const name of ["La Prueba del Doble", "Primer Servicio", "Sin el Autor"]) {
+      expect(screen.getByRole("heading", { name }), name).toBeInTheDocument();
+    }
+  });
+
+  it("shows every 2027 commitment, the counters at zero and the rule that failures stay", () => {
+    const { container } = render(<App />);
+    const rows = [...container.querySelectorAll("table.commit tbody tr")];
+    expect(rows.map((r) => r.id)).toEqual(commitments.map((c) => c.id.toLowerCase()));
+    expect(commitments.map((c) => c.id)).toEqual(Array.from({ length: 10 }, (_, i) => `C${i + 1}`));
+    for (const c of commitments) {
+      const row = container.querySelector(`#${c.id.toLowerCase()}`)!;
+      expect(row.textContent).toContain(c.title);
+      expect(row.textContent).toContain(c.state);
+      expect(row.textContent).toContain(c.ifMissed);
+    }
+    const counts = [...container.querySelectorAll(".counters li")].map((li) => li.querySelector(".v")?.textContent);
+    expect(counts).toEqual(["0", "0", "0"]);
+    expect(screen.getByText(/0 de 10/)).toBeInTheDocument();
+    expect(screen.getByText(/Un compromiso fallado se queda en el cuadro/)).toBeInTheDocument();
+    expect(container.querySelector("table.commit caption")).not.toBeNull();
+    for (const th of container.querySelectorAll("table.commit thead th")) expect(th).toHaveAttribute("scope", "col");
+  });
+
+  it("marks a commitment as done only with proof, and never drops a commitment", () => {
+    for (const c of commitments.filter((x) => x.state === "cumplido")) {
+      expect(c.evidence.length, c.id).toBeGreaterThan(0);
+      for (const e of c.evidence) expect(e.href, c.id).toMatch(/^https:\/\//);
+    }
+  });
+
+  it("collects no personal data in the founding venues section", () => {
+    const { container } = render(<App />);
+    const section = container.querySelector("#locales-fundadores")!;
+    expect(section.querySelector("form, input, textarea, a[href^='mailto:']")).toBeNull();
   });
 });
 
