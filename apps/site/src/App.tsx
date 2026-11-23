@@ -127,6 +127,11 @@ export const faqs = [
     a: "Sí. Es Apache-2.0. Para probarlo basta Node.js, pnpm y Docker. Para producción, el repositorio incluye un Compose con PostgreSQL, la API y Caddy (que obtiene el certificado HTTPS), un runbook de despliegue y una guía de refuerzo. Sigue siendo pre-alfa.",
   },
   {
+    t: "Accesibilidad",
+    q: "¿Es accesible?",
+    a: "La app de sala ha tenido un repaso de accesibilidad: títulos y regiones, controles con etiqueta, contraste, devolución del foco en los diálogos y un foco visible en el plano de sala, con pruebas automáticas en las pantallas de acceso. No hay una auditoría formal, así que cuéntanos lo que encuentres.",
+  },
+  {
     t: "Agentes",
     q: "¿Cómo lo opera un agente de IA?",
     a: "Con el servidor MCP incluido: el mismo catálogo de 18 herramientas que la API, expuesto por stdio. Está publicado en npm y en el registro oficial de MCP: npx -y @opencovers/mcp.",
@@ -679,7 +684,7 @@ function Faq() {
               key={f.q}
               className="card rv"
               data-open={open === i}
-              style={{ ...d(0), "--c": cardColors[i], "--i": i, zIndex: i + 1 } as CSSProperties}
+              style={{ ...d(0), "--c": cardColors[i % cardColors.length], "--i": i, "--n": faqs.length, zIndex: i + 1 } as CSSProperties}
             >
               <span className="tab" aria-hidden />
               <button className="q" type="button" aria-expanded={open === i} onClick={() => setOpen(open === i ? -1 : i)}>

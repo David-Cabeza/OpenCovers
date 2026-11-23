@@ -226,13 +226,13 @@ a { color: inherit; }
 .faq h2 { margin-bottom: 56px; }
 .card { position: relative; background: var(--c); padding: 20px 28px 70px; margin-top: -26px; border-radius: 0 20px 20px 20px; }
 .card:first-of-type { margin-top: 0; }
-.card .tab { position: absolute; left: calc((100% - 200px) / 5 * var(--i)); top: -40px; width: 200px; height: 40px; background: var(--c); clip-path: polygon(0 100%, 12% 0, 88% 0, 100% 100%); }
+.card .tab { position: absolute; left: calc((100% - 200px) / (var(--n) - 1) * var(--i)); top: -40px; width: 200px; height: 40px; background: var(--c); clip-path: polygon(0 100%, 12% 0, 88% 0, 100% 100%); }
 .card button.q { display: block; width: 100%; text-align: left; font-size: var(--lead); font-weight: 600; line-height: 1.25; cursor: pointer; }
 .card .a { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.5s var(--ease), opacity 0.4s; }
-.card[data-open="true"] .a { max-height: 14em; opacity: 1; }
+.card[data-open="true"] .a { max-height: 24em; opacity: 1; }
 .card .a p { padding-top: 14px; padding-bottom: 8px; }
 .faq .stack { padding-top: 40px; }
-@media (max-width: 760px) { .faq { grid-template-columns: 1fr; } .faq .col { grid-column: 1; } .card .tab { left: calc((100% - 120px) / 5 * var(--i)); width: 120px; } }
+@media (max-width: 760px) { .faq { grid-template-columns: 1fr; } .faq .col { grid-column: 1; } .card .tab { left: calc((100% - 120px) / (var(--n) - 1) * var(--i)); width: 120px; } }
 
 /* ---------- cta ---------- */
 .cta { background: var(--accent); color: var(--accent-ink); min-height: 90svh; display: grid; grid-template-columns: 5fr 1fr 5fr; padding: 40px var(--m); gap: 0; }

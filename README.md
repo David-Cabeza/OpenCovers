@@ -72,6 +72,10 @@ The staff app has a pre-shift list of who is coming and what they need, an avail
 
 The engine keeps one guest record per venue, matched by normalized email or phone. The API lists and reads guests, and an admin merges and unmerges them with an audit trail. Through the API, an admin can also block a contact. The blocklist stores a keyed hash of the contact, and a new booking from that contact is refused with `booking_declined`. There is no guest screen in the staff app yet.
 
+### ♿ Accessibility
+
+The staff app had an accessibility pass: headings and landmarks, labelled controls, text contrast, focus return in dialogs and a visible focus ring on the floor plan, with automated tests that guard the headings and landmarks of the sign-in screens. There has been no formal audit, so treat it as work in progress and report what you find.
+
 ### 🌍 Languages and themes
 
 The staff app speaks Spanish and English, with light and dark themes. A selector in the top bar (and on the sign-in screen) changes the language and the choice is kept in the browser; the first time it uses the browser's language when it is one of the two, and Spanish otherwise. The texts live in one catalog per area under `apps/web/src/i18n/`, see its README for how to add one.
