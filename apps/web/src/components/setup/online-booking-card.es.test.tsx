@@ -125,4 +125,16 @@ describe("OnlineBookingCard in Spanish", () => {
     expect(await screen.findByText("Elige al menos dos zonas, o ninguna.")).toBeInTheDocument();
     expect(screen.queryByText(/Pick at least two zones/)).not.toBeInTheDocument();
   });
+
+  it("disables the waitlist switch in the demo with a Spanish note", async () => {
+    mockApi({
+      [`GET ${PATH}`]: { body: SETTINGS },
+      "GET /v1/venues/v1/services": { body: SERVICES },
+      "GET /api/demo/status": { body: { enabled: true, googleEnabled: false } },
+    });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+    await screen.findByText("No disponible en la demo.");
+    expect(screen.getByLabelText("Lista de espera para días completos")).toBeDisabled();
+  });
 });

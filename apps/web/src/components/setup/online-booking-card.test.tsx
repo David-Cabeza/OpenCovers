@@ -885,4 +885,22 @@ describe("OnlineBookingCard widget language", () => {
     renderWithApp(<OnlineBookingCard venueId="v1" />);
     await waitFor(async () => expect(await options()).toEqual(["es", "en"]));
   });
+
+  it("shows the waitlist switch in the demo as off and disabled, with a short note", async () => {
+    setup({ waitlistEnabled: true }, { "GET /api/demo/status": { body: { enabled: true, googleEnabled: false } } });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+    await screen.findByText("Not available in the demo.");
+    const sw = screen.getByLabelText("Waitlist for full days");
+    expect(sw).toBeDisabled();
+    expect(sw).not.toBeChecked();
+  });
+
+  it("keeps the waitlist switch usable outside the demo", async () => {
+    setup({}, { "GET /api/demo/status": { body: { enabled: false, googleEnabled: false } } });
+    renderWithApp(<OnlineBookingCard venueId="v1" />);
+    await loaded();
+    expect(screen.getByLabelText("Waitlist for full days")).toBeEnabled();
+    expect(screen.queryByText("Not available in the demo.")).not.toBeInTheDocument();
+  });
 });
