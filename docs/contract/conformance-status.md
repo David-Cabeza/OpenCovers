@@ -97,4 +97,5 @@ C1 to C42, C46 to C49, C52 to C54, C56 to C66, C68, C69, C71 to C73, C74 and C75
 ## Notes
 
 - `POST /v1/venues/{venueId}/reservations/walk-in` and `GET /v1/venues/{venueId}/pacing` are now in `openapi.yaml` (checkpoint audit P1-3, T04a). They describe the code as it is. The cases that exercise them are C1, C14, C16, C21, C23, C26, C36, C57, C61 and C62, and no status changes.
+- `GET`, `POST` `/v1/venues/{venueId}/tables`, `PATCH` and `DELETE` `/v1/venues/{venueId}/tables/{tableId}` and `DELETE /v1/venues/{venueId}/services/{name}` are now in `openapi.yaml` (checkpoint audit P1-3, T04b). They describe the code as it is. The cases that exercise them are C1, C10, C22 and C36, and no status changes.
 - Email delivery is Resend. The templates in `apps/api/src/lib/mailer.ts` are placeholders pending legal review of the text and basis; sends are gated by `notificationsEnabled` (default off).

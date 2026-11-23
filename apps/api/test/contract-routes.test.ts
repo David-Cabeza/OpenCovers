@@ -19,10 +19,6 @@ const key = (method: string, p: string) =>
 const UNDOCUMENTED = [
   // to document in T04
   "GET /v1/venues/{venueId}/floor",
-  "GET /v1/venues/{venueId}/tables",
-  "POST /v1/venues/{venueId}/tables",
-  "PATCH /v1/venues/{venueId}/tables/{tableId}",
-  "DELETE /v1/venues/{venueId}/tables/{tableId}",
   "GET /v1/venues/{venueId}/floor-items",
   "POST /v1/venues/{venueId}/floor-items",
   "PATCH /v1/venues/{venueId}/floor-items/{itemId}",
@@ -33,7 +29,6 @@ const UNDOCUMENTED = [
   "GET /v1/auth/keys",
   "POST /v1/auth/keys",
   "DELETE /v1/auth/keys",
-  "DELETE /v1/venues/{venueId}/services/{name}",
 ];
 
 // Not method + path routes of the API surface: ALL is middleware (auth, CORS, limits),
