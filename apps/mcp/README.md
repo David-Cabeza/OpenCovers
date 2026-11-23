@@ -77,3 +77,14 @@ Every write that books, changes a booking or touches the waitlist takes an optio
 ## Publishing
 
 `pnpm --filter @opencovers/mcp build` compiles to `dist/`, and `prepack` does it automatically. The package is published to npm as `@opencovers/mcp` and listed in the official MCP registry through `server.json` (its `name` must match `mcpName` in `package.json`).
+
+## Releasing the MCP package
+
+Only the owner publishes, with a passkey. A release PR changes the version and `CHANGELOG.md`; it never publishes. Before publishing, from a clean checkout of `main`:
+
+1. Run `pnpm --filter @opencovers/mcp test` and `pnpm --filter @opencovers/mcp typecheck`. The version test fails if `package.json`, both fields of `server.json` and `VERSION` in `src/index.ts` differ.
+2. Run `pnpm --filter @opencovers/mcp build`, then `grep -c "X-OpenCovers-Channel" dist/client.js` and `grep -c "date must be YYYY-MM-DD" dist/index.js`. Both must be above 0.
+3. Run `npm pack --dry-run` in `apps/mcp` and check that the list holds only `dist/`, `README.md`, `LICENSE` and `package.json`.
+4. Run `npm view @opencovers/mcp version` to confirm the version you are about to publish is new.
+5. Publish: `npm publish`, then `mcp-publisher publish` from `apps/mcp`.
+6. Create the GitHub release with notes copied from `CHANGELOG.md`.
