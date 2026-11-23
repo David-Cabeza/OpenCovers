@@ -161,6 +161,27 @@ export function requireVerifiedGoogleEmail(profile: { email_verified?: boolean }
   return {};
 }
 
+/** The columns of `account` that hold what Google's token endpoint returned. */
+const OAUTH_TOKEN_FIELDS = [
+  "accessToken",
+  "refreshToken",
+  "idToken",
+  "accessTokenExpiresAt",
+  "refreshTokenExpiresAt",
+  "scope",
+] as const;
+
+/**
+ * Google only proves who signs in, so an account row keeps the Google user id and never Google's tokens. Better Auth
+ * writes them on the first sign-in, on a link to an existing user and on every later sign-in (and on a token refresh,
+ * if a row still held one). Each of those writes passes here: when it carries a token, all of them are stored as null.
+ * A password account never carries one, so it is untouched.
+ */
+function withoutOAuthTokens(data: Partial<Record<(typeof OAUTH_TOKEN_FIELDS)[number], unknown>>) {
+  if (OAUTH_TOKEN_FIELDS.every((field) => data[field] == null)) return;
+  return { data: Object.fromEntries(OAUTH_TOKEN_FIELDS.map((field) => [field, null])) };
+}
+
 const CHALLENGE_MESSAGES = {
   CHALLENGE_REQUIRED: "Solve the sign-in challenge first. Ask POST /api/demo/magic-link-challenge for one.",
   CHALLENGE_INVALID:
@@ -322,6 +343,10 @@ export function createAuth(settings: DemoSettings, deps: AuthDeps = {}) {
             if (token !== null) await grantClaimedInvitation(db, token, account.id);
           },
         },
+      },
+      account: {
+        create: { before: async (data) => withoutOAuthTokens(data) },
+        update: { before: async (data) => withoutOAuthTokens(data) },
       },
       ...(demo ? { session: { create: { after: onSession } } } : {}),
     },
