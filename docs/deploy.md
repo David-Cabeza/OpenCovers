@@ -312,26 +312,23 @@ $dc up -d --build --wait
 
 #### Privacy notice for the demo
 
-The demo's privacy notice is the "La demo" section of [`apps/site/public/privacidad.html`](../apps/site/public/privacidad.html) (live at `https://opencovers.dev/privacidad.html#demo`). It is the one source of truth: change the page, not a copy here. It is a draft for legal review, not legal advice. Its open points (controller, privacy mailbox, legal basis, international transfers, Resend region, log rotation) are listed in a comment at the top of the file and as `[...]` placeholders in the text.
+The demo's privacy notice is the "La demo" section of [`apps/site/public/privacidad.html`](../apps/site/public/privacidad.html) (live at `https://opencovers.dev/privacidad.html#demo`). It is the one source of truth: change the page, not a copy here. A fork that runs its own demo replaces the controller, the privacy mailbox, the processors and the legal bases with its own. The page was written without a lawyer's review and is not legal advice. Its open points for a reviewer are in a comment at the top of the file, and the questions are in [`legal-review-demo.md`](legal-review-demo.md).
 
-> **Demo alojada.** Si pruebas la demo en demo.opencovers.dev guardamos tu dirección de correo (o la que verifica Google) para crear tu restaurante de prueba y enviarte el enlace de acceso. Tu restaurante de prueba y tu cuenta se borran tras 14 días sin acceso. Puedes pedir el borrado escribiendo a [contacto].
->
-> **Hosted demo.** If you try the demo at demo.opencovers.dev we store your email address (or the one Google verifies) to create your sandbox restaurant and send you the sign-in link. The sandbox and your account are deleted after 14 days without sign-in. You can ask for erasure by writing to [contact].
+The page names the controller and the processors (hosting, email, sign-in, DNS) and the international transfers. The controller's tax id and address are not in the repository. The site deploy fills the `{{LEGAL_TAX_ID}}` and `{{LEGAL_ADDRESS}}` tokens from the repository secrets of the same names (`apps/site/scripts/inject-legal.mjs`). The sign-in form links to `condiciones.html` (terms of use) and `privacidad.html`, which a fork also adapts.
 
-Resend (email) and Google (sign-in) process that data, so the privacy page should name them. The sign-in form shows "By continuing you accept the terms of use and the privacy policy" with links to `apps/site/public/condiciones.html` and `privacidad.html`. The terms page is a draft without lawyer review.
+#### Launch checklist for your own demo
 
-#### Launch checklist
+Run through these steps before you publish your demo. The project's own status is in [`ROADMAP.md`](../ROADMAP.md), not here.
 
-- [ ] Legal review of the terms of use (`condiciones.html`) and of the privacy notice above, including who the controller is. Pending and optional. Both texts were written without a lawyer's review, and the demo opened on 2026-11-21 without it, by the owner's decision.
-- [x] `privacidad.html` carries the demo wording, a working privacy address (`privacidad@opencovers.dev`), the legal bases, the transfers, the Resend region and the log rotation. The controller's tax id and address come from the `LEGAL_TAX_ID` and `LEGAL_ADDRESS` secrets at build time.
-- [ ] DNS records resolve, and ports 80 and 443 are open on the server and nothing else.
-- [ ] Resend domain verified, and a test magic link reaches a real inbox (check spam too).
-- [ ] Google client created, its redirect URI added, and a test sign-in works (or both Google variables left empty).
-- [x] The sign-in screens (the staff app's demo UI) are on `main` (PR #216), so the demo has a way in.
-- [ ] `https://demo.opencovers.dev/health` answers, and a new visitor reaches a sandbox whose `/w/{bookingKey}` page opens on `book.demo.opencovers.dev`.
-- [ ] The caps (`DEMO_MAX_SANDBOXES`, `DEMO_MAX_NEW_PER_DAY`) fit the server and your email plan.
-- [ ] `DEMO_SSH_*` secrets set on the `demo` environment, and one manual run of `deploy-demo` is green.
-- [x] Last: `url` in `apps/site/demo.json` is `https://demo.opencovers.dev` (PR #260), so the site links to the demo from the Spanish hero, the English page and `llms.txt`. A fork leaves it empty until its own demo is live.
+1. Have a lawyer review your terms of use and privacy notice, including who the controller is, or decide knowingly to open without a review.
+2. Edit `privacidad.html` and `condiciones.html`: your controller, a working privacy address, the legal bases, your processors, the transfers, the email region and the log rotation. Set the `LEGAL_TAX_ID` and `LEGAL_ADDRESS` secrets for the build.
+3. Check that the DNS records resolve, and that ports 80 and 443 are open on the server and nothing else.
+4. Verify the email domain in Resend, and check that a test magic link reaches a real inbox (look in spam too).
+5. Create the Google client and add its redirect URI, then test a sign-in. Or leave both Google variables empty.
+6. Check that `https://<your-demo-host>/health` answers, and that a new visitor reaches a sandbox whose `/w/{bookingKey}` page opens on your widget host.
+7. Set the caps (`DEMO_MAX_SANDBOXES`, `DEMO_MAX_NEW_PER_DAY`) to fit the server and your email plan.
+8. Set the `DEMO_SSH_*` secrets on the `demo` environment, and run `deploy-demo` once by hand until it is green.
+9. Last, set `url` in `apps/site/demo.json` to your demo's address, so the site links to it from the Spanish hero, the English page and `llms.txt`. Leave it empty until the demo is live.
 
 ## Public site
 
