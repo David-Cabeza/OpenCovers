@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { REPO } from "./brigada";
 import { BrigadaTeaser } from "./Brigada";
-import { DEMO_URL, Footer, GithubButton, Nav, d, useReveal } from "./chrome";
+import { DEMO_URL, Footer, GithubButton, Nav, SectionHead, d, useReveal } from "./chrome";
 import { RoadmapTeaser } from "./Roadmap";
 
 /* ------------------------------------------------------------------ data */
@@ -376,7 +376,7 @@ function Showcase() {
   return (
     <section id="prueba" className="show" style={{ "--st": field } as CSSProperties}>
       <div className="copy">
-        <h2 className="rv">Mesa 4: {word}</h2>
+        <SectionHead eyebrow="Pruébalo">Mesa 4: {word}</SectionHead>
         <p className="rv" style={d(90)} aria-live="polite">{msg}</p>
         <button className="again rv" style={d(160)} type="button" onClick={reset}>Empezar de nuevo</button>
       </div>
@@ -408,7 +408,7 @@ function Showcase() {
 function How() {
   return (
     <section className="how" aria-labelledby="how-h">
-      <h2 id="how-h" className="rv">Así está hecho</h2>
+      <SectionHead id="how-h">Así está hecho</SectionHead>
       <div className="tiles">
         {tiles.map((t, i) => (
           <div key={t.h} className="tile rv" style={d(i * 80)}>
@@ -466,7 +466,7 @@ function Modules() {
 
   return (
     <section id="motor" className="mod">
-      <h2 className="rv">Dentro del motor</h2>
+      <SectionHead>Dentro del motor</SectionHead>
       <div className="pic win rv">
         <WinBar />
         <div className="shot">
@@ -546,7 +546,7 @@ function Faq() {
   return (
     <section id="faq" className="faq">
       <div className="col">
-        <h2 className="rv">Preguntas</h2>
+        <SectionHead>Preguntas</SectionHead>
         <div className="stack">
           {faqs.map((f, i) => (
             <div

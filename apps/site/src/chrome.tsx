@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import demo from "../demo.json";
 import { REPO } from "./brigada";
 
@@ -6,6 +6,16 @@ const REPO_API = "https://api.github.com/repos/David-Cabeza/OpenCovers";
 // The hosted demo (ADR-0022). Empty hides every demo link. Set `url` in apps/site/demo.json once the demo is live.
 export const DEMO_URL: string = demo.url;
 export const d = (ms: number) => ({ "--d": `${ms}ms` }) as CSSProperties;
+
+/* One header for every content section: an optional eyebrow (a nav label) and the heading. The page title stays an h1. */
+export function SectionHead({ id, eyebrow, Title = "h2", children }: { id?: string; eyebrow?: string; Title?: "h1" | "h2"; children: ReactNode }) {
+  return (
+    <div className="sh">
+      {eyebrow && <p className="eyebrow rv">{eyebrow}</p>}
+      <Title id={id} className="rv">{children}</Title>
+    </div>
+  );
+}
 
 const markColors = ["var(--f1)", "var(--f2)", "var(--f3)", "var(--f4)", "var(--f1)", "var(--f2)", "var(--f3)", "var(--f4)", "var(--f1)", "var(--f2)"];
 const markHeights = [100, 78, 92, 70, 100, 84, 66, 94, 72, 88];
