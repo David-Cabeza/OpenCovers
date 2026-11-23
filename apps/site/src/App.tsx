@@ -379,23 +379,32 @@ function Hero() {
 
 function Intro() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(true);
+  const userPaused = useRef(false);
+  const [playing, setPlaying] = useState(false);
+  // The video costs 838 KB, so nothing loads until it is on screen. It plays only while visible and
+  // never on its own with reduced motion; after a manual pause it stays paused.
   useEffect(() => {
     const v = videoRef.current;
-    if (v && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      v.pause();
-      setPlaying(false);
-    }
+    if (!v || !("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (!e.isIntersecting) v.pause();
+        else if (!userPaused.current && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) v.play().catch(() => {});
+      },
+      { threshold: 0.25 },
+    );
+    io.observe(v);
+    return () => io.disconnect();
   }, []);
   const toggle = () => {
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
+      userPaused.current = false;
       void v.play();
-      setPlaying(true);
     } else {
+      userPaused.current = true;
       v.pause();
-      setPlaying(false);
     }
   };
   return (
@@ -411,7 +420,7 @@ function Intro() {
           <i style={{ background: "#28c840" }} />
           <b>OpenCovers — La Taberna del Faro</b>
         </div>
-        <video ref={videoRef} autoPlay muted loop playsInline preload="metadata" poster="/media/opencovers-demo-poster.webp" aria-label="Demo de OpenCovers: la agenda del día, una reserva hecha desde el widget que aparece en la agenda, el rechazo de una doble reserva en la misma mesa y hora, y un agente de IA que choca con la misma regla">
+        <video ref={videoRef} muted loop playsInline preload="none" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} poster="/media/opencovers-demo-poster.webp" aria-label="Demo de OpenCovers: la agenda del día, una reserva hecha desde el widget que aparece en la agenda, el rechazo de una doble reserva en la misma mesa y hora, y un agente de IA que choca con la misma regla">
           <source src="/media/opencovers-demo.mp4" type="video/mp4" />
         </video>
         <button type="button" className="vtoggle" onClick={toggle}>

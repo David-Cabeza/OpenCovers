@@ -172,6 +172,17 @@ describe("discoverability", () => {
   });
 });
 
+describe("demo video", () => {
+  it("does not load or start on its own", () => {
+    render(<App />);
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).not.toHaveAttribute("autoplay");
+    expect(video).toHaveAttribute("preload", "none");
+    expect(screen.getByRole("button", { name: "Reproducir vídeo" })).toBeInTheDocument();
+  });
+});
+
 describe("GitHub star count", () => {
   const stubStars = (n: number) =>
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ stargazers_count: n }))));
