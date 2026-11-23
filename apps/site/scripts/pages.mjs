@@ -3,4 +3,5 @@
 export const prerendered = [
   { file: "index.html", render: "render" },
   { file: "hoja-de-ruta/index.html", render: "renderRoadmap" },
+  { file: "brigada/index.html", render: "renderBrigada" },
 ];

@@ -1,15 +1,51 @@
 import { REPO, allTasksHref, firstTimes, ranks, trackHref, tracks } from "./brigada";
 import { DEMO_URL, d } from "./chrome";
 
+const BRIGADA_PAGE = "/brigada/";
+
+function RouteOfTen() {
+  return (
+    <div className="sub">
+      <h3>Ruta de diez minutos</h3>
+      <ol>
+        {DEMO_URL && <li>Abre <a href={DEMO_URL}>la demo</a> y haz una reserva de prueba. Los datos son inventados.</li>}
+        <li>Elige una partida y abre su lista de tareas.</li>
+        <li>Comenta en la tarea que la quieres. Una persona del proyecto te la asigna.</li>
+        <li>
+          Si la tarea es de código, necesitas Node.js 22.9 o más, pnpm y Docker. Con eso: <code>docker compose up -d</code>, <code>pnpm install</code>, <code>pnpm db:migrate</code>, <code>pnpm dev</code> y <code>pnpm test</code>. La primera instalación lleva más de diez minutos.
+        </li>
+      </ol>
+    </div>
+  );
+}
+
+const Lede = ({ Title }: { Title: "h1" | "h2" }) => (
+  <div className="top">
+    <Title id="brigada-t" className="rv">La Brigada</Title>
+    <p className="rv" style={d(90)}>
+      En una cocina, la brigada es el equipo y cada persona tiene su partida. Aquí también: hay sitio para quien programa, traduce, prueba en su móvil o ha llevado una sala un viernes por la noche.
+    </p>
+  </div>
+);
+
+/* The home keeps the hook: the lede, the ten-minute route and a way in. The page has the whole Brigada. */
+export function BrigadaTeaser() {
+  return (
+    <section id="brigada" className="brig" aria-labelledby="brigada-t">
+      <Lede Title="h2" />
+      <RouteOfTen />
+      <div className="sub acts">
+        <a className="btn" href={BRIGADA_PAGE}>Ver toda la Brigada</a>
+        <a className="btn ghost" href={allTasksHref}>Ver todas las tareas de la Brigada</a>
+      </div>
+    </section>
+  );
+}
+
 export function Brigada() {
   return (
     <section id="brigada" className="brig" aria-labelledby="brigada-t">
-      <div className="top">
-        <h2 id="brigada-t" className="rv">La Brigada</h2>
-        <p className="rv" style={d(90)}>
-          En una cocina, la brigada es el equipo y cada persona tiene su partida. Aquí también: hay sitio para quien programa, traduce, prueba en su móvil o ha llevado una sala un viernes por la noche.
-        </p>
-      </div>
+      <Lede Title="h1" />
       <div className="sub">
         <h3>Antes de que inviertas tu tiempo, cómo está esto</h3>
         <p>
@@ -39,17 +75,7 @@ export function Brigada() {
           })}
         </ul>
       </div>
-      <div className="sub">
-        <h3>Ruta de diez minutos</h3>
-        <ol>
-          {DEMO_URL && <li>Abre <a href={DEMO_URL}>la demo</a> y haz una reserva de prueba. Los datos son inventados.</li>}
-          <li>Elige una partida y abre su lista de tareas.</li>
-          <li>Comenta en la tarea que la quieres. Una persona del proyecto te la asigna.</li>
-          <li>
-            Si la tarea es de código, necesitas Node.js 22.9 o más, pnpm y Docker. Con eso: <code>docker compose up -d</code>, <code>pnpm install</code>, <code>pnpm db:migrate</code>, <code>pnpm dev</code> y <code>pnpm test</code>. La primera instalación lleva más de diez minutos.
-          </li>
-        </ol>
-      </div>
+      <RouteOfTen />
       <div className="sub">
         <h3>Qué pasa después</h3>
         <ul>

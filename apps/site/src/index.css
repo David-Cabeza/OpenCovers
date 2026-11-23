@@ -292,7 +292,7 @@ main:focus { outline: none; }
 /* ---------- brigada: plain rows on a field ---------- */
 .brig { background: var(--f2); padding: var(--gap) var(--m); }
 .brig .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-.brig h2 { font-size: var(--hero); }
+.brig h1, .brig h2 { font-size: var(--hero); }
 .brig .top p { font-size: var(--lead); max-width: 28ch; line-height: 1.25; }
 .brig ul.tracks { list-style: none; margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 48px var(--m); }
 .brig .tracks li a, .brig .tracks li .static { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; text-decoration: none; transition: transform 0.3s var(--ease); }

@@ -87,20 +87,21 @@ export function GithubButton() {
 }
 
 const ROADMAP_PAGE = "/hoja-de-ruta/";
+const BRIGADA_PAGE = "/brigada/";
 
 const SECTIONS = [
   { href: "#features", label: "Por qué" },
   { href: "#prueba", label: "Pruébalo" },
   { href: "#motor", label: "Dentro" },
   { href: ROADMAP_PAGE, label: "Hoja de ruta" },
-  { href: "#brigada", label: "La Brigada" },
+  { href: BRIGADA_PAGE, label: "La Brigada" },
   { href: "#faq", label: "Preguntas" },
 ];
 
-/** The nav lives on the home and on the roadmap page. Off the home, in-page anchors point back to the home. */
-export function Nav({ page = "home" }: { page?: "home" | "roadmap" }) {
+/** The nav lives on the home and on the pages. Off the home, in-page anchors point back to the home. */
+export function Nav({ page = "home" }: { page?: "home" | "roadmap" | "brigada" }) {
   const link = (href: string) => (page === "home" || !href.startsWith("#") ? href : `/${href}`);
-  const current = (href: string) => (page === "roadmap" && href === ROADMAP_PAGE ? ("page" as const) : undefined);
+  const current = (href: string) => ((page === "roadmap" && href === ROADMAP_PAGE) || (page === "brigada" && href === BRIGADA_PAGE) ? ("page" as const) : undefined);
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   return (
