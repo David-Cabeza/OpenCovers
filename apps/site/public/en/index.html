@@ -75,7 +75,7 @@
       <h1>OpenCovers</h1>
       <p>OpenCovers is an open source reservation engine for restaurants. It handles availability, bookings, tables and a signed event feed. You use it through an HTTP API or an MCP server.</p>
       <p>The same engine runs a staff app (agenda, availability, floor plan and setup, in Spanish and English) and a booking widget a venue embeds on its own site, in seven languages (five of them machine-assisted and waiting for native review) and a light or dark look.</p>
-      <p class="muted">Status: pre-alpha. The engine, the staff app and the MCP server run locally and pass their tests, and the booking widget is in progress. License: Apache-2.0. Stack: Node.js, Hono, Drizzle and PostgreSQL.</p>
+      <p class="muted">Status: pre-alpha. The engine, the staff app and the MCP server run locally and pass their tests, and the booking widget is in progress. 70 of the 78 conformance cases pass and 8 are partial. Not built yet: payments, SMS and WhatsApp, reminders, a guest screen in the staff app and POS adapters. License: Apache-2.0. Stack: Node.js, Hono, Drizzle and PostgreSQL.</p>
       <p><a href="https://github.com/David-Cabeza/OpenCovers">Source code on GitHub</a></p>
       <!--demo-link-->
 
@@ -93,7 +93,7 @@
       <p>The API lives under <code>/v1</code>. It is described in <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/openapi.yaml">an OpenAPI contract</a>. Errors use a fixed vocabulary, listed in <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/errors.md">errors.md</a>. The contract and its <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/conformance.md">conformance cases</a> come before the implementation. <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/webhooks.md">Webhooks</a> are documented separately.</p>
 
       <h2>MCP server</h2>
-      <p>The MCP server exposes 18 tools over stdio: <code>reservation.*</code>, <code>waitlist.*</code> and <code>venue.*</code>. It wraps the HTTP API. It is published on npm as <a href="https://www.npmjs.com/package/@opencovers/mcp">@opencovers/mcp</a>.</p>
+      <p>The MCP server exposes 18 tools over stdio: <code>reservation.*</code>, <code>waitlist.*</code> and <code>venue.*</code>. It wraps the HTTP API. It is published on npm as <a href="https://www.npmjs.com/package/@opencovers/mcp">@opencovers/mcp</a> and listed in the official MCP registry as <code>io.github.David-Cabeza/opencovers</code>.</p>
       <pre><code>npx -y @opencovers/mcp</code></pre>
       <p>Create an agent key in the staff app under Setup, API keys. See the <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/contract/mcp.md">MCP contract</a> and the <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/apps/mcp/README.md">package README</a>.</p>
 
@@ -113,6 +113,7 @@ pnpm dev               # API :3000 · staff app :5173 · site :5174</code></pre>
         <li><a href="https://github.com/David-Cabeza/OpenCovers/tree/main/docs/adr">Architecture decision records</a></li>
         <li><a href="https://github.com/David-Cabeza/OpenCovers/blob/main/ROADMAP.md">Roadmap</a></li>
         <li><a href="https://github.com/David-Cabeza/OpenCovers/blob/main/LICENSE">Apache-2.0 license</a></li>
+        <li><a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/deploy.md">Deployment guide</a> and <a href="https://github.com/David-Cabeza/OpenCovers/blob/main/docs/hardening.md">hardening guide</a></li>
         <li><a href="/llms.txt">llms.txt</a></li>
       </ul>
 
