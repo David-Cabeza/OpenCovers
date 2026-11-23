@@ -15,21 +15,9 @@ const METHODS = ["get", "put", "post", "delete", "patch"] as const;
 const key = (method: string, p: string) =>
   `${method.toUpperCase()} ${p.replace(/:[A-Za-z0-9_]+|\{[^}]+\}/g, "{}")}`;
 
-// Routes the contract owes. Each one is documented by T04 and then deleted from here.
-const UNDOCUMENTED = [
-  // to document in T04
-  "GET /v1/venues/{venueId}/floor",
-  "GET /v1/venues/{venueId}/floor-items",
-  "POST /v1/venues/{venueId}/floor-items",
-  "PATCH /v1/venues/{venueId}/floor-items/{itemId}",
-  "DELETE /v1/venues/{venueId}/floor-items/{itemId}",
-  "GET /v1/venues/{venueId}/keys",
-  "POST /v1/venues/{venueId}/keys",
-  "DELETE /v1/venues/{venueId}/keys",
-  "GET /v1/auth/keys",
-  "POST /v1/auth/keys",
-  "DELETE /v1/auth/keys",
-];
+// Routes the contract owes. Each one is documented and then deleted from here. Empty since T04c: a new route
+// that is not in openapi.yaml fails the test, and an entry added here must be a route that is served and not documented.
+const UNDOCUMENTED: string[] = [];
 
 // Not method + path routes of the API surface: ALL is middleware (auth, CORS, limits),
 // OPTIONS answers CORS preflight. Neither is a contract operation.

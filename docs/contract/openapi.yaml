@@ -1097,6 +1097,402 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/floor:
+    get:
+      operationId: venue.floor
+      summary: Read the floor plan with which tables are occupied at a moment
+      description: |
+        Every table of the venue, ordered by `name`, with its layout and
+        whether a reservation holds it at one moment. The moment is `date`
+        and `time` read in the venue's time zone. Either one left out is
+        today's date or the current time of day in that zone. A table is
+        `occupied` when an active hold on it starts before the moment and
+        ends after it, so a hold that starts exactly then does not count, and
+        one that ends exactly then does not either. An occupied table also
+        carries the `reservationId`, `partySize` and `guestName` of that
+        reservation. A free table has none of the three.
+
+        A `date` that is not a real calendar date, or a `time` that is not
+        `HH:MM` from `00:00` to `23:59`, fails with `invalid_request`. The
+        decorative items of the plan (bar, plants) are not here, they come
+        from `GET /venues/{venueId}/floor-items`. Any key or role that can
+        read the venue may call it, `read` included. A venue id that does
+        not exist, which only a key granted every venue can reach, answers
+        `200` with `tables: []`. Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: date
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: time
+          in: query
+          required: false
+          schema: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$", example: "21:30" }
+      responses:
+        "200":
+          description: The tables and their occupancy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tables]
+                properties:
+                  tables:
+                    type: array
+                    items: { $ref: "#/components/schemas/FloorTable" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/floor-items:
+    get:
+      operationId: venue.listFloorItems
+      summary: List the decorative items of the floor plan
+      description: |
+        The items of the plan that are not tables, such as a bar or a plant.
+        They have no order. Any key or role that can read the venue may call
+        it, `read` included. Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The items
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FloorItemList" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: venue.addFloorItem
+      summary: Add an item to the floor plan
+      description: |
+        Adds one item and answers `201` with the new item and every item of
+        the venue. The engine makes the `id` (a UUID) and a body `id` is
+        ignored, as is any field not listed. `type` must be a non-empty
+        string, and any such string is stored, there is no list of types.
+        `label`, `posX`, `posY`, `width` and `height` are read only when
+        they have the right JSON type, and a value of another type is
+        ignored as if left out, so `posX: "9"` stores `0`. Defaults are an
+        empty label, `0`, `0`, `80` and `40`, and `rotation` starts at `0`.
+        A missing or empty `type`, or one that is not a string, fails with
+        `invalid_request`. No range is checked, see the notes on
+        `FloorItemCreate`.
+
+        The call takes no `Idempotency-Key` and ignores one. A repeat adds
+        another item, so a retry after a lost answer duplicates. Admin only.
+        A `read` or `write` key or role fails with `forbidden`. A sandbox
+        venue at its cap of items answers `409` with `demo_limit_reached`.
+        Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FloorItemCreate" }
+      responses:
+        "201":
+          description: The new item and all the venue's items
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, item]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/FloorItem" }
+                  item: { $ref: "#/components/schemas/FloorItem" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/floor-items/{itemId}:
+    patch:
+      operationId: venue.updateFloorItemLayout
+      summary: Move, resize or rotate a floor plan item
+      description: |
+        Sets the position, rotation and size of one item. Only `x`, `y`,
+        `rotation`, `width` and `height` are read, each only when it is a
+        JSON number, and they write `posX`, `posY`, `rotation`, `width` and
+        `height`. Any other field, `type` and `label` included, and a value
+        that is not a number, is ignored. A body with none of the five, an
+        empty one included, changes nothing. Values are stored as given,
+        with no range check, and a fractional or very large number is not
+        refused, see the notes on `FloorItemLayout`.
+
+        An `itemId` that is not an item of this venue changes nothing and
+        still answers `200`, as does the id of an item of another venue. The
+        call takes no `Idempotency-Key` and ignores one. Admin only. A
+        `read` or `write` key or role fails with `forbidden`. Not exposed
+        through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/itemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FloorItemLayout" }
+      responses:
+        "200":
+          description: The venue's items after the write
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FloorItemList" }
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: venue.deleteFloorItem
+      summary: Delete a floor plan item
+      description: |
+        Removes the item and answers with the items that remain. An `itemId`
+        that is not an item of the venue, or that belongs only to another
+        venue, changes nothing and still answers `200`. The call takes no
+        body and no `Idempotency-Key`, and it ignores both. Admin only. A
+        `read` or `write` key or role fails with `forbidden`. Not exposed
+        through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/itemId"
+      responses:
+        "200":
+          description: The venue's items after the delete
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FloorItemList" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /auth/keys:
+    get:
+      operationId: auth.listKeys
+      summary: List every API key of the instance
+      description: |
+        The account-level key routes, not scoped to a venue. They need an
+        `apikey` header with an `admin` key, and a staff session is never
+        accepted, with or without a cookie: a request with no `apikey` fails
+        with `unauthorized`. A key of any other role fails with `forbidden`,
+        an unknown key with `unauthorized`. The venue the admin key is
+        granted does not matter: any `admin` key lists, makes and revokes
+        keys for every venue of the instance. An `admin` key cannot be made
+        through `POST /venues/{venueId}/keys`, only through `POST /auth/keys`
+        or by the operator in the database.
+
+        Lists every registered key, whichever venue it is granted, ordered by
+        `principal` (ties in no fixed order). An entry holds the `principal`
+        and the `role` and nothing else: no key value, no hash and no venue
+        grants, so an entry cannot be revoked from here by reference. To read
+        the keys of one venue with their hashes use
+        `GET /venues/{venueId}/keys`. Not exposed through MCP.
+      responses:
+        "200":
+          description: The keys
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys:
+                    type: array
+                    items: { $ref: "#/components/schemas/AccountKey" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: auth.addKey
+      summary: Register an API key for one or more venues, any role
+      description: |
+        Registers a key the caller chose and grants it the listed venues,
+        with `read`, `write` or `admin`. Same auth as `GET /auth/keys`: an
+        `admin` key in the `apikey` header, never a session. The engine does
+        not generate the key and does not return it. The answer is `{ ok:
+        true }` and holds no key value, so the caller keeps the key it chose.
+        The engine stores only its SHA-256 hash.
+
+        `key` and `principal` must be strings and `role` one of `read`,
+        `write` or `admin`, or the call fails with `invalid_request`.
+        Unlike the venue route, an empty `key` or `principal` is accepted
+        here. `venues` is a list of venue ids, and `["*"]` (the default when
+        it is left out) grants every venue, present and future. Anything but
+        a list of strings fails with `invalid_request`. The venue ids are not
+        checked against existing venues, so a grant can name a venue that
+        does not exist, and an empty list registers a key that reaches no
+        venue.
+
+        A `key` already registered keeps its `principal` and `role`, the
+        listed venues are added to its grants, and the call answers `200`
+        either way. The route records no staff member as the maker. It takes
+        no `Idempotency-Key` and ignores one, and a repeat gives the same
+        state. A sandbox venue's cap on keys is not applied here. Not
+        exposed through MCP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountKeyCreate" }
+      responses:
+        "200":
+          description: The key is registered. The answer never holds the key.
+          content:
+            application/json:
+              schema: 
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, example: true }
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: auth.revokeKey
+      summary: Revoke a key everywhere
+      description: |
+        Takes the `key` itself in a JSON body (unlike the venue route, which
+        takes a `hash`) and deletes every grant of that key and the key. It
+        stops working on every venue. A body with no string `key` fails with
+        `invalid_request`, and a `key` in the query is not read and the call
+        fails. A key that is not registered changes nothing and still
+        answers `200`, so the answer does not tell whether the key existed.
+
+        The next request that sends the revoked key fails with
+        `unauthorized`, on any venue, with no cache and no delay. An `admin`
+        key may revoke itself. Same auth as `GET /auth/keys`: an `admin` key
+        in the `apikey` header, never a session. It takes no
+        `Idempotency-Key` and ignores one, and a repeat gives the same state.
+        Not exposed through MCP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountKeyRevoke" }
+      responses:
+        "200":
+          description: The key is gone, or it was never there
+          content:
+            application/json:
+              schema: 
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, example: true }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/keys:
+    get:
+      operationId: venue.listKeys
+      summary: List the API keys granted to the venue
+      description: |
+        Every key that holds a grant on this venue, ordered by `principal`
+        (ties in no fixed order). A key granted to every venue (`*`, minted
+        through `POST /auth/keys`) is not listed here, because the list
+        reads only the grants that name this venue. A key granted to this
+        venue and to others is listed here and in each of them.
+
+        The list never holds a key value. The engine stores only the SHA-256
+        hash of a key and cannot recover the key from it. Each entry carries
+        that `hash`, the full 64 hex characters, as the handle to revoke the
+        key with. The hash is not a credential: a request presents the key,
+        which the engine hashes, so sending the hash as `apikey` fails with
+        `unauthorized`.
+
+        Admin only, through a staff session or an `admin` key. A `read` or
+        `write` key or role fails with `forbidden`. Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      responses:
+        "200":
+          description: The keys
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VenueKeyList" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: venue.addKey
+      summary: Register an API key for the venue
+      description: |
+        Registers a key the caller chose and grants it this venue, with
+        `read` or `write`. The engine does not generate the key and does not
+        return it: the response holds only the venue's keys by `hash`, so
+        the caller makes the key, keeps it, and hands it to the agent. The
+        key is shown nowhere afterwards. Make it long and random (the
+        hardening guide says at least 32 random bytes), the engine checks
+        only that it is a non-empty string.
+
+        `key`, `principal` and `role` are all required. `key` and `principal`
+        must be non-empty strings. `role` must be `read` or `write`, so
+        `admin` fails with `invalid_request`, as does a missing or empty
+        field. Nothing is written when it fails. `principal` is the name the
+        key's requests carry in attribution, not a credential.
+
+        A `key` that is already registered is not replaced: its stored
+        `principal` and `role` stay as they were, this venue is added to its
+        grants, and the call still answers `201`. So the answer's entry can
+        show a different `principal` and `role` than the ones sent. A key
+        value is registered once per instance, whichever venue made it.
+
+        Admin only, through a staff session or an `admin` key. A `read` or
+        `write` key or role fails with `forbidden`. A key made with a
+        session records the staff member who made it, and removing that
+        member from the venue revokes it (C32). The call takes no
+        `Idempotency-Key` and ignores one, and the same body gives the same
+        state, so a retry is safe. A sandbox venue at its cap of keys
+        answers `409` with `demo_limit_reached`. Not exposed through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VenueKeyCreate" }
+      responses:
+        "201":
+          description: The venue's keys after the write
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VenueKeyList" }
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: venue.revokeKey
+      summary: Revoke a key's access to the venue
+      description: |
+        Takes the `hash` of a listed key in a JSON body, never the key
+        itself and never a query parameter (a `hash` in the query is not
+        read and the call fails). It removes the key's grant on this venue.
+        When that was the key's last grant the key is deleted, otherwise it
+        stays valid on its other venues. To cut a key off everywhere,
+        revoke it on each venue or use `DELETE /auth/keys`.
+
+        The next request that sends the key for this venue fails with
+        `unauthorized` when the key is gone, and with `venue_not_found` when
+        it still holds other venues. The revoke takes effect on the next
+        request, there is no cache and no delay. A key can revoke itself, an
+        `admin` key included, and then fails with `unauthorized`.
+
+        A `hash` that is not a key of this venue, or of a key granted only to
+        another venue, changes nothing and still answers `200`. A body with
+        no string `hash` fails with `invalid_request`. The call takes no
+        `Idempotency-Key` and ignores one, and a repeat gives the same
+        state. Admin only, through a staff session or an `admin` key. A
+        `read` or `write` key or role fails with `forbidden`. Not exposed
+        through MCP.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VenueKeyRevoke" }
+      responses:
+        "200":
+          description: The venue's keys after the revoke
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VenueKeyList" }
+        default:
+          $ref: "#/components/responses/Error"
+
   /venues/{venueId}/events:
     get:
       operationId: reservation.events
@@ -3142,6 +3538,8 @@ components:
         guest merges need `admin`. Any other role fails with `forbidden`.
         Members, invitations, and the guest blocklist need an `admin` staff
         session, and refuse every key with `forbidden`.
+        `/auth/keys` is the reverse: it needs an `admin` key and refuses a
+        session with `unauthorized`.
 
   parameters:
     venueId:
@@ -3187,6 +3585,12 @@ components:
       required: true
       schema: { type: string }
       description: The table id.
+    itemId:
+      name: itemId
+      in: path
+      required: true
+      schema: { type: string }
+      description: The floor item id.
     entryId:
       name: entryId
       in: path
@@ -4382,6 +4786,186 @@ components:
         x: { type: integer, description: Written to `posX`. }
         y: { type: integer, description: Written to `posY`. }
         rotation: { type: integer }
+
+    FloorTable:
+      type: object
+      description: A table of the floor plan and who holds it at the asked moment.
+      required: [id, name, seats, zone, shape, posX, posY, rotation, occupied]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        seats: { type: integer, minimum: 1 }
+        zone: { type: string }
+        shape: { type: string, example: round }
+        posX: { type: integer }
+        posY: { type: integer }
+        rotation: { type: integer }
+        occupied:
+          type: boolean
+          description: True when an active hold covers the moment asked.
+        reservationId:
+          type: string
+          description: The reservation that holds the table. Only when `occupied`.
+        partySize:
+          type: integer
+          description: Only when `occupied`.
+        guestName:
+          type: string
+          description: |
+            The name on the reservation. Only when `occupied`. It is guest
+            data, so the route is for staff and keys that can read the venue.
+
+    FloorItem:
+      type: object
+      required: [id, venueId, type, label, posX, posY, width, height, rotation]
+      properties:
+        id: { type: string, description: A UUID the engine made. }
+        venueId: { type: string }
+        type:
+          type: string
+          description: A free string, such as `bar` or `plant`. No list is enforced.
+        label: { type: string, description: Empty unless set. }
+        posX: { type: integer }
+        posY: { type: integer }
+        width: { type: integer, description: 80 unless set. }
+        height: { type: integer, description: 40 unless set. }
+        rotation: { type: integer, description: 0 until set. }
+
+    FloorItemList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/FloorItem" }
+
+    FloorItemCreate:
+      type: object
+      required: [type]
+      description: |
+        Numbers must be integers within the 32-bit range, and the engine does
+        not check it. A fractional or out-of-range number, a body that is not
+        valid JSON, and a `null` body are not answered with `invalid_request`:
+        the call fails with a `500` that has no contract error body. Nothing
+        is stored in those cases.
+      properties:
+        type: { type: string, minLength: 1, example: bar }
+        label: { type: string }
+        posX: { type: integer }
+        posY: { type: integer }
+        width: { type: integer }
+        height: { type: integer }
+
+    FloorItemLayout:
+      type: object
+      description: |
+        Each field is read only when it is a number, and others are ignored.
+        A fractional or out-of-range number, invalid JSON, a `null` body and
+        a missing body are not answered with `invalid_request`: the call
+        fails with a `500` that has no contract error body. Nothing is
+        stored in those cases.
+      properties:
+        x: { type: integer, description: Written to `posX`. }
+        y: { type: integer, description: Written to `posY`. }
+        rotation: { type: integer }
+        width: { type: integer }
+        height: { type: integer }
+
+    VenueKey:
+      type: object
+      required: [principal, role, hash]
+      properties:
+        principal: { type: string }
+        role: { type: string, enum: [read, write, admin] }
+        hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: |
+            The SHA-256 of the key, in lower-case hex. The handle to revoke
+            the key with. It cannot be used to authenticate and the key
+            cannot be recovered from it. `role` can be `admin` for a key
+            made through `POST /auth/keys` and granted this venue by name.
+          example: "0000000000000000000000000000000000000000000000000000000000000000"
+
+    VenueKeyList:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items: { $ref: "#/components/schemas/VenueKey" }
+
+    VenueKeyCreate:
+      type: object
+      required: [key, principal, role]
+      description: |
+        A body that is not valid JSON, a `null` body and a missing body fail
+        with a `500` that has no contract error body, not `invalid_request`.
+      properties:
+        key:
+          type: string
+          minLength: 1
+          writeOnly: true
+          description: |
+            The secret the caller chose. Sent once, here. It is never in a
+            response or a listing.
+          example: oc_example_not_a_real_key
+        principal: { type: string, minLength: 1, example: reservations-agent }
+        role: { type: string, enum: [read, write] }
+
+    VenueKeyRevoke:
+      type: object
+      required: [hash]
+      description: |
+        A body that is not valid JSON, a `null` body and a missing body fail
+        with a `500` that has no contract error body, not `invalid_request`.
+      properties:
+        hash:
+          type: string
+          description: The `hash` of a key from the listing.
+          example: "0000000000000000000000000000000000000000000000000000000000000000"
+
+    AccountKey:
+      type: object
+      required: [principal, role]
+      properties:
+        principal: { type: string }
+        role: { type: string, enum: [read, write, admin] }
+
+    AccountKeyCreate:
+      type: object
+      required: [key, principal, role]
+      description: |
+        A body that is not valid JSON, a `null` body and a missing body fail
+        with a `500` that has no contract error body, not `invalid_request`.
+      properties:
+        key:
+          type: string
+          writeOnly: true
+          description: The secret the caller chose. Never in a response.
+          example: oc_example_not_a_real_key
+        principal: { type: string, example: reservations-agent }
+        role: { type: string, enum: [read, write, admin] }
+        venues:
+          type: array
+          items: { type: string }
+          default: ["*"]
+          description: |
+            Venue ids, or `*` for every venue, present and future. Not checked
+            against existing venues.
+
+    AccountKeyRevoke:
+      type: object
+      required: [key]
+      description: |
+        A body that is not valid JSON, a `null` body and a missing body fail
+        with a `500` that has no contract error body, not `invalid_request`.
+      properties:
+        key:
+          type: string
+          writeOnly: true
+          description: The key itself, not its hash.
+          example: oc_example_not_a_real_key
 
     ErasureResult:
       type: object
