@@ -413,7 +413,9 @@ function Features() {
         >
           <div className="txt">
             <h2 className="s">{b.s}</h2>
-            <p className="c">{b.c}</p>
+            <div className="c">
+              <p>{b.c}</p>
+            </div>
           </div>
           <button
             type="button"
@@ -592,7 +594,9 @@ function Modules() {
                 <span><i />{m.name}</span>
                 <small>{m.tag}</small>
               </span>
-              <span className="more">{m.body}</span>
+              <span className="more">
+                <span>{m.body}</span>
+              </span>
             </button>
             <img
               className="inl"
@@ -755,7 +759,9 @@ function Faq() {
                 {f.q}
               </button>
               <div className="a">
-                <p>{f.a}</p>
+                <div>
+                  <p>{f.a}</p>
+                </div>
               </div>
             </div>
           ))}

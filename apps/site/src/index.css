@@ -107,8 +107,10 @@ a { color: inherit; }
 .sw[data-on="true"] { background: var(--on); color: var(--ink); }
 .sw .txt { max-width: 62rem; }
 .sw .s { font-size: var(--head); line-height: 0.98; }
-.sw .c { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; font-size: var(--body); max-width: 52ch; transition: max-height 0.5s var(--ease), opacity 0.5s, margin 0.5s var(--ease); }
-.sw[data-on="true"] .c { max-height: 9em; opacity: 1; margin-top: 14px; }
+.sw .c { display: grid; grid-template-rows: 1fr; margin-top: 14px; font-size: var(--body); max-width: 52ch; transition: grid-template-rows 0.5s var(--ease), opacity 0.5s, margin 0.5s var(--ease); }
+.sw .c > * { min-height: 0; overflow: hidden; }
+.js .sw .c { grid-template-rows: 0fr; opacity: 0; margin-top: 0; }
+.js .sw[data-on="true"] .c { grid-template-rows: 1fr; opacity: 1; margin-top: 14px; }
 .tg { flex: none; padding: 0; cursor: pointer; font-size: var(--head); width: 1.9em; height: 1.1em; border-radius: 999px; background: #c9c9c4; position: relative; transition: background 0.3s; }
 .tg::after { content: ""; position: absolute; top: 0.1em; left: 0.1em; width: 0.9em; height: 0.9em; border-radius: 50%; background: #fff; transition: transform 0.35s var(--ease); }
 .sw[data-on="true"] .tg { background: var(--ink); }
@@ -162,8 +164,10 @@ a { color: inherit; }
 .mod .head span { display: inline-flex; align-items: center; gap: 12px; }
 .mod .head i { width: 0.5em; height: 0.5em; border-radius: 50%; background: var(--accent); flex: none; }
 .mod .head small { font-size: var(--small); font-weight: 600; color: var(--muted); }
-.mod .more { max-height: 0; overflow: hidden; opacity: 0; font-size: var(--body); max-width: 34ch; transition: max-height 0.45s var(--ease), opacity 0.4s, margin 0.4s; }
-.mod li[data-on="true"] .more { max-height: 8em; opacity: 1; margin-top: 10px; color: var(--ink); }
+.mod .more { display: grid; grid-template-rows: 1fr; margin-top: 10px; font-size: var(--body); max-width: 34ch; transition: grid-template-rows 0.45s var(--ease), opacity 0.4s, margin 0.4s; }
+.mod .more > * { min-height: 0; overflow: hidden; }
+.js .mod .more { grid-template-rows: 0fr; opacity: 0; margin-top: 0; }
+.js .mod li[data-on="true"] .more { grid-template-rows: 1fr; opacity: 1; margin-top: 10px; color: var(--ink); }
 .mod li .inl { display: none; width: 100%; aspect-ratio: 16 / 10; max-height: 62vh; object-fit: contain; background: var(--surface); margin: 6px 0 14px; }
 /* Phones, and any short screen such as a phone turned sideways: no sticky picture that covers the list. Each module
    shows its own picture under its text, and only a tap, focus or hover opens one. */
@@ -235,8 +239,10 @@ a { color: inherit; }
 .card { scroll-margin-top: 84px; }
 .card .tab { position: absolute; left: calc((100% - 200px) / (var(--n) - 1) * var(--i)); top: -40px; width: 200px; height: 40px; background: var(--c); clip-path: polygon(0 100%, 12% 0, 88% 0, 100% 100%); }
 .card button.q { display: block; width: 100%; text-align: left; font-size: var(--lead); font-weight: 600; line-height: 1.25; cursor: pointer; }
-.card .a { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.5s var(--ease), opacity 0.4s; }
-.card[data-open="true"] .a { max-height: 24em; opacity: 1; }
+.card .a { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.5s var(--ease), opacity 0.4s; }
+.card .a > * { min-height: 0; overflow: hidden; }
+.js .card .a { grid-template-rows: 0fr; opacity: 0; }
+.js .card[data-open="true"] .a { grid-template-rows: 1fr; opacity: 1; }
 .card .a p { padding-top: 14px; padding-bottom: 8px; }
 .faq .stack { padding-top: 40px; }
 @media (max-width: 760px) { .faq { grid-template-columns: 1fr; } .faq .col { grid-column: 1; } .card .tab { left: calc((100% - 120px) / (var(--n) - 1) * var(--i)); width: 120px; } }
