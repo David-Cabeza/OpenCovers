@@ -290,14 +290,24 @@ main:focus { outline: none; }
 .brig .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
 .brig h2 { font-size: var(--hero); }
 .brig .top p { font-size: var(--lead); max-width: 28ch; line-height: 1.25; }
-.brig ul { list-style: none; margin-top: 72px; display: grid; grid-template-columns: 1fr 1fr; gap: 48px var(--m); }
-.brig li a { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; text-decoration: none; transition: transform 0.3s var(--ease); }
-.brig li a:hover { transform: translateX(8px); }
+.brig ul.tracks { list-style: none; margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 48px var(--m); }
+.brig .tracks li a, .brig .tracks li .static { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; text-decoration: none; transition: transform 0.3s var(--ease); }
+.brig .tracks li a:hover { transform: translateX(8px); }
 .brig .n { display: flex; align-items: center; gap: 14px; font-family: var(--display); font-weight: 700; letter-spacing: -0.03em; font-size: var(--lead); line-height: 1; }
 .brig .n i { width: 0.55em; height: 0.55em; border-radius: 50%; background: var(--accent); flex: none; }
-.brig li small { font-size: var(--small); font-weight: 600; align-self: center; }
-.brig li p { grid-column: 1 / -1; max-width: 34ch; }
-@media (max-width: 760px) { .brig ul { grid-template-columns: 1fr; } }
+.brig .tracks li small { font-size: var(--small); font-weight: 600; align-self: center; }
+.brig .tracks li p { grid-column: 1 / -1; max-width: 34ch; }
+@media (max-width: 760px) { .brig ul.tracks { grid-template-columns: 1fr; } }
+.brig .sub { margin-top: 72px; max-width: 60rem; }
+.brig .sub h3 { font-size: var(--lead); line-height: 1.1; margin-bottom: 16px; }
+.brig .sub p + p, .brig .sub ul + p, .brig .sub dl + p { margin-top: 12px; }
+.brig .sub ol, .brig .sub ul:not(.tracks) { padding-left: 1.25em; display: grid; gap: 8px; }
+.brig .sub dl { display: grid; gap: 12px; margin-top: 8px; }
+.brig .sub dt { font-weight: 700; }
+.brig .sub a { text-decoration: underline; text-underline-offset: 3px; }
+.brig .sub code { font-size: 0.9em; overflow-wrap: anywhere; }
+.brig .sub.acts { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
+.brig .sub.acts a { text-decoration: none; }
 
 /* ---------- faq: index cards ---------- */
 .faq { padding: var(--gap) var(--m); display: grid; grid-template-columns: 2fr 8fr 2fr; }

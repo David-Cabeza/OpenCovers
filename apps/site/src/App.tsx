@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import demo from "../demo.json";
+import { REPO, allTasksHref, firstTimes, ranks, trackHref, tracks } from "./brigada";
 import {
   boardRule, boardWarning, commitments, counters, countersNote, foundingVenues, manifesto, milestones, northStar, notPlanned,
   quarters, saturdayGate, saturdayGateIntro, today, todayLegend, updatedAt, whyNotEstablished,
   type CommitmentState, type Gate, type Quarter, type Today,
 } from "./roadmap";
 
-const REPO = "https://github.com/David-Cabeza/OpenCovers";
-const GOOD_FIRST_ISSUES = `${REPO}/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22`;
 const REPO_API = "https://api.github.com/repos/David-Cabeza/OpenCovers";
 // The hosted demo (ADR-0022). Empty hides every demo link. Set `url` in apps/site/demo.json once the demo is live.
 const DEMO_URL: string = demo.url;
@@ -112,14 +111,6 @@ const modules = [
     pos: "50% 50%",
     alt: "Formulario de reserva del widget y página de autoservicio de una reserva, con el restaurante de prueba La Taberna del Faro",
   },
-];
-
-const challenges = [
-  { title: "Revisar las traducciones del widget", tag: "producto", body: "Catalán, francés, alemán, italiano y portugués esperan a un hablante nativo.", href: `${REPO}/issues/172` },
-  { title: "Probar el widget en Safari y Firefox", tag: "calidad", body: "Reservar de principio a fin en los dos navegadores y anotar lo que falle.", href: `${REPO}/issues/175` },
-  { title: "Encabezado y regiones en el acceso", tag: "accesibilidad", body: "Las pantallas de entrada y registro necesitan un título y landmarks.", href: `${REPO}/issues/174` },
-  { title: "Guía para Google Business Profile", tag: "documentación", body: "Poner el enlace de reserva en una ficha real y documentar los pasos.", href: `${REPO}/issues/156` },
-  { title: "Medir el widget en PageSpeed Insights", tag: "rendimiento", body: "Una medición en móvil del widget incrustado, guardada en docs.", href: `${REPO}/issues/154` },
 ];
 
 export const faqs = [
@@ -942,7 +933,7 @@ function Roadmap() {
       <FoundingVenues />
       <div className="acts rv">
         <a className="btn accent" href={ROADMAP_URL}>Ver la hoja de ruta completa</a>
-        <a className="btn ghost" href={`${REPO}/issues`}>Ver tareas abiertas</a>
+        <a className="btn ghost" href={allTasksHref}>Ver tareas abiertas</a>
       </div>
     </section>
   );
@@ -950,24 +941,87 @@ function Roadmap() {
 
 function Brigada() {
   return (
-    <section id="brigada" className="brig">
+    <section id="brigada" className="brig" aria-labelledby="brigada-t">
       <div className="top">
-        <h2 className="rv">La Brigada</h2>
+        <h2 id="brigada-t" className="rv">La Brigada</h2>
         <p className="rv" style={d(90)}>
-          Cada tarea acotada es un cubierto. Reclama uno, resuélvelo y súbelo como PR. <a href={GOOD_FIRST_ISSUES}>Ver todas las tareas abiertas</a>.
+          En una cocina, la brigada es el equipo y cada persona tiene su partida. Aquí también: hay sitio para quien programa, traduce, prueba en su móvil o ha llevado una sala un viernes por la noche.
         </p>
       </div>
-      <ul>
-        {challenges.map((c, i) => (
-          <li key={c.title} className="rv" style={d((i % 2) * 80)}>
-            <a href={c.href}>
-              <span className="n"><i />{c.title}</span>
-              <small>{c.tag}</small>
-              <p>{c.body}</p>
-            </a>
+      <div className="sub">
+        <h3>Antes de que inviertas tu tiempo, cómo está esto</h3>
+        <p>
+          OpenCovers es pre-alfa. Lo mantiene una persona. La mayor parte del código la escriben agentes de IA, y esa persona revisa cada cambio antes de fusionarlo. Todavía no sirve para las reservas de un restaurante real, y los textos legales de la demo no los ha revisado un abogado.
+        </p>
+        <p>
+          Hay sitio para ti porque lo que más nos frena es lo que un agente no puede hacer: oír si una traducción suena natural, tener un iPhone en la mano, haber sentado un grupo de doce sin reserva o instalar esto en un servidor que no es el nuestro.
+        </p>
+      </div>
+      <div className="sub">
+        <h3>Elige tu partida</h3>
+        <ul className="tracks">
+          {tracks.map((t, i) => {
+            const href = trackHref(t);
+            const body = (
+              <>
+                <span className="n"><i />{t.name}</span>
+                <small>{t.first}</small>
+                <p>{t.who}</p>
+              </>
+            );
+            return (
+              <li key={t.key} className="rv" style={d((i % 2) * 80)}>
+                {href ? <a href={href} aria-label={`${t.name}: ${t.first}. Ver tareas abiertas`}>{body}</a> : <div className="static">{body}</div>}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <div className="sub">
+        <h3>Ruta de diez minutos</h3>
+        <ol>
+          {DEMO_URL && <li>Abre <a href={DEMO_URL}>la demo</a> y haz una reserva de prueba. Los datos son inventados.</li>}
+          <li>Elige una partida y abre su lista de tareas.</li>
+          <li>Comenta en la tarea que la quieres. Una persona del proyecto te la asigna.</li>
+          <li>
+            Si la tarea es de código, necesitas Node.js 22.9 o más, pnpm y Docker. Con eso: <code>docker compose up -d</code>, <code>pnpm install</code>, <code>pnpm db:migrate</code>, <code>pnpm dev</code> y <code>pnpm test</code>. La primera instalación lleva más de diez minutos.
           </li>
-        ))}
-      </ul>
+        </ol>
+      </div>
+      <div className="sub">
+        <h3>Qué pasa después</h3>
+        <ul>
+          <li><b>Objetivo: primera respuesta de una persona en 48 horas</b>, también si la respuesta es «esto ya está hecho». Es una meta, no una garantía. Si un día fallamos, lo diremos en la propia tarea.</li>
+          <li><b>Revisión por una persona.</b> Si va a tardar, te lo decimos.</li>
+          <li><b>Tu nombre solo aparece con tu permiso.</b> También si lo tuyo fue probar, traducir u opinar.</li>
+          <li><b>Si usas un agente de IA, dilo.</b> Aquí no es un problema: es como trabajamos. Solo pedimos que conste y que detrás haya una persona que responda.</li>
+        </ul>
+      </div>
+      <div className="sub">
+        <h3>De comensal a segundo de cocina</h3>
+        <p>Es nuestra propuesta de reconocimiento. Todavía no hay nadie en ningún rango.</p>
+        <dl className="ranks">
+          {ranks.map((r) => (
+            <div key={r.name}>
+              <dt>{r.name}</dt>
+              <dd>Se llega con: {r.how}. {r.change}.</dd>
+            </div>
+          ))}
+        </dl>
+        <p>No hay puntos, clasificaciones ni rachas. Nadie sube por cantidad.</p>
+      </div>
+      <div className="sub">
+        <h3>El muro de las primeras veces</h3>
+        <p>Cada línea ocurre una sola vez. Las vacías son la invitación.</p>
+        <ul>
+          {firstTimes.map((f) => <li key={f}>{f}: <em>pendiente</em></li>)}
+        </ul>
+        <p>Nuestra meta para 2027: veinticinco personas de fuera acreditadas antes del 15 de diciembre. Hoy no hay ninguna.</p>
+      </div>
+      <div className="sub acts">
+        <a className="btn" href={`${REPO}/blob/main/CONTRIBUTING.md`}>Cómo contribuir, paso a paso</a>
+        <a className="btn ghost" href={allTasksHref}>Ver todas las tareas de la Brigada</a>
+      </div>
     </section>
   );
 }
