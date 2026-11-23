@@ -232,6 +232,7 @@ a { color: inherit; }
 .faq h2 { margin-bottom: 56px; }
 .card { position: relative; background: var(--c); padding: 20px 28px 70px; margin-top: -26px; border-radius: 0 20px 20px 20px; }
 .card:first-of-type { margin-top: 0; }
+.card { scroll-margin-top: 84px; }
 .card .tab { position: absolute; left: calc((100% - 200px) / (var(--n) - 1) * var(--i)); top: -40px; width: 200px; height: 40px; background: var(--c); clip-path: polygon(0 100%, 12% 0, 88% 0, 100% 100%); }
 .card button.q { display: block; width: 100%; text-align: left; font-size: var(--lead); font-weight: 600; line-height: 1.25; cursor: pointer; }
 .card .a { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.5s var(--ease), opacity 0.4s; }

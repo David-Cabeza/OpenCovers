@@ -727,6 +727,17 @@ function Brigada() {
 
 function Faq() {
   const [open, setOpen] = useState(0);
+  // The card that was open closes as this one opens and everything below it moves up,
+  // so once that transition ends bring the tapped card back under the header if it left.
+  const openCard = (i: number, card: Element | null) => {
+    setOpen(open === i ? -1 : i);
+    if (open === i || !card) return;
+    window.setTimeout(() => {
+      const nav = document.querySelector(".nav")?.getBoundingClientRect().bottom ?? 0;
+      const top = card.getBoundingClientRect().top;
+      if (top < nav + 8 || top > window.innerHeight * 0.6) card.scrollIntoView({ block: "start" });
+    }, 520);
+  };
   return (
     <section id="faq" className="faq">
       <div className="col">
@@ -740,7 +751,7 @@ function Faq() {
               style={{ ...d(0), "--c": cardColors[i % cardColors.length], "--i": i, "--n": faqs.length, zIndex: i + 1 } as CSSProperties}
             >
               <span className="tab" aria-hidden />
-              <button className="q" type="button" aria-expanded={open === i} onClick={() => setOpen(open === i ? -1 : i)}>
+              <button className="q" type="button" aria-expanded={open === i} onClick={(e) => openCard(i, e.currentTarget.closest(".card"))}>
                 {f.q}
               </button>
               <div className="a">
