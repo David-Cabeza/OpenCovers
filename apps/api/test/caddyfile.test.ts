@@ -57,13 +57,23 @@ describe("production Caddyfile", () => {
     const headers = staff.slice(staff.indexOf("header {"), staff.indexOf("}", staff.indexOf("header {")));
     expect(headers).toContain('X-Frame-Options "DENY"');
     expect(headers).toMatch(/Content-Security-Policy "[^"]*frame-ancestors 'none'[^"]*"/);
-    // The global header block, the HSTS line, the Content-Type of the two 404 pages (/w/* and /r), the demo's
-    // X-Robots-Tag and the Content-Type of its robots.txt.
-    expect(staff.match(/^\s*header\b/gm)).toHaveLength(6);
+    // The global header block, the HSTS line, the Content-Type of the three 404 pages (/w/*, /r and the guest API),
+    // the demo's X-Robots-Tag and the Content-Type of its robots.txt.
+    expect(staff.match(/^\s*header\b/gm)).toHaveLength(7);
     expect(staff).toMatch(/header @https Strict-Transport-Security/);
     expect(handle(staff, "/w/*")).toMatch(/respond ".*" 404/);
     expect(handle(staff, "/w/*")).not.toContain("reverse_proxy");
     expect(staff.indexOf("handle /w/*")).toBeLessThan(staff.indexOf("handle /v1/*"));
+  });
+
+  it("answers /v1/public/* with the /w/* 404 on the staff site when WIDGET_ADDRESS is set, and only then", () => {
+    expect(staff).toMatch(/@guest_api_off \{\s*expression `"\{\$WIDGET_ADDRESS:\}" != ""`\s*path \/v1\/public\/\*\s*\}/);
+    const off = handle(staff, "@guest_api_off")!;
+    expect(off).not.toContain("reverse_proxy");
+    expect(off.match(/respond ".*" 404/)![0]).toBe(handle(staff, "/w/*")!.match(/respond ".*" 404/)![0]);
+    // Before the /v1/* rule that forwards it, which stays for keyed routes and for a single-host install.
+    expect(staff.indexOf("handle @guest_api_off")).toBeLessThan(staff.indexOf("handle /v1/*"));
+    expect(handle(staff, "/v1/*")).toContain("reverse_proxy {$API_UPSTREAM:api:3000}");
   });
 
   it("sends no X-Frame-Options and no frame-ancestors of its own on the widget page", () => {

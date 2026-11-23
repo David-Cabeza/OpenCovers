@@ -35,7 +35,7 @@ What it does not expose: the staff app, `/api/*` and `/health`. The staff host a
 
 Two limits you should know:
 
-- `/v1/public/*` is not host-gated. The staff host's `/v1/*` rule also forwards it to the API, so the same guest routes answer there too. The staff origin's session cookie does not authorize them, and the same rate limits apply. If you want them reachable only on the widget host, block the path on the staff host in your own Caddyfile. This is inferred from `apps/web/Caddyfile` and `apps/api/src/app.ts` and has not been tested.
+- `/v1/public/*` is not gated by the API. The shipped Caddyfile answers it with the same `404` as `/w/*` on the staff host once `WIDGET_ADDRESS` is set, and forwards it only on the widget host. Without `WIDGET_ADDRESS` (no widget host) the staff host still forwards it, and a proxy of your own must block it. The staff origin's session cookie never authorizes these routes, and the same rate limits apply.
 - The 404 pages, the widget `Content-Security-Policy` and the frame rules differ per host. See Security headers.
 
 ### The one public venue route

@@ -11,7 +11,7 @@ staff=${STAFF_HOST:-staff.test}
 widget=${WIDGET_HOST:-book.test}
 name="oc-caddy-check-$$"
 cleanup() {
-  docker rm -f "$name-api" "$name-caddy" "$name-caddy-demo" >/dev/null 2>&1 || true
+  docker rm -f "$name-api" "$name-caddy" "$name-caddy-demo" "$name-caddy-single" >/dev/null 2>&1 || true
   docker network rm "$name" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -46,6 +46,10 @@ docker run -d --name "$name-caddy" --network "$name" --network-alias caddy \
 # The same file with NOINDEX=on, as compose.demo.yaml sets it for the demo hosts.
 docker run -d --name "$name-caddy-demo" --network "$name" --network-alias caddy-demo \
   -e "SITE_ADDRESS=http://$staff" -e "WIDGET_ADDRESS=http://$widget" -e NOINDEX=on \
+  -v "$caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine >/dev/null
+# One host, no WIDGET_ADDRESS: the guest API keeps answering on the staff host.
+docker run -d --name "$name-caddy-single" --network "$name" --network-alias caddy-single \
+  -e "SITE_ADDRESS=http://$staff" \
   -v "$caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine >/dev/null
 sleep 2
 
@@ -86,8 +90,24 @@ check "staff /w/*: frame-ancestors 'none'" "Content-Security-Policy: .*frame-anc
 check "staff /w/*: never reaches the API" "upstream" "$out" no
 
 out=$(get "$staff" /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA)
-check "staff /v1/*: X-Frame-Options DENY" "X-Frame-Options: DENY" "$out" yes
-check "staff /v1/*: frame-ancestors 'none'" "frame-ancestors 'none'" "$out" yes
+w=$(get "$staff" /w/pk_AAAAAAAAAAAAAAAAAAAAAA)
+check "staff /v1/public/*: 404" "HTTP/1.1 404" "$out" yes
+check "staff /v1/public/*: never reaches the API" "upstream" "$out" no
+check "staff /v1/public/*: the same body as /w/*" "Aquí no hay nada que reservar" "$out" yes
+[ "$(sed -n '/^$/,$p' <<<"$out")" = "$(sed -n '/^$/,$p' <<<"$w")" ] && echo "ok    staff /v1/public/*: identical body to /w/*" || { echo "FAIL  staff /v1/public/*: identical body to /w/*"; failures=$((failures + 1)); }
+check "staff /v1/public/*: X-Frame-Options DENY" "X-Frame-Options: DENY" "$out" yes
+check "staff /v1/public/*: frame-ancestors 'none'" "frame-ancestors 'none'" "$out" yes
+out=$(get "$staff" /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA/reservations 100)
+check "staff POST /v1/public/*: 404, never reaches the API" "upstream" "$out" no
+
+out=$(get "$staff" /v1/venues/x/reservations)
+check "staff /v1/venues/*: still reaches the API" "upstream" "$out" yes
+
+# Single host (WIDGET_ADDRESS unset): nothing changes for /v1.
+out=$(TARGET=caddy-single get "$staff" /v1/public/pk_AAAAAAAAAAAAAAAAAAAAAA)
+check "single host /v1/public/*: reaches the API" "upstream" "$out" yes
+out=$(TARGET=caddy-single get "$staff" /v1/venues/x/reservations)
+check "single host /v1/venues/*: reaches the API" "upstream" "$out" yes
 
 out=$(get "$widget" /w/pk_AAAAAAAAAAAAAAAAAAAAAA)
 check "widget /w/*: 200 from the API" "upstream" "$out" yes
