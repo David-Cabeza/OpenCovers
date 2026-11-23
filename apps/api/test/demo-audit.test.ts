@@ -584,6 +584,26 @@ describe("F11, F12 and F13", () => {
     expect(((await read.json()) as { allowedOrigins: string[] }).allowedOrigins).toEqual([]);
   });
 
+  it("refuses to turn the public waitlist on in the demo, and still lets it be turned off", async () => {
+    const { cookie, account } = await signIn(freshEmail());
+    const venueId = await sandboxVenue(account.email);
+    const put = (body: object) =>
+      app.request(`/v1/venues/${venueId}/online-booking`, json(cookie, { method: "PUT", body: JSON.stringify(body) }));
+    const waitlistOf = async () =>
+      ((await (await app.request(`/v1/venues/${venueId}/online-booking`, json(cookie))).json()) as { waitlistEnabled: boolean }).waitlistEnabled;
+    expect(await waitlistOf()).toBe(false);
+    expect((await put({ waitlistEnabled: true })).status).toBe(400);
+    expect(await waitlistOf()).toBe(false);
+    expect((await put({ waitlistEnabled: false })).status).toBe(200);
+    expect((await put({ maxPartySize: 6 })).status).toBe(200);
+    // Outside the demo the same write is accepted.
+    vi.stubEnv("DEMO_MODE", "");
+    expect((await put({ waitlistEnabled: true })).status).toBe(200);
+    expect(await waitlistOf()).toBe(true);
+    vi.stubEnv("DEMO_MODE", "1");
+    expect((await put({ waitlistEnabled: false })).status).toBe(200);
+  });
+
   it("sets the demo host as the only allowed origin when the demo URL is https", async () => {
     vi.stubEnv("BETTER_AUTH_URL", "https://demo.opencovers.dev");
     const v = await makeUser();
