@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import demo from "../demo.json";
 import { notPlanned, phases, today, type Phase, type Today } from "./roadmap";
 
@@ -495,6 +495,20 @@ function Showcase() {
       setMsg(`Reserva guardada de ${fmt(sel)} a ${fmt(sel + 2)}. Prueba ahora a solapar otra hora.`);
     }
   };
+  // A radio group takes one tab stop and moves with the arrow keys, Home and End.
+  const onRadioKeys = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!(e.target as HTMLElement).matches('[role="radio"]')) return;
+    const i = SLOTS.indexOf(sel);
+    let n: number;
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") n = (i + 1) % SLOTS.length;
+    else if (e.key === "ArrowUp" || e.key === "ArrowLeft") n = (i - 1 + SLOTS.length) % SLOTS.length;
+    else if (e.key === "Home") n = 0;
+    else if (e.key === "End") n = SLOTS.length - 1;
+    else return;
+    e.preventDefault();
+    setSel(SLOTS[n]);
+    e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]')[n]?.focus();
+  };
   const reset = () => {
     setBookings(initial);
     setState("free");
@@ -512,7 +526,7 @@ function Showcase() {
         <p className="rv" style={d(90)} aria-live="polite">{msg}</p>
         <button className="again rv" style={d(160)} type="button" onClick={reset}>Empezar de nuevo</button>
       </div>
-      <div className="ctl rv" style={d(120)} data-ui role="radiogroup" aria-label="Hora de la reserva, dos horas por reserva">
+      <div className="ctl rv" style={d(120)} data-ui role="radiogroup" aria-label="Hora de la reserva, dos horas por reserva" onKeyDown={onRadioKeys}>
         {SLOTS.map((h) => {
           const who = whoAt(h);
           return (
@@ -521,6 +535,7 @@ function Showcase() {
               type="button"
               role="radio"
               aria-checked={sel === h}
+              tabIndex={sel === h ? 0 : -1}
               data-taken={!!who}
               className="row"
               onClick={() => setSel(h)}
@@ -826,7 +841,7 @@ function Cta() {
       <div className="r">
         <div className="dlg rv" style={d(120)} data-ui>
           <h3>Arranca en local</h3>
-          <pre><code>{commands}</code></pre>
+          <pre tabIndex={0} aria-label="Comandos para empezar"><code>{commands}</code></pre>
           <div className="acts">
             <a className="btn accent" href={`${REPO}#quick-start`}>Ir al repositorio</a>
             <button className="btn alt" type="button" onClick={copy}>{copied ? "Copiado" : "Copiar comandos"}</button>

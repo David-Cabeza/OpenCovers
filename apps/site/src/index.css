@@ -84,6 +84,16 @@ a { color: inherit; }
 .skip:focus { top: 12px; }
 main:focus { outline: none; }
 
+/* ---------- touch targets: 44 px for controls that are not a link inside a sentence ---------- */
+.brand, .btn, .ctl .row, .ctl .go, .win .vtoggle { min-height: 44px; }
+.tg::before { content: ""; position: absolute; inset: -12px -2px; }
+.show .again { display: inline-flex; align-items: center; min-height: 44px; margin-top: 8px; }
+.card button.q { padding: 9px 0; margin: -9px 0; }
+@media (pointer: coarse) {
+  .foot ul { gap: 0; }
+  .foot li a { display: flex; align-items: center; min-height: 44px; }
+}
+
 /* ---------- hero: the table ---------- */
 .hero { position: relative; min-height: calc(100svh - 62px); overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding: 64px var(--m) 72px; }
 .hero .copy { position: relative; z-index: 1; width: min(52%, 780px); }
@@ -123,7 +133,7 @@ main:focus { outline: none; }
 .sw .c > * { min-height: 0; overflow: hidden; }
 .js .sw .c { grid-template-rows: 0fr; opacity: 0; margin-top: 0; }
 .js .sw[data-on="true"] .c { grid-template-rows: 1fr; opacity: 1; margin-top: 14px; }
-.tg { flex: none; padding: 0; cursor: pointer; font-size: var(--head); width: 1.9em; height: 1.1em; border-radius: 999px; background: #c9c9c4; position: relative; transition: background 0.3s; }
+.tg { flex: none; padding: 0; cursor: pointer; font-size: var(--head); width: 1.9em; height: 1.1em; border-radius: 999px; background: #767672; position: relative; transition: background 0.3s; }
 .tg::after { content: ""; position: absolute; top: 0.1em; left: 0.1em; width: 0.9em; height: 0.9em; border-radius: 50%; background: #fff; transition: transform 0.35s var(--ease); }
 .sw[data-on="true"] .tg { background: var(--ink); }
 .sw[data-on="true"] .tg::after { transform: translateX(0.8em); }
@@ -209,7 +219,7 @@ main:focus { outline: none; }
 .road .side ul { list-style: none; display: grid; gap: 10px; }
 .road .side li { display: flex; gap: 12px; align-items: baseline; }
 .road .side li::before { content: ""; flex: none; width: 0.5em; height: 0.5em; border-radius: 50%; background: var(--accent); transform: translateY(-0.05em); }
-.road .side a { display: inline-block; margin-top: 18px; font-weight: 600; text-underline-offset: 5px; }
+.road .side a { display: inline-block; margin-top: 8px; padding: 10px 0; font-weight: 600; text-underline-offset: 5px; }
 .road .now, .road .never { margin-top: var(--gap); }
 .road .now h3, .road .never h3 { font-size: var(--head); margin-bottom: 40px; }
 .road table { width: 100%; border-collapse: collapse; font-size: var(--small); text-align: left; }
