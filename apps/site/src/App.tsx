@@ -519,9 +519,22 @@ function How() {
 
 function Modules() {
   const [active, setActive] = useState(2);
+  const [compact, setCompact] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
 
+  // The same query as the stylesheet: on a phone, or a short screen, the pictures sit inside the list.
   useEffect(() => {
+    if (!window.matchMedia) return;
+    const query = window.matchMedia("(max-width: 860px), (max-height: 560px)");
+    const update = () => setCompact(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    // In the compact layout opening a module moves the ones below it, so scrolling must not pick the module.
+    if (compact) return;
     const items = listRef.current?.querySelectorAll<HTMLElement>("li");
     if (!items || !("IntersectionObserver" in window)) return;
     const io = new IntersectionObserver(
@@ -534,7 +547,7 @@ function Modules() {
     );
     items.forEach((i) => io.observe(i));
     return () => io.disconnect();
-  }, []);
+  }, [compact]);
 
   return (
     <section id="motor" className="mod">
@@ -555,13 +568,40 @@ function Modules() {
       <ul ref={listRef}>
         {modules.map((m, i) => (
           <li key={m.name} data-i={i} data-on={i === active}>
-            <button type="button" onClick={() => setActive(i)} onMouseEnter={() => setActive(i)} onFocus={() => setActive(i)}>
+            <button
+              type="button"
+              aria-expanded={compact ? i === active : undefined}
+              onClick={(e) => {
+                setActive(i);
+                if (!compact) return;
+                // The module that was open folds away and moves this one, so bring it back into view once it has settled.
+                const li = e.currentTarget.closest("li");
+                const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+                window.setTimeout(() => li?.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" }), 480);
+              }}
+              // Hover and focus open a module only in the sticky-picture layout. In the compact one they would move the list
+              // in the middle of a tap, so the click lands elsewhere, and only the click opens a module.
+              onMouseEnter={() => {
+                if (!compact) setActive(i);
+              }}
+              onFocus={() => {
+                if (!compact) setActive(i);
+              }}
+            >
               <span className="head">
                 <span><i />{m.name}</span>
                 <small>{m.tag}</small>
               </span>
               <span className="more">{m.body}</span>
             </button>
+            <img
+              className="inl"
+              src={m.img}
+              alt={i === active ? m.alt : ""}
+              aria-hidden={i === active ? undefined : true}
+              loading="lazy"
+              style={{ objectPosition: m.pos }}
+            />
           </li>
         ))}
       </ul>

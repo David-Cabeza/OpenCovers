@@ -164,11 +164,17 @@ a { color: inherit; }
 .mod .head small { font-size: var(--small); font-weight: 600; color: var(--muted); }
 .mod .more { max-height: 0; overflow: hidden; opacity: 0; font-size: var(--body); max-width: 34ch; transition: max-height 0.45s var(--ease), opacity 0.4s, margin 0.4s; }
 .mod li[data-on="true"] .more { max-height: 8em; opacity: 1; margin-top: 10px; color: var(--ink); }
-@media (max-width: 860px) {
+.mod li .inl { display: none; width: 100%; aspect-ratio: 16 / 10; max-height: 62vh; object-fit: contain; background: var(--surface); margin: 6px 0 14px; }
+/* Phones, and any short screen such as a phone turned sideways: no sticky picture that covers the list. Each module
+   shows its own picture under its text, and only a tap, focus or hover opens one. */
+@media (max-width: 860px), (max-height: 560px) {
   .mod { grid-template-columns: 1fr; padding-top: var(--gap); }
   .mod h2, .mod ul { grid-column: 1; grid-row: auto; }
-  .mod .pic { grid-column: 1; grid-row: auto; position: sticky; top: 62px; z-index: 2; width: 100%; aspect-ratio: 16 / 10; margin: 0 calc(var(--m) * -1); width: calc(100% + var(--m) * 2); }
-  .mod ul { padding-top: 32px; }
+  .mod .pic { display: none; }
+  .mod ul { padding-top: 8px; }
+  .mod li { scroll-margin: 84px 0 16px; }
+  .mod li button { padding: 18px 0; min-height: 44px; }
+  .mod li[data-on="true"] .inl { display: block; }
 }
 
 /* ---------- roadmap: phases as rows on the table ---------- */
