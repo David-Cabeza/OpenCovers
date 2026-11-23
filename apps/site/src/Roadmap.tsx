@@ -234,7 +234,16 @@ function FoundingVenues() {
         ))}
       </dl>
       <p>{foundingVenues.closing}</p>
-      <p className="fine">{foundingVenues.contact}</p>
+      <p>
+        <a
+          className="btn"
+          href={`mailto:${foundingVenues.contact.address}?subject=${encodeURIComponent(foundingVenues.contact.subject)}&body=${encodeURIComponent(foundingVenues.contact.body)}`}
+        >
+          Escríbenos desde tu correo
+        </a>{" "}
+        <span className="fine">o a {foundingVenues.contact.address}</span>
+      </p>
+      <p className="fine">{foundingVenues.contact.note}</p>
     </div>
   );
 }

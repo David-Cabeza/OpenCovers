@@ -428,6 +428,21 @@ export const foundingVenues = {
     { h: "Qué no prometemos", t: "Atención a cualquier hora, funciones con fecha, ni que el servicio alojado será gratuito después de 2027. Sí prometemos avisar con tres meses de cualquier cambio, y que la versión que instalas tú seguirá siendo gratuita." },
   ],
   closing: "No empezaremos hasta que un profesional haya revisado los textos legales y haya un acuerdo firmado. Tu nombre no aparece en ningún sitio sin tu permiso.",
-  /** No hay todavía un canal de contacto propio para esto, y la web no recoge datos. */
-  contact: "Todavía no hay un canal de contacto para locales. Cuando exista, lo anunciaremos aquí. Esta página no recoge datos de nadie.",
+  /** Buzón propio y mensaje preparado (mailto). La web no recoge ni envía datos: lo que se escribe sale del programa de correo de quien escribe. */
+  contact: {
+    address: "locales@opencovers.dev",
+    subject: "Local fundador: quiero saber más",
+    body: [
+      "Hola, soy de un restaurante y me interesa ser local fundador de OpenCovers.",
+      "",
+      "Nombre del local y ciudad:",
+      "Tipo de cocina y número aproximado de cubiertos por servicio:",
+      "Cómo llevas hoy las reservas (libro, hoja de cálculo, teléfono, otro programa):",
+      "Qué te haría más falta para probarlo:",
+      "Mejor forma y hora para hablar:",
+      "",
+      "Entiendo que OpenCovers está en fase pre-alfa y que no empezaréis hasta tener revisados los textos legales y un acuerdo firmado.",
+    ].join("\n"),
+    note: "Esta página no recoge datos: el botón abre tu programa de correo con un mensaje preparado y lo que escribas sale de tu correo, no de la web. Solo lo leerá el mantenedor y lo usaremos únicamente para responderte sobre este programa. Si prefieres no dar datos del local, escribe solo \"quiero saber más\".",
+  },
 };
