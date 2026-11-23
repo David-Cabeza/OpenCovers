@@ -2,8 +2,8 @@
 // Derives the counts that docs restate by hand (conformance status, MCP tools,
 // widget languages) from their sources, and fails when a guarded file states
 // another number next to its keyword. Plain Node, no dependencies.
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -81,9 +81,22 @@ for (const file of files) {
   });
 }
 
+// ADR rule: an ADR whose Status is Accepted must not still say nothing is built.
+for (const name of readdirSync(join(root, "docs/adr")).filter((f) => f.endsWith(".md") && f !== "TEMPLATE.md")) {
+  const file = `docs/adr/${name}`;
+  const lines = read(file).split("\n");
+  const status = lines.find((l) => l.startsWith("- Status:"));
+  if (!status || status.slice(9).trim().split(/\s+/)[0].replace(/[^A-Za-z]/g, "") !== "Accepted") continue;
+  lines.forEach((line, i) => {
+    checked++;
+    if (line.includes("Nothing in this record is built")) {
+      errors.push(`${file}:${i + 1}: Status is Accepted but the text says "Nothing in this record is built"; replace it with what was built`);
+    }
+  });
+}
+
 if (errors.length) {
   console.error("check-docs failed:\n" + errors.map((e) => "  " + e).join("\n"));
   process.exit(1);
 }
 console.log(`check-docs ok: ${checked} statements match (${cases} cases: ${count.PASS} pass, ${count.PARTIAL} partial, ${count.GAP} gap; ${tools} tools; ${locales} languages)`);
-// An ADR rule ("Nothing in this record is built" on an Accepted ADR) would plug in here, reading docs/adr/*.md.
