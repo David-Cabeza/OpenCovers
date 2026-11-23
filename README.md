@@ -30,6 +30,10 @@ Most booking systems are tied to a CRM, a point-of-sale system, or a single vend
 
 OpenCovers keeps the book independent. Any platform or AI agent reads availability, creates a booking, modifies it, or cancels it through the same contract — and the no-double-booking rule is enforced by the database, not by application code.
 
+**Who it is for.** Developers and agencies building a booking front end or an agent, and restaurants with technical help that want to own their book. Not yet for a venue that needs a supported service: this is pre-alpha.
+
+**Try it.** There are three routes. The [hosted demo](https://demo.opencovers.dev) gives you a sandbox restaurant with invented data after you sign in with an email link or Google, with nothing to install (see [Hosted demo](#hosted-demo)). To run it on your machine, follow the [quick start](#quick-start). To deploy it, use the production Compose stack in [docs/deploy.md](docs/deploy.md).
+
 ## Features
 
 ### 📅 Availability and booking
@@ -60,9 +64,15 @@ The 18-tool catalog (`reservation.*`, `waitlist.*`, `venue.*`) is exposed over s
 
 Walk-ins, a waitlist, zones, and automatic table assignment. The engine seats guests now, holds them in a queue, and assigns tables so platforms and agents never think about floor plans. A waitlist entry is seated once, even when two requests try to seat it at the same time. The API also lets a guest join, read and leave a venue's waitlist through public routes. The widget has a join form for a full day and a page at `/r/waitlist` to read and leave the entry. Both are off by default, their wording is provisional pending legal review, and they were tested with fakes and jsdom, not end to end in a browser.
 
+### 🗓️ Before and during service
+
+The staff app has a pre-shift list of who is coming and what they need, an availability screen that explains why a slot is closed, and a pacing view of covers booked against capacity per time slot.
+
 ### 🙋 Guests
 
 The engine keeps one guest record per venue, matched by normalized email or phone. The API lists and reads guests, and an admin merges and unmerges them with an audit trail. Through the API, an admin can also block a contact. The blocklist stores a keyed hash of the contact, and a new booking from that contact is refused with `booking_declined`. There is no guest screen in the staff app yet.
+
+### 🌍 Languages and themes
 
 The staff app speaks Spanish and English, with light and dark themes. A selector in the top bar (and on the sign-in screen) changes the language and the choice is kept in the browser; the first time it uses the browser's language when it is one of the two, and Spanish otherwise. The texts live in one catalog per area under `apps/web/src/i18n/`, see its README for how to add one.
 
@@ -84,7 +94,7 @@ Through Resend, a guest gets an email when a booking is confirmed, changed or ca
 
 ### 🔔 Signed webhooks
 
-Register an HTTPS endpoint and the engine pushes every reservation event to it: created, modified, cancelled, seated, attended, no_show, and erased. Each POST is signed with HMAC-SHA256, arrives in order, and is retried with backoff until acknowledged. Private and metadata addresses are refused. See [docs/contract/webhooks.md](docs/contract/webhooks.md).
+Register an HTTPS endpoint and the engine pushes every reservation event to it: created, modified, cancelled, seated, attended, no_show, and erased. Each POST is signed with HMAC-SHA256, arrives in order, and is retried with backoff until acknowledged. Private and metadata addresses are refused. See [docs/contract/webhooks.md](docs/contract/webhooks.md). Endpoints are registered through the API; the staff app has no screen for them yet.
 
 ### 🧹 Erasure built in
 
@@ -95,7 +105,7 @@ An admin erases a guest's data by guest record or by principal, and gets back co
 ```mermaid
 flowchart LR
     subgraph web["Staff app · React + Tailwind (5173)"]
-        UI[Agenda · Availability · Floor plan · Waitlist · Team · Setup]
+        UI[Agenda · Pre-shift · Floor plan · Availability · Waitlist · Pacing · Team · Setup]
     end
     subgraph api["API · Node.js + Hono (3000)"]
         AUTH[Better Auth · sessions]
@@ -106,7 +116,7 @@ flowchart LR
         TOOLS[18 tools]
     end
     subgraph widget["Booking widget · /w and /r"]
-        GUEST[Book · view · change · cancel]
+        GUEST[Book · join the waitlist · view · change · cancel]
     end
     DB[(PostgreSQL<br/>GiST exclusion)]
 
@@ -241,20 +251,26 @@ docs/        the contract, ADRs, and requirements
 - The database enforces the no-overlap rule. Application code does not.
 - Every write carries an idempotency key and produces a monotonic version.
 - A venue's data is isolated. A request for another venue returns not found.
-- The engine takes a booking and honors a STOP without a memory platform.
+- The engine takes a booking without a CRM or a memory platform.
 - The engine stores the minimum guest data a booking needs.
 - Erasure returns counts and keeps hashes, not personal values.
 - The contract and the conformance cases come before the implementation.
 
 ## Hosted demo
 
-A hosted demo is open to the public at [demo.opencovers.dev](https://demo.opencovers.dev), with its [terms of use](https://opencovers.dev/condiciones.html) and [privacy notice](https://opencovers.dev/privacidad.html). With `DEMO_MODE=1` one deployment becomes a public demo where each visitor signs in with an emailed magic link (after a proof-of-work challenge) or with Google, and gets a sandbox restaurant of their own, with caps on what it can hold and a sandbox bar and guided tour in the staff app. The terms and the privacy notice were written without a lawyer's review, and a sandbox is deleted after 14 days without a sign-in. It runs on its own host and database, never next to real data, and it is off by default. See [ADR-0022](docs/adr/0022-hosted-demo-sandbox.md) and the [deploy guide](docs/deploy.md#hosted-demo). The public site links to it from the hero.
+A hosted demo is open to the public at [demo.opencovers.dev](https://demo.opencovers.dev), with its [terms of use](https://opencovers.dev/condiciones.html) and [privacy notice](https://opencovers.dev/privacidad.html). With `DEMO_MODE=1` one deployment becomes a public demo where each visitor signs in with an emailed magic link (after a proof-of-work challenge) or with Google, and gets a sandbox restaurant of their own, with caps on what it can hold (by default 150 reservations and 100 guests per sandbox; no webhooks; email only to the visitor's own address) and a sandbox bar and guided tour in the staff app. The terms and the privacy notice were written without a lawyer's review, and a sandbox is deleted after 14 days without a sign-in. It runs on its own host and database, never next to real data, and it is off by default. See [ADR-0022](docs/adr/0022-hosted-demo-sandbox.md) and the [deploy guide](docs/deploy.md#hosted-demo). The public site links to it from the hero.
 
 ## Deploy
 
 OpenCovers has no hosting vendor dependency. It needs PostgreSQL and a Node.js process. The API ships as a Docker image, and the staff app is a static build that any web server can serve. Whoever forks it for a venue decides where the database lives. The project's own site is on GitHub Pages at [opencovers.dev](https://opencovers.dev). See [docs/deploy.md](docs/deploy.md). Self-hosters should also read the [hardening guide](docs/hardening.md).
 
 ## Status
+
+| Works today | Preview | Not built yet |
+| --- | --- | --- |
+| The engine and its API, the staff app, the MCP server (18 tools, on npm), signed webhooks, erasure, a production Docker Compose stack | The booking widget and the guest self-service page, guest emails (Spanish only, off by default), the public waitlist (off by default, provisional wording) | Payments, SMS and WhatsApp, reminders and STOP handling, a guest screen in the staff app, POS adapters, a remote MCP endpoint |
+
+The details:
 
 Pre-alpha. The engine, the staff screens, and the MCP server are implemented and tested locally. Of the 78 conformance cases, 70 pass and 8 are partial (C43 to C45, C50, C51, C55, C67 and C70), signed webhooks included. None is a gap. 17 cases (C39 to C55) specify the booking widget and self-service link: 11 pass and 6 are partial (C43 to C45, C50, C51 and C55). Stages 2 to 7, 9, 10, 12 and 15 of ADR-0017 are built. They are the online booking settings, the public booking API for config, availability and create, the guest self-service link to read, change and cancel a booking, the booking widget with its framed page, the guest's self-service page, the Online booking card in Setup, the venue's theme (colors, corner radius, font and logo) in the widget and in Setup, the `embed.js` script that sizes the iframe and passes the host page's language, a "lost your link?" form that emails a new link when the venue has email on (placeholder email text), and the widget in seven languages, five of them machine-assisted and waiting for native review. Stages 8, 11 and 13 wait on a legal review or an optional CAPTCHA, and stage 14 is deferred. ADR-0021 adds the day strip, the zone choice and the summary step to the widget. Its public waitlist is built in the API (C68 to C78: join, read, leave and the join email, migration 0047), and its widget join (on a full day, with an unticked consent box) and the `/r/waitlist` page are built too (stage 12). They are off by default, the wording is provisional pending legal review, C70 stays partial, and the hosted demo does not turn it on. A production deployment is prepared (Dockerfile, a Compose stack behind Caddy with security headers and health checks, and a runbook), and the same images run the [hosted demo](#hosted-demo), which is open to the public. Its terms of use and privacy notice were drafted without a lawyer's review. Do not rely on OpenCovers for a real venue's bookings yet. Email delivery is wired via Resend; the templates' legal text and consent basis are still pending review. See [ROADMAP.md](ROADMAP.md).
 
