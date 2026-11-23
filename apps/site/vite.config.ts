@@ -18,6 +18,7 @@ export default defineConfig({
       input: {
         main: path.resolve(import.meta.dirname, "index.html"),
         roadmap: path.resolve(import.meta.dirname, "hoja-de-ruta/index.html"),
+        brigada: path.resolve(import.meta.dirname, "brigada/index.html"),
       },
     },
   },

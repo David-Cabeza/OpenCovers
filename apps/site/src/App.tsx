@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { REPO } from "./brigada";
-import { Brigada } from "./Brigada";
+import { BrigadaTeaser } from "./Brigada";
 import { DEMO_URL, Footer, GithubButton, Nav, d, useReveal } from "./chrome";
 import { RoadmapTeaser } from "./Roadmap";
 
@@ -174,7 +174,7 @@ export default function App() {
         <How />
         <Modules />
         <RoadmapTeaser />
-        <Brigada />
+        <BrigadaTeaser />
         <Faq />
         <Cta />
       </main>

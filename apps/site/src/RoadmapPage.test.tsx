@@ -77,7 +77,7 @@ describe("roadmap page", () => {
 });
 
 describe("entry pages", () => {
-  const entries = ["index.html", "hoja-de-ruta/index.html"];
+  const entries = ["index.html", "hoja-de-ruta/index.html", "brigada/index.html"];
   const csp = (html: string) => html.match(/<meta http-equiv="Content-Security-Policy"[^>]*>/)?.[0];
   const inline = (html: string) => html.match(/<script>[^<]*<\/script>/)?.[0];
 
@@ -104,5 +104,15 @@ describe("entry pages", () => {
     expect(read("public/sitemap.xml")).toContain("<loc>https://opencovers.dev/hoja-de-ruta/</loc>");
     expect(read("vite.config.ts")).toContain("hoja-de-ruta/index.html");
     expect(read("scripts/pages.mjs")).toContain("hoja-de-ruta/index.html");
+  });
+
+  it("lists the Brigada page in the sitemap, the Vite inputs and the prerender list, with its own canonical", () => {
+    expect(read("public/sitemap.xml")).toContain("<loc>https://opencovers.dev/brigada/</loc>");
+    expect(read("vite.config.ts")).toContain("brigada/index.html");
+    expect(read("scripts/pages.mjs")).toContain("brigada/index.html");
+    const html = read("brigada/index.html");
+    expect(html).toContain('<link rel="canonical" href="https://opencovers.dev/brigada/" />');
+    expect(html).toContain('<meta property="og:url" content="https://opencovers.dev/brigada/" />');
+    expect(html).not.toContain("hreflang");
   });
 });
