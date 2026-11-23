@@ -26,13 +26,43 @@ describe("public site", () => {
     );
   });
 
-  it("links each Brigada card to its own open issue and keeps one link to the full list", () => {
+  it("renders the eight Brigada tracks with label filters and never links a single issue", () => {
     const { container } = render(<App />);
+    const section = container.querySelector("#brigada")!;
     const repo = "https://github.com/David-Cabeza/OpenCovers";
-    const hrefs = [...container.querySelectorAll("#brigada li a")].map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual([172, 175, 174, 156, 154].map((n) => `${repo}/issues/${n}`));
-    const all = screen.getByRole("link", { name: "Ver todas las tareas abiertas" });
-    expect(all.getAttribute("href")).toContain("label%3A%22good+first+issue%22");
+    const cards = [...section.querySelectorAll("ul.tracks > li")];
+    expect(cards.map((li) => li.querySelector(".n")?.textContent)).toEqual(
+      ["Motor", "Sala digital", "Idiomas", "Pruebas", "Guías", "Sala", "Agentes", "Legal"],
+    );
+    const labels = ["track:backend", "track:front", "track:i18n", "track:qa", "track:docs", "track:floor", "agent-ok"];
+    labels.forEach((label, i) => {
+      const href = cards[i].querySelector("a")!.getAttribute("href")!;
+      expect(href.startsWith(`${repo}/issues?q=`)).toBe(true);
+      const q = decodeURIComponent(href.split("?q=")[1]);
+      expect(q).toContain("label:brigada");
+      expect(q).toContain(label);
+    });
+    // Legal has no public task list and no mailbox meant for it: plain text, no link.
+    expect(cards[7].querySelector("a")).toBeNull();
+    const hrefs = [...section.querySelectorAll("a")].map((a) => a.getAttribute("href") ?? "");
+    expect(hrefs.some((h) => /\/issues\/\d+/.test(h))).toBe(false);
+    expect(hrefs.some((h) => h.startsWith("mailto:"))).toBe(false);
+  });
+
+  it("states the real status in the Brigada section and heads it accessibly", () => {
+    const { container } = render(<App />);
+    const section = container.querySelector("#brigada")!;
+    expect(section.getAttribute("aria-labelledby")).toBe("brigada-t");
+    expect(screen.getByRole("heading", { level: 2, name: "La Brigada" })).toBeInTheDocument();
+    const text = section.textContent ?? "";
+    expect(text).toContain("pre-alfa");
+    expect(text).toContain("Lo mantiene una persona");
+    expect(text).toContain("agentes de IA");
+    expect(text).toContain("Objetivo: primera respuesta de una persona en 48 horas");
+    for (const cmd of ["docker compose up -d", "pnpm install", "pnpm db:migrate", "pnpm dev", "pnpm test"]) {
+      expect(text).toContain(cmd);
+    }
+    for (const rank of ["Comensal", "Cocinero", "Jefe de partida", "Segundo de cocina"]) expect(text).toContain(rank);
   });
 
   it("points every README anchor at a heading the README has", () => {
