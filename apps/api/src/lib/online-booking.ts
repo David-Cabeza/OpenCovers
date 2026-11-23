@@ -367,6 +367,9 @@ export async function setOnlineBooking(
     if (merged.minPartySize > merged.maxPartySize) return { ok: false, code: "invalid_request" };
     // The join sends an email, so the waitlist cannot be turned on while the venue's email is off (C68). Turning
     // email off later keeps the stored value; the public channel then reads the waitlist as off.
+    // The hosted demo does not show the public waitlist: its consent label and email wording are not approved yet.
+    // Only turning it on is refused, so turning it off and a write that leaves it alone still work.
+    if (rest.waitlistEnabled === true && demoMode()) return { ok: false, code: "invalid_request" };
     if (rest.waitlistEnabled === true && !venue.notificationsEnabled) return { ok: false, code: "invalid_request" };
     const rows = await tx
       .select({ name: services.name, days: services.days })
