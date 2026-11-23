@@ -18,7 +18,7 @@ describe("roadmap page", () => {
 
   it("renders the whole roadmap with the nav marked as current", () => {
     const { container } = render(<RoadmapPage />);
-    expect(screen.getByRole("heading", { name: "Hoja de ruta 2027" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Hoja de ruta 2027" })).toBeInTheDocument();
     for (const id of ["hoja-de-ruta", "locales-fundadores"]) {
       expect(container.querySelector(`#${id}`), id).not.toBeNull();
     }

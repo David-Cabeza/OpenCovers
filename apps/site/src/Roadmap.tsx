@@ -239,11 +239,12 @@ function FoundingVenues() {
   );
 }
 
-export function Roadmap() {
+export function Roadmap({ pageTitle = false }: { pageTitle?: boolean }) {
+  const Title = pageTitle ? "h1" : "h2";
   return (
     <section id="hoja-de-ruta" className="road" aria-labelledby="road-h">
       <div className="top">
-        <h2 id="road-h" className="rv">Hoja de ruta 2027</h2>
+        <Title id="road-h" className="rv">Hoja de ruta 2027</Title>
         <p className="rv" style={d(90)}>{ROAD_LEDE}</p>
       </div>
       <Manifesto />

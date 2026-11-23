@@ -207,7 +207,7 @@ main:focus { outline: none; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .road { background: var(--surface); padding: var(--gap) var(--m); }
 .road .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-.road h2 { font-size: var(--hero); }
+.road h1, .road h2 { font-size: var(--hero); line-height: 0.95; }
 .road .top p { font-size: var(--lead); max-width: 28ch; line-height: 1.25; }
 .road .now, .road .never { margin-top: var(--gap); }
 .road .now h3, .road .never h3 { font-size: var(--head); margin-bottom: 40px; }

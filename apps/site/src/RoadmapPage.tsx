@@ -9,7 +9,7 @@ export default function RoadmapPage() {
       <a className="skip" href="#contenido">Saltar al contenido</a>
       <Nav page="roadmap" />
       <main id="contenido" tabIndex={-1}>
-        <Roadmap />
+        <Roadmap pageTitle />
       </main>
       <Footer />
     </>
