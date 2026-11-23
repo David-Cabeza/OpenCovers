@@ -18,8 +18,6 @@ const key = (method: string, p: string) =>
 // Routes the contract owes. Each one is documented by T04 and then deleted from here.
 const UNDOCUMENTED = [
   // to document in T04
-  "POST /v1/venues/{venueId}/reservations/walk-in",
-  "GET /v1/venues/{venueId}/pacing",
   "GET /v1/venues/{venueId}/floor",
   "GET /v1/venues/{venueId}/tables",
   "POST /v1/venues/{venueId}/tables",

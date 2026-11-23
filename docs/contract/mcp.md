@@ -23,6 +23,8 @@ The MCP server implements this catalog. It wraps the HTTP API and is scoped per 
 | `venue.getConfig` | GET /venues/{venueId}/config | read | none |
 | `venue.setConfig` | PUT /venues/{venueId}/config | write | none |
 
+Each tool id is the `operationId` of its path in `openapi.yaml`, for example `reservation.walk_in` for `POST /venues/{venueId}/reservations/walk-in`. `GET /venues/{venueId}/pacing` (`reservation.pacing`) has no MCP tool.
+
 ## Tool hints
 
 Every tool sets `readOnlyHint`, `destructiveHint` and `idempotentHint` explicitly. A client that sees a write tool without `destructiveHint: false` must treat it as destructive, so none is left to the default. `idempotentHint` is true when the same call, key included, has no further effect. A write tool generates a fresh key when the caller omits it, so a retry is only idempotent when the caller passes the key back.

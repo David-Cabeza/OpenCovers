@@ -251,6 +251,55 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /venues/{venueId}/pacing:
+    get:
+      operationId: reservation.pacing
+      summary: Read the covers against the capacity of each slot on one day
+      description: |
+        The service rhythm of one day. It returns one entry for each service
+        that serves the weekday of `date` in the venue's time zone, and an
+        empty list when none does. Each entry lists the service's slots, one
+        every `slotIntervalMinutes` from the opening of the service up to
+        its close. The last seating offset is not applied, so the list holds
+        every grid time, including those the venue no longer seats. A service
+        that crosses midnight lists its times after midnight at the end,
+        under the same `date`.
+
+        `capacity` is the total seats of all the venue's tables, the same
+        number in every slot. `covers` is the sum of `partySize` of the
+        reservations of that `date` whose status is `booked` or `seated` and
+        whose held interval contains the slot's start, from its start
+        inclusive to its end exclusive. Walk-ins count. Cancelled, `attended`
+        and `no_show` reservations do not, so a booking that has left no
+        longer counts in the slots it held. A booking with no table, under
+        the overbooking ceiling, counts as well, so `covers` can exceed
+        `capacity`. The answer holds no guest data. The route takes no
+        service filter. Needs any key or role that can read the venue.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - name: date
+          in: query
+          required: true
+          description: |
+            A real `YYYY-MM-DD` calendar date from `1900-01-01` to
+            `9998-12-31`. Any other value, and a missing one, fails with
+            `invalid_request`.
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: The slots of each service
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pacing]
+                properties:
+                  pacing:
+                    type: array
+                    items: { $ref: "#/components/schemas/PacingService" }
+        default:
+          $ref: "#/components/responses/Error"
+
   /venues/{venueId}/reservations:
     get:
       operationId: reservation.list
@@ -317,6 +366,65 @@ paths:
       responses:
         "200":
           description: The created reservation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        default:
+          $ref: "#/components/responses/Error"
+
+  /venues/{venueId}/reservations/walk-in:
+    post:
+      operationId: reservation.walk_in
+      summary: Seat a guest who has no booking
+      description: |
+        Creates a reservation that is `seated` from the start, at version 1.
+        `date` and `time` default to now in the venue's time zone. The
+        service is the one that covers that date and time, so a time outside
+        every service, or on a weekday no service serves, fails with
+        `outside_hours`. `date` and `time` follow the rules of
+        `reservation.create`: a `date` that is not a real `YYYY-MM-DD`
+        calendar date, or is outside `1900-01-01` to `9998-12-31`, and a
+        `time` that is not `HH:MM`, fail with `invalid_request`.
+
+        The tables are held for the venue's turn time for the party size, or
+        120 minutes when the venue has none, as in a create. With `tables`
+        the engine uses exactly those tables, and they must be distinct
+        tables of the venue, else `invalid_request`. With `tables` empty or
+        omitted it assigns them, inside `zone` when one is given. A table
+        already taken, or no table that fits, fails with `slot_taken`, and a
+        party larger than the tables or the venue holds fails with
+        `party_size_too_large`. A walk-in never uses the overbooking
+        ceiling, so it holds a table or fails: an auto-assigned walk-in with
+        no free combination fails with `no_suitable_table`.
+
+        A walk-in is not held to the slot grid, the lead time, the booking
+        horizon, the blocked dates, or the party limits of the service. It is
+        held to the last seating: a time after it fails with `outside_hours`. It is not counted against `maxActivePerGuestPerDay` and
+        is never declined by the guest blocklist (ADR-0018). It takes the
+        same `guest`, `rating` and `commentary` fields as a create, except
+        `reconfirmation`: a body that carries it, whatever the value, fails
+        with `invalid_request`. A walk-in has no `service` or `source` input.
+
+        The key behaves as in a create. A repeat of the key returns the first
+        reservation and writes nothing, even when the other arguments differ.
+        A walk-in and a create share one key space, so the key of a create of
+        the same venue returns that reservation. A key used for a modify, a
+        cancel, a status change or a seat from the waitlist fails with
+        `invalid_request`. The write emits one `created` event and no
+        `seated` event, and sends the same confirmation and notice emails as
+        a create. Needs a `write` or `admin` key or role. A `read` key or
+        role fails with `forbidden`.
+      parameters:
+        - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WalkInCreate" }
+      responses:
+        "200":
+          description: The seated reservation
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Reservation" }
@@ -3498,6 +3606,64 @@ components:
           $ref: "#/components/schemas/Commentary"
         reconfirmation:
           $ref: "#/components/schemas/Reconfirmation"
+
+    WalkInCreate:
+      type: object
+      required: [partySize]
+      description: |
+        The body of a walk-in. Only `partySize` is required. A `date` or
+        `time` that is not a string, and `tables` that is not an array, are
+        ignored as if absent.
+      properties:
+        date:
+          type: string
+          format: date
+          description: Defaults to today in the venue's time zone.
+        time:
+          type: string
+          description: "`HH:MM`. Defaults to now in the venue's time zone."
+        partySize:
+          type: integer
+          minimum: 1
+        zone:
+          type: string
+        tables:
+          type: array
+          description: |
+            When set, the engine must use these tables. When empty or omitted,
+            the engine assigns them.
+          items: { type: string }
+        guest:
+          $ref: "#/components/schemas/Guest"
+        rating:
+          $ref: "#/components/schemas/Rating"
+        commentary:
+          $ref: "#/components/schemas/Commentary"
+
+    PacingSlot:
+      type: object
+      required: [time, capacity, covers]
+      properties:
+        time:
+          type: string
+          example: "21:00"
+          description: The slot's start, `HH:MM` in the venue's time zone.
+        capacity:
+          type: integer
+          description: The total seats of the venue's tables.
+        covers:
+          type: integer
+          description: The guests of the `booked` and `seated` reservations that hold a table at this time.
+
+    PacingService:
+      type: object
+      required: [service, slots]
+      properties:
+        service:
+          type: string
+        slots:
+          type: array
+          items: { $ref: "#/components/schemas/PacingSlot" }
 
     ReservationModify:
       type: object
