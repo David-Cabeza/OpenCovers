@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { REPO } from "./brigada";
 import { Brigada } from "./Brigada";
 import { DEMO_URL, Footer, GithubButton, Nav, d, useReveal } from "./chrome";
@@ -273,12 +273,7 @@ function Intro() {
         OpenCovers lo separa de todo.
       </p>
       <div className="win rv" style={d(120)} data-ui>
-        <div className="bar" aria-hidden>
-          <i style={{ background: "#ff5f57" }} />
-          <i style={{ background: "#febc2e" }} />
-          <i style={{ background: "#28c840" }} />
-          <b>OpenCovers — La Taberna del Faro</b>
-        </div>
+        <WinBar>OpenCovers — La Taberna del Faro</WinBar>
         <video ref={videoRef} muted loop playsInline preload="none" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} poster="/media/opencovers-demo-poster.webp" aria-label="Demo de OpenCovers: la agenda del día, una reserva hecha desde el widget que aparece en la agenda, el rechazo de una doble reserva en la misma mesa y hora, y un agente de IA que choca con la misma regla">
           <source src="/media/opencovers-demo.mp4" type="video/mp4" />
         </video>
@@ -426,6 +421,17 @@ function How() {
   );
 }
 
+function WinBar({ children }: { children?: ReactNode }) {
+  return (
+    <div className="bar" aria-hidden>
+      <i style={{ background: "#ff5f57" }} />
+      <i style={{ background: "#febc2e" }} />
+      <i style={{ background: "#28c840" }} />
+      {children && <b>{children}</b>}
+    </div>
+  );
+}
+
 function Modules() {
   const [active, setActive] = useState(2);
   const [compact, setCompact] = useState(false);
@@ -461,18 +467,20 @@ function Modules() {
   return (
     <section id="motor" className="mod">
       <h2 className="rv">Dentro del motor</h2>
-      <div className="pic rv">
-        {modules.map((m, i) => (
-          <img
-            key={m.name}
-            src={m.img}
-            alt={i === active ? m.alt : ""}
-            aria-hidden={i === active ? undefined : true}
-            loading="lazy"
-            className={i === active ? "on" : ""}
-           
-          />
-        ))}
+      <div className="pic win rv">
+        <WinBar />
+        <div className="shot">
+          {modules.map((m, i) => (
+            <img
+              key={m.name}
+              src={m.img}
+              alt={i === active ? m.alt : ""}
+              aria-hidden={i === active ? undefined : true}
+              loading="lazy"
+              className={i === active ? "on" : ""}
+            />
+          ))}
+        </div>
       </div>
       <ul ref={listRef}>
         {modules.map((m, i) => (
@@ -505,14 +513,16 @@ function Modules() {
                 <span>{m.body}</span>
               </span>
             </button>
-            <img
-              className="inl"
-              src={m.img}
-              alt={i === active ? m.alt : ""}
-              aria-hidden={i === active ? undefined : true}
-              loading="lazy"
-              style={{ objectPosition: m.pos }}
-            />
+            <div className="inl win">
+              <WinBar />
+              <img
+                src={m.img}
+                alt={i === active ? m.alt : ""}
+                aria-hidden={i === active ? undefined : true}
+                loading="lazy"
+                style={{ objectPosition: m.pos }}
+              />
+            </div>
           </li>
         ))}
       </ul>
