@@ -1,6 +1,6 @@
 # ADR-0010: Membership audit
 
-- Status: Proposed
+- Status: Accepted (owner, 2026-11-23). Built: C31 and `membership-audit.test.ts`.
 - Date: 2026-11-16
 - Deciders: David Cabeza
 

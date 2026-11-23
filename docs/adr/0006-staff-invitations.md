@@ -1,6 +1,6 @@
 # ADR-0006: Staff invitations
 
-- Status: Proposed
+- Status: Accepted (owner, 2026-11-23). Built: C27 and `invitations.ts`.
 - Date: 2026-11-15
 - Deciders: David Cabeza
 

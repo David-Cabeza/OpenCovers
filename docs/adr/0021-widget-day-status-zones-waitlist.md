@@ -4,7 +4,7 @@
 - Date: 2026-11-19
 - Deciders: David Cabeza
 
-Nothing in this record is built. It proposes the next widget features so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow, in that order. It extends [ADR-0017](0017-booking-widget-and-self-service-link.md) and changes some of its rules, listed under Consequences. Open questions for the owner are marked `Q1` to `Q11`.
+Built so far: stages 1 to 12 of section 7. The public waitlist ships off by default, with provisional wording until the legal review (Q11). The record proposed these features so that the contract (`docs/contract/openapi.yaml`), the conformance cases and the code can follow, in that order. It extends [ADR-0017](0017-booking-widget-and-self-service-link.md) and changes some of its rules, listed under Consequences. Open questions for the owner are marked `Q1` to `Q11`.
 
 ## Decisions at a glance
 
@@ -269,3 +269,13 @@ The owner asked to keep wallet passes in view because they are trending and can 
 
 - **Q1. Range.** 14 days per call with paging for the calendar, or up to 42 for a month in one call at 3 times the cost?
 - **Q11. Legal review.** Placement of the notice link, whether a booking without `privacyNoticeUrl` is acceptable, consent wording, and confirmation that pre-ticked boxes are not valid consent under EU rules.
+
+## Amendment 2026-11-23: where the open questions stand
+
+Facts only. The status stays Proposed until the owner accepts the record.
+
+- **Q7 (waitlist caps) is built as the proposed default.** The caps are constants: 2 open public entries per contact, 1 per contact per date, 50 per date per venue.
+- **Q8 (booking from an entry) is built as the proposed default.** There is no `booked` status. Staff book with the staff create and then cancel the entry.
+- **Q1 (range of `/days`) and Q11 (legal review) remain open.**
+- **Stage 12 shipped** (`WaitlistJoin.tsx`, `WaitlistPage.tsx`, the date, window and source on the staff waitlist).
+- **The public waitlist is off by default** (`waitlistEnabled: false`). A venue turns it on in Setup. The consent label and the join email text stay provisional until Q11.

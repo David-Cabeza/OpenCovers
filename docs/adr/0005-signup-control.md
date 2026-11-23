@@ -1,6 +1,6 @@
 # ADR-0005: Sign-up control
 
-- Status: Proposed
+- Status: Accepted (owner, 2026-11-23). Built: `apps/api/src/lib/signup.ts` and the hook in `auth.ts`, tested in `signup.test.ts`.
 - Date: 2026-11-15
 - Deciders: David Cabeza
 

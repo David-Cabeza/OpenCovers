@@ -1,6 +1,6 @@
 # ADR-0008: Venue creation limit
 
-- Status: Proposed
+- Status: Accepted (owner, 2026-11-23). Built: C29 and `venue-creation.test.ts`.
 - Date: 2026-11-16
 - Deciders: David Cabeza
 
