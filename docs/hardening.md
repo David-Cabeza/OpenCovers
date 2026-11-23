@@ -192,7 +192,7 @@ What the code does provide:
 - `X-Content-Type-Options: nosniff`.
 - `Referrer-Policy: strict-origin-when-cross-origin`.
 - `X-Frame-Options: DENY`.
-- `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'`.
+- `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'`.
 - `Strict-Transport-Security: max-age=31536000`, only on HTTPS requests. It has no `includeSubDomains` and no `preload`.
 - The `Server` header is removed.
 
