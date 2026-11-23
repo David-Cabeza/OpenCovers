@@ -1,6 +1,6 @@
 # Legal review brief: hosted demo privacy notice and terms (ADR-0022)
 
-Status: the demo opened to the public on 2026-11-21 by the owner's decision, before any legal review. The privacy notice ([`apps/site/public/privacidad.html`](../apps/site/public/privacidad.html), pull request #262) and the site button (#260) are merged, and the Google sign-in app is published. The terms of use ([`apps/site/public/condiciones.html`](../apps/site/public/condiciones.html)) and the notice were drafted without a lawyer, and nobody has reviewed them. The review is pending and optional. Nothing here is legal advice or approved text. The notice's yellow brackets mark what a reviewer would decide. The sign-in form says "By continuing you accept the terms of use and the privacy policy" and links both. The demo collects no newsletter leads and has no consent box (ADR-0022, amendment of 2026-11-21). The demo runs at `demo.opencovers.dev`.
+Status: the demo opened to the public on 2026-11-21 by the owner's decision, before any legal review. The privacy notice ([`apps/site/public/privacidad.html`](../apps/site/public/privacidad.html), pull request #262) and the site button (#260) are merged, and the Google sign-in app is published. The terms of use ([`apps/site/public/condiciones.html`](../apps/site/public/condiciones.html)) and the notice were drafted without a lawyer, and nobody has reviewed them. The review is pending and optional. Nothing here is legal advice or approved text. The notice's open points for a reviewer are listed in a comment at the top of the file. The sign-in form says "By continuing you accept the terms of use and the privacy policy" and links both. The demo collects no newsletter leads and has no consent box (ADR-0022, amendment of 2026-11-21). The demo runs at `demo.opencovers.dev`.
 
 ## Who and what
 
@@ -28,7 +28,9 @@ Cookies and local storage: one session cookie (`__Secure-better-auth.session_tok
 
 ## Processors and places
 
-Hetzner Cloud (server and database, Helsinki). Resend (email sending; the owner reports the domain is in the EU region, Ireland). Google (sign in, if chosen; fonts for the app). Cloudflare (DNS and the privacy mailbox forwarding; demo traffic does not pass through it). GitHub (hosts the website and the code; receives no demo data). We have not checked any processor's transfer safeguards or signed any data processing agreement beyond each provider's standard terms.
+Hetzner Cloud (server and database, Helsinki). Resend (email sending; the domain sends from the EU region, Ireland, but Resend keeps its account data in the US). Google (sign in, if chosen; fonts for the app). Cloudflare (DNS and the privacy mailbox forwarding; demo traffic does not pass through it). GitHub (hosts the website and the code; receives no demo data).
+
+Transfers outside the EEA were checked on 2026-11-22 from each provider's official pages. Resend, Google, Cloudflare and GitHub process data in the US. Each states it is certified under the EU-US Data Privacy Framework (DPF) and falls back to the Commission's standard contractual clauses (SCCs) if the framework lapses. Resend's data processing agreement is part of its terms, and so is Cloudflare's and GitHub's. Hetzner keeps the data in the EU (Finland) and makes no such transfer. Hetzner's data processing agreement is concluded by the customer in the account, and the owner reports concluding it on 2026-11-22. No other agreement was signed beyond each provider's standard terms. The notice says the same in its transfers paragraph.
 
 ## Proposed legal bases (to validate)
 
@@ -40,7 +42,7 @@ Hetzner Cloud (server and database, Helsinki). Resend (email sending; the owner 
 ## Questions for the reviewer
 
 1. Are the two proposed bases right, and does each purpose need an interest assessment or other record?
-2. Which safeguards are required for the transfers outside the EEA (Google, Cloudflare, GitHub, and Resend if its region is not Ireland)? Is the providers' standard terms enough or is more needed?
+2. Are the safeguards enough for the transfers outside the EEA (Resend, Google, Cloudflare, GitHub): DPF certification with the SCCs as fallback, and each provider's standard data processing terms? Is more needed, for example a transfer impact assessment, given that Resend keeps its account data in the US although mail leaves from Ireland?
 3. A visitor can share the sandbox widget link. Another person then types their data, and the visitor sees it. Who is responsible for that data, and does the notice cover it, or must the widget show its own notice?
 4. Does the notice meet the information duties (RGPD art. 13, LSSI), including the identity and address shown? Is the Spanish Data Protection Agency the right authority to name? Are the terms of use sound, and is accepting them by continuing enough?
 5. Are the notice and the terms, written in Spanish only, enough for visitors who use the English or other interface languages?
@@ -48,4 +50,4 @@ Hetzner Cloud (server and database, Helsinki). Resend (email sending; the owner 
 
 ## What changes after the review
 
-If a review happens, the reviewer's text replaces the marked bases and the transfers paragraph in the notice, and any change to the terms goes into `condiciones.html`. The same review should cover the waitlist wording in [`legal-review-waitlist.md`](legal-review-waitlist.md).
+If a review happens, the reviewer's text replaces the bases and the transfers paragraph in the notice, and any change to the terms goes into `condiciones.html`. The same review should cover the waitlist wording in [`legal-review-waitlist.md`](legal-review-waitlist.md).

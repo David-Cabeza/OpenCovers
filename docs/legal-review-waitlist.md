@@ -1,6 +1,6 @@
 # Legal review brief: public waitlist wording (ADR-0021 Q11)
 
-Status: draft for a lawyer's review. Nothing here is legal advice or approved text. The wording below is a proposal to be changed by the reviewer. The code ships the email text as provisional (`apps/api/src/lib/email-messages.ts`) and the waitlist is off by default (`waitlistEnabled`).
+Status: draft for a lawyer's review. Nothing here is legal advice or approved text. The wording below is a proposal to be changed by the reviewer. The code ships the email text as provisional (`apps/api/src/lib/email-messages.ts`). The waitlist is off by default (`waitlistEnabled` is false), and the hosted demo keeps it off.
 
 ## What the feature does
 
@@ -42,4 +42,4 @@ A guest who finds a date fully booked can leave their name, an email address, pa
 
 ## What changes after the review
 
-The reviewer's text replaces the label and the email catalog entries. Only then does the widget stage (ADR-0021 stage 12) ship, and a venue turns the waitlist on. The same review covers the confirmation email (REQ-N2) and the consent stored per booking (REQ-N4).
+The reviewer's text replaces the label and the email catalog entries. The widget stage (ADR-0021 stage 12) already shipped (PR #293), off by default with this provisional wording, so until the review no venue should turn the waitlist on for real guests, and the demo keeps it off. The same review covers the confirmation email (REQ-N2) and the consent stored per booking (REQ-N4).
