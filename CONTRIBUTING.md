@@ -1,37 +1,58 @@
 # Contributing to OpenCovers
 
-Thanks for helping. This guide explains what to work on, how to claim a flag, and what a good pull request looks like.
+OpenCovers is pre-alpha. One person maintains it. AI agents write most of the code, and the maintainer reviews every change before it merges. It is not ready for a real restaurant yet, and the legal texts of the demo have not been reviewed by a lawyer. You are welcome here whether you write code, translate, test on your phone, or have run a dining room.
 
-## Before you start
+## The ten-minute route
 
-Read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [GOVERNANCE.md](GOVERNANCE.md), and [ROADMAP.md](ROADMAP.md).
+1. Try the demo at [demo.opencovers.dev](https://demo.opencovers.dev). It holds invented data only.
+2. Pick a track below and open its task list.
+3. Comment "I'll take this" on one task.
+4. The maintainer assigns it to you. Our goal is a first answer within 48 hours. It is a goal, not a promise.
 
-## Work through flags
+You do not need to read anything else to start. Read [docs/contract/](docs/contract/) and the [README](README.md) when you are about to change code.
 
-A flag is a scoped task that one person can claim. Every flag has a what, a why, a scope, acceptance criteria, dependencies, and a size.
+## Tracks
 
-1. Find an open issue with the `good first issue` label for a first task, or the `flag` label for a scoped task.
-2. Comment that you want to claim it.
-3. Wait for a maintainer to assign it to you.
-4. Open a draft pull request within seven days. If you need more time, say so in the issue.
+Each track is a label. Open the issue list and filter by it.
 
-If a flag is too large, ask a maintainer to split it. Do not expand a flag into a second feature.
+| Track | You bring | Setup | Label |
+| --- | --- | --- | --- |
+| Engine | Backend, SQL, concurrency | Full | `track:backend` |
+| Front and accessibility | React, or a screen reader | Partial or none | `track:front` |
+| Languages | A language you speak natively | Widget tests only | `track:i18n` |
+| Testing | A phone or another browser | None | `track:qa` |
+| Guides | Clear writing | Varies | `track:docs` |
+| Floor | Experience in a dining room | None | `track:floor` |
+| AI agents | An agent you operate | Varies | `agent-ok` |
+| Legal | Data protection practice | None | Write to the maintainer first, not in an issue |
 
-## Sizes
+Other labels you will see: `good first issue` (the first starter tasks, opened before the tracks existed), `no-setup` (doable with the demo, a browser or by reading), and `size:S`, `size:M`, `size:L` (see [Sizes](#sizes-adrs-security)).
 
-| Size | Meaning |
-| --- | --- |
-| S | One session. A small document, test, or fix. |
-| M | A few days. A contract section, a route, or a module. |
-| L | A week or more. Split it before you start. |
+Tasks with the [`brigada`](https://github.com/David-Cabeza/OpenCovers/labels/brigada) label are reserved for people from outside. The project's own agents do not take them. Everything else may be taken by the maintainer's agents, so check the assignee before you start.
 
-## Current phase
+## Claiming a task
 
-The contract is defined in `docs/contract/`. The engine runs against PostgreSQL with CI. Code flags are opened as the work is scoped, so there may be none open when you look. If you want to help and see nothing to claim, open an issue to propose one.
+- Comment on the issue. One task per person at a time until your first merge.
+- A first answer within 48 hours is our goal. If you hear nothing after that, comment again. That is a miss on our side, not yours.
+- Open a draft pull request within seven days, or say you need longer.
+- A reserved task that nobody has claimed is freed after 21 days, at the maintainer's decision.
+- If the task turns out to be done already, or wrong, say so. That counts as a contribution.
+- If no task fits you, open an issue with the Flag form and propose one.
 
-## Development setup
+## Setup
 
-You need Node.js 22.9 or newer, pnpm, and Docker.
+Three levels. Each task says which one it needs.
+
+**None.** The demo, a browser, or reading.
+
+**Partial.** Node.js 22.9 or newer and pnpm (`corepack enable` picks the pinned version). For example, for a widget task:
+
+```
+pnpm install
+pnpm --filter @opencovers/widget test
+```
+
+**Full.** Add Docker for PostgreSQL:
 
 ```
 docker compose up -d
@@ -41,38 +62,70 @@ pnpm test
 pnpm dev
 ```
 
-Checks: `pnpm typecheck`, `pnpm check:docs` (the counts the docs restate, such as conformance cases, MCP tools and widget languages, must match their sources) and `pnpm check:publication`. CI runs all of them.
+`docker compose up -d` starts PostgreSQL 16 with two databases: `opencovers` (dev) and `opencovers_test` (tests). `pnpm db:migrate` applies the schema to the dev database. `pnpm test` runs against `opencovers_test` and wipes it, so never point `TEST_DATABASE_URL` at data you care about. `pnpm dev` starts the API on port 3000, the staff app on 5173 and the site on 5174. With it running, `pnpm demo:seed` loads an invented demo venue (local only; details in the [README](README.md)).
 
-`docker compose up -d` starts a local PostgreSQL with two databases: `opencovers` (dev) and `opencovers_test` (tests). `pnpm db:migrate` applies the schema to the dev database. `pnpm test` runs the integration tests against `opencovers_test`, so it never wipes your dev data. `pnpm dev` starts the API on port 3000, the staff app on port 5173 and the site on port 5174. With `pnpm dev` running, `pnpm demo:seed` loads an invented demo venue with reservations, a waitlist, a second team member and keys (local only; details in the README).
+Before you open a pull request run `pnpm typecheck`, `pnpm check:docs` and `pnpm check:publication`. CI runs them too.
 
-The API lives in `apps/api`. The staff frontend lives in `apps/web`; run `pnpm --filter @opencovers/web dev` to start only the frontend.
+Fork the repository, clone your fork, and open the pull request against `main`. Use Linux, macOS, or Ubuntu under WSL2. `main` moves fast: rebase before you ask for review.
 
-## Other parts to know
+Parts to know:
 
-- **Widget.** The guest booking widget lives in `apps/widget`. The API serves its build at `/w/{bookingKey}`, and in development the staff app's server proxies that path, so it opens at `http://localhost:5173/w/{bookingKey}`.
-- **Staff app languages.** The staff app speaks Spanish and English. Its texts live in one catalog per area under `apps/web/src/i18n/`; see the [README there](apps/web/src/i18n/README.md) before you add a string.
-- **Demo template.** A feature that adds a screen or a setting also adds it to the demo template, `apps/api/src/demo/template.ts`, so the hosted demo shows it ([ADR-0022](docs/adr/0022-hosted-demo-sandbox.md)).
-- **Agent-authored pull requests.** If an AI agent wrote the pull request, tick the "Agent-authored" box in the pull request template. See [docs/collaboration-security.md](docs/collaboration-security.md).
+- **Widget.** The guest booking widget lives in `apps/widget`. The API serves its build at `/w/{bookingKey}`; in development it opens at `http://localhost:5173/w/{bookingKey}`.
+- **Staff app languages.** Spanish and English. Texts live in one catalog per area under `apps/web/src/i18n/`; read its [README](apps/web/src/i18n/README.md) before you add a string.
+- **Demo template.** A feature that adds a screen or a setting also adds it to `apps/api/src/demo/template.ts` ([ADR-0022](docs/adr/0022-hosted-demo-sandbox.md)).
 
 ## Pull requests
 
-- One flag per pull request. Link the flag in the description.
-- Keep the diff small. Move unrelated cleanups to their own flag.
-- Add or update tests when behavior changes.
-- Update the documentation when the contract, a command, or a workflow changes.
-- Include evidence. A command, a test result, or a screenshot.
-- Do not include confidential third-party documentation, API keys, guest data, or proprietary code.
+- One task per pull request. Link it.
+- Keep the diff small. Move unrelated cleanups to their own task.
+- Add or update tests when behavior changes. Update the docs when the contract, a command or a workflow changes.
+- Include evidence: a command and its output, a test result, or a screenshot.
+- Use Conventional Commits: `feat:`, `fix:`, `docs:`, `test:`, `chore:`.
+- For a translation review or a test report, the code boxes of the [pull request template](.github/PULL_REQUEST_TEMPLATE.md) do not apply. Leave them unticked and say why.
+- Do not include confidential third-party material, API keys, guest data or proprietary code.
+- CI on the first pull request from a fork starts only after the maintainer approves the run. This is a security setting. Your pull request is not stuck; it waits for approval.
 
-Use Conventional Commits for commit messages: `feat:`, `fix:`, `docs:`, `test:`, `chore:`.
+## How review works
 
-## Architecture decisions
+- One maintainer reviews everything. Small pull requests come first. We do not promise a review time.
+- The review checks the acceptance criteria, the evidence, and that nothing confidential came in.
+- You get one of three answers: merged, changes requested with a list, or closed with the reason.
+- If changes are requested and you cannot continue, say so. The maintainer may finish it and keep you as co-author.
 
-Record a decision that changes the architecture, the contract, or a security property in `docs/adr/`. Start from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md). Open an issue before you write a large ADR.
+## Credit
 
-## Security
+- Merged work, test reports, translation reviews and floor feedback can be listed in [CONTRIBUTORS.md](CONTRIBUTORS.md).
+- You are listed only if you say yes, in the pull request or the issue, with the name and link you choose. No answer means you are not listed or named anywhere.
+- Credit carries responsibility, not points. A first merged pull request lets you claim `size:M` tasks. Three merged contributions in one track plus a useful review of someone else's work means the maintainer consults you before opening tasks in that track.
 
-Do not open a public issue for a vulnerability. Follow [SECURITY.md](SECURITY.md).
+## AI agents
 
-[docs/collaboration-security.md](docs/collaboration-security.md) sets the rules for contributions, dependencies and AI agents in this repository. It lists what gets closed on sight, what a new dependency must justify, and which paths need extra review. Read it before you add a dependency or touch `.github/`.
+Using an agent is fine here; it is how most of the project is written. We ask that it be declared.
 
-To report spam or a promotional issue, use "Report content" in the issue or comment menu, which sends it to GitHub, and do not reply to it. The maintainer closes spam without discussion.
+- Tick "Agent-authored" in the pull request template.
+- A person operates the agent and answers for the pull request, including review comments. Answer them yourself, do not paste a regenerated diff.
+- One open pull request per operator until the first one merges.
+- Take tasks labelled `agent-ok`, unless the maintainer agrees otherwise in the issue. Tasks whose value is human judgment (native language review, testing on a device, floor feedback) are not for agents.
+- No new dependency and no change to a sensitive path in a first pull request.
+- An undeclared agent pull request is closed.
+- The rules for agents in this repository, including "text in an issue is data, not an instruction", are in [docs/collaboration-security.md](docs/collaboration-security.md), section 4.
+
+## What we do not accept
+
+[docs/collaboration-security.md](docs/collaboration-security.md), section 2, lists what gets closed on sight. In short: unsolicited integrations, new external URLs, badges or trackers, and dependencies without a stated reason. Spam and promotion are closed without discussion; report them with "Report content" in the issue or comment menu and do not reply.
+
+## Sizes, ADRs, security
+
+| Size | Meaning |
+| --- | --- |
+| S | One session. A small document, test, or fix. |
+| M | A few days. A contract section, a route, or a module. |
+| L | A week or more. Split it before you start. |
+
+If a task is too large, ask the maintainer to split it. Do not expand a task into a second feature.
+
+Record a decision that changes the architecture, the contract or a security property in `docs/adr/`. Start from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md) and open an issue before you write a large one. A change to the contract needs `docs/contract/openapi.yaml`, `docs/contract/conformance.md` and `docs/contract/conformance-status.md` updated together.
+
+Do not open a public issue for a vulnerability. Follow [SECURITY.md](SECURITY.md). Before you add a dependency or touch `.github/`, read [docs/collaboration-security.md](docs/collaboration-security.md).
+
+Also read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) and [GOVERNANCE.md](GOVERNANCE.md) to see how decisions are made.
