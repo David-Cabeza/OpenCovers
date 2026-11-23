@@ -25,7 +25,7 @@ Three numbers measure the year. All three are zero today.
 | --- | --- | --- | --- |
 | Venues in service | 0 | 10, at least 3 run by someone other than the maintainer | 3 |
 | Third parties that pass the conformance kit on their own deployment | 0 | 3 | 1 |
-| Outside people credited in the contributors file (it does not exist yet) | 0 | 25, of them 12 with a merged pull request | 10 |
+| Outside people credited in [CONTRIBUTORS.md](CONTRIBUTORS.md) | 0 | 25, of them 12 with a merged pull request | 10 |
 
 A venue is "in service" when a real restaurant has taken all its bookings on OpenCovers for four weeks in a row, under a signed agreement, on an instance whose restore has been rehearsed. The demo does not count.
 
@@ -66,7 +66,7 @@ Until the end of 2026. Goal: take the decisions the year hangs on, and open the 
 - **A server for the stable instance.** Done when a host apart from the demo is ready to run tagged releases. Blocked on: owner.
 - **Timeouts and errors that fail safely.** Done when a stuck transaction cannot hold a venue's writes without limit, and an unexpected error answers in the contract's error format. Blocked on: nothing.
 - **Remote MCP, part 2: grants and the consent screen** (#370). Blocked on: nothing.
-- **Tasks reserved for people.** Done when a label marks tasks the project's own agents do not take, and [CONTRIBUTING.md](CONTRIBUTING.md) opens with a ten-minute route. Blocked on: owner.
+- **Tasks reserved for people.** Done when the [`brigada` label](https://github.com/David-Cabeza/OpenCovers/labels/brigada) marks tasks the project's own agents do not take, and [CONTRIBUTING.md](CONTRIBUTING.md) opens with a ten-minute route. Blocked on: owner.
 - **ADR-0021 and ADR-0022 accepted or amended.** Both are still proposals. Blocked on: owner.
 
 ## Next
@@ -130,7 +130,7 @@ Everything guest-facing is built off and turned on only with the review that cov
 ## Blocked on someone outside the code
 
 - **A legal review.** It unblocks six of the eight partial conformance cases, the public waitlist, reminders and any pilot. The briefs are written: [demo](docs/legal-review-demo.md), [waitlist](docs/legal-review-waitlist.md).
-- **A first venue.** Independent, one room, a paper book or a spreadsheet today, willing to keep two books for two weeks. A founding-venues page on opencovers.dev will explain how, once it exists.
+- **A first venue.** Independent, one room, a paper book or a spreadsheet today, willing to keep two books for two weeks. The [founding-venues page](https://opencovers.dev/#locales-fundadores) explains how.
 - **Native reviewers** for Catalan, French, German, Italian and Portuguese.
 - **Someone to install it and restore it without us,** and to tell us where the guides fail.
 - **Clients and integrators** that call the stable instance, and later run the conformance kit.
@@ -164,10 +164,10 @@ Not at all, because an open-source engine cannot or should not own them:
 ## How to pick up work
 
 - Start with the ten-minute route in [CONTRIBUTING.md](CONTRIBUTING.md). You do not need to read anything else first.
-- Once the label exists, tasks reserved for people from outside will carry it. The project's own agents do not take them.
+- Tasks reserved for people from outside carry the [`brigada` label](https://github.com/David-Cabeza/OpenCovers/labels/brigada). The project's own agents do not take them.
 - There are tracks for backend and concurrency, front end and accessibility, native speakers, testing on your own phone, guides, people who have run a dining room, and AI agents with a person who answers for them. Half of them need no code.
 - Comment on a task to claim it. A person answers within 48 hours.
-- If you run a restaurant, the founding-venues page on opencovers.dev will say how to join, once it exists. If you practise data protection law, write to the maintainer before anything else.
-- Credit goes in the contributors file, once it exists, with the name you choose, and only if you say yes.
+- If you run a restaurant, the [founding-venues page](https://opencovers.dev/#locales-fundadores) says how to join. If you practise data protection law, write to the maintainer before anything else.
+- Credit goes in [CONTRIBUTORS.md](CONTRIBUTORS.md), with the name you choose, and only if you say yes.
 
 Older decision records refer to numbered phases. That list ended on 2026-11-23 and stays in this file's history.
