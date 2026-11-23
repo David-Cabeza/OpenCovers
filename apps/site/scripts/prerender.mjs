@@ -3,25 +3,22 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { prerendered } from "./pages.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
-const htmlPath = path.join(root, "dist/index.html");
 const ssrDir = path.join(root, "dist-ssr");
 const marker = '<div id="root"></div>';
 
-const { render, renderFaqJsonLd } = await import(pathToFileURL(path.join(ssrDir, "entry-server.js")).href);
-const html = await readFile(htmlPath, "utf8");
-if (!html.includes(marker)) {
-  throw new Error(`prerender: ${marker} not found in dist/index.html`);
+const ssr = await import(pathToFileURL(path.join(ssrDir, "entry-server.js")).href);
+for (const { file, render } of prerendered) {
+  const htmlPath = path.join(root, "dist", file);
+  const html = await readFile(htmlPath, "utf8");
+  if (!html.includes(marker)) throw new Error(`prerender: ${marker} not found in dist/${file}`);
+  if (!html.includes("</head>")) throw new Error(`prerender: </head> not found in dist/${file}`);
+  const page = html.replace(marker, () => `<div id="root">${ssr[render]()}</div>`);
+  // FAQPage structured data comes from the same `faqs` array as the visible FAQ, and only the home has a FAQ.
+  await writeFile(htmlPath, file === "index.html" ? page.replace("</head>", () => `${ssr.renderFaqJsonLd()}\n</head>`) : page);
 }
-// FAQPage structured data comes from the same `faqs` array as the visible FAQ.
-if (!html.includes("</head>")) throw new Error("prerender: </head> not found in dist/index.html");
-await writeFile(
-  htmlPath,
-  html
-    .replace(marker, () => `<div id="root">${render()}</div>`)
-    .replace("</head>", () => `${renderFaqJsonLd()}\n</head>`),
-);
 await rm(ssrDir, { recursive: true, force: true });
 
 // The demo link of the English page and llms.txt. apps/site/demo.json holds the one switch: empty, no page links
@@ -47,4 +44,4 @@ if (demoUrl) {
   await writeFile(llmsPath, llms.replace(anchor, () => anchor + entry));
 }
 console.log(`prerender: demo link ${demoUrl ? `on (${demoUrl})` : "off"}`);
-console.log("prerender: dist/index.html now contains the rendered page");
+console.log(`prerender: rendered ${prerendered.map((p) => p.file).join(", ")}`);

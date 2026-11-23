@@ -86,16 +86,21 @@ export function GithubButton() {
   );
 }
 
+const ROADMAP_PAGE = "/hoja-de-ruta/";
+
 const SECTIONS = [
   { href: "#features", label: "Por qué" },
   { href: "#prueba", label: "Pruébalo" },
   { href: "#motor", label: "Dentro" },
-  { href: "#hoja-de-ruta", label: "Hoja de ruta" },
+  { href: ROADMAP_PAGE, label: "Hoja de ruta" },
   { href: "#brigada", label: "La Brigada" },
   { href: "#faq", label: "Preguntas" },
 ];
 
-export function Nav() {
+/** The nav lives on the home and on the roadmap page. Off the home, in-page anchors point back to the home. */
+export function Nav({ page = "home" }: { page?: "home" | "roadmap" }) {
+  const link = (href: string) => (page === "home" || !href.startsWith("#") ? href : `/${href}`);
+  const current = (href: string) => (page === "roadmap" && href === ROADMAP_PAGE ? ("page" as const) : undefined);
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   return (
@@ -117,7 +122,7 @@ export function Nav() {
         >
           <ul className="links">
             {SECTIONS.map((x) => (
-              <li key={x.href}><a href={x.href}>{x.label}</a></li>
+              <li key={x.href}><a href={link(x.href)} aria-current={current(x.href)}>{x.label}</a></li>
             ))}
           </ul>
           <button ref={btn} type="button" className="menubtn" aria-expanded={open} aria-controls="menu" onClick={() => setOpen(!open)}>
@@ -125,7 +130,7 @@ export function Nav() {
           </button>
           <ul id="menu" className="menu" hidden={!open}>
             {SECTIONS.map((x) => (
-              <li key={x.href}><a href={x.href} onClick={() => setOpen(false)}>{x.label}</a></li>
+              <li key={x.href}><a href={link(x.href)} aria-current={current(x.href)} onClick={() => setOpen(false)}>{x.label}</a></li>
             ))}
           </ul>
         </nav>
@@ -157,7 +162,7 @@ export function Footer() {
         <ul>
           <li><a href={`${REPO}/blob/main/CONTRIBUTING.md`}>Contribuir</a></li>
           <li><a href={`${REPO}/blob/main/ROADMAP.md`}>Roadmap</a></li>
-          <li><a href="#locales-fundadores">Locales fundadores</a></li>
+          <li><a href="/hoja-de-ruta/#locales-fundadores">Locales fundadores</a></li>
         </ul>
         <ul>
           <li><a href={`${REPO}/blob/main/LICENSE`}>Apache-2.0</a></li>

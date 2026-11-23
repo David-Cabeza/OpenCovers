@@ -130,7 +130,7 @@ Everything guest-facing is built off and turned on only with the review that cov
 ## Blocked on someone outside the code
 
 - **A legal review.** It unblocks six of the eight partial conformance cases, the public waitlist, reminders and any pilot. The briefs are written: [demo](docs/legal-review-demo.md), [waitlist](docs/legal-review-waitlist.md).
-- **A first venue.** Independent, one room, a paper book or a spreadsheet today, willing to keep two books for two weeks. The [founding-venues page](https://opencovers.dev/#locales-fundadores) explains how.
+- **A first venue.** Independent, one room, a paper book or a spreadsheet today, willing to keep two books for two weeks. The [founding-venues page](https://opencovers.dev/hoja-de-ruta/#locales-fundadores) explains how.
 - **Native reviewers** for Catalan, French, German, Italian and Portuguese.
 - **Someone to install it and restore it without us,** and to tell us where the guides fail.
 - **Clients and integrators** that call the stable instance, and later run the conformance kit.
@@ -167,7 +167,7 @@ Not at all, because an open-source engine cannot or should not own them:
 - Tasks reserved for people from outside carry the [`brigada` label](https://github.com/David-Cabeza/OpenCovers/labels/brigada). The project's own agents do not take them.
 - There are tracks for backend and concurrency, front end and accessibility, native speakers, testing on your own phone, guides, people who have run a dining room, and AI agents with a person who answers for them. Half of them need no code.
 - Comment on a task to claim it. A person answers within 48 hours.
-- If you run a restaurant, the [founding-venues page](https://opencovers.dev/#locales-fundadores) says how to join. If you practise data protection law, write to the maintainer before anything else.
+- If you run a restaurant, the [founding-venues page](https://opencovers.dev/hoja-de-ruta/#locales-fundadores) says how to join. If you practise data protection law, write to the maintainer before anything else.
 - Credit goes in [CONTRIBUTORS.md](CONTRIBUTORS.md), with the name you choose, and only if you say yes.
 
 Older decision records refer to numbered phases. That list ended on 2026-11-23 and stays in this file's history.

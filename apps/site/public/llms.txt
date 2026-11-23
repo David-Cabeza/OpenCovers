@@ -30,6 +30,6 @@ Goals for 2027 (these are GOALS, not facts; all three measures are zero today): 
 
 - [Source code](https://github.com/David-Cabeza/OpenCovers)
 - [npm package @opencovers/mcp](https://www.npmjs.com/package/@opencovers/mcp)
-- [Roadmap on the site (Spanish)](https://opencovers.dev/#hoja-de-ruta)
+- [Roadmap on the site (Spanish)](https://opencovers.dev/hoja-de-ruta/)
 - [Contributing](https://github.com/David-Cabeza/OpenCovers/blob/main/CONTRIBUTING.md)
 - [Sitio en español](https://opencovers.dev/)

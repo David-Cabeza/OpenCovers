@@ -264,6 +264,8 @@ main:focus { outline: none; }
 .road .never h3 { font-size: var(--lead); margin-bottom: 24px; }
 .road .never h4 { margin-top: 32px; font-weight: 700; }
 .road .why { max-width: 70ch; margin-top: 8px; }
+.road tbody tr[id], .road .founding { scroll-margin-top: 84px; }
+.road.teaser .manifesto, .road.teaser .board, .road.teaser .acts { margin-top: 20px; }
 .road .founding { border-top: 2px solid var(--ink); padding-top: 24px; max-width: 70ch; }
 .road .founding h4 { font-family: var(--display); font-size: var(--lead); margin-bottom: 8px; }
 .road .founding dl { display: grid; gap: 12px; margin: 16px 0; }
