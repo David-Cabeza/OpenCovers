@@ -4,11 +4,14 @@
 
 The product around the engine: a staff app (agenda, availability, floor plan, setup; Spanish and English) and a guest booking widget for a venue's own site (in progress; seven languages, of which ca, fr, de, it and pt are machine-assisted and not yet reviewed by a native speaker; light and dark). The guest side of the public waitlist is built but off by default, with provisional wording pending legal review, and it is not enabled in the hosted demo.
 
-Not built yet: payments and deposits, SMS and WhatsApp, reminders, reporting beyond a pacing view, POS adapters, and a guest screen in the staff app. Guest emails ship in Spanish only and their text is a placeholder pending legal review. The hosted demo is a sandbox with invented data, not a service for running a real restaurant.
+Not built yet: payments and deposits, SMS and WhatsApp, reminders, reporting beyond a pacing view, POS adapters, a guest screen in the staff app and a remote MCP endpoint (only part 1, an OAuth 2.1 authorization server behind `MCP_REMOTE`, is merged, off by default). No restaurant runs on OpenCovers yet. Guest emails ship in Spanish only and their text is a placeholder pending legal review. The texts of the hosted demo (terms and privacy notice) were written without a lawyer's review. The hosted demo is a sandbox with invented data, not a service for running a real restaurant.
+
+Goals for 2027 (these are GOALS, not facts; all three measures are zero today): a restaurant runs a full service on software it can read, host and leave, and anyone can check it works. Measures, with the goal for 15 December 2027 and the level below which we call the year a miss: venues in service, goal 10 (at least 3 run by someone other than the maintainer), miss below 3; third parties that pass the conformance kit on their own deployment, goal 3, miss below 1; outside people credited as contributors, goal 25, miss below 10. Named milestones, all goals: the Double-Booking Trial (1 March to 30 April), First Service (June, depends on a legal review and a venue) and Without the Author (third quarter, depends on a third party). A missed commitment stays on the board with its cause.
 
 ## Start here
 
 - [Overview for developers (English)](https://opencovers.dev/en/): what it is, guarantees, API, MCP server and local setup.
+- [Roadmap 2027](https://github.com/David-Cabeza/OpenCovers/blob/main/ROADMAP.md): goals, measures, milestones and what is blocked on someone outside the code.
 - [README](https://github.com/David-Cabeza/OpenCovers/blob/main/README.md): features, architecture and quick start.
 
 ## Contract
@@ -27,5 +30,6 @@ Not built yet: payments and deposits, SMS and WhatsApp, reminders, reporting bey
 
 - [Source code](https://github.com/David-Cabeza/OpenCovers)
 - [npm package @opencovers/mcp](https://www.npmjs.com/package/@opencovers/mcp)
-- [Roadmap](https://github.com/David-Cabeza/OpenCovers/blob/main/ROADMAP.md)
+- [Roadmap on the site (Spanish)](https://opencovers.dev/#hoja-de-ruta)
+- [Contributing](https://github.com/David-Cabeza/OpenCovers/blob/main/CONTRIBUTING.md)
 - [Sitio en español](https://opencovers.dev/)
