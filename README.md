@@ -10,17 +10,15 @@
 
 <sub>Pre-alpha: it runs locally with tests and is not ready for a real venue. Public site: <a href="https://opencovers.dev">opencovers.dev</a>. A hosted demo, a sandbox with invented data, is open at <a href="https://demo.opencovers.dev">demo.opencovers.dev</a>.</sub>
 
-![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=node.js&logoColor=white)
-![Hono](https://img.shields.io/badge/Hono-API-ff5b35)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
-![Tailwind](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss&logoColor=white)
+[![CI](https://github.com/David-Cabeza/OpenCovers/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/David-Cabeza/OpenCovers/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@opencovers/mcp?label=npm%20%40opencovers%2Fmcp&color=cb3837)](https://www.npmjs.com/package/@opencovers/mcp)
-![MCP](https://img.shields.io/badge/MCP-server-7c3aed)
 ![Status](https://img.shields.io/badge/status-pre--alpha-ffb020)
 [![License](https://img.shields.io/badge/License-Apache_2.0-d97757)](LICENSE)
 ![PRs](https://img.shields.io/badge/PRs-welcome-38d591)
+
+<a href="https://demo.opencovers.dev"><img src="docs/assets/agenda.webp" alt="The OpenCovers staff app showing the agenda for the day: a table of reservations with guest, party size, table and status" width="720"></a>
+
+<sub><a href="#why">Why</a> · <a href="#features">Features</a> · <a href="#how-it-works">How it works</a> · <a href="#quick-start">Quick start</a> · <a href="#hosted-demo">Hosted demo</a> · <a href="#status">Status</a> · <a href="#contributing">Contributing</a></sub>
 
 </div>
 
@@ -220,11 +218,10 @@ For developers and agents, a 90-second video (Spanish captions with an English l
 
 ## Screenshots
 
-The staff app in action: the agenda, the floor plan, the floor editor, the waitlist, the online booking settings and the team screen. All screens show the invented demo venue "La Taberna del Faro" (`pnpm demo:seed`), running locally.
+The staff app in action (the agenda is at the top of this page): the floor plan, the floor editor, the waitlist, the online booking settings and the team screen. All screens show the invented demo venue "La Taberna del Faro" (`pnpm demo:seed`), running locally.
 
 <p align="center">
-  <img src="docs/assets/agenda.webp" alt="Agenda for the day: a table of reservations with guest, party size, table and status (booked, seated, attended, cancelled, no-show)" width="420">
-  <img src="docs/assets/floor-plan.webp" alt="Live floor plan of a restaurant: tables with chairs on a wooden floor, with the seated parties highlighted" width="420">
+  <img src="docs/assets/floor-plan.webp" alt="Live floor plan of a restaurant: tables with chairs on a wooden floor, with the seated parties highlighted" width="700">
 </p>
 <p align="center">
   <img src="docs/assets/floor-editor.webp" alt="Floor editor: tables and room elements (bar, kitchen, door, plant) arranged on the floor plan" width="700">
