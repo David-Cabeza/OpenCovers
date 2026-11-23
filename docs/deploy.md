@@ -58,7 +58,7 @@ The widget must live on a host name of its own, never the staff app's, so the st
 
 What each part does:
 
-- Caddy's widget site block forwards `/w/*`, `/r`, `/favicon.ico` (the API answers `204` there, only on the widget host) and `/v1/public/*` to the API and answers everything else with `404`. The staff site block answers `/w/*` and `/r` with `404` and keeps `X-Frame-Options: DENY` and `frame-ancestors 'none'` on every path.
+- Caddy's widget site block forwards `/w/*`, `/r`, `/favicon.ico` (the API answers `204` there, only on the widget host) and `/v1/public/*` to the API and answers everything else with `404`. The staff site block answers `/w/*`, `/r` and, once `WIDGET_ADDRESS` is set, `/v1/public/*` with `404` and keeps `X-Frame-Options: DENY` and `frame-ancestors 'none'` on every path.
 - The API writes the page per venue, because the page's `Content-Security-Policy` lists the origins allowed to frame it: `frame-ancestors 'self'` and the venue's `allowedOrigins`, or `'none'` when the list is empty, which allows only top-level use. It sends no `X-Frame-Options`. It also serves the widget's built files under `/w/assets/`. The guest's self-service link, `https://book.example.com/r#TOKEN`, opens the same build at `/r`, which no site may frame. The token stays in the fragment, so it never reaches Caddy, the API or their logs. The API image builds the widget, so nothing else needs copying.
 - The API serves the page only for requests to the `WIDGET_ADDRESS` host. Without `WIDGET_ADDRESS`, a production API (`NODE_ENV=production`, as in the image) serves no widget page, and Caddy's widget block listens for `widget.invalid`, a name that never resolves. An API whose `WIDGET_ADDRESS` has the host name of `BETTER_AUTH_URL` or of a `TRUSTED_ORIGINS` entry refuses to start, whatever the port.
 - A venue's site that sends its own `Content-Security-Policy` must allow the widget origin in `frame-src`.
@@ -247,7 +247,7 @@ The repository ships the pieces. The project's own demo is `demo.opencovers.dev`
 | --- | --- |
 | `compose.demo.yaml` | The stack: `db`, `api` (`DEMO_MODE=1`, `NODE_ENV=production`, `SIGNUP=closed`), `cleanup` and `web` (Caddy plus the staff app build). Project name `opencovers-demo`, so its volumes are `opencovers-demo_pgdata` and `opencovers-demo_caddy_data`, never those of `compose.prod.yaml`. |
 | `.env.demo.example` | Every variable, with comments. Copy it to `.env.demo` on the server. `.env.demo` is git-ignored. |
-| `apps/web/Caddyfile` | The same Caddyfile as production. The staff host serves the app, `/api`, `/v1` and `/health`, and answers 404 on `/w/*` and `/r`. The widget host serves only `/w/*`, `/r`, `/favicon.ico` and `/v1/public/*`. |
+| `apps/web/Caddyfile` | The same Caddyfile as production. The staff host serves the app, `/api`, `/v1` and `/health`, and answers 404 on `/w/*`, `/r` and `/v1/public/*`. The widget host serves only `/w/*`, `/r`, `/favicon.ico` and `/v1/public/*`. |
 | `.github/workflows/deploy-demo.yml` | Redeploys the demo over SSH on every push to `main` that touches the API, web, widget, database, lockfile or the compose file. |
 | `apps/site/demo.json` | The site's "Probar la demo" and "Try the demo" button. Empty means no button. |
 
