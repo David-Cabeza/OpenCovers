@@ -100,14 +100,25 @@ Status: every item below is done.
 
 Exit criterion: the staff app signs in and books a table against an API running from the Docker image.
 
+### Operations
+
+A follow-up to Phase 8, with no phase number of its own. The site roadmap mirrors only phases 10 to 16, so these items stay here. Status: none of it is built.
+
+- Pending: monitoring of the hosted demo, with an alert when it is down. [S]
+- Pending: a stable partner or staging instance, apart from the demo that redeploys on every push to `main`. [M]
+- Pending: a release process with a CHANGELOG and version tags for the repository. Only `@opencovers/mcp` is released on npm today. [S]
+- Pending: a decision on backups of the demo database. The demo holds sandboxes, so the decision may be that it needs none. [S]
+
+Exit criterion: the demo has an alert, a partner can test against an instance that does not change under them, and a release has a tag and a changelog entry.
+
 ### Phase 0: Publication readiness
 
-Status: the repository is public. Two checks remain.
+Status: the repository is public. One check remains.
 
 - Done: Apache-2.0 license, README, contribution guide, code of conduct, security policy, governance, and the flag and pull request templates.
 - Done: private vulnerability reporting through GitHub, as [SECURITY.md](SECURITY.md) describes.
 - Done: the repository history was checked on 2026-11-22. All 825 commits on every ref hold no secrets or key files, no `.env` file, no owner personal data and no client reference material. Phone numbers in it are test fixtures. `scripts/check-publication.sh` still checks only the working tree, so repeat the history check before a release.
-- Pending: a monitored private contact for the code of conduct.
+- Pending: a monitored private contact for the code of conduct. This is the one check that remains. Until it exists, [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) points to a maintainer.
 
 Exit criterion: the public repository holds no confidential or proprietary material, and every reporting channel is live.
 
@@ -234,6 +245,8 @@ The aim is a small, documented contract and a community of adapters, not a long 
 - A first POS adapter, then adapters for common regional systems. [L each]
 - Importers for exports from other reservation systems. [M each]
 - A calendar and availability feed. [M]
+- Remote MCP, part 2: the consent screen and the grant table that let a user authorize an agent. Part 1, the OAuth 2.1 authorization server, is built behind `MCP_REMOTE`, off by default ([ADR-0014](docs/adr/0014-remote-mcp-oauth.md)). Tracked in issue #67. [L, split it]
+- Remote MCP, part 3: the `/mcp` dispatcher, venue isolation tests, and the conformance cases. There is no `/mcp` endpoint yet. Tracked in issue #67. [L, split it]
 - A reference voice-agent integration over the existing MCP server, with the venue's own keys. [M]
 - A typed client library generated from the OpenAPI contract. [M]
 - A conformance kit so an adapter author can prove an adapter works. [L, split it]
@@ -273,7 +286,10 @@ Some capabilities of large platforms depend on things an open-source engine cann
 
 ## Decisions that block the roadmap
 
-- Standalone or internal-only product.
 - The first-venue route.
 - Legal review of guest data, retention, confirmation text, and reminder text.
 - The data controller of a shared guest book in a group, decided in Phase 15.
+
+Decided:
+
+- Standalone or internal-only product. Decided on 2026-11-23: standalone and public. The repository, the npm package and the demo are public. The first-venue route stays open.
