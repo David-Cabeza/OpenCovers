@@ -30,6 +30,14 @@ describe("public site", () => {
     );
   });
 
+  it("gives each content section one h2 under the common header, with the eyebrow reusing the nav label", () => {
+    const { container } = render(<App />);
+    for (const sel of [".show", ".how", ".mod", ".road", ".brig", ".faq"]) {
+      expect(container.querySelectorAll(`${sel} h2`), sel).toHaveLength(1);
+    }
+    expect(container.querySelector(".show .eyebrow")?.textContent).toBe("Pruébalo");
+  });
+
   it("keeps the Brigada hook on the home and sends the reader to the page", () => {
     const { container } = render(<App />);
     const section = container.querySelector("#brigada")!;

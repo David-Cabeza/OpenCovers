@@ -1,5 +1,5 @@
 import { REPO, allTasksHref, firstTimes, ranks, trackHref, tracks } from "./brigada";
-import { DEMO_URL, d } from "./chrome";
+import { DEMO_URL, SectionHead, d } from "./chrome";
 
 const BRIGADA_PAGE = "/brigada/";
 
@@ -21,7 +21,7 @@ function RouteOfTen() {
 
 const Lede = ({ Title }: { Title: "h1" | "h2" }) => (
   <div className="top">
-    <Title id="brigada-t" className="rv">La Brigada</Title>
+    <SectionHead id="brigada-t" Title={Title}>La Brigada</SectionHead>
     <p className="rv" style={d(90)}>
       En una cocina, la brigada es el equipo y cada persona tiene su partida. Aquí también: hay sitio para quien programa, traduce, prueba en su móvil o ha llevado una sala un viernes por la noche.
     </p>

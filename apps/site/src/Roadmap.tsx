@@ -1,5 +1,5 @@
 import { REPO, allTasksHref } from "./brigada";
-import { d } from "./chrome";
+import { SectionHead, d } from "./chrome";
 import {
   boardRule, boardWarning, commitments, counters, countersNote, foundingVenues, manifesto, milestones, northStar, notPlanned,
   quarters, saturdayGate, saturdayGateIntro, today, todayLegend, updatedAt, whyNotEstablished,
@@ -244,7 +244,7 @@ export function Roadmap({ pageTitle = false }: { pageTitle?: boolean }) {
   return (
     <section id="hoja-de-ruta" className="road" aria-labelledby="road-h">
       <div className="top">
-        <Title id="road-h" className="rv">Hoja de ruta 2027</Title>
+        <SectionHead id="road-h" Title={Title}>Hoja de ruta 2027</SectionHead>
         <p className="rv" style={d(90)}>{ROAD_LEDE}</p>
       </div>
       <Manifesto />
@@ -302,7 +302,7 @@ export function RoadmapTeaser() {
   return (
     <section id="hoja-de-ruta" className="road teaser" aria-labelledby="road-h">
       <div className="top">
-        <h2 id="road-h" className="rv">Hoja de ruta 2027</h2>
+        <SectionHead id="road-h">Hoja de ruta 2027</SectionHead>
         <p className="rv" style={d(90)}>{ROAD_LEDE}</p>
       </div>
       <div className="manifesto">
