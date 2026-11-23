@@ -34,5 +34,7 @@ jobs:
       - run: pnpm install
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm check:docs
+      - run: pnpm check:publication
     env:
       TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/opencovers_test
