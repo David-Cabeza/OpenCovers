@@ -69,10 +69,15 @@ describe("roadmap page", () => {
     }
   });
 
-  it("collects no personal data in the founding venues section", () => {
+  it("collects no personal data in the founding venues section and offers one prepared message", () => {
     const { container } = render(<RoadmapPage />);
     const section = container.querySelector("#locales-fundadores")!;
-    expect(section.querySelector("form, input, textarea, a[href^='mailto:']")).toBeNull();
+    expect(section.querySelector("form, input, textarea")).toBeNull();
+    const links = [...section.querySelectorAll("a[href^='mailto:']")];
+    expect(links).toHaveLength(1);
+    const href = links[0].getAttribute("href")!;
+    expect(href.startsWith("mailto:locales@opencovers.dev?subject=")).toBe(true);
+    expect(decodeURIComponent(href)).toContain("Nombre del local y ciudad");
   });
 });
 
