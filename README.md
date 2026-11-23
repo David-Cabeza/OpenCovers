@@ -192,6 +192,10 @@ The GIF shows the engine refusing a second booking of the same table. The MP4 is
 
 > [Download the full-resolution demo (MP4)](https://raw.githubusercontent.com/David-Cabeza/OpenCovers/main/docs/assets/opencovers-demo.mp4)
 
+For a restaurant owner, an 80-second video of one service (Spanish captions): the pre-service view, the floor plan, the waitlist, a booking from the widget, the online booking settings with a live preview, the booking history and the floor editor. The self-service link is blurred. [Download the MP4](https://raw.githubusercontent.com/David-Cabeza/OpenCovers/main/docs/assets/opencovers-servicio.mp4)
+
+For developers and agents, a 90-second video (Spanish captions with an English line): creating an API key in the staff app, the MCP host configuration, a booking made by an MCP client, the refusal with `slot_taken`, a retry with the same idempotency key that returns the same booking, the channel recorded in the booking history and the event feed. The terminal windows are the real output of an `@opencovers/mcp` run, replayed, and the API key is blurred. [Download the MP4](https://raw.githubusercontent.com/David-Cabeza/OpenCovers/main/docs/assets/opencovers-desarrolladores.mp4)
+
 ## Screenshots
 
 The staff app in action: the agenda, the floor plan, the floor editor, the waitlist, the online booking settings and the team screen. All screens show the invented demo venue "La Taberna del Faro" (`pnpm demo:seed`), running locally.
