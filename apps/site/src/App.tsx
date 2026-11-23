@@ -100,6 +100,14 @@ const modules = [
     pos: "40% 50%",
     alt: "Editor del plano de sala",
   },
+  {
+    name: "Reserva online",
+    tag: "Cliente",
+    body: "El cliente reserva desde tu web, recibe un enlace privado y cambia o cancela sin llamar. Con tus colores. En pruebas.",
+    img: "/media/online-booking.webp",
+    pos: "50% 50%",
+    alt: "Formulario de reserva del widget y página de autoservicio de una reserva, con el restaurante de prueba La Taberna del Faro",
+  },
 ];
 
 const challenges = [
