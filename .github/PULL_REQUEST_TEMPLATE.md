@@ -15,6 +15,7 @@ Commands, test results, or a link to the verification. For a documentation chang
 - [ ] This pull request links one flag or issue.
 - [ ] I added or updated tests where behavior changed.
 - [ ] I updated the documentation.
+- [ ] Does this PR build a Proposed ADR? Update its Status.
 - [ ] I did not include confidential third-party material, API keys, or guest data.
 - [ ] I read CONTRIBUTING.md.
 - [ ] This pull request adds no dependency, or the description justifies each one (see docs/collaboration-security.md).
