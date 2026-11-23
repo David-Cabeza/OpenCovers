@@ -9,6 +9,7 @@ import { useVenues } from "@/hooks/use-venues";
 import { useT } from "@/i18n";
 import { useUiStore } from "@/stores/ui-store";
 import { readSectionParam, sectionForTarget, setSectionParam } from "@/lib/settings-section";
+import { readViewParam, setViewParam, visibleView } from "@/lib/view-param";
 import { AgendaView } from "./agenda/agenda-view";
 import { AvailabilityView } from "./availability/availability-view";
 import { FloorView } from "./floor/floor-view";
@@ -29,7 +30,7 @@ export function Dashboard() {
   const demo = useDemoStatus();
   const venueId = useUiStore((s) => s.venueId);
   const setVenue = useUiStore((s) => s.setVenue);
-  const [active, setActive] = useState<ViewId>(() => (readSectionParam() ? "setup" : "agenda"));
+  const [active, setActive] = useState<ViewId>(() => (readSectionParam() ? "setup" : (readViewParam() ?? "agenda")));
   const [navOpen, setNavOpen] = useState(false);
   const [section, setSection] = useState<string | null>(null);
 
@@ -44,6 +45,16 @@ export function Dashboard() {
       setVenue(venues[0].id);
     }
   }, [venues, venueId, setVenue]);
+
+  // A screen the role cannot see (a reader opening `?view=team`) falls back to the agenda once the role is known.
+  useEffect(() => {
+    if (role) setActive((view) => visibleView(view, role));
+  }, [role]);
+
+  // The screen is part of the address, so a reload (F5) comes back to it. `?section=` already implies Settings.
+  useEffect(() => {
+    setViewParam(active === "setup" && readSectionParam() ? null : active);
+  }, [active]);
 
   const goTo = useCallback((view: ViewId, to?: string) => {
     setActive(view);

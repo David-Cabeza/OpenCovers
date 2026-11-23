@@ -31,6 +31,7 @@ beforeEach(() => {
   mockApi({ "GET /v1/venues": { body: VENUES } });
 });
 afterEach(() => {
+  window.history.replaceState(null, "", "/");
   resetApiMocks();
   document.title = "OpenCovers";
 });
