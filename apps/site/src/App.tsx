@@ -72,9 +72,9 @@ const modules = [
     name: "Lista de espera y walk-ins",
     tag: "Sala",
     body: "Los dos flujos físicos más comunes en sala, con el ritmo del servicio a la vista.",
-    img: "/media/agenda.webp",
-    pos: "70% 60%",
-    alt: "Agenda con lista de espera",
+    img: "/media/waitlist.webp",
+    pos: "50% 20%",
+    alt: "Lista de espera con dos grupos y el botón Sentar",
   },
   {
     name: "Plano de sala",
@@ -124,7 +124,7 @@ export const faqs = [
   {
     t: "Hosting",
     q: "¿Puedo autohospedarlo?",
-    a: "Sí. Es Apache-2.0 y se arranca con Node.js, pnpm y Docker (PostgreSQL). El repositorio incluye un Dockerfile y un runbook de despliegue.",
+    a: "Sí. Es Apache-2.0. Para probarlo basta Node.js, pnpm y Docker. Para producción, el repositorio incluye un Compose con PostgreSQL, la API y Caddy (que obtiene el certificado HTTPS), un runbook de despliegue y una guía de refuerzo. Sigue siendo pre-alfa.",
   },
   {
     t: "Agentes",
