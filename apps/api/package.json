@@ -14,13 +14,13 @@
     "demo:cleanup": "tsx --env-file-if-exists=../../.env src/demo/cleanup-cli.ts"
   },
   "dependencies": {
-    "@better-auth/cimd": "1.7.25",
-    "@better-auth/oauth-provider": "1.7.25",
-    "@hono/node-server": "^2.1.8",
-    "better-auth": "1.7.25",
+    "@better-auth/cimd": "1.7.27",
+    "@better-auth/oauth-provider": "1.7.27",
+    "@hono/node-server": "^2.1.11",
+    "better-auth": "1.7.27",
     "drizzle-orm": "^0.45.4",
-    "hono": "^4.13.18",
-    "libphonenumber-js": "^1.13.16",
+    "hono": "^4.13.19",
+    "libphonenumber-js": "^1.13.17",
     "pg": "^8.23.1",
     "tsx": "^4.23.15"
   },
@@ -29,6 +29,6 @@
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   }
 }
