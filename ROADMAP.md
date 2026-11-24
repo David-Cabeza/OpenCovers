@@ -4,7 +4,7 @@
 
 OpenCovers is pre-alpha. No restaurant runs on it yet.
 
-What exists: the booking engine and its HTTP API, a staff app, a guest booking widget, an MCP server with 18 tools on npm, signed webhooks, a production Docker Compose stack, and a hosted demo with invented data. The database, not the application, refuses a double booking. 70 of the 78 conformance cases pass and 8 are partial.
+What exists: the booking engine and its HTTP API, a staff app, a guest booking widget, an MCP server with 18 tools on npm, signed webhooks, a production Docker Compose stack, and a hosted demo with invented data. The database, not the application, refuses a double booking. 71 of the 79 conformance cases pass and 8 are partial.
 
 What is missing before a real venue can use it: a legal review of the texts a guest sees, automatic backups with a rehearsed restore, alerts, tests in a real browser, and someone to call when something breaks. The demo's terms and privacy notice were written without a lawyer's review.
 
