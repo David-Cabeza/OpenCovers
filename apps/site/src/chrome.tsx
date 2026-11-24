@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import demo from "../demo.json";
 import { REPO } from "./brigada";
 
@@ -6,6 +6,14 @@ const REPO_API = "https://api.github.com/repos/David-Cabeza/OpenCovers";
 // The hosted demo (ADR-0022). Empty hides every demo link. Set `url` in apps/site/demo.json once the demo is live.
 export const DEMO_URL: string = demo.url;
 export const d = (ms: number) => ({ "--d": `${ms}ms` }) as CSSProperties;
+
+/* Sub-block headings keep the level they have on the home, under a section h2. A page whose title is an h1 sets the shift to 1 so no level is skipped.
+   The CSS selects on data-lv (the home level), not on the tag. */
+export const HeadingShift = createContext(0);
+export function H({ n, children }: { n: 3 | 4; children: ReactNode }) {
+  const Tag = `h${n - useContext(HeadingShift)}` as "h2" | "h3" | "h4";
+  return <Tag data-lv={n}>{children}</Tag>;
+}
 
 /* One header for every content section: an optional eyebrow (a nav label) and the heading. The page title stays an h1. */
 export function SectionHead({ id, eyebrow, Title = "h2", children }: { id?: string; eyebrow?: string; Title?: "h1" | "h2"; children: ReactNode }) {

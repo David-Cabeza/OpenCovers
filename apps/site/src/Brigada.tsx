@@ -1,12 +1,12 @@
 import { REPO, allTasksHref, firstTimes, ranks, trackHref, tracks } from "./brigada";
-import { DEMO_URL, SectionHead, d } from "./chrome";
+import { DEMO_URL, H, HeadingShift, SectionHead, d } from "./chrome";
 
 const BRIGADA_PAGE = "/brigada/";
 
 function RouteOfTen() {
   return (
     <div className="sub">
-      <h3>Ruta de diez minutos</h3>
+      <H n={3}>Ruta de diez minutos</H>
       <ol>
         {DEMO_URL && <li>Abre <a href={DEMO_URL}>la demo</a> y haz una reserva de prueba. Los datos son inventados.</li>}
         <li>Elige una partida y abre su lista de tareas.</li>
@@ -44,10 +44,11 @@ export function BrigadaTeaser() {
 
 export function Brigada() {
   return (
+    <HeadingShift value={1}>
     <section id="brigada" className="brig" aria-labelledby="brigada-t">
       <Lede Title="h1" />
       <div className="sub">
-        <h3>Antes de que inviertas tu tiempo, cómo está esto</h3>
+        <H n={3}>Antes de que inviertas tu tiempo, cómo está esto</H>
         <p>
           OpenCovers es pre-alfa. Lo mantiene una persona. La mayor parte del código la escriben agentes de IA, y esa persona revisa cada cambio antes de fusionarlo. Todavía no sirve para las reservas de un restaurante real, y los textos legales de la demo no los ha revisado un abogado.
         </p>
@@ -56,7 +57,7 @@ export function Brigada() {
         </p>
       </div>
       <div className="sub">
-        <h3>Elige tu partida</h3>
+        <H n={3}>Elige tu partida</H>
         <ul className="tracks">
           {tracks.map((t, i) => {
             const href = trackHref(t);
@@ -77,7 +78,7 @@ export function Brigada() {
       </div>
       <RouteOfTen />
       <div className="sub">
-        <h3>Qué pasa después</h3>
+        <H n={3}>Qué pasa después</H>
         <ul>
           <li><b>Objetivo: primera respuesta de una persona en 48 horas</b>, también si la respuesta es «esto ya está hecho». Es una meta, no una garantía. Si un día fallamos, lo diremos en la propia tarea.</li>
           <li><b>Revisión por una persona.</b> Si va a tardar, te lo decimos.</li>
@@ -86,7 +87,7 @@ export function Brigada() {
         </ul>
       </div>
       <div className="sub">
-        <h3>De comensal a segundo de cocina</h3>
+        <H n={3}>De comensal a segundo de cocina</H>
         <p>Es nuestra propuesta de reconocimiento. Todavía no hay nadie en ningún rango.</p>
         <dl className="ranks">
           {ranks.map((r) => (
@@ -99,7 +100,7 @@ export function Brigada() {
         <p>No hay puntos, clasificaciones ni rachas. Nadie sube por cantidad.</p>
       </div>
       <div className="sub">
-        <h3>El muro de las primeras veces</h3>
+        <H n={3}>El muro de las primeras veces</H>
         <p>Cada línea ocurre una sola vez. Las vacías son la invitación.</p>
         <ul>
           {firstTimes.map((f) => <li key={f}>{f}: <em>pendiente</em></li>)}
@@ -111,5 +112,6 @@ export function Brigada() {
         <a className="btn ghost" href={allTasksHref}>Ver todas las tareas de la Brigada</a>
       </div>
     </section>
+    </HeadingShift>
   );
 }
