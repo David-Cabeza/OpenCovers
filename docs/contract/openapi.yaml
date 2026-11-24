@@ -940,8 +940,11 @@ paths:
         the services that remain. The name is matched exactly and must be
         URL-encoded in the path. A name that no service of the venue has, and
         a name that belongs only to another venue, change nothing and still
-        answer `200`. The call takes no body and no `Idempotency-Key`, and it
-        ignores both. Repeating it is harmless.
+        answer `200`: a delete is idempotent, so an unknown name is not an
+        error and reveals nothing about other venues. A name that is empty or
+        longer than 200 characters fails with `invalid_request`. The call
+        takes no body and no `Idempotency-Key`, and it ignores both.
+        Repeating it is harmless.
 
         A delete is never refused because the service is in use. Reservations
         keep the service name they were booked under, so they read back
@@ -1003,11 +1006,18 @@ paths:
         `posY`, `rotation`) is never touched by this call, so a replace keeps
         it. It answers `200`, new table or not, with the venue's tables.
 
-        `id` and `name` must be strings and `id` must not be empty. `seats`
-        must be an integer of at least 1. Anything else fails with
-        `invalid_request` and changes nothing. `name` may be empty. A `zone`
-        or `shape` that is not a string is ignored, as if left out, and
-        `shape` is not checked against a list. A table `id` is unique per
+        The body must be a JSON object. `id` is 1 to 64 characters of
+        letters, digits, `.`, `_`, `:` and `-`, starting with a letter or a
+        digit. `name` is a string that is not blank after trimming, at most
+        100 characters, and is stored trimmed. `seats` is an integer from 1
+        to 200. `zone`, when sent, is a string of at most 100 characters.
+        `shape`, when sent, is one of `round`, `oval`, `square`, `rectangle`,
+        `long` or `rect` (`rect` is the older spelling of `rectangle`, kept
+        because stored tables use it). Anything else fails with
+        `invalid_request` and changes nothing: a malformed, empty or `null`
+        body, a body that is not an object, a wrong type, a value out of
+        range, and a field the schema does not list (`posX` included, which
+        `PATCH` sets). Nothing is silently ignored. A table `id` is unique per
         venue, and the same `id` in another venue is another table.
 
         The call takes no `Idempotency-Key` and ignores one. The same body
@@ -1034,16 +1044,22 @@ paths:
       operationId: venue.updateTableLayout
       summary: Move or rotate a table on the floor plan
       description: |
-        Sets the position and rotation of one table. Only `x`, `y` and
-        `rotation` are read, each only when it is a JSON number, and they
-        write `posX`, `posY` and `rotation`. Any other field, `name` and
-        `seats` included, and a value that is not a number, is ignored. A
-        body with none of the three, an empty one included, changes nothing.
-        The values are stored as given, with no range or unit check.
+        Sets the position and rotation of one table. The body must be a JSON
+        object with any of `x` and `y` (integers from -10000 to 10000, written
+        to `posX` and `posY`) and `rotation` (an integer from -360 to 360).
+        A malformed, empty or `null` body, a body that is not an object, a
+        value that is not an integer in range, and any other field (`name` and
+        `seats` included) fail with `invalid_request` and change nothing. An
+        object with none of the three changes nothing and answers `200` for a
+        table of this venue.
 
-        A `tableId` that is not a table of this venue changes nothing and
-        still answers `200`, as does the id of a table of another venue. The
-        call takes no `Idempotency-Key` and ignores one. Admin only. A `read`
+        A `tableId` that is not a table of this venue fails with
+        `invalid_request` and changes nothing, because the error vocabulary
+        has no not-found code for tables. The id of a table of another venue
+        answers exactly the same, so the answer reveals nothing about other
+        venues. A `tableId` that is empty or longer than 200 characters fails
+        the same way. The call takes no `Idempotency-Key` and ignores one.
+        Admin only. A `read`
         or `write` key or role fails with `forbidden`. Not exposed through
         MCP.
       parameters:
@@ -1068,8 +1084,11 @@ paths:
       description: |
         Removes the table from this venue and answers with the tables that
         remain. A `tableId` that is not a table of the venue, or that belongs
-        only to another venue, changes nothing and still answers `200`. The
-        call takes no body and no `Idempotency-Key`, and it ignores both.
+        only to another venue, changes nothing and still answers `200`: a
+        delete is idempotent, and the answer reveals nothing about other
+        venues. A `tableId` that is empty or longer than 200 characters fails
+        with `invalid_request`. The call takes no body and no
+        `Idempotency-Key`, and it ignores both.
 
         A delete is never refused because the table is in use, and it does
         not cancel or move any reservation. The table stops being a table of
@@ -4766,7 +4785,7 @@ components:
           description: The zone the table sits in. Empty when it has none.
         shape:
           type: string
-          description: A free string for the floor plan. `round` unless set.
+          description: A shape for the floor plan. `round` unless set. Tables stored before the check may hold another string.
           example: round
         posX: { type: integer, description: "Floor plan position, 0 until set." }
         posY: { type: integer, description: "Floor plan position, 0 until set." }
@@ -4784,19 +4803,26 @@ components:
       type: object
       required: [id, name, seats]
       properties:
-        id: { type: string, minLength: 1 }
-        name: { type: string }
-        seats: { type: integer, minimum: 1 }
-        zone: { type: string, description: Defaults to the empty string. }
-        shape: { type: string, description: Defaults to `round`. }
+        id:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+          description: 1 to 64 characters.
+        name: { type: string, maxLength: 100, description: Not blank after trimming. Stored trimmed. }
+        seats: { type: integer, minimum: 1, maximum: 200 }
+        zone: { type: string, maxLength: 100, description: Defaults to the empty string. }
+        shape:
+          type: string
+          enum: [round, oval, square, rectangle, long, rect]
+          description: Defaults to `round`. `rect` is the older spelling of `rectangle`.
 
     TableLayout:
       type: object
-      description: Each field is read only when it is a number. Others are ignored.
+      description: Any of the three. Another field, or a value out of range, fails with `invalid_request`.
+      additionalProperties: false
       properties:
-        x: { type: integer, description: Written to `posX`. }
-        y: { type: integer, description: Written to `posY`. }
-        rotation: { type: integer }
+        x: { type: integer, minimum: -10000, maximum: 10000, description: Written to `posX`. }
+        y: { type: integer, minimum: -10000, maximum: 10000, description: Written to `posY`. }
+        rotation: { type: integer, minimum: -360, maximum: 360 }
 
     FloorTable:
       type: object

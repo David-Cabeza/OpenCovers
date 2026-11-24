@@ -6,6 +6,10 @@ All notable changes to OpenCovers are listed here. The format follows [Keep a Ch
 
 Feature PRs append their entries here. The release PR moves them under a version heading.
 
+### Fixed
+
+- The table routes (`POST /v1/venues/{venueId}/tables`, `PATCH` and `DELETE .../tables/{tableId}`) and `DELETE .../services/{name}` now check their input: a malformed or non-object body, a wrong type, `seats` outside 1 to 200, an unknown `shape`, a fractional or huge position and an unlisted field answer `400 invalid_request` and write nothing, instead of a `500` or a silent ignore. `PATCH` of an unknown table id answers `invalid_request`.
+
 ### Security
 
 - `GET`, `POST` and `DELETE /v1/auth/keys` now require an `admin` API key that holds the all-venues grant (`*`). An `admin` key granted only named venues gets `403 forbidden` there, so it can no longer act on keys outside its venues. It still manages its own venues' keys through `/v1/venues/{venueId}/keys`.
