@@ -239,6 +239,20 @@ pnpm demo:cleanup             # needs DEMO_MODE=1 and passes the startup guard; 
 
 **Search engines.** `compose.demo.yaml` sets `NOINDEX=on` on the `web` service, so Caddy adds `X-Robots-Tag: noindex, nofollow` to every answer of the staff and widget hosts and serves `/robots.txt` as `Disallow: /` on both; with `NOINDEX` unset, as in `compose.prod.yaml`, the Caddyfile behaves as before.
 
+### Using the demo as an integration target
+
+The hosted demo is meant for people trying the product. A partner can test a client against it, with these limits in mind:
+
+- **A sandbox expires 14 days after its owner last signed in to the staff app.** Using an API key does not count. A partner that only calls the API loses the venue and its keys unless the owner signs in at least every two weeks.
+- **No webhooks.** A sandbox venue refuses them (`apps/api/src/demo/limits.ts`). Poll the agenda or the reservation events instead.
+- **No remote MCP.** The API refuses to start with `MCP_REMOTE=on` and `DEMO_MODE=1`. The stdio package `@opencovers/mcp` works against the demo.
+- **Keys.** The owner creates `read` or `write` keys in Setup, Developers. A key cannot be `admin`. The header is `apikey`. The sandbox caps above apply, including 10 API keys.
+- **Mail goes only to the sandbox owner.** A guest with another address gets nothing.
+- **It changes under you.** Every merge to `main` that touches the API, the staff app, the widget or the demo compose file redeploys it, after the tests of that commit pass. Expect a short cut at each redeploy.
+- **No backups**, and the demo's data is invented. Do not put real guests in it.
+
+For a venue that must not expire, receive webhooks or use remote MCP, run your own instance from `compose.prod.yaml`. The project has no shared staging instance yet; the roadmap plans a stable instance on a host apart from the demo.
+
 ### Runbook: put the demo online
 
 The repository ships the pieces. The project's own demo is `demo.opencovers.dev`, with the booking widget at `book.demo.opencovers.dev`, on one VPS with Docker. These are defaults. Change them in `.env.demo` and in the repository variables below.
