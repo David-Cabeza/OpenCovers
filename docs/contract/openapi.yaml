@@ -1003,16 +1003,25 @@ paths:
         `posY`, `rotation`) is never touched by this call, so a replace keeps
         it. It answers `200`, new table or not, with the venue's tables.
 
-        `id` and `name` must be strings and `id` must not be empty. `seats`
-        must be an integer of at least 1. Anything else fails with
-        `invalid_request` and changes nothing. `name` may be empty. A `zone`
-        or `shape` that is not a string is ignored, as if left out, and
-        `shape` is not checked against a list. A table `id` is unique per
-        venue, and the same `id` in another venue is another table.
+        The body is a JSON object with only the fields of `TableUpsert`.
+        `id` is 1 to 64 letters, digits, `.`, `_` or `-`, starting with a
+        letter or digit. `name` is 1 to 80 characters with at least one that
+        is not a space. `seats` is an integer from 1 to 100. `zone`, when
+        sent, is a string of at most 80 characters, empty included. `shape`,
+        when sent, is one of `round`, `oval`, `square`, `rectangle`, `long`
+        or `rect` (the older name of `rectangle`). A body that is missing,
+        malformed, `null` or not an object, a field of the wrong type,
+        `null` included, a value out of range, and a field not listed fail
+        with `invalid_request` and change nothing. A table `id` is unique
+        per venue, and the same `id` in another venue is another table. An
+        unknown venue fails with `venue_not_found`, also for a key that
+        holds the all-venues grant.
 
-        The call takes no `Idempotency-Key` and ignores one. The same body
-        gives the same state, so a retry is safe. Admin only. A `read` or
-        `write` key or role fails with `forbidden`. Not exposed through MCP.
+        The call takes no `Idempotency-Key` and ignores one. The `id` is the
+        key: the same body gives the same state and the same answer, so a
+        retry is safe, and a body that differs replaces the table. Admin
+        only. A `read` or `write` key or role fails with `forbidden`. Not
+        exposed through MCP.
       parameters:
         - $ref: "#/components/parameters/venueId"
       requestBody:
@@ -1034,18 +1043,23 @@ paths:
       operationId: venue.updateTableLayout
       summary: Move or rotate a table on the floor plan
       description: |
-        Sets the position and rotation of one table. Only `x`, `y` and
-        `rotation` are read, each only when it is a JSON number, and they
-        write `posX`, `posY` and `rotation`. Any other field, `name` and
-        `seats` included, and a value that is not a number, is ignored. A
-        body with none of the three, an empty one included, changes nothing.
-        The values are stored as given, with no range or unit check.
+        Sets the position and rotation of one table. The body is a JSON
+        object with at least one of `x`, `y` and `rotation` and no other
+        field. `x` and `y` are integers from 0 to 10000 and write `posX` and
+        `posY`. `rotation` is an integer from 0 to 359, in degrees. A field
+        left out keeps its stored value. A body that is missing, malformed,
+        `null`, not an object or empty, a value that is not such an integer,
+        `null` included, and any other field fail with `invalid_request`
+        and change nothing. That includes `name` and `seats`, which only
+        `POST /venues/{venueId}/tables` sets.
 
-        A `tableId` that is not a table of this venue changes nothing and
-        still answers `200`, as does the id of a table of another venue. The
-        call takes no `Idempotency-Key` and ignores one. Admin only. A `read`
-        or `write` key or role fails with `forbidden`. Not exposed through
-        MCP.
+        A `tableId` that is not a table of this venue fails with
+        `table_not_found`, and so does the id of a table of another venue,
+        with the same answer. An unknown venue fails with `venue_not_found`,
+        also for a key that holds the all-venues grant. The call takes no
+        `Idempotency-Key` and ignores one. The same body gives the same
+        state, so a retry is safe. Admin only. A `read` or `write` key or
+        role fails with `forbidden`. Not exposed through MCP.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/tableId"
@@ -1068,8 +1082,11 @@ paths:
       description: |
         Removes the table from this venue and answers with the tables that
         remain. A `tableId` that is not a table of the venue, or that belongs
-        only to another venue, changes nothing and still answers `200`. The
-        call takes no body and no `Idempotency-Key`, and it ignores both.
+        only to another venue, changes nothing and still answers `200` with
+        the same tables, so a repeated delete gets the same answer. An
+        unknown venue fails with `venue_not_found`, also for a key that
+        holds the all-venues grant. The call takes no body and no
+        `Idempotency-Key`, and it ignores both.
 
         A delete is never refused because the table is in use, and it does
         not cancel or move any reservation. The table stops being a table of
@@ -4783,20 +4800,31 @@ components:
     TableUpsert:
       type: object
       required: [id, name, seats]
+      additionalProperties: false
       properties:
-        id: { type: string, minLength: 1 }
-        name: { type: string }
-        seats: { type: integer, minimum: 1 }
-        zone: { type: string, description: Defaults to the empty string. }
-        shape: { type: string, description: Defaults to `round`. }
+        id:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          pattern: "\\S"
+        seats: { type: integer, minimum: 1, maximum: 100 }
+        zone: { type: string, maxLength: 80, description: Defaults to the empty string. }
+        shape:
+          type: string
+          enum: [round, oval, square, rectangle, long, rect]
+          description: Defaults to `round`. `rect` is the older name of `rectangle`.
 
     TableLayout:
       type: object
-      description: Each field is read only when it is a number. Others are ignored.
+      minProperties: 1
+      additionalProperties: false
       properties:
-        x: { type: integer, description: Written to `posX`. }
-        y: { type: integer, description: Written to `posY`. }
-        rotation: { type: integer }
+        x: { type: integer, minimum: 0, maximum: 10000, description: Written to `posX`. }
+        y: { type: integer, minimum: 0, maximum: 10000, description: Written to `posY`. }
+        rotation: { type: integer, minimum: 0, maximum: 359, description: Degrees. }
 
     FloorTable:
       type: object
@@ -5938,6 +5966,7 @@ components:
         - stale_second_factor
         - expired_cursor
         - waitlist_entry_not_found
+        - table_not_found
         - webhook_not_found
         - webhook_url_rejected
         - webhook_limit_reached

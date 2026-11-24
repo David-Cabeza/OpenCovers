@@ -95,6 +95,10 @@ A sign-up with a bad `X-Invitation-Token` fails on the auth route with `403` and
 
 - `expired_cursor`: the event cursor is older than the venue's retention period. Not retryable.
 
+## Tables
+
+- `table_not_found`: the table does not exist, or belongs to another venue. Indistinguishable from not found. `404`. Not retryable.
+
 ## Webhooks
 
 - `webhook_not_found`: the webhook does not exist, or belongs to another venue. Indistinguishable from not found. Not retryable.

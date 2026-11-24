@@ -1,8 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { services, tables } from "../db/schema";
+import { services, tables, venues } from "../db/schema";
 import * as schema from "../db/schema";
 import { enforceSandboxCap } from "../demo/limits";
+import { integer, oneOf, optional, text } from "./body";
 
 export type Db = NodePgDatabase<typeof schema>;
 
@@ -46,6 +47,33 @@ export function parseDays(value: unknown): number[] | null {
   return [...(value as number[])].sort((a, b) => a - b);
 }
 
+// `rect` is the older name of `rectangle`, still in stored data and the demo template.
+const TABLE_SHAPES = ["round", "oval", "square", "rectangle", "long", "rect"] as const;
+
+// Starts with a letter or digit, so an id is never `.` or `..` in a URL path.
+const TABLE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+export const TABLE_FIELDS = {
+  id: text(64, TABLE_ID),
+  name: text(80, /\S/),
+  seats: integer(1, 100),
+  zone: optional(text(80)),
+  shape: optional(oneOf(TABLE_SHAPES)),
+};
+
+export const TABLE_LAYOUT_FIELDS = {
+  x: optional(integer(0, 10_000)),
+  y: optional(integer(0, 10_000)),
+  rotation: optional(integer(0, 359)),
+};
+
+type VenueNotFound = { ok: false; code: "venue_not_found" };
+
+async function venueExists(db: Db, venueId: string): Promise<boolean> {
+  const [venue] = await db.select({ id: venues.id }).from(venues).where(eq(venues.id, venueId));
+  return venue !== undefined;
+}
+
 export async function listTables(db: Db, venueId: string): Promise<TableInfo[]> {
   const rows = await db
     .select()
@@ -68,8 +96,9 @@ export async function upsertTable(
   db: Db,
   venueId: string,
   input: { id: string; name: string; seats: number; zone?: string; shape?: string },
-): Promise<void> {
-  await db.transaction(async (tx) => {
+): Promise<{ ok: true } | VenueNotFound> {
+  return db.transaction(async (tx) => {
+    if (!(await venueExists(tx as unknown as Db, venueId))) return { ok: false, code: "venue_not_found" } as const;
     const [known] = await tx
       .select({ id: tables.id })
       .from(tables)
@@ -94,6 +123,7 @@ export async function upsertTable(
           shape: input.shape ?? "round",
         },
       });
+    return { ok: true } as const;
   });
 }
 
@@ -102,22 +132,29 @@ export async function updateTableLayout(
   venueId: string,
   tableId: string,
   input: { x?: number; y?: number; rotation?: number },
-): Promise<void> {
+): Promise<{ ok: true } | VenueNotFound | { ok: false; code: "table_not_found" }> {
   const set: Record<string, number> = {};
   if (input.x !== undefined) set.posX = input.x;
   if (input.y !== undefined) set.posY = input.y;
   if (input.rotation !== undefined) set.rotation = input.rotation;
-  if (Object.keys(set).length === 0) return;
-  await db
+  if (Object.keys(set).length === 0) return { ok: true };
+  const updated = await db
     .update(tables)
     .set(set)
-    .where(and(eq(tables.venueId, venueId), eq(tables.id, tableId)));
+    .where(and(eq(tables.venueId, venueId), eq(tables.id, tableId)))
+    .returning({ id: tables.id });
+  if (updated.length > 0) return { ok: true };
+  return { ok: false, code: (await venueExists(db, venueId)) ? "table_not_found" : "venue_not_found" };
 }
 
-export async function deleteTable(db: Db, venueId: string, tableId: string): Promise<void> {
-  await db
+/** Idempotent: an id that is not a table of the venue deletes nothing and is still ok. */
+export async function deleteTable(db: Db, venueId: string, tableId: string): Promise<{ ok: true } | VenueNotFound> {
+  const deleted = await db
     .delete(tables)
-    .where(and(eq(tables.venueId, venueId), eq(tables.id, tableId)));
+    .where(and(eq(tables.venueId, venueId), eq(tables.id, tableId)))
+    .returning({ id: tables.id });
+  if (deleted.length === 0 && !(await venueExists(db, venueId))) return { ok: false, code: "venue_not_found" };
+  return { ok: true };
 }
 
 export async function listServices(db: Db, venueId: string): Promise<ServiceInfo[]> {
