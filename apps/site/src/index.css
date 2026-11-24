@@ -35,9 +35,9 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-h1, h2, h3 { font-family: var(--display); font-weight: 700; letter-spacing: -0.04em; line-height: 0.95; }
+h1, h2, h3:not([data-lv="4"]), [data-lv="3"] { font-family: var(--display); font-weight: 700; letter-spacing: -0.04em; line-height: 0.95; }
 h1 { font-size: var(--hero); line-height: 0.9; }
-h2 { font-size: var(--head); }
+h2:not([data-lv]) { font-size: var(--head); }
 p { max-width: 60ch; }
 a { color: inherit; }
 :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
@@ -217,7 +217,7 @@ main:focus { outline: none; }
 .road.teaser { background: var(--bg); }
 .road .top p { font-size: var(--lead); max-width: 28ch; line-height: 1.25; }
 .road .now, .road .never { margin-top: var(--gap); }
-.road .now h3, .road .never h3 { font-size: var(--head); margin-bottom: 40px; }
+.road .now [data-lv="3"], .road .never [data-lv="3"] { font-size: var(--head); margin-bottom: 40px; }
 .road table { width: 100%; border-collapse: collapse; font-size: var(--small); text-align: left; }
 .road th, .road td { padding: 14px 16px 14px 0; vertical-align: top; border-top: 1px solid var(--ink); }
 .road thead th { border-top: 0; color: var(--muted); font-weight: 600; padding-top: 0; }
@@ -244,12 +244,12 @@ main:focus { outline: none; }
 @media (pointer: coarse) { .road .idx a { min-height: 44px; } }
 .road .acts { margin-top: var(--gap); display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
 .road .top p { max-width: 44ch; font-size: var(--body); }
-.road h3 { font-family: var(--display); }
+.road [data-lv="3"] { font-family: var(--display); }
 .road .manifesto, .road .board, .road .miles, .road .quarters, .road .founding { margin-top: calc(var(--gap) * 0.6); }
 .road .manifesto { max-width: 62ch; }
 .road .star { font-family: var(--display); font-weight: 700; font-size: var(--lead); line-height: 1.15; letter-spacing: -0.02em; }
 .road .manifesto ul { list-style: none; margin-top: 24px; display: grid; gap: 10px; }
-.road .board h3, .road .miles h3, .road .quarters h3, .road .founding h3 { font-size: var(--lead); margin-bottom: 24px; }
+.road .board [data-lv="3"], .road .miles [data-lv="3"], .road .quarters [data-lv="3"], .road .founding [data-lv="3"] { font-size: var(--lead); margin-bottom: 24px; }
 .road .counters { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px var(--m); }
 .road .counters li { display: grid; gap: 4px; align-content: start; border-top: 2px solid var(--ink); padding-top: 12px; }
 .road .counters .v { font-family: var(--display); font-weight: 700; font-size: var(--head); line-height: 1; }
@@ -274,7 +274,7 @@ main:focus { outline: none; }
 .road .gates li { padding: 1px 10px; border: 1px solid var(--muted); border-radius: 999px; font-size: 0.8125rem; color: var(--muted); background: var(--bg); }
 .road .miles ul { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--m); }
 .road .miles li { background: var(--bg); padding: 20px; border-top: 4px solid var(--accent); display: grid; gap: 10px; align-content: start; }
-.road .miles h4 { font-family: var(--display); font-size: var(--lead); line-height: 1.05; }
+.road .miles [data-lv="4"] { font-family: var(--display); font-size: var(--lead); line-height: 1.05; }
 .road .miles .when { font-size: var(--small); font-weight: 600; }
 .road .miles .head { font-weight: 700; }
 .road .qtr { border-top: 2px solid var(--ink); padding: 16px 0; }
@@ -283,18 +283,18 @@ main:focus { outline: none; }
 .road .qtr > ul { list-style: none; display: grid; gap: 14px; margin-top: 12px; }
 .road .qtr > ul > li { display: grid; gap: 4px; max-width: 80ch; }
 .road .qtr small { font-weight: 700; color: var(--ink); margin-right: 0.4em; }
-.road .qtr h4 { margin-top: 16px; font-weight: 700; }
+.road .qtr [data-lv="4"] { margin-top: 16px; font-weight: 700; }
 .road .qtr div > ul { margin: 6px 0 0 1.2em; }
 .road .now .qtr { margin-top: 0; }
-.road .never h3 { font-size: var(--lead); margin-bottom: 24px; }
-.road .never h4 { margin-top: 32px; font-weight: 700; }
+.road .never [data-lv="3"] { font-size: var(--lead); margin-bottom: 24px; }
+.road .never [data-lv="4"] { margin-top: 32px; font-weight: 700; }
 .road .why { max-width: 70ch; margin-top: 8px; }
 .road tbody tr[id], .road .founding { scroll-margin-top: 84px; }
 .road.teaser { padding-block: var(--pad); }
 .road.teaser .top + .manifesto { margin-top: var(--hs); }
 .road.teaser .manifesto + .board, .road.teaser .board + .acts { margin-top: var(--blk); }
 .road .founding { border-top: 2px solid var(--ink); padding-top: 24px; max-width: 70ch; }
-.road .founding h4 { font-family: var(--display); font-size: var(--lead); margin-bottom: 8px; }
+.road .founding [data-lv="4"] { font-family: var(--display); font-size: var(--lead); margin-bottom: 8px; }
 .road .founding dl { display: grid; gap: 12px; margin: 16px 0; }
 .road .founding dt { font-weight: 700; }
 .road tbody th { overflow-wrap: anywhere; }
@@ -328,7 +328,7 @@ main:focus { outline: none; }
 .brig .tracks li p { grid-column: 1 / -1; max-width: 34ch; }
 @media (max-width: 760px) { .brig ul.tracks { grid-template-columns: 1fr; } }
 .brig .sub { margin-top: 72px; max-width: 60rem; }
-.brig .sub h3 { font-size: var(--lead); line-height: 1.1; margin-bottom: 16px; }
+.brig .sub [data-lv="3"] { font-size: var(--lead); line-height: 1.1; margin-bottom: 16px; }
 .brig .sub p + p, .brig .sub ul + p, .brig .sub dl + p { margin-top: 12px; }
 .brig .sub ol, .brig .sub ul:not(.tracks) { padding-left: 1.25em; display: grid; gap: 8px; }
 .brig .sub dl { display: grid; gap: 12px; margin-top: 8px; }

@@ -70,4 +70,14 @@ describe("brigada page", () => {
     expect(paths).toContain("/brigada/");
     for (const p of paths) expect(siteFileExists(p), p).toBe(true);
   });
+
+  it("has one h1 and never skips a heading level", () => {
+    const { container } = render(<BrigadaPage />);
+    const levels = [...container.querySelectorAll("h1, h2, h3, h4, h5, h6")].map((h) => Number(h.tagName[1]));
+    expect(levels.filter((l) => l === 1)).toHaveLength(1);
+    expect(levels[0]).toBe(1);
+    levels.forEach((l, i) => {
+      if (i > 0) expect(l, `heading ${i} jumps from h${levels[i - 1]} to h${l}`).toBeLessThanOrEqual(levels[i - 1] + 1);
+    });
+  });
 });

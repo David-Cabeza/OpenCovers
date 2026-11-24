@@ -1,5 +1,5 @@
 import { REPO, allTasksHref } from "./brigada";
-import { SectionHead, d } from "./chrome";
+import { H, HeadingShift, SectionHead, d } from "./chrome";
 import {
   boardRule, boardWarning, commitments, counters, countersNote, foundingVenues, manifesto, milestones, northStar, notPlanned,
   quarters, saturdayGate, saturdayGateIntro, today, todayLegend, updatedAt, whyNotEstablished,
@@ -70,7 +70,7 @@ function Counters() {
 function Board() {
   return (
     <div className="board" id="el-cuadro">
-      <h3>El cuadro · actualizado el {updatedAt}</h3>
+      <H n={3}>El cuadro · actualizado el {updatedAt}</H>
       <Counters />
       <p className="fine">{countersNote}</p>
       <p className="rule"><b>La regla del cuadro.</b> {boardRule}</p>
@@ -129,11 +129,11 @@ function Board() {
 function Milestones() {
   return (
     <div className="miles" id="hitos">
-      <h3>Tres hitos con nombre</h3>
+      <H n={3}>Tres hitos con nombre</H>
       <ul>
         {milestones.map((m) => (
           <li key={m.name}>
-            <h4>{m.name}</h4>
+            <H n={4}>{m.name}</H>
             <p className="when">{m.when} · <a href={`#${m.commitment.toLowerCase()}`}>{m.commitment}</a></p>
             <p>{m.story}</p>
             <p className="head">{m.headline}</p>
@@ -169,7 +169,7 @@ function QuarterBlock({ q }: { q: Quarter }) {
 function Quarters() {
   return (
     <div className="quarters" id="trimestres">
-      <h3>Trimestre a trimestre</h3>
+      <H n={3}>Trimestre a trimestre</H>
       {quarters.map((q) => (
         <QuarterBlock key={q.key} q={q} />
       ))}
@@ -186,7 +186,7 @@ function SaturdayGate() {
       <p className="goal">{saturdayGateIntro}</p>
       {saturdayGate.map((g) => (
         <div key={g.group}>
-          <h4>{g.group}</h4>
+          <H n={4}>{g.group}</H>
           <ul>
             {g.items.map((it) => (
               <li key={it}>{it}</li>
@@ -222,8 +222,8 @@ function NotPlannedItem({ s }: { s: string }) {
 function FoundingVenues() {
   return (
     <div id="locales-fundadores" className="founding">
-      <h3>Locales fundadores</h3>
-      <h4>{foundingVenues.title}</h4>
+      <H n={3}>Locales fundadores</H>
+      <H n={4}>{foundingVenues.title}</H>
       <p>{foundingVenues.lead}</p>
       <dl>
         {foundingVenues.blocks.map((b) => (
@@ -283,6 +283,7 @@ function PageIndex() {
 export function Roadmap({ pageTitle = false }: { pageTitle?: boolean }) {
   const Title = pageTitle ? "h1" : "h2";
   return (
+    <HeadingShift value={pageTitle ? 1 : 0}>
     <section id="hoja-de-ruta" className="road" aria-labelledby="road-h">
       <div className="top">
         <SectionHead id="road-h" Title={Title}>Hoja de ruta 2027</SectionHead>
@@ -321,13 +322,13 @@ export function Roadmap({ pageTitle = false }: { pageTitle?: boolean }) {
         </details>
       </div>
       <div className="never" id="no-haremos">
-        <h3>No haremos en 2027</h3>
+        <H n={3}>No haremos en 2027</H>
         <ul>
           {notPlanned.map((s) => (
             <NotPlannedItem key={s} s={s} />
           ))}
         </ul>
-        <h4>Por qué esto y no una plataforma consolidada</h4>
+        <H n={4}>Por qué esto y no una plataforma consolidada</H>
         <p className="why">{whyNotEstablished}</p>
       </div>
       <FoundingVenues />
@@ -336,6 +337,7 @@ export function Roadmap({ pageTitle = false }: { pageTitle?: boolean }) {
         <a className="btn ghost" href={allTasksHref}>Ver tareas abiertas</a>
       </div>
     </section>
+    </HeadingShift>
   );
 }
 
@@ -351,7 +353,7 @@ export function RoadmapTeaser() {
         <p className="star">{northStar}</p>
       </div>
       <div className="board">
-        <h3>El cuadro · actualizado el {updatedAt}</h3>
+        <H n={3}>El cuadro · actualizado el {updatedAt}</H>
         <Counters />
       </div>
       <div className="acts rv">
