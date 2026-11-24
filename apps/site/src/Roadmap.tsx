@@ -69,7 +69,7 @@ function Counters() {
 
 function Board() {
   return (
-    <div className="board">
+    <div className="board" id="el-cuadro">
       <h3>El cuadro · actualizado el {updatedAt}</h3>
       <Counters />
       <p className="fine">{countersNote}</p>
@@ -128,7 +128,7 @@ function Board() {
 
 function Milestones() {
   return (
-    <div className="miles">
+    <div className="miles" id="hitos">
       <h3>Tres hitos con nombre</h3>
       <ul>
         {milestones.map((m) => (
@@ -168,7 +168,7 @@ function QuarterBlock({ q }: { q: Quarter }) {
 
 function Quarters() {
   return (
-    <div className="quarters">
+    <div className="quarters" id="trimestres">
       <h3>Trimestre a trimestre</h3>
       {quarters.map((q) => (
         <QuarterBlock key={q.key} q={q} />
@@ -179,7 +179,7 @@ function Quarters() {
 
 function SaturdayGate() {
   return (
-    <details className="qtr gate">
+    <details className="qtr gate" id="puerta-del-sabado">
       <summary>
         <span className="hz">La Puerta del Sábado</span> Lo que tiene que ser verdad antes de cualquier dato real
       </summary>
@@ -248,6 +248,38 @@ function FoundingVenues() {
   );
 }
 
+/* Only the page carries the index; every label is a heading or title already shown below. */
+const INDEX_REST: { id: string; label: string }[] = [
+  { id: "hitos", label: "Tres hitos con nombre" },
+  { id: "trimestres", label: "Trimestre a trimestre" },
+  { id: "puerta-del-sabado", label: "La Puerta del Sábado" },
+  { id: "donde-estamos-hoy", label: "Dónde estamos hoy" },
+  { id: "no-haremos", label: "No haremos en 2027" },
+  { id: "locales-fundadores", label: "Locales fundadores" },
+];
+
+function PageIndex() {
+  return (
+    <nav className="idx" aria-label="En esta página">
+      <ul className="idx-c">
+        <li className="idx-board"><a href="#el-cuadro">El cuadro</a></li>
+        {commitments.map((c) => (
+          <li key={c.id}>
+            <a href={`#${c.id.toLowerCase()}`} aria-label={`${c.id} ${c.title}`}>
+              <b>{c.id}</b><span className="t"> {c.title}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <ul className="idx-s">
+        {INDEX_REST.map((r) => (
+          <li key={r.id}><a href={`#${r.id}`}>{r.label}</a></li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
 export function Roadmap({ pageTitle = false }: { pageTitle?: boolean }) {
   const Title = pageTitle ? "h1" : "h2";
   return (
@@ -256,12 +288,13 @@ export function Roadmap({ pageTitle = false }: { pageTitle?: boolean }) {
         <SectionHead id="road-h" Title={Title}>Hoja de ruta 2027</SectionHead>
         <p className="rv" style={d(90)}>{ROAD_LEDE}</p>
       </div>
+      {pageTitle && <PageIndex />}
       <Manifesto />
       <Board />
       <Milestones />
       <Quarters />
       <SaturdayGate />
-      <div className="now">
+      <div className="now" id="donde-estamos-hoy">
         <details className="qtr" open>
           <summary>
             <span className="hz">Dónde estamos hoy</span> Verificado en el repositorio el 23 de noviembre de 2026
@@ -287,7 +320,7 @@ export function Roadmap({ pageTitle = false }: { pageTitle?: boolean }) {
           </p>
         </details>
       </div>
-      <div className="never">
+      <div className="never" id="no-haremos">
         <h3>No haremos en 2027</h3>
         <ul>
           {notPlanned.map((s) => (
