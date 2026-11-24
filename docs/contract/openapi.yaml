@@ -3713,6 +3713,10 @@ components:
         requiresConfirmation:
           type: boolean
           default: false
+          description: |
+            Reserved for a venue that approves bookings by hand (ADR-0017, stage 14, deferred). The engine does not
+            send it today: a slot carries no such field, which a client reads as `false`. Treat every listed time
+            as confirmed automatically. A client must still accept the field and read `true` as "pending approval".
 
     AvailabilityExplanation:
       type: object

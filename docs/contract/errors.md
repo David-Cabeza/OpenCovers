@@ -82,8 +82,8 @@ A sign-up with a bad `X-Invitation-Token` fails on the auth route with `403` and
 
 ## Idempotency and outcome
 
-- `idempotency_in_flight`: a write with this key is already running. Retryable.
-- `unknown_outcome`: the engine cannot tell whether the write landed. The client must retry with the same key or read back. Retryable.
+- `idempotency_in_flight`: a write with this key is already running. Retryable. Send it again with the same key after a short wait. The engine does not return it today: a duplicate sent while the first request runs waits for it and then replays its result (`apps/api/src/lib/idempotency.ts`, concurrent cases in `apps/api/test/idempotent-writes.test.ts`). A client still handles it, because the code is part of the contract.
+- `unknown_outcome`: the engine cannot tell whether the write landed. The client must retry with the same key or read back. Retryable. The engine does not return it today either.
 - `transient`: a downstream dependency failed temporarily. Retryable.
 
 ## Notices and erasure
