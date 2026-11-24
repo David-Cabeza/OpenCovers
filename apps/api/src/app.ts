@@ -103,10 +103,13 @@ import {
   listServices,
   parseDays,
   listTables,
+  TABLE_FIELDS,
+  TABLE_LAYOUT_FIELDS,
   updateTableLayout,
   upsertService,
   upsertTable,
 } from "./lib/catalog";
+import { parseBody } from "./lib/body";
 import {
   cancelReservation,
   createReservation,
@@ -1291,45 +1294,28 @@ app.get("/v1/venues/:venueId/tables", async (c) => {
 
 app.post("/v1/venues/:venueId/tables", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
-  const body = await c.req.json();
-  if (
-    typeof body.id !== "string" ||
-    body.id === "" ||
-    typeof body.name !== "string" ||
-    typeof body.seats !== "number" ||
-    !Number.isInteger(body.seats) ||
-    body.seats < 1
-  ) {
-    return error(c, "invalid_request");
-  }
-  await upsertTable(db, venueId, {
-    id: body.id,
-    name: body.name,
-    seats: body.seats,
-    zone: typeof body.zone === "string" ? body.zone : undefined,
-    shape: typeof body.shape === "string" ? body.shape : undefined,
-  });
+  const input = await parseBody(c.req, TABLE_FIELDS);
+  if (!input) return error(c, "invalid_request");
+  const result = await upsertTable(db, venueId, input);
+  if (!result.ok) return error(c, result.code);
   const tables = await listTables(db, venueId);
   return c.json({ tables });
 });
 
 app.delete("/v1/venues/:venueId/tables/:tableId", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
-  const tableId = c.req.param("tableId");
-  await deleteTable(db, venueId, tableId);
+  const result = await deleteTable(db, venueId, c.req.param("tableId"));
+  if (!result.ok) return error(c, result.code);
   const tables = await listTables(db, venueId);
   return c.json({ tables });
 });
 
 app.patch("/v1/venues/:venueId/tables/:tableId", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
-  const tableId = c.req.param("tableId");
-  const body = await c.req.json();
-  await updateTableLayout(db, venueId, tableId, {
-    x: typeof body.x === "number" ? body.x : undefined,
-    y: typeof body.y === "number" ? body.y : undefined,
-    rotation: typeof body.rotation === "number" ? body.rotation : undefined,
-  });
+  const input = await parseBody(c.req, TABLE_LAYOUT_FIELDS);
+  if (!input || Object.values(input).every((v) => v === undefined)) return error(c, "invalid_request");
+  const result = await updateTableLayout(db, venueId, c.req.param("tableId"), input);
+  if (!result.ok) return error(c, result.code);
   const tables = await listTables(db, venueId);
   return c.json({ tables });
 });
