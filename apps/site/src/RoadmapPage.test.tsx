@@ -32,6 +32,20 @@ describe("roadmap page", () => {
     expect(container.querySelector("header a[href='/#features']")).not.toBeNull();
   });
 
+  it("has an in-page index with one link per target, every href pointing at an id on the page", () => {
+    const { container } = render(<RoadmapPage />);
+    const nav = screen.getByRole("navigation", { name: "En esta página" });
+    const hrefs = [...nav.querySelectorAll("a")].map((a) => a.getAttribute("href")!);
+    expect(hrefs).toEqual([
+      "#el-cuadro",
+      ...commitments.map((c) => `#${c.id.toLowerCase()}`),
+      "#hitos", "#trimestres", "#puerta-del-sabado", "#donde-estamos-hoy", "#no-haremos", "#locales-fundadores",
+    ]);
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+    for (const h of hrefs) expect(container.querySelector(h), h).not.toBeNull();
+    expect(container.querySelectorAll("h1")).toHaveLength(1);
+  });
+
   it("links only to site pages that exist", () => {
     const { container } = render(<RoadmapPage />);
     const paths = [...container.querySelectorAll("a, img, source")]
