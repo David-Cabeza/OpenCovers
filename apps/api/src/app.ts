@@ -107,6 +107,8 @@ import {
   upsertService,
   upsertTable,
 } from "./lib/catalog";
+import { readJsonObject } from "./lib/json-body";
+import { isPathValue, parseTableLayout, parseTableUpsert } from "./lib/table-input";
 import {
   cancelReservation,
   createReservation,
@@ -1291,24 +1293,10 @@ app.get("/v1/venues/:venueId/tables", async (c) => {
 
 app.post("/v1/venues/:venueId/tables", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
-  const body = await c.req.json();
-  if (
-    typeof body.id !== "string" ||
-    body.id === "" ||
-    typeof body.name !== "string" ||
-    typeof body.seats !== "number" ||
-    !Number.isInteger(body.seats) ||
-    body.seats < 1
-  ) {
-    return error(c, "invalid_request");
-  }
-  await upsertTable(db, venueId, {
-    id: body.id,
-    name: body.name,
-    seats: body.seats,
-    zone: typeof body.zone === "string" ? body.zone : undefined,
-    shape: typeof body.shape === "string" ? body.shape : undefined,
-  });
+  const body = await readJsonObject(c);
+  const input = body && parseTableUpsert(body);
+  if (!input) return error(c, "invalid_request");
+  await upsertTable(db, venueId, input);
   const tables = await listTables(db, venueId);
   return c.json({ tables });
 });
@@ -1316,6 +1304,8 @@ app.post("/v1/venues/:venueId/tables", adminOnly, async (c) => {
 app.delete("/v1/venues/:venueId/tables/:tableId", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const tableId = c.req.param("tableId");
+  if (!isPathValue(tableId)) return error(c, "invalid_request");
+  // An unknown table, or another venue's, is not an error: a delete is idempotent.
   await deleteTable(db, venueId, tableId);
   const tables = await listTables(db, venueId);
   return c.json({ tables });
@@ -1324,12 +1314,11 @@ app.delete("/v1/venues/:venueId/tables/:tableId", adminOnly, async (c) => {
 app.patch("/v1/venues/:venueId/tables/:tableId", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const tableId = c.req.param("tableId");
-  const body = await c.req.json();
-  await updateTableLayout(db, venueId, tableId, {
-    x: typeof body.x === "number" ? body.x : undefined,
-    y: typeof body.y === "number" ? body.y : undefined,
-    rotation: typeof body.rotation === "number" ? body.rotation : undefined,
-  });
+  const body = await readJsonObject(c);
+  const layout = body && parseTableLayout(body);
+  if (!layout || !isPathValue(tableId)) return error(c, "invalid_request");
+  // No not-found code exists for tables: an unknown id and another venue's id answer alike.
+  if (!(await updateTableLayout(db, venueId, tableId, layout))) return error(c, "invalid_request");
   const tables = await listTables(db, venueId);
   return c.json({ tables });
 });
@@ -1370,6 +1359,7 @@ app.post("/v1/venues/:venueId/services", adminOnly, async (c) => {
 app.delete("/v1/venues/:venueId/services/:name", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const name = c.req.param("name");
+  if (!isPathValue(name)) return error(c, "invalid_request");
   await deleteService(db, venueId, name);
   const services = await listServices(db, venueId);
   return c.json({ services });

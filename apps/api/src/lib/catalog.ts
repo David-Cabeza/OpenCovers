@@ -97,21 +97,24 @@ export async function upsertTable(
   });
 }
 
+/** Resolves to false when the venue has no table with this id (nothing is written). */
 export async function updateTableLayout(
   db: Db,
   venueId: string,
   tableId: string,
   input: { x?: number; y?: number; rotation?: number },
-): Promise<void> {
+): Promise<boolean> {
   const set: Record<string, number> = {};
   if (input.x !== undefined) set.posX = input.x;
   if (input.y !== undefined) set.posY = input.y;
   if (input.rotation !== undefined) set.rotation = input.rotation;
-  if (Object.keys(set).length === 0) return;
-  await db
-    .update(tables)
-    .set(set)
-    .where(and(eq(tables.venueId, venueId), eq(tables.id, tableId)));
+  const where = and(eq(tables.venueId, venueId), eq(tables.id, tableId));
+  if (Object.keys(set).length === 0) {
+    const [known] = await db.select({ id: tables.id }).from(tables).where(where);
+    return known !== undefined;
+  }
+  const changed = await db.update(tables).set(set).where(where).returning({ id: tables.id });
+  return changed.length > 0;
 }
 
 export async function deleteTable(db: Db, venueId: string, tableId: string): Promise<void> {
