@@ -40,7 +40,7 @@ export function DemoBar({ status }: { status: DemoStatus }) {
 function ViewSwitch({ bookingKey, widgetOrigin }: { bookingKey: string | null; widgetOrigin: string | null }) {
   const t = useT();
   const { resolvedTheme } = useTheme();
-  const base = "inline-flex h-8 items-center gap-1.5 px-3 text-sm font-medium";
+  const base = "inline-flex h-8 coarse:h-11 items-center gap-1.5 px-3 text-sm font-medium";
   return (
     <div role="group" aria-label={t("demo.bar.view")} className="inline-flex overflow-hidden rounded-md border bg-background">
       <span aria-current="true" className={cn(base, "bg-primary text-primary-foreground")}>
@@ -144,14 +144,14 @@ function Checklist({ venueId }: { venueId: string }) {
   const manual = (id: StepId, openAgenda: boolean) => (
     <span className="flex flex-wrap gap-2">
       {openAgenda && (
-        <Button type="button" size="xs" variant="outline" className="max-sm:h-9 max-sm:px-3" onClick={() => {
+        <Button type="button" size="xs" variant="outline" className="max-sm:h-9 max-sm:px-3 coarse:h-11" onClick={() => {
             void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
             nav?.goTo("agenda");
           }}>
           {t("demo.tour.openAgenda")}
         </Button>
       )}
-      <Button type="button" size="xs" variant="ghost" className="max-sm:h-9 max-sm:px-3" onClick={() => toggle(id)}>
+      <Button type="button" size="xs" variant="ghost" className="max-sm:h-9 max-sm:px-3 coarse:h-11" onClick={() => toggle(id)}>
         {done[id] ? t("demo.tour.untick") : t("demo.tour.markDone")}
       </Button>
     </span>
@@ -172,7 +172,7 @@ function Checklist({ venueId }: { venueId: string }) {
         aria-expanded={open}
         aria-controls={open ? "demo-checklist" : undefined}
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 py-1 text-sm font-medium"
+        className="flex items-center gap-2 py-1 coarse:min-h-11 text-sm font-medium"
       >
         <ChevronDownIcon className={cn("size-4 transition-transform", !open && "-rotate-90")} aria-hidden="true" />
         {t("demo.tour.title", { done: count, total: steps.length })}
