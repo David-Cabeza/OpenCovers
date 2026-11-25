@@ -11,9 +11,15 @@ import { useT } from "@/i18n"
 import { useTheme } from "@/lib/theme"
 import { toast, Toaster as Sonner, type ToasterProps } from "sonner"
 
-// An error toast often carries the only explanation of what failed, so it stays until it is dismissed.
+// An error toast often carries the only explanation of what failed, so it stays until it is dismissed. The same
+// message replaces itself instead of piling up while the same failure repeats.
 const toastError = toast.error
-toast.error = (message, data) => toastError(message, { duration: Infinity, ...data })
+toast.error = (message, data) =>
+  toastError(message, {
+    duration: Infinity,
+    id: typeof message === "string" ? `error:${message}` : undefined,
+    ...data,
+  })
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { resolvedTheme } = useTheme()
