@@ -82,6 +82,7 @@ describe("FloorTableCard", () => {
     await waitFor(() => expect(card.contains(document.activeElement)).toBe(true));
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(node).toHaveFocus();
   });
 
   it("opens on tap for touch and closes with the close button", async () => {
@@ -92,6 +93,7 @@ describe("FloorTableCard", () => {
     await screen.findByRole("dialog");
     fireEvent.click(await screen.findByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(node).toHaveFocus();
   });
 
   it("shows nothing for a free table and keeps the walk-in button", async () => {

@@ -58,6 +58,8 @@ export function FloorTableCard({
   const dragging = useRef(false);
   const focusCard = useRef(false);
   const lastPointer = useRef("mouse");
+  const anchorEl = useRef<HTMLElement | null>(null);
+  const returning = useRef(false);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -80,6 +82,16 @@ export function FloorTableCard({
     setOpen(false);
   }
 
+  // Closing from the card (Escape, close button, Move) hands focus back to the table that opened it.
+  function closeToTable() {
+    hide();
+    const el = anchorEl.current;
+    if (!el || !el.isConnected) return;
+    returning.current = true;
+    el.focus();
+    returning.current = false;
+  }
+
   const inCard = (node: EventTarget | null) =>
     node instanceof Node && Boolean(contentRef.current?.contains(node));
 
@@ -96,6 +108,7 @@ export function FloorTableCard({
         data-table-card-anchor=""
         aria-describedby={open ? contentId : undefined}
         onPointerEnter={(e: React.PointerEvent) => {
+          anchorEl.current = e.currentTarget as HTMLElement;
           lastPointer.current = e.pointerType;
           if (e.pointerType === "mouse") schedule(true, OPEN_DELAY);
         }}
@@ -103,6 +116,7 @@ export function FloorTableCard({
           if (e.pointerType === "mouse") schedule(false, CLOSE_DELAY);
         }}
         onPointerDown={(e: React.PointerEvent) => {
+          anchorEl.current = e.currentTarget as HTMLElement;
           lastPointer.current = e.pointerType;
         }}
         onClick={() => {
@@ -112,6 +126,8 @@ export function FloorTableCard({
           else show();
         }}
         onFocus={(e: React.FocusEvent) => {
+          anchorEl.current = e.currentTarget as HTMLElement;
+          if (returning.current) return;
           let visible = true;
           try {
             visible = e.currentTarget.matches(":focus-visible");
@@ -124,6 +140,7 @@ export function FloorTableCard({
           if (!inCard(e.relatedTarget)) hide();
         }}
         onKeyDown={(e: React.KeyboardEvent) => {
+          anchorEl.current = e.currentTarget as HTMLElement;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             focusCard.current = true;
@@ -145,6 +162,9 @@ export function FloorTableCard({
         id={contentId}
         ref={contentRef}
         side="top"
+        collisionPadding={8}
+        className="max-h-(--radix-popover-content-available-height) overflow-y-auto"
+        onEscapeKeyDown={() => closeToTable()}
         aria-label={t("floor.card.label", { name: table.guestName || table.name })}
         onOpenAutoFocus={(e) => {
           if (!focusCard.current) e.preventDefault();
@@ -170,11 +190,11 @@ export function FloorTableCard({
           table={table}
           tableNames={tableNames}
           open={open}
-          onClose={hide}
+          onClose={closeToTable}
           onMoveRequest={
             onMoveRequest
               ? () => {
-                  hide();
+                  closeToTable();
                   onMoveRequest();
                 }
               : undefined
