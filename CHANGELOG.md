@@ -6,6 +6,11 @@ All notable changes to OpenCovers are listed here. The format follows [Keep a Ch
 
 Feature PRs append their entries here. The release PR moves them under a version heading.
 
+### Changed
+
+- A table may seat up to 200 guests (it was 100), on `POST /v1/venues/{venueId}/tables`.
+- `DELETE /v1/venues/{venueId}/services/{name}` with a name over 200 characters that the venue does not store now fails with `400 invalid_request` instead of answering `200`.
+
 ### Security
 
 - `GET`, `POST` and `DELETE /v1/auth/keys` now require an `admin` API key that holds the all-venues grant (`*`). An `admin` key granted only named venues gets `403 forbidden` there, so it can no longer act on keys outside its venues. It still manages its own venues' keys through `/v1/venues/{venueId}/keys`.
