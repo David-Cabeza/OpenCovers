@@ -69,7 +69,7 @@ export const TABLE_LAYOUT_FIELDS = {
 
 type VenueNotFound = { ok: false; code: "venue_not_found" };
 
-async function venueExists(db: Db, venueId: string): Promise<boolean> {
+export async function venueExists(db: Db, venueId: string): Promise<boolean> {
   const [venue] = await db.select({ id: venues.id }).from(venues).where(eq(venues.id, venueId));
   return venue !== undefined;
 }
