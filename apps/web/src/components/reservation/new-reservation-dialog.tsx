@@ -34,21 +34,25 @@ interface NewReservationDialogProps {
   partySize: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Show a time field, for callers that open the dialog without a chosen slot. */
+  timeEditable?: boolean;
 }
 
 export function NewReservationDialog({
   venueId,
   date,
-  time,
+  time: initialTime,
   partySize,
   open,
   onOpenChange,
+  timeEditable = false,
 }: NewReservationDialogProps) {
   const t = useT();
   const queryClient = useQueryClient();
   const { data } = useTables(venueId);
   const tables = data?.tables ?? [];
   const [selected, setSelected] = useState<string[]>([]);
+  const [time, setTime] = useState(initialTime);
 
   const {
     register,
@@ -76,6 +80,10 @@ export function NewReservationDialog({
       setSelected([]);
     }
   }, [open, partySize, reset]);
+
+  useEffect(() => {
+    if (open) setTime(initialTime);
+  }, [open, initialTime]);
 
   function toggleTable(id: string) {
     setSelected((prev) =>
@@ -124,6 +132,18 @@ export function NewReservationDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {timeEditable && (
+            <div className="space-y-2">
+              <Label htmlFor="reservation-time">{t("floor.time")}</Label>
+              <Input
+                id="reservation-time"
+                type="time"
+                required
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+              />
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="party-size">{t("reservation.partySize")}</Label>
             <Input

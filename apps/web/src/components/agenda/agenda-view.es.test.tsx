@@ -37,6 +37,7 @@ describe("AgendaView in Spanish", () => {
     expect(await screen.findByText("Jane Doe")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Agenda" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cliente sin reserva" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Nueva reserva" })).toBeInTheDocument();
     expect(screen.getByText("Reservada")).toBeInTheDocument();
     expect(screen.getByText("1 reserva · 3 cubiertos")).toBeInTheDocument();
     expect(screen.getByText(longDate(todayIso()))).toBeInTheDocument();

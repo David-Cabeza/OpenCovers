@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Reservation } from "@/lib/api";
+import { longDate } from "@/lib/date";
 import { mockApi, renderWithApp, resetApiMocks } from "@/test/mock-api";
 import { AgendaView } from "./agenda-view";
 
@@ -47,7 +48,10 @@ async function openRowMenu(user: ReturnType<typeof userEvent.setup>, guest = "Ja
 }
 
 describe("AgendaView actions", () => {
-  afterEach(resetApiMocks);
+  afterEach(() => {
+    resetApiMocks();
+    window.history.replaceState(null, "", "/");
+  });
 
   it("lists the reservations of the day", async () => {
     setup(reservation());
@@ -198,6 +202,46 @@ describe("AgendaView actions", () => {
       partySize: 2,
       guest: { name: "Sam", consent: "unknown" },
     });
+  });
+
+  it("opens a new reservation for the agenda day, with a time to set, and the booking joins the list", async () => {
+    window.history.replaceState(null, "", "/?date=2030-01-01");
+    const created: Reservation[] = [];
+    const { api, user } = setup(reservation(), {
+      "GET /v1/venues/v1/availability": { body: { availability: { dinner: [{ time: "20:00", available: true, type: "slot" }] } } },
+      [TABLES_ROUTE]: { body: { tables: TABLES } },
+      "POST /v1/venues/v1/reservations": () => {
+        const r = reservation({ id: "r3", time: "20:00", guest: { name: "Pat", consent: "unknown" } });
+        created.push(r);
+        return { body: r };
+      },
+      [AGENDA]: () => ({ body: { reservations: [reservation(), ...created] } }),
+    });
+    await screen.findByText("Jane Doe");
+
+    const primary = screen.getByRole("button", { name: "New reservation" });
+    expect(screen.getByRole("button", { name: "Walk-in" })).toHaveClass("border");
+    expect(primary).not.toHaveClass("border");
+    await user.click(primary);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(new RegExp(longDate("2030-01-01"), "i"))).toBeInTheDocument();
+    await waitFor(() => expect(within(dialog).getByLabelText("Time")).toHaveValue("20:00"));
+    await user.click(within(dialog).getByRole("button", { name: /Table 2/ }));
+    await user.type(within(dialog).getByLabelText("Guest name"), "Pat");
+    await user.click(within(dialog).getByRole("button", { name: "Create reservation" }));
+
+    await waitFor(() => expect(api.writes()).toHaveLength(1));
+    expect(api.writes()[0].body).toMatchObject({ date: "2030-01-01", time: "20:00", tables: ["t2"] });
+    expect(await screen.findByText("Pat")).toBeInTheDocument();
+  });
+
+  it("does not offer a new reservation on a past day", async () => {
+    window.history.replaceState(null, "", "/?date=2020-01-01");
+    setup(reservation());
+    await screen.findByText("Jane Doe");
+
+    expect(screen.getByRole("button", { name: "New reservation" })).toBeDisabled();
   });
 
   it("edits consent, rating and note from the row menu", async () => {
@@ -368,7 +412,6 @@ describe("AgendaView overview", () => {
 describe("AgendaView day in the address", () => {
   afterEach(() => {
     resetApiMocks();
-    window.history.replaceState(null, "", "/");
   });
 
   it("opens the day in ?date and writes the new day when navigating", async () => {

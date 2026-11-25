@@ -25,14 +25,16 @@ import { AssignTablesDialog } from "@/components/reservation/assign-tables-dialo
 import { CancelReservationDialog } from "@/components/reservation/cancel-reservation-dialog";
 import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
 import { ReservationTraceDialog } from "@/components/reservation/reservation-trace-dialog";
+import { NewReservationDialog } from "@/components/reservation/new-reservation-dialog";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { LoadError } from "@/components/load-error";
 import { useAgenda } from "@/hooks/use-agenda";
+import { useAvailability } from "@/hooks/use-availability";
 import { useTables } from "@/hooks/use-tables";
 import { useT, type MessageKey } from "@/i18n";
 import { api, type Reservation } from "@/lib/api";
-import { longDate } from "@/lib/date";
+import { longDate, nowTime, todayIso } from "@/lib/date";
 import { useDayParam } from "@/lib/day-param";
 import { errorMessage, isApiError } from "@/lib/error-message";
 import { guestInitials } from "@/lib/format";
@@ -69,10 +71,18 @@ function groupByService(reservations: Reservation[]) {
   return groups;
 }
 
+/** The next quarter hour, e.g. "19:07" gives "19:15". */
+function nextQuarterHour(): string {
+  const [h, m] = nowTime().split(":").map(Number);
+  const total = Math.min(h * 60 + Math.ceil((m + 1) / 15) * 15, 23 * 60 + 45);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 export function AgendaView({ venueId }: { venueId: string }) {
   const t = useT();
   const [date, setDate] = useDayParam();
   const [walkInOpen, setWalkInOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
   const [editing, setEditing] = useState<Reservation | null>(null);
   const [assigning, setAssigning] = useState<Reservation | null>(null);
   const [cancelling, setCancelling] = useState<Reservation | null>(null);
@@ -82,6 +92,15 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const reservations = data?.reservations ?? [];
   const { data: tablesData } = useTables(venueId);
   const tableNames = new Map((tablesData?.tables ?? []).map((table) => [table.id, table.name]));
+
+  // Only asked for while the dialog is open: the first free time of the day is its default.
+  const { data: availability } = useAvailability(newOpen ? venueId : null, date, 2);
+  const isToday = date === todayIso();
+  const isPast = date < todayIso();
+  const firstFree = Object.values(availability?.availability ?? {})
+    .flat()
+    .find((slot) => slot.available)?.time;
+  const newTime = isToday ? nextQuarterHour() : (firstFree ?? "20:00");
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
@@ -127,7 +146,12 @@ export function AgendaView({ venueId }: { venueId: string }) {
         actions={
           <>
             <DayNav date={date} onChange={setDate} />
-            <Button onClick={() => setWalkInOpen(true)}>{t("agenda.walkIn")}</Button>
+            <Button disabled={isPast} onClick={() => setNewOpen(true)}>
+              {t("reservation.new.title")}
+            </Button>
+            <Button variant="outline" onClick={() => setWalkInOpen(true)}>
+              {t("agenda.walkIn")}
+            </Button>
           </>
         }
       />
@@ -186,6 +210,15 @@ export function AgendaView({ venueId }: { venueId: string }) {
         </>
       )}
 
+      <NewReservationDialog
+        venueId={venueId}
+        date={date}
+        time={newTime}
+        partySize={2}
+        open={newOpen}
+        onOpenChange={setNewOpen}
+        timeEditable
+      />
       <WalkInDialog venueId={venueId} open={walkInOpen} onOpenChange={setWalkInOpen} />
       <AssignTablesDialog
         venueId={venueId}
