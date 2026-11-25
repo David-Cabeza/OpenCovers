@@ -20,7 +20,7 @@ export function FloorSkinToggle() {
           title={t(s.descriptionKey)}
           onClick={() => setSkin(s.id)}
           className={cn(
-            "rounded-md px-3 py-1 font-medium max-sm:min-h-11 coarse:min-h-11 transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            "rounded-md px-3 py-1 font-medium max-sm:min-h-11 coarse:min-h-11 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             skin === s.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >

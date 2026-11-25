@@ -33,7 +33,7 @@ export function RoleSelect({ venueId, member }: { venueId: string; member: Membe
       value={member.role}
       disabled={change.isPending}
       onChange={(e) => change.mutate(e.target.value as Role)}
-      className="h-8 rounded-md max-sm:h-11 coarse:h-11 border border-input bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="h-8 rounded-md max-sm:h-11 coarse:h-11 border border-input bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
     >
       {ROLES.map((r) => (
         <option key={r} value={r}>

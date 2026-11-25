@@ -59,7 +59,7 @@ export function MoveDialog({
                   disabled={pending || !source?.reservationId}
                   aria-label={t("floor.move.to", { table: target.name })}
                   onClick={() => source?.reservationId && onMove(source.reservationId, target.id)}
-                  className="flex w-full items-center justify-between gap-3 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50 disabled:opacity-50"
+                  className="flex w-full items-center justify-between gap-3 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50"
                 >
                   <span className="min-w-0">
                     <span className="block truncate font-medium">{target.name}</span>
