@@ -3,10 +3,10 @@ import { MaximizeIcon, MinimizeIcon, RotateCwIcon } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n";
-import { useUiStore } from "@/stores/ui-store";
 import { FloorTableCard } from "./floor-table-card";
 import { FloorItemShape } from "./floor-item-shape";
 import { guestsText } from "./guests-text";
+import { useFloorSkinGate } from "./skin-gate";
 import { FLOOR_SKINS } from "./skins";
 
 export interface CanvasTable {
@@ -188,7 +188,7 @@ export function FloorCanvas({
   onDeleteItem?: (itemId: string) => void;
 }) {
   const tr = useT();
-  const skin = FLOOR_SKINS[useUiStore((s) => s.floorSkin)];
+  const skin = FLOOR_SKINS[useFloorSkinGate().skin];
   const canvasRef = useRef<HTMLDivElement>(null);
   const [posOverrides, setPosOverrides] = useState<Record<string, { x: number; y: number }>>({});
   const [sizeOverrides, setSizeOverrides] = useState<Record<string, { w: number; h: number }>>({});
