@@ -1006,7 +1006,7 @@ paths:
         The body is a JSON object with only the fields of `TableUpsert`.
         `id` is 1 to 64 letters, digits, `.`, `_` or `-`, starting with a
         letter or digit. `name` is 1 to 80 characters with at least one that
-        is not a space. `seats` is an integer from 1 to 100. `zone`, when
+        is not a space. `seats` is an integer from 1 to 200. `zone`, when
         sent, is a string of at most 80 characters, empty included. `shape`,
         when sent, is one of `round`, `oval`, `square`, `rectangle`, `long`
         or `rect` (the older name of `rectangle`). A body that is missing,
@@ -4810,7 +4810,7 @@ components:
           minLength: 1
           maxLength: 80
           pattern: "\\S"
-        seats: { type: integer, minimum: 1, maximum: 100 }
+        seats: { type: integer, minimum: 1, maximum: 200 }
         zone: { type: string, maxLength: 80, description: Defaults to the empty string. }
         shape:
           type: string
