@@ -33,6 +33,7 @@ export const ERRORS = {
   guest_booking_limit: { status: 409, retryable: false },
   expired_cursor: { status: 400, retryable: false },
   table_not_found: { status: 404, retryable: false },
+  floor_item_not_found: { status: 404, retryable: false },
   webhook_not_found: { status: 404, retryable: false },
   webhook_url_rejected: { status: 400, retryable: false },
   webhook_limit_reached: { status: 409, retryable: false },

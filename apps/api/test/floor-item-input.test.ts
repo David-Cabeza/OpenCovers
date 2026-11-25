@@ -132,7 +132,7 @@ describe("POST /floor-items with an Idempotency-Key", () => {
     expect(first.status).toBe(201);
     const created = (await first.json()).item;
     const again = await send("POST", `${VENUE}/floor-items`, json(valid), ADMIN, KEY);
-    expect(again.status).toBe(200);
+    expect(again.status).toBe(201);
     const body = await again.json();
     expect(body.item).toEqual(created);
     expect(body.items.filter((i: { type: string }) => i.type === "bar")).toHaveLength(2); // the seeded one and this one
@@ -163,7 +163,7 @@ describe("POST /floor-items with an Idempotency-Key", () => {
     const created = (await (await send("POST", `${VENUE}/floor-items`, json(valid), ADMIN, KEY)).json()).item;
     await send("DELETE", `${VENUE}/floor-items/${created.id}`);
     const again = await send("POST", `${VENUE}/floor-items`, json(valid), ADMIN, KEY);
-    expect(again.status).toBe(200);
+    expect(again.status).toBe(201);
     expect((await again.json()).item).toBeUndefined();
     expect((await snapshot()).filter((r) => r.venueId === VENUE)).toHaveLength(1);
   });
