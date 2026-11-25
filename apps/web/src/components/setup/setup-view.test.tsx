@@ -200,4 +200,19 @@ describe("SetupView", () => {
     await user.click(await screen.findByRole("button", { name: "Edit Mesa 1" }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
+
+  it("gives the Dining room a heading outline with no skipped level", async () => {
+    open("room");
+    setup();
+    renderWithApp(<SetupView venueId="v1" role="admin" />);
+    await screen.findByRole("heading", { name: "Services" });
+    const headings = screen.getAllByRole("heading").map((h) => [h.tagName, h.textContent]);
+    expect(headings).toEqual([
+      ["H1", "Settings"],
+      ["H2", "Dining room"],
+      ["H3", "Tables"],
+      ["H3", "Floor layout"],
+      ["H3", "Services"],
+    ]);
+  });
 });

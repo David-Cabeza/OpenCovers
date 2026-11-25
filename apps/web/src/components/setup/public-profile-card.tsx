@@ -136,7 +136,7 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("publicprofile.title")}</CardTitle>
+        <CardTitle as="h3">{t("publicprofile.title")}</CardTitle>
         <CardDescription>{t("publicprofile.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -298,7 +298,7 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
             </SaveBar>
 
             <div className="space-y-3 border-t pt-6">
-              <h3 className="font-display text-lg">{t("publicprofile.preview.title")}</h3>
+              <h4 className="font-display text-lg">{t("publicprofile.preview.title")}</h4>
               <div className="space-y-2">
                 <Label htmlFor="pp-url">{t("publicprofile.url.label")}</Label>
                 <div className="flex gap-2">

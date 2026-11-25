@@ -74,7 +74,7 @@ export function FloorEditor({ venueId }: { venueId: string }) {
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          <CardTitle>{t("setup.floor.title")}</CardTitle>
+          <CardTitle as="h3">{t("setup.floor.title")}</CardTitle>
           <CardDescription>{t("setup.floor.description")}</CardDescription>
         </div>
         <Select

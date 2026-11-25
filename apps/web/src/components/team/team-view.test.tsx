@@ -49,6 +49,17 @@ describe("TeamView", () => {
     expect(within(invites).getByText("1")).toBeInTheDocument();
   });
 
+  it("makes each card title a heading under the page heading", async () => {
+    setup();
+    await screen.findByText("Ana");
+    expect(screen.getAllByRole("heading").map((h) => [h.tagName, h.textContent])).toEqual([
+      ["H1", "Team"],
+      ["H2", "Members"],
+      ["H2", "Invitations"],
+      ["H2", "Audit log"],
+    ]);
+  });
+
   it("shows each member's initial and each invitation's status", async () => {
     setup();
     expect(await screen.findByText("A")).toBeInTheDocument();
