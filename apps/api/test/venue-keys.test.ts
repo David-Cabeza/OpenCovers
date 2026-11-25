@@ -45,7 +45,7 @@ describe("venue keys", () => {
     const created = await app.request(`/v1/venues/${venueId}/keys`, {
       method: "POST",
       headers: { Cookie: cookie, "Content-Type": "application/json" },
-      body: JSON.stringify({ key: "agent-key-1", principal: "my-agent", role: "write" }),
+      body: JSON.stringify({ key: "agent-key-1-0123456789abcdefghijklmnop", principal: "my-agent", role: "write" }),
     });
     expect(created.status).toBe(201);
     const createdBody = await created.json();
@@ -64,7 +64,7 @@ describe("venue keys", () => {
 
     const agenda = await app.request(
       `/v1/venues/${venueId}/agenda?date=2026-11-12`,
-      { headers: { apikey: "agent-key-1" } },
+      { headers: { apikey: "agent-key-1-0123456789abcdefghijklmnop" } },
     );
     expect(agenda.status).toBe(200);
 
@@ -77,7 +77,7 @@ describe("venue keys", () => {
 
     const after = await app.request(
       `/v1/venues/${venueId}/agenda?date=2026-11-12`,
-      { headers: { apikey: "agent-key-1" } },
+      { headers: { apikey: "agent-key-1-0123456789abcdefghijklmnop" } },
     );
     expect(after.status).toBe(401);
   });

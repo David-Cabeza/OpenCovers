@@ -9,6 +9,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 ### Changed
 
 - `POST`, `PATCH` and `DELETE /v1/venues/{venueId}/floor-items` check their input (C80). A bad body, a fractional or out-of-range number and a field not listed fail with `400 invalid_request` instead of a `500` or a silent success. An unknown venue fails with `404 venue_not_found`, and a `PATCH` of an unknown item or another venue's item with `404 floor_item_not_found` (a new code). `POST` takes an optional `Idempotency-Key`. `POST /v1/venues/{venueId}/services` refuses a name over 200 characters.
+- `POST` and `DELETE /v1/venues/{venueId}/keys` and `/v1/auth/keys` check their input (C81). A bad or missing body and any query parameter (a key or hash in the URL) fail with `400 invalid_request` instead of a `500`. A new key must be 32 to 256 visible ASCII characters and a `principal` must not be empty; keys registered before keep working. An unknown venue fails with `404 venue_not_found` instead of a `201`. Registering a key again with the same `principal` and `role` answers as before; with another one it fails with `409 key_conflict` (a new code) instead of answering success and keeping the old role.
 - A table may seat up to 200 guests (it was 100), on `POST /v1/venues/{venueId}/tables`.
 - `DELETE /v1/venues/{venueId}/services/{name}` with a name over 200 characters that the venue does not store now fails with `400 invalid_request` instead of answering `200`.
 

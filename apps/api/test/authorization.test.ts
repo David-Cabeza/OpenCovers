@@ -116,7 +116,7 @@ const ADMIN_ROUTES: Route[] = [
     name: "POST /keys",
     method: "POST",
     path: () => "/keys",
-    body: { key: "minted-by-anyone", principal: "rogue", role: "write" },
+    body: { key: "minted-by-anyone-0123456789abcdefghijklmnop", principal: "rogue", role: "write" },
     status: 201,
   },
 ];
