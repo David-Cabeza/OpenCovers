@@ -17,22 +17,24 @@ export function DemoBar({ status }: { status: DemoStatus }) {
   if (!venueId) return null;
   return (
     <div role="region" aria-label={t("demo.bar.label")} className="print:hidden border-b border-primary/30 bg-primary/10 text-sm">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2 sm:px-6">
-        <p>
-          <strong className="font-medium">{t("demo.bar.title")}</strong> {t("demo.bar.sandbox")}
-          {expiresAt && <> {t("demo.bar.expires", { date: formatExpiry(expiresAt) })}</>}{" "}
-          <a
-            href={DEPLOY_YOURSELF_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="underline underline-offset-2"
-          >
-            {t("demo.bar.deploy")}
-          </a>
-        </p>
-        <ViewSwitch bookingKey={bookingKey ?? null} widgetOrigin={widgetOrigin ?? null} />
-      </div>
-      <Checklist venueId={venueId} />
+      <Checklist
+        venueId={venueId}
+        lead={
+          <p>
+            <strong className="font-medium">{t("demo.bar.title")}</strong> {t("demo.bar.sandbox")}
+            {expiresAt && <> {t("demo.bar.expires", { date: formatExpiry(expiresAt) })}</>}{" "}
+            <a
+              href={DEPLOY_YOURSELF_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2"
+            >
+              {t("demo.bar.deploy")}
+            </a>
+          </p>
+        }
+        switcher={<ViewSwitch bookingKey={bookingKey ?? null} widgetOrigin={widgetOrigin ?? null} />}
+      />
     </div>
   );
 }
@@ -40,7 +42,7 @@ export function DemoBar({ status }: { status: DemoStatus }) {
 function ViewSwitch({ bookingKey, widgetOrigin }: { bookingKey: string | null; widgetOrigin: string | null }) {
   const t = useT();
   const { resolvedTheme } = useTheme();
-  const base = "inline-flex h-8 coarse:h-11 items-center gap-1.5 px-3 text-sm font-medium";
+  const base = "inline-flex h-7 coarse:h-11 items-center gap-1.5 px-3 text-sm font-medium";
   return (
     <div role="group" aria-label={t("demo.bar.view")} className="inline-flex overflow-hidden rounded-md border bg-background">
       <span aria-current="true" className={cn(base, "bg-primary text-primary-foreground")}>
@@ -81,6 +83,26 @@ function readTicked(venueId: string): StepId[] {
   }
 }
 
+const FOLD_PREFIX = "oc-demo-folded:";
+
+/** The visitor's own choice for this sandbox, or null when they have not made one. */
+function readFolded(venueId: string): boolean | null {
+  try {
+    const raw = window.localStorage.getItem(FOLD_PREFIX + venueId);
+    return raw === "1" ? true : raw === "0" ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeFolded(venueId: string, folded: boolean) {
+  try {
+    window.localStorage.setItem(FOLD_PREFIX + venueId, folded ? "1" : "0");
+  } catch {
+    // Storage can be blocked. The fold then lasts until the page reloads.
+  }
+}
+
 function writeTicked(venueId: string, ticked: StepId[]) {
   try {
     window.localStorage.setItem(STORAGE_PREFIX + venueId, JSON.stringify(ticked));
@@ -93,13 +115,18 @@ function writeTicked(venueId: string, ticked: StepId[]) {
  * Booking and cancelling are read from the bookings the guest widget made. "Find it in the agenda" and "open its
  * trace" (the agenda row's menu) cannot be read from anywhere, so the visitor ticks them.
  */
-function Checklist({ venueId }: { venueId: string }) {
+function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.ReactNode; switcher: React.ReactNode }) {
   const t = useT();
-  // Open on a wide screen; on a phone the tour would take half of it, so it starts folded.
-  const [open, setOpen] = useState(() => window.matchMedia?.("(min-width: 640px)").matches ?? true);
+  // The visitor's choice wins and is remembered per sandbox. Without one the tour is open on a wide screen (on a
+  // phone it would take half of it, so it starts folded) and folds itself once every step is done.
+  const [folded, setFolded] = useState<boolean | null>(() => readFolded(venueId));
+  const [wide] = useState(() => window.matchMedia?.("(min-width: 640px)").matches ?? true);
   const [ticked, setTicked] = useState<StepId[]>(() => readTicked(venueId));
   const nav = useNavigation();
-  useEffect(() => setTicked(readTicked(venueId)), [venueId]);
+  useEffect(() => {
+    setTicked(readTicked(venueId));
+    setFolded(readFolded(venueId));
+  }, [venueId]);
 
   // The diner books in another tab, so look again when this one comes back into focus and every few seconds.
   const { data } = useQuery({
@@ -164,37 +191,49 @@ function Checklist({ venueId }: { venueId: string }) {
     { id: "cancel", text: t("demo.tour.cancel") },
   ];
   const count = Object.values(done).filter(Boolean).length;
+  const open = folded === null ? wide && count < steps.length : !folded;
 
   return (
-    <div className="border-t border-primary/20 px-4 py-1.5 sm:px-6">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={open ? "demo-checklist" : undefined}
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 py-1 coarse:min-h-11 text-sm font-medium"
-      >
-        <ChevronDownIcon className={cn("size-4 transition-transform", !open && "-rotate-90")} aria-hidden="true" />
-        {t("demo.tour.title", { done: count, total: steps.length })}
-      </button>
+    <>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 px-4 pb-1 pt-1.5 sm:px-6">
+        {lead}
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1">
+          {switcher}
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={open ? "demo-checklist" : undefined}
+            onClick={() => {
+              setFolded(open);
+              writeFolded(venueId, open);
+            }}
+            className="flex items-center gap-2 py-1 coarse:min-h-11 text-sm font-medium"
+          >
+            <ChevronDownIcon className={cn("size-4 transition-transform", !open && "-rotate-90")} aria-hidden="true" />
+            {t("demo.tour.title", { done: count, total: steps.length })}
+          </button>
+        </div>
+      </div>
       {open && (
-        <ol id="demo-checklist" className="space-y-1.5 pb-2 pl-6">
+        <ol id="demo-checklist" className="space-y-1.5 border-t border-primary/20 px-4 pb-2 pt-1.5 sm:px-6">
           {steps.map((step) => (
-            <li key={step.id} className="grid grid-cols-[auto_1fr] items-start gap-x-2 gap-y-1 sm:flex sm:flex-wrap sm:items-center sm:gap-x-3">
-              {done[step.id] ? (
-                <CheckCircle2Icon className="size-4 text-primary" aria-hidden="true" />
-              ) : (
-                <CircleIcon className="size-4 text-muted-foreground" aria-hidden="true" />
-              )}
-              <span className={cn(done[step.id] && "text-muted-foreground line-through")}>
-                {step.text}
-                <span className="sr-only">{" "}{done[step.id] ? t("demo.tour.done") : t("demo.tour.notDone")}</span>
+            <li key={step.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="inline-flex items-start gap-2">
+                {done[step.id] ? (
+                  <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                ) : (
+                  <CircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                )}
+                <span className={cn(done[step.id] && "text-foreground/70 line-through")}>
+                  {step.text}
+                  <span className="sr-only">{" "}{done[step.id] ? t("demo.tour.done") : t("demo.tour.notDone")}</span>
+                </span>
               </span>
-              {step.action && <span className="col-start-2 sm:col-auto">{step.action}</span>}
+              {step.action && <span className="max-sm:pl-6">{step.action}</span>}
             </li>
           ))}
         </ol>
       )}
-    </div>
+    </>
   );
 }
