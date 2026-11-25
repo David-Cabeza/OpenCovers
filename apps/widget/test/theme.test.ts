@@ -80,6 +80,26 @@ describe("theme tokens", () => {
   it("keeps the system font equal to the stylesheet default", () => {
     expect(css).toContain(`--oc-font: ${FONT_STACKS.system};`);
   });
+
+  it("keeps the field edge at 3:1 against the field in both default palettes", () => {
+    const lum = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const mix = (a: string, b: string, pa: number) => "#" + [1, 3, 5].map((i) => Math.round(parseInt(a.slice(i, i + 2), 16) * pa + parseInt(b.slice(i, i + 2), 16) * (1 - pa)).toString(16).padStart(2, "0")).join("");
+    const share = Number(/--oc-field-border: color-mix\(in srgb, var\(--oc-text\) (\d+)%, var\(--oc-border\)\)/.exec(css)?.[1]) / 100;
+    expect(share).toBeGreaterThan(0);
+    const palettes = [
+      { text: "#1c1b19", background: "#ffffff", border: "#cfcac1" },
+      { text: "#f1eee8", background: "#181715", border: "#4a4640" },
+    ];
+    for (const { text, background, border } of palettes) {
+      expect(css).toContain(`--oc-text: ${text};`);
+      expect(css).toContain(`--oc-border: ${border};`);
+      const [a, b] = [lum(mix(text, border, share)), lum(background)];
+      expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)).toBeGreaterThanOrEqual(3);
+    }
+  });
 });
 
 describe("logo", () => {

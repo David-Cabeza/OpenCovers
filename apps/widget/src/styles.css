@@ -9,6 +9,8 @@
   --oc-text: #1c1b19;
   --oc-muted: #5c5852;
   --oc-border: #cfcac1;
+  /* The edge of a field is a control boundary (WCAG 1.4.11, 3:1), so it is the border pulled toward the text; it follows a venue's colors. */
+  --oc-field-border: color-mix(in srgb, var(--oc-text) 40%, var(--oc-border));
   --oc-danger: #a1271c;
   --oc-radius: 8px;
   --oc-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -51,6 +53,7 @@
   --color-text: var(--oc-text);
   --color-muted: var(--oc-muted);
   --color-border: var(--oc-border);
+  --color-field: var(--oc-field-border);
   --color-danger: var(--oc-danger);
   --radius-oc: var(--oc-radius);
 }
