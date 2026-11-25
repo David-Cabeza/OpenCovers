@@ -101,7 +101,7 @@ Caddy is the only proxy in front of the API. Its `reverse_proxy` directive repla
 2. Switch the integration to the new key.
 3. Revoke the old one in the same screen. It is the same as `DELETE /v1/venues/{venueId}/keys` with the old key's `hash`.
 
-Generate keys with at least 32 random bytes, for example `openssl rand -base64 32`.
+Generate keys with at least 32 random bytes, for example `openssl rand -base64 32`. The API refuses a new key shorter than 32 characters, longer than 256, or with a space or a character outside visible ASCII, and refuses a key sent in the query string. A key registered before that rule keeps working until you revoke it. A key value is registered once: registering it again with another `principal` or `role` fails with `key_conflict` and changes nothing.
 
 ### Rotate `BETTER_AUTH_SECRET`
 
