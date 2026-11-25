@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { useT } from "@/i18n";
 import { api } from "@/lib/api";
 
@@ -51,10 +51,10 @@ export function SlotExplanation({
       <PopoverContent aria-label={t("availability.why", { time })} className="space-y-2">
         <p className="text-sm font-medium">{t("availability.why", { time })}</p>
         {isPending ? (
-          <div className="space-y-2">
+          <Loading className="space-y-2">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-2/3" />
-          </div>
+          </Loading>
         ) : isError ? (
           <p className="text-sm text-destructive">{t("availability.explainFailed")}</p>
         ) : (

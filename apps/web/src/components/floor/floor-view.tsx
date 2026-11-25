@@ -8,7 +8,7 @@ import { LoadError } from "@/components/load-error";
 import { canEditSetup, useNavigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { FloorCanvas } from "@/components/floor/floor-canvas";
 import { FloorSkinToggle } from "@/components/floor/floor-skin-toggle";
@@ -99,7 +99,7 @@ export function FloorView({ venueId }: { venueId: string }) {
       )}
 
       {isPending ? (
-        <Skeleton className="h-[480px] w-full" />
+        <Loading><Skeleton className="h-[480px] w-full" /></Loading>
       ) : isError && !data ? (
         <LoadError what={t("floor.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : tables.length === 0 ? (

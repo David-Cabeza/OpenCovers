@@ -24,7 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadError } from "@/components/load-error";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useT, type MessageKey } from "@/i18n";
@@ -357,7 +357,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
         {isError && !data ? (
           <LoadError compact what={t("onlinebooking.loadWhat")} error={loadError} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : isPending || !form || !data ? (
-          <Skeleton className="h-24 w-full" />
+          <Loading><Skeleton className="h-24 w-full" /></Loading>
         ) : (
           <>
             <div

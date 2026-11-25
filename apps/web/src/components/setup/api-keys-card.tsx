@@ -15,7 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { LoadError } from "@/components/load-error";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { useVenueKeys } from "@/hooks/use-venue-keys";
 import { api, type ApiKey, type Role } from "@/lib/api";
 import { CreateKeyDialog } from "./create-key-dialog";
@@ -54,7 +54,7 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
       </CardHeader>
       <CardContent>
         {isPending ? (
-          <Skeleton className="h-24 w-full" />
+          <Loading><Skeleton className="h-24 w-full" /></Loading>
         ) : isError && !data ? (
           <LoadError compact what={t("setup.keys.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : keys.length === 0 ? (

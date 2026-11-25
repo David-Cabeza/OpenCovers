@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -91,7 +91,7 @@ export function AuditLog({ venueId }: { venueId: string }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {audit.isPending ? (
-          <Skeleton className="h-24 w-full" />
+          <Loading><Skeleton className="h-24 w-full" /></Loading>
         ) : audit.isError && entries.length === 0 ? (
           <div role="alert" className="flex items-center gap-3 py-2 text-sm text-destructive">
             {errorMessage(audit.error, t("team.audit.loadFailed"))}

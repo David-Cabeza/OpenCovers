@@ -2,7 +2,7 @@ import { useState } from "react";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { useDemoStatus } from "@/lib/demo";
 import { DemoSignIn } from "./demo-sign-in";
 import { LanguageSelect } from "@/components/layout/language-select";
@@ -33,7 +33,7 @@ export function AuthScreen() {
         </div>
 
         {demo === null ? (
-          <Skeleton className="h-72 w-full" />
+          <Loading><Skeleton className="h-72 w-full" /></Loading>
         ) : demo.enabled ? (
           <Card>
             <CardHeader>

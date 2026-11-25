@@ -4,7 +4,7 @@ import { LoadError } from "@/components/load-error";
 import { useDemoStatus } from "@/lib/demo";
 import { DemoBar } from "./demo/demo-bar";
 import { ServerBanner } from "@/components/server-banner";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { useVenues } from "@/hooks/use-venues";
 import { useT } from "@/i18n";
 import { useUiStore } from "@/stores/ui-store";
@@ -117,10 +117,10 @@ export function Dashboard() {
             className="flex-1 p-4 outline-none sm:p-6 lg:p-8 print:p-0"
           >
             {isPending ? (
-              <div className="space-y-4">
+              <Loading className="space-y-4">
                 <Skeleton className="h-9 w-56" />
                 <Skeleton className="h-64 w-full" />
-              </div>
+              </Loading>
             ) : isError && !data ? (
               <LoadError title={t("layout.dashboard.loadVenues")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
             ) : venues.length === 0 ? (

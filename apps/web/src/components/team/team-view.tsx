@@ -25,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { api, type Invitation, type InvitationStatus, type Member } from "@/lib/api";
 import { dateTime } from "@/lib/date";
 import { errorMessage } from "@/lib/error-message";
@@ -135,7 +135,7 @@ function MembersCard({ venueId }: { venueId: string }) {
       </CardHeader>
       <CardContent>
         {isPending ? (
-          <Skeleton className="h-24 w-full" />
+          <Loading><Skeleton className="h-24 w-full" /></Loading>
         ) : isError && !data ? (
           <LoadError compact title={t("team.members.loadError")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : members.length === 0 ? (
@@ -235,7 +235,7 @@ function InvitationsCard({ venueId }: { venueId: string }) {
       </CardHeader>
       <CardContent>
         {isPending ? (
-          <Skeleton className="h-24 w-full" />
+          <Loading><Skeleton className="h-24 w-full" /></Loading>
         ) : isError && !data ? (
           <LoadError compact title={t("team.invitations.loadError")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : invitations.length === 0 ? (

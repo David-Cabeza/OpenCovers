@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { LoadError } from "@/components/load-error";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { useServices } from "@/hooks/use-services";
 import { useTables } from "@/hooks/use-tables";
 import { api, type Service, type Table as TableInfo } from "@/lib/api";
@@ -279,7 +279,7 @@ function TablesSection({ venueId }: { venueId: string }) {
       </CardHeader>
       <CardContent>
         {isPending ? (
-          <Skeleton className="h-24 w-full" />
+          <Loading><Skeleton className="h-24 w-full" /></Loading>
         ) : isError && !data ? (
           <LoadError compact what={t("setup.tables.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : tables.length === 0 ? (
@@ -369,7 +369,7 @@ function ServicesSection({ venueId }: { venueId: string }) {
       </CardHeader>
       <CardContent>
         {isPending ? (
-          <Skeleton className="h-24 w-full" />
+          <Loading><Skeleton className="h-24 w-full" /></Loading>
         ) : isError && !data ? (
           <LoadError compact what={t("setup.services.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : services.length === 0 ? (

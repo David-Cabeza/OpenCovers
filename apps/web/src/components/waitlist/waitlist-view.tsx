@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/empty-state";
 import { LoadError } from "@/components/load-error";
 import { PageHeader } from "@/components/layout/page-header";
 import { Pill } from "@/components/pill";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { Stat } from "@/components/stat";
 import { useWaitlist } from "@/hooks/use-waitlist";
 import { useT } from "@/i18n";
@@ -84,14 +84,14 @@ export function WaitlistView({ venueId }: { venueId: string }) {
       </div>
 
       {isPending ? (
-        <div className="space-y-3">
+        <Loading className="space-y-3">
           <div className="grid grid-cols-3 gap-3">
             {[0, 1, 2].map((n) => (
               <Skeleton key={n} className="h-24" />
             ))}
           </div>
           <Skeleton className="h-32 w-full" />
-        </div>
+        </Loading>
       ) : isError && !data ? (
         <LoadError what={t("waitlist.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : entries.length === 0 ? (

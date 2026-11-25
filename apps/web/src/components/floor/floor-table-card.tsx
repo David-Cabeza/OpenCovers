@@ -234,7 +234,7 @@ function CardBody({
           {t("floor.card.loadFailed")}
         </p>
       ) : isPending || !r ? (
-        <div data-testid="card-loading" role="status" aria-label={t("floor.card.loading")} className="space-y-2">
+        <div data-testid="card-loading" role="status" aria-busy="true" aria-label={t("floor.card.loading")} className="space-y-2">
           <Skeleton className="h-4 w-3/4" />
           <Skeleton className="h-4 w-1/2" />
           <Skeleton className="h-4 w-2/3" />

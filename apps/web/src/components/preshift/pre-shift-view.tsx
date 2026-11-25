@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { Stat } from "@/components/stat";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useServices } from "@/hooks/use-services";
@@ -92,14 +92,14 @@ export function PreShiftView({ venueId }: { venueId: string }) {
       />
 
       {agenda.isPending ? (
-        <div className="space-y-3">
+        <Loading className="space-y-3">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[0, 1, 2, 3].map((n) => (
               <Skeleton key={n} className="h-24" />
             ))}
           </div>
           <Skeleton className="h-64 w-full" />
-        </div>
+        </Loading>
       ) : agenda.isError && !agenda.data ? (
         <LoadError
           what={t("preshift.loadWhat")}
