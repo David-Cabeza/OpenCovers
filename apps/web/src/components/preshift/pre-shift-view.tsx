@@ -131,7 +131,7 @@ export function PreShiftView({ venueId }: { venueId: string }) {
             {largeCount > 0 && ` · ${t("preshift.largeCount", { count: largeCount, min: LARGE_PARTY_MIN })}`}
           </p>
 
-          <ul className="divide-y overflow-hidden rounded-xl border bg-card print:rounded-none print:border-x-0">
+          <ul className="@container divide-y overflow-hidden rounded-xl border bg-card print:rounded-none print:border-x-0">
             {rows.map((row) => (
               <PreShiftRowView key={row.reservation.id} row={row} />
             ))}
@@ -151,7 +151,7 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
     <li
       data-slot="preshift-row"
       className={cn(
-        "grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-l-4 border-l-transparent px-4 py-3 md:grid-cols-[4rem_minmax(0,13rem)_9rem_8rem_minmax(0,1fr)] md:items-start md:gap-x-4 print:break-inside-avoid print:py-2",
+        "grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-l-4 border-l-transparent px-4 py-3 @[53rem]:grid-cols-[4rem_minmax(0,13rem)_9rem_8rem_minmax(0,1fr)] @[53rem]:items-start @[53rem]:gap-x-4 print:grid-cols-[4rem_minmax(0,13rem)_9rem_8rem_minmax(0,1fr)] print:items-start print:gap-x-4 print:break-inside-avoid print:py-2",
         large && "border-l-warning",
       )}
     >
@@ -162,7 +162,7 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
           <div className="truncate text-xs text-muted-foreground">{reservation.guest.contact}</div>
         )}
       </div>
-      <div className="col-span-2 col-start-1 flex flex-wrap items-center gap-x-4 gap-y-2 pl-[calc(3.5rem+0.75rem)] md:contents">
+      <div className="col-span-2 col-start-1 flex flex-wrap items-center gap-x-4 gap-y-2 pl-[calc(3.5rem+0.75rem)] @[53rem]:contents print:contents">
         <div>
           {large ? (
             <Pill tone="warning" className="tabular-nums">
@@ -185,7 +185,7 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
         </div>
         <div className="flex min-w-0 flex-col gap-2 md:basis-auto">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 print:flex-nowrap">
               <span className="text-xs text-muted-foreground">{t("preshift.consent")}</span>
               <Pill tone={reservation.guest.consent === "granted" ? "success" : "muted"}>
                 {t(`common.consent.${reservation.guest.consent ?? "unknown"}`)}
