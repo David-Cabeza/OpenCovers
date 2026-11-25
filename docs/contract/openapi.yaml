@@ -1187,24 +1187,34 @@ paths:
       summary: Add an item to the floor plan
       description: |
         Adds one item and answers `201` with the new item and every item of
-        the venue. The engine makes the `id` (a UUID) and a body `id` is
-        ignored, as is any field not listed. `type` must be a non-empty
-        string, and any such string is stored, there is no list of types.
-        `label`, `posX`, `posY`, `width` and `height` are read only when
-        they have the right JSON type, and a value of another type is
-        ignored as if left out, so `posX: "9"` stores `0`. Defaults are an
-        empty label, `0`, `0`, `80` and `40`, and `rotation` starts at `0`.
-        A missing or empty `type`, or one that is not a string, fails with
-        `invalid_request`. No range is checked, see the notes on
-        `FloorItemCreate`.
+        the venue. The engine makes the `id` (a UUID). The body is a JSON
+        object with `type` and, optionally, `label`, `posX`, `posY`, `width`
+        and `height`, and no other field: a body `id` or a `rotation` fails.
+        `type` is 1 to 32 lower-case letters, digits or `-`, starting with a
+        letter or digit, and any such string is stored, there is no list of
+        types. `label` is a string of at most 80 characters, and may be
+        empty. `posX` and `posY` are integers from 0 to 10000, `width` and
+        `height` integers from 1 to 2000. Defaults are an empty label, `0`,
+        `0`, `80` and `40`, and `rotation` starts at `0`. A body that is
+        missing, malformed, `null`, not an object or empty, a missing
+        `type`, a value of the wrong type, `null` included, a fractional
+        number or one out of range, and any field not listed fail with
+        `invalid_request` and store nothing. An unknown venue fails with
+        `venue_not_found`, also for a key that holds the all-venues grant.
 
-        The call takes no `Idempotency-Key` and ignores one. A repeat adds
-        another item, so a retry after a lost answer duplicates. Admin only.
-        A `read` or `write` key or role fails with `forbidden`. A sandbox
-        venue at its cap of items answers `409` with `demo_limit_reached`.
-        Not exposed through MCP.
+        With an `Idempotency-Key` of 1 to 200 characters, a repeat of the
+        key in the venue adds nothing and answers `201` with the items and
+        the item the first call made, even when the body differs. If that
+        item was deleted since, the repeat answers `201` with the items and
+        no `item`. A key used before for another kind of write fails with
+        `invalid_request`. Without a key every call adds an item, so a retry
+        after a lost answer duplicates. An empty or longer key fails with
+        `invalid_request`. Admin only. A `read` or `write` key or role fails
+        with `forbidden`. A sandbox venue at its cap of items answers `409`
+        with `demo_limit_reached`. Not exposed through MCP.
       parameters:
         - $ref: "#/components/parameters/venueId"
+        - $ref: "#/components/parameters/optionalIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -1212,12 +1222,12 @@ paths:
             schema: { $ref: "#/components/schemas/FloorItemCreate" }
       responses:
         "201":
-          description: The new item and all the venue's items
+          description: The new item (absent on a repeat whose item was deleted) and all the venue's items
           content:
             application/json:
               schema:
                 type: object
-                required: [items, item]
+                required: [items]
                 properties:
                   items:
                     type: array
@@ -1231,20 +1241,24 @@ paths:
       operationId: venue.updateFloorItemLayout
       summary: Move, resize or rotate a floor plan item
       description: |
-        Sets the position, rotation and size of one item. Only `x`, `y`,
-        `rotation`, `width` and `height` are read, each only when it is a
-        JSON number, and they write `posX`, `posY`, `rotation`, `width` and
-        `height`. Any other field, `type` and `label` included, and a value
-        that is not a number, is ignored. A body with none of the five, an
-        empty one included, changes nothing. Values are stored as given,
-        with no range check, and a fractional or very large number is not
-        refused, see the notes on `FloorItemLayout`.
+        Sets the position, rotation and size of one item. The body is a JSON
+        object with at least one of `x`, `y`, `rotation`, `width` and
+        `height` and no other field. `x` and `y` are integers from 0 to
+        10000 and write `posX` and `posY`. `rotation` is an integer from 0
+        to 359, in degrees. `width` and `height` are integers from 1 to
+        2000. A field left out keeps its stored value. A body that is
+        missing, malformed, `null`, not an object or empty, a value that is
+        not such an integer, `null` included, and any other field, `type`,
+        `label` and `id` included, fail with `invalid_request` and change
+        nothing.
 
-        An `itemId` that is not an item of this venue changes nothing and
-        still answers `200`, as does the id of an item of another venue. The
-        call takes no `Idempotency-Key` and ignores one. Admin only. A
-        `read` or `write` key or role fails with `forbidden`. Not exposed
-        through MCP.
+        An `itemId` that is not an item of this venue fails with
+        `floor_item_not_found`, and so does the id of an item of another
+        venue, with the same answer. An unknown venue fails with
+        `venue_not_found`, also for a key that holds the all-venues grant.
+        The call takes no `Idempotency-Key` and ignores one. The same body
+        gives the same state, so a retry is safe. Admin only. A `read` or
+        `write` key or role fails with `forbidden`. Not exposed through MCP.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/itemId"
@@ -1267,7 +1281,10 @@ paths:
       description: |
         Removes the item and answers with the items that remain. An `itemId`
         that is not an item of the venue, or that belongs only to another
-        venue, changes nothing and still answers `200`. The call takes no
+        venue, changes nothing and still answers `200` with the same items,
+        so a retry is safe and the answer does not show whether the id
+        exists elsewhere. An unknown venue fails with `venue_not_found`,
+        also for a key that holds the all-venues grant. The call takes no
         body and no `Idempotency-Key`, and it ignores both. Admin only. A
         `read` or `write` key or role fails with `forbidden`. Not exposed
         through MCP.
@@ -4884,34 +4901,35 @@ components:
     FloorItemCreate:
       type: object
       required: [type]
+      additionalProperties: false
       description: |
-        Numbers must be integers within the 32-bit range, and the engine does
-        not check it. A fractional or out-of-range number, a body that is not
-        valid JSON, and a `null` body are not answered with `invalid_request`:
-        the call fails with a `500` that has no contract error body. Nothing
-        is stored in those cases.
+        Integers only. A fractional number, one out of range, a `null` and a
+        value of another type fail with `invalid_request`, as does a field
+        not listed. The limits are the ones the staff floor editor stays
+        inside: its element sizes go from 6 to 260 and its canvas positions
+        stay under 10000.
       properties:
-        type: { type: string, minLength: 1, example: bar }
-        label: { type: string }
-        posX: { type: integer }
-        posY: { type: integer }
-        width: { type: integer }
-        height: { type: integer }
+        type: { type: string, minLength: 1, maxLength: 32, pattern: "^[a-z0-9][a-z0-9-]*$", example: bar }
+        label: { type: string, maxLength: 80 }
+        posX: { type: integer, minimum: 0, maximum: 10000 }
+        posY: { type: integer, minimum: 0, maximum: 10000 }
+        width: { type: integer, minimum: 1, maximum: 2000 }
+        height: { type: integer, minimum: 1, maximum: 2000 }
 
     FloorItemLayout:
       type: object
+      minProperties: 1
+      additionalProperties: false
       description: |
-        Each field is read only when it is a number, and others are ignored.
-        A fractional or out-of-range number, invalid JSON, a `null` body and
-        a missing body are not answered with `invalid_request`: the call
-        fails with a `500` that has no contract error body. Nothing is
-        stored in those cases.
+        At least one field. Integers only. A fractional number, one out of
+        range, a `null` and a value of another type fail with
+        `invalid_request`, as does a field not listed.
       properties:
-        x: { type: integer, description: Written to `posX`. }
-        y: { type: integer, description: Written to `posY`. }
-        rotation: { type: integer }
-        width: { type: integer }
-        height: { type: integer }
+        x: { type: integer, minimum: 0, maximum: 10000, description: Written to `posX`. }
+        y: { type: integer, minimum: 0, maximum: 10000, description: Written to `posY`. }
+        rotation: { type: integer, minimum: 0, maximum: 359 }
+        width: { type: integer, minimum: 1, maximum: 2000 }
+        height: { type: integer, minimum: 1, maximum: 2000 }
 
     VenueKey:
       type: object
@@ -5970,6 +5988,7 @@ components:
         - expired_cursor
         - waitlist_entry_not_found
         - table_not_found
+        - floor_item_not_found
         - webhook_not_found
         - webhook_url_rejected
         - webhook_limit_reached

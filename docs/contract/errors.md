@@ -99,6 +99,10 @@ A sign-up with a bad `X-Invitation-Token` fails on the auth route with `403` and
 
 - `table_not_found`: the table does not exist, or belongs to another venue. Indistinguishable from not found. `404`. Not retryable.
 
+## Floor items
+
+- `floor_item_not_found`: the floor plan item does not exist, or belongs to another venue. Indistinguishable from not found. `404`. Not retryable.
+
 ## Webhooks
 
 - `webhook_not_found`: the webhook does not exist, or belongs to another venue. Indistinguishable from not found. Not retryable.

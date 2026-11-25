@@ -162,6 +162,9 @@ import { notifyReservation } from "./lib/notifications";
 import {
   addFloorItem,
   deleteFloorItem,
+  FLOOR_ITEM_FIELDS,
+  FLOOR_ITEM_LAYOUT_FIELDS,
+  MAX_IDEMPOTENCY_KEY_LENGTH,
   listFloorItems,
   updateFloorItemLayout,
 } from "./lib/floor-items";
@@ -1249,41 +1252,30 @@ app.get("/v1/venues/:venueId/floor-items", async (c) => {
 
 app.post("/v1/venues/:venueId/floor-items", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
-  const body = await c.req.json();
-  if (typeof body.type !== "string" || body.type === "") {
-    return error(c, "invalid_request");
-  }
-  const item = await addFloorItem(db, venueId, {
-    type: body.type,
-    label: typeof body.label === "string" ? body.label : undefined,
-    posX: typeof body.posX === "number" ? body.posX : undefined,
-    posY: typeof body.posY === "number" ? body.posY : undefined,
-    width: typeof body.width === "number" ? body.width : undefined,
-    height: typeof body.height === "number" ? body.height : undefined,
-  });
+  const key = c.req.header("Idempotency-Key");
+  if (key !== undefined && (key === "" || key.length > MAX_IDEMPOTENCY_KEY_LENGTH)) return error(c, "invalid_request");
+  const input = await parseBody(c.req, FLOOR_ITEM_FIELDS);
+  if (!input) return error(c, "invalid_request");
+  const result = await addFloorItem(db, venueId, input, key);
+  if (!result.ok) return error(c, result.code);
   const items = await listFloorItems(db, venueId);
-  return c.json({ items, item }, 201);
+  return c.json({ items, ...(result.item ? { item: result.item } : {}) }, 201);
 });
 
 app.delete("/v1/venues/:venueId/floor-items/:itemId", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
-  const itemId = c.req.param("itemId");
-  await deleteFloorItem(db, venueId, itemId);
+  const result = await deleteFloorItem(db, venueId, c.req.param("itemId"));
+  if (!result.ok) return error(c, result.code);
   const items = await listFloorItems(db, venueId);
   return c.json({ items });
 });
 
 app.patch("/v1/venues/:venueId/floor-items/:itemId", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
-  const itemId = c.req.param("itemId");
-  const body = await c.req.json();
-  await updateFloorItemLayout(db, venueId, itemId, {
-    x: typeof body.x === "number" ? body.x : undefined,
-    y: typeof body.y === "number" ? body.y : undefined,
-    rotation: typeof body.rotation === "number" ? body.rotation : undefined,
-    width: typeof body.width === "number" ? body.width : undefined,
-    height: typeof body.height === "number" ? body.height : undefined,
-  });
+  const input = await parseBody(c.req, FLOOR_ITEM_LAYOUT_FIELDS);
+  if (!input || Object.values(input).every((v) => v === undefined)) return error(c, "invalid_request");
+  const result = await updateFloorItemLayout(db, venueId, c.req.param("itemId"), input);
+  if (!result.ok) return error(c, result.code);
   const items = await listFloorItems(db, venueId);
   return c.json({ items });
 });
@@ -1334,6 +1326,7 @@ app.post("/v1/venues/:venueId/services", adminOnly, async (c) => {
   if (
     typeof body.name !== "string" ||
     body.name === "" ||
+    body.name.length > MAX_SERVICE_PATH_LENGTH ||
     typeof body.openStart !== "string" ||
     typeof body.openEnd !== "string" ||
     !isPartyLimit(body.minPartySize) ||
