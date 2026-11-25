@@ -56,7 +56,7 @@ describe("POST /tables rejects a bad body and writes nothing", () => {
     ["an empty body", ""],
     ["no body", undefined],
     ["seats over the int range", json({ ...valid, seats: 99999999999 })],
-    ["seats over the maximum of 100", json({ ...valid, seats: 101 })],
+    ["seats over the maximum of 200", json({ ...valid, seats: 201 })],
     ["seats in exponent form beyond the maximum", json({ ...valid, seats: 1e12 })],
     ["an empty name", json({ ...valid, name: "" })],
     ["a blank name", json({ ...valid, name: "   " })],
@@ -94,9 +94,11 @@ describe("POST /tables still accepts what the staff app sends", () => {
       const res = await send("POST", `${VENUE}/tables`, json({ id: `s-${shape}`, name: "M", seats: 1, zone: "Sala", shape }));
       expect(res.status, shape).toBe(200);
     }
-    const edge = { id: `T_9.a-${"x".repeat(57)}`, name: "n".repeat(80), seats: 100, zone: "" };
+    const edge = { id: `T_9.a-${"x".repeat(57)}`, name: "n".repeat(80), seats: 200, zone: "" };
     const res = await send("POST", `${VENUE}/tables`, json(edge));
     expect(res.status).toBe(200);
+    // A banquet table seats more than 100.
+    expect((await send("POST", `${VENUE}/tables`, json({ id: "banquet", name: "Banquete", seats: 101 }))).status).toBe(200);
     const { tables: list } = await res.json();
     expect(list).toContainEqual({ ...edge, shape: "round", posX: 0, posY: 0, rotation: 0 });
   });
