@@ -99,6 +99,8 @@ import { isCreator, mayCreateVenue, signupMode, transferCreator } from "./lib/si
 import { changeMemberRole, listMembers, removeMember } from "./lib/members";
 import {
   deleteService,
+  hasService,
+  MAX_SERVICE_PATH_LENGTH,
   deleteTable,
   listServices,
   parseDays,
@@ -1356,6 +1358,10 @@ app.post("/v1/venues/:venueId/services", adminOnly, async (c) => {
 app.delete("/v1/venues/:venueId/services/:name", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
   const name = c.req.param("name");
+  // A very long name is a bad request, not an unknown service. One stored before the bound still deletes.
+  if (name.length > MAX_SERVICE_PATH_LENGTH && !(await hasService(db, venueId, name))) {
+    return error(c, "invalid_request");
+  }
   await deleteService(db, venueId, name);
   const services = await listServices(db, venueId);
   return c.json({ services });

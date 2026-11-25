@@ -202,6 +202,18 @@ export async function upsertService(
   return { ok: true };
 }
 
+/** Longest service name a path lookup accepts. A name stored before the bound can be longer. */
+export const MAX_SERVICE_PATH_LENGTH = 200;
+
+export async function hasService(db: Db, venueId: string, name: string): Promise<boolean> {
+  const [row] = await db
+    .select({ name: services.name })
+    .from(services)
+    .where(and(eq(services.venueId, venueId), eq(services.name, name)))
+    .limit(1);
+  return row !== undefined;
+}
+
 export async function deleteService(db: Db, venueId: string, name: string): Promise<void> {
   await db
     .delete(services)

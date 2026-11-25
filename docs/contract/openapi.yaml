@@ -940,8 +940,11 @@ paths:
         the services that remain. The name is matched exactly and must be
         URL-encoded in the path. A name that no service of the venue has, and
         a name that belongs only to another venue, change nothing and still
-        answer `200`. The call takes no body and no `Idempotency-Key`, and it
-        ignores both. Repeating it is harmless.
+        answer `200`. A name over 200 characters that the venue does not
+        store fails with `invalid_request` and changes nothing; a service
+        stored with a longer name, made before that bound, is still deleted.
+        An empty name matches no route. The call takes no body and no
+        `Idempotency-Key`, and it ignores both. Repeating it is harmless.
 
         A delete is never refused because the service is in use. Reservations
         keep the service name they were booked under, so they read back
