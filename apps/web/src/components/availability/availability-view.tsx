@@ -148,7 +148,7 @@ function ServiceSlots({
               type="button"
               variant="outline"
               onClick={() => onSelect(slot.time)}
-              className="h-10 border-primary/30 tabular-nums text-primary hover:border-primary hover:bg-accent"
+              className="h-10 coarse:h-11 border-primary/30 tabular-nums text-primary hover:border-primary hover:bg-accent"
             >
               {slot.time}
             </Button>

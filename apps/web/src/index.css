@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+/* Touch screens of any width: controls need a 44 px target, which a width breakpoint cannot tell. */
+@custom-variant coarse (@media (pointer: coarse));
 
 :root {
   /* Tells the browser which palette to use for what it draws itself: scrollbars, date and time pickers, form controls. */

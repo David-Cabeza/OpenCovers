@@ -224,7 +224,7 @@ function CardBody({
             {t("floor.card.summary", { guests: guestsText(party), table: table.name })}
           </p>
         </div>
-        <Button type="button" variant="ghost" size="icon" className="-mr-1 -mt-1 size-7 shrink-0" aria-label={t("common.close")} onClick={onClose}>
+        <Button type="button" variant="ghost" size="icon" className="-mr-1 -mt-1 size-7 coarse:size-11 shrink-0" aria-label={t("common.close")} onClick={onClose}>
           <XIcon className="size-4" />
         </Button>
       </div>

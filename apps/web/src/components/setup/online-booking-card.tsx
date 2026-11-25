@@ -474,7 +474,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     id="ob-locale"
                     value={form.locale}
                     onChange={(e) => setForm({ ...form, locale: e.target.value })}
-                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                    className="h-9 coarse:h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
                   >
                     {widgetLocales.map((l) => (
                       <option key={l} value={l}>
@@ -605,7 +605,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                           type="color"
                           value={form.theme.colors[k]}
                           onChange={(e) => setTheme({ colors: { ...form.theme.colors, [k]: e.target.value } })}
-                          className="h-8 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent"
+                          className="h-8 w-10 coarse:h-11 coarse:w-11 shrink-0 cursor-pointer rounded border border-input bg-transparent"
                         />
                         <Label htmlFor={`ob-color-${k}`} className="font-normal">
                           {t(COLOR_LABELS[k])}
@@ -644,7 +644,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                                     darkColors: { ...DEFAULT_DARK_COLORS, ...form.theme.darkColors, [k]: e.target.value },
                                   })
                                 }
-                                className="h-8 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent"
+                                className="h-8 w-10 coarse:h-11 coarse:w-11 shrink-0 cursor-pointer rounded border border-input bg-transparent"
                               />
                               <Label htmlFor={`ob-dark-color-${k}`} className="font-normal">
                                 {t("onlinebooking.dark.color", { color: t(COLOR_LABELS[k]).toLowerCase() })}
@@ -673,7 +673,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                               id="ob-dark-font"
                               value={form.theme.darkFont}
                               onChange={(e) => setTheme({ darkFont: e.target.value as Font | "" })}
-                              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                              className="h-9 coarse:h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
                             >
                               <option value="">{t("onlinebooking.sameAsLight")}</option>
                               {FONTS.map((f) => (
@@ -706,7 +706,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                         id="ob-font"
                         value={form.theme.font}
                         onChange={(e) => setTheme({ font: e.target.value as Font })}
-                        className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                        className="h-9 coarse:h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
                       >
                         {FONTS.map((f) => (
                           <option key={f} value={f}>

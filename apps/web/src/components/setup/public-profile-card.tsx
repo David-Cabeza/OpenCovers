@@ -248,7 +248,7 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
                     id="pp-price"
                     value={form.priceRange}
                     onChange={(e) => setForm({ ...form, priceRange: e.target.value })}
-                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                    className="h-9 coarse:h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
                   >
                     <option value="">{t("publicprofile.price.none")}</option>
                     {PRICE_RANGES.map((p) => (

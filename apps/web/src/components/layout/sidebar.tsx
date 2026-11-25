@@ -80,7 +80,7 @@ function NavList({
             aria-current={isActive ? "page" : undefined}
             title={collapsed ? t(item.labelKey) : undefined}
             className={cn(
-              "relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+              "relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 coarse:min-h-11 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
               collapsed && "justify-center px-0",
               isActive && "bg-accent text-accent-foreground",
             )}
@@ -139,7 +139,7 @@ export function Sidebar({
           aria-label={collapsed ? t("layout.nav.expand") : t("layout.nav.collapse")}
           aria-expanded={!collapsed}
           className={cn(
-            "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+            "flex w-full items-center gap-3 rounded-lg px-3 py-2 coarse:min-h-11 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
             collapsed && "justify-center px-0",
           )}
         >
