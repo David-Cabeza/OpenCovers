@@ -554,6 +554,8 @@ describe("F6: caps count inside the transaction", () => {
     vi.stubEnv("DEMO_MAX_API_KEYS", "1");
     await addVenueKey(db, venueId, "key-one", "agent", "read");
     await expect(addVenueKey(db, venueId, "key-two", "agent", "read")).rejects.toBeInstanceOf(DemoLimitError);
+    // A repeat of a key the venue holds is not a new one (C81).
+    await expect(addVenueKey(db, venueId, "key-one", "agent", "read")).resolves.toEqual({ ok: true });
     // blocklist
     vi.stubEnv("DEMO_MAX_BLOCKLIST", "1");
     const first = await addToBlocklist(db, blocklistKeys, venueId, v.id, { contact: "+34600000001" }, null);
