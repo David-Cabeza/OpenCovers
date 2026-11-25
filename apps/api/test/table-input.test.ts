@@ -209,6 +209,27 @@ describe("PATCH /tables/{tableId} rejects a bad body and writes nothing", () => 
   });
 });
 
+// The floor editor (apps/web floor-canvas) clamps a drag with Math.max(0, ...) and turns a table with
+// (rotation + 90) % 360, so it sends x and y from 0 and rotation 0, 90, 180 or 270. The demo template has positive
+// positions and no rotation. A negative position or a rotation of 360 or more is never a legitimate request.
+describe("PATCH /tables/{tableId} layout range matches what the floor editor sends", () => {
+  it.each([{ x: 0, y: 0 }, { x: 10000, y: 10000 }, { rotation: 0 }, { rotation: 90 }, { rotation: 180 }, { rotation: 270 }, { rotation: 359 }])(
+    "accepts %j",
+    async (layout) => {
+      expect((await send("PATCH", `${VENUE}/tables/t1`, json(layout))).status).toBe(200);
+    },
+  );
+
+  it.each([{ x: -1 }, { y: -1 }, { x: -10000 }, { rotation: -1 }, { rotation: -90 }, { rotation: 360 }, { rotation: 450 }])(
+    "refuses %j and writes nothing",
+    async (layout) => {
+      const before = await snapshot();
+      await expectRejected(await send("PATCH", `${VENUE}/tables/t1`, json(layout)), "invalid_request", 400);
+      expect(await snapshot()).toEqual(before);
+    },
+  );
+});
+
 describe("DELETE /tables/{tableId}", () => {
   it("answers 200 for an unknown id and another venue's id alike, and deletes nothing", async () => {
     const before = await snapshot();
