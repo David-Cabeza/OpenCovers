@@ -56,7 +56,7 @@ const TABLE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 export const TABLE_FIELDS = {
   id: text(64, TABLE_ID),
   name: text(80, /\S/),
-  seats: integer(1, 100),
+  seats: integer(1, 200),
   zone: optional(text(80)),
   shape: optional(oneOf(TABLE_SHAPES)),
 };
@@ -200,6 +200,18 @@ export async function upsertService(
       .onConflictDoUpdate({ target: [services.venueId, services.name], set: row });
   });
   return { ok: true };
+}
+
+/** Longest service name a path lookup accepts. A name stored before the bound can be longer. */
+export const MAX_SERVICE_PATH_LENGTH = 200;
+
+export async function hasService(db: Db, venueId: string, name: string): Promise<boolean> {
+  const [row] = await db
+    .select({ name: services.name })
+    .from(services)
+    .where(and(eq(services.venueId, venueId), eq(services.name, name)))
+    .limit(1);
+  return row !== undefined;
 }
 
 export async function deleteService(db: Db, venueId: string, name: string): Promise<void> {

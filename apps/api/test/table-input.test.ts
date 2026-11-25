@@ -56,7 +56,7 @@ describe("POST /tables rejects a bad body and writes nothing", () => {
     ["an empty body", ""],
     ["no body", undefined],
     ["seats over the int range", json({ ...valid, seats: 99999999999 })],
-    ["seats over the maximum of 100", json({ ...valid, seats: 101 })],
+    ["seats over the maximum of 200", json({ ...valid, seats: 201 })],
     ["seats in exponent form beyond the maximum", json({ ...valid, seats: 1e12 })],
     ["an empty name", json({ ...valid, name: "" })],
     ["a blank name", json({ ...valid, name: "   " })],
@@ -73,6 +73,21 @@ describe("POST /tables rejects a bad body and writes nothing", () => {
     ["an id that is a dot path segment", json({ ...valid, id: ".." })],
     ["an id with a slash", json({ ...valid, id: "a/b" })],
     ["an unknown field", json({ ...valid, posX: 40 })],
+    ["an array body", json([valid])],
+    ["a number body", "5"],
+    ["a string body", json("x")],
+    ["a missing id", json({ name: "T9", seats: 4 })],
+    ["an empty id", json({ ...valid, id: "" })],
+    ["a numeric id", json({ ...valid, id: 5 })],
+    ["a missing name", json({ id: "t9", seats: 4 })],
+    ["a numeric name", json({ ...valid, name: 3 })],
+    ["missing seats", json({ id: "t9", name: "T9" })],
+    ["seats of 0", json({ ...valid, seats: 0 })],
+    ["negative seats", json({ ...valid, seats: -1 })],
+    ["fractional seats", json({ ...valid, seats: 2.5 })],
+    ["string seats", json({ ...valid, seats: "4" })],
+    ["null seats", json({ ...valid, seats: null })],
+    ["an empty shape", json({ ...valid, shape: "" })],
   ];
 
   it.each(cases)("%s", async (_name, body) => {
@@ -94,11 +109,28 @@ describe("POST /tables still accepts what the staff app sends", () => {
       const res = await send("POST", `${VENUE}/tables`, json({ id: `s-${shape}`, name: "M", seats: 1, zone: "Sala", shape }));
       expect(res.status, shape).toBe(200);
     }
-    const edge = { id: `T_9.a-${"x".repeat(57)}`, name: "n".repeat(80), seats: 100, zone: "" };
+    const edge = { id: `T_9.a-${"x".repeat(57)}`, name: "n".repeat(80), seats: 200, zone: "" };
     const res = await send("POST", `${VENUE}/tables`, json(edge));
     expect(res.status).toBe(200);
+    // A banquet table seats more than 100.
+    expect((await send("POST", `${VENUE}/tables`, json({ id: "banquet", name: "Banquete", seats: 101 }))).status).toBe(200);
     const { tables: list } = await res.json();
     expect(list).toContainEqual({ ...edge, shape: "round", posX: 0, posY: 0, rotation: 0 });
+  });
+});
+
+describe("POST /tables, the values that stay valid", () => {
+  it("accepts short and numeric ids and the lowest and highest seat counts", async () => {
+    for (const [id, seats] of [["1", 1], ["T1", 200], ["mesa_2", 7], ["a".repeat(64), 2]] as const) {
+      expect((await send("POST", `${VENUE}/tables`, json({ id, name: "M", seats }))).status, id).toBe(200);
+    }
+  });
+
+  it("gives a zone and a shape left out the defaults, and a replace resets them", async () => {
+    await send("POST", `${VENUE}/tables`, json({ ...valid, zone: "Sala", shape: "oval" }));
+    const res = await send("POST", `${VENUE}/tables`, json(valid));
+    expect(res.status).toBe(200);
+    expect((await res.json()).tables).toContainEqual(expect.objectContaining({ id: "t9", zone: "", shape: "round" }));
   });
 });
 
@@ -120,6 +152,16 @@ describe("PATCH /tables/{tableId} rejects a bad body and writes nothing", () => 
     ["a name, which only POST sets", json({ name: "Renamed" })],
     ["seats, which only POST sets", json({ seats: 6 })],
     ["a body id", json({ id: "t2", x: 8 })],
+    ["a number body", "5"],
+    ["a string body", json("x")],
+    ["a null x", json({ x: null })],
+    ["an x of 1e999, which parses to Infinity", '{"x":1e999}'],
+    ["an x over the int range", json({ x: 99999999999 })],
+    ["a fractional y", json({ y: 0.1 })],
+    ["a y over 10000", json({ y: 10001 })],
+    ["a fractional rotation", json({ rotation: 90.5 })],
+    ["a boolean rotation", json({ rotation: true })],
+    ["a bad field next to a good one", json({ x: 40, y: "no" })],
   ];
 
   it.each(cases)("%s", async (_name, body) => {
@@ -138,6 +180,21 @@ describe("PATCH /tables/{tableId} rejects a bad body and writes nothing", () => 
     expect(await snapshot()).toEqual(before);
   });
 
+  it("answers table_not_found for an id of 300 characters, as for any unknown id", async () => {
+    const before = await snapshot();
+    await expectRejected(await send("PATCH", `${VENUE}/tables/${"a".repeat(300)}`, json({ x: 8 })), "table_not_found", 404);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("changes only the fields sent and leaves the other tables alone", async () => {
+    const res = await send("PATCH", `${VENUE}/tables/t1`, json({ rotation: 270 }));
+    expect(res.status).toBe(200);
+    const { tables: list } = await res.json();
+    expect(list).toContainEqual(expect.objectContaining({ id: "t1", posX: 16, posY: 24, rotation: 270 }));
+    const [other] = (await snapshot()).filter((t) => t.venueId === OTHER);
+    expect(other).toMatchObject({ id: "b1", posX: 8, posY: 8, rotation: 90 });
+  });
+
   it("answers venue_not_found for an unknown venue, even with the all-venues key", async () => {
     const before = await snapshot();
     await expectRejected(await send("PATCH", "ti-nowhere/tables/t1", json({ x: 8 }), ALL), "venue_not_found", 404);
@@ -152,6 +209,27 @@ describe("PATCH /tables/{tableId} rejects a bad body and writes nothing", () => 
   });
 });
 
+// The floor editor (apps/web floor-canvas) clamps a drag with Math.max(0, ...) and turns a table with
+// (rotation + 90) % 360, so it sends x and y from 0 and rotation 0, 90, 180 or 270. The demo template has positive
+// positions and no rotation. A negative position or a rotation of 360 or more is never a legitimate request.
+describe("PATCH /tables/{tableId} layout range matches what the floor editor sends", () => {
+  it.each([{ x: 0, y: 0 }, { x: 10000, y: 10000 }, { rotation: 0 }, { rotation: 90 }, { rotation: 180 }, { rotation: 270 }, { rotation: 359 }])(
+    "accepts %j",
+    async (layout) => {
+      expect((await send("PATCH", `${VENUE}/tables/t1`, json(layout))).status).toBe(200);
+    },
+  );
+
+  it.each([{ x: -1 }, { y: -1 }, { x: -10000 }, { rotation: -1 }, { rotation: -90 }, { rotation: 360 }, { rotation: 450 }])(
+    "refuses %j and writes nothing",
+    async (layout) => {
+      const before = await snapshot();
+      await expectRejected(await send("PATCH", `${VENUE}/tables/t1`, json(layout)), "invalid_request", 400);
+      expect(await snapshot()).toEqual(before);
+    },
+  );
+});
+
 describe("DELETE /tables/{tableId}", () => {
   it("answers 200 for an unknown id and another venue's id alike, and deletes nothing", async () => {
     const before = await snapshot();
@@ -161,6 +239,19 @@ describe("DELETE /tables/{tableId}", () => {
     expect(foreign.status).toBe(200);
     expect(await foreign.json()).toEqual(await unknown.json());
     expect(await snapshot()).toEqual(before);
+  });
+
+  it("answers 200 for an id of 300 characters, as for any unknown id", async () => {
+    const before = await snapshot();
+    expect((await send("DELETE", `${VENUE}/tables/${"a".repeat(300)}`)).status).toBe(200);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("deletes a known table, only in its own venue", async () => {
+    const res = await send("DELETE", `${VENUE}/tables/t1`);
+    expect(res.status).toBe(200);
+    expect((await res.json()).tables.some((t: { id: string }) => t.id === "t1")).toBe(false);
+    expect((await snapshot()).map((t) => `${t.venueId}/${t.id}`)).toEqual([`${OTHER}/b1`]);
   });
 
   it("answers venue_not_found for an unknown venue, even with the all-venues key", async () => {
