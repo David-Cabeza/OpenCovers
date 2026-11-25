@@ -1,13 +1,15 @@
 import { cn } from "cn";
 import { useT } from "@/i18n";
 import { useUiStore } from "@/stores/ui-store";
+import { useFloorSkinGate } from "./skin-gate";
 import { FLOOR_SKIN_LIST } from "./skins";
 
 // Per-user choice of how the floor plan is drawn. Stored in this browser only.
 export function FloorSkinToggle() {
   const t = useT();
-  const skin = useUiStore((s) => s.floorSkin);
+  const { showSwitch, skin } = useFloorSkinGate();
   const setSkin = useUiStore((s) => s.setFloorSkin);
+  if (!showSwitch) return null;
   return (
     <div role="group" aria-label={t("floor.skin.group")} className="inline-flex rounded-lg border bg-card p-0.5 text-sm">
       {FLOOR_SKIN_LIST.map((s) => (
