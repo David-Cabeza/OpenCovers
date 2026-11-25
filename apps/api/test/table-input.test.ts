@@ -73,6 +73,21 @@ describe("POST /tables rejects a bad body and writes nothing", () => {
     ["an id that is a dot path segment", json({ ...valid, id: ".." })],
     ["an id with a slash", json({ ...valid, id: "a/b" })],
     ["an unknown field", json({ ...valid, posX: 40 })],
+    ["an array body", json([valid])],
+    ["a number body", "5"],
+    ["a string body", json("x")],
+    ["a missing id", json({ name: "T9", seats: 4 })],
+    ["an empty id", json({ ...valid, id: "" })],
+    ["a numeric id", json({ ...valid, id: 5 })],
+    ["a missing name", json({ id: "t9", seats: 4 })],
+    ["a numeric name", json({ ...valid, name: 3 })],
+    ["missing seats", json({ id: "t9", name: "T9" })],
+    ["seats of 0", json({ ...valid, seats: 0 })],
+    ["negative seats", json({ ...valid, seats: -1 })],
+    ["fractional seats", json({ ...valid, seats: 2.5 })],
+    ["string seats", json({ ...valid, seats: "4" })],
+    ["null seats", json({ ...valid, seats: null })],
+    ["an empty shape", json({ ...valid, shape: "" })],
   ];
 
   it.each(cases)("%s", async (_name, body) => {
@@ -104,6 +119,21 @@ describe("POST /tables still accepts what the staff app sends", () => {
   });
 });
 
+describe("POST /tables, the values that stay valid", () => {
+  it("accepts short and numeric ids and the lowest and highest seat counts", async () => {
+    for (const [id, seats] of [["1", 1], ["T1", 200], ["mesa_2", 7], ["a".repeat(64), 2]] as const) {
+      expect((await send("POST", `${VENUE}/tables`, json({ id, name: "M", seats }))).status, id).toBe(200);
+    }
+  });
+
+  it("gives a zone and a shape left out the defaults, and a replace resets them", async () => {
+    await send("POST", `${VENUE}/tables`, json({ ...valid, zone: "Sala", shape: "oval" }));
+    const res = await send("POST", `${VENUE}/tables`, json(valid));
+    expect(res.status).toBe(200);
+    expect((await res.json()).tables).toContainEqual(expect.objectContaining({ id: "t9", zone: "", shape: "round" }));
+  });
+});
+
 describe("PATCH /tables/{tableId} rejects a bad body and writes nothing", () => {
   const cases: [string, string | undefined][] = [
     ["a malformed JSON body", "{not json"],
@@ -122,6 +152,16 @@ describe("PATCH /tables/{tableId} rejects a bad body and writes nothing", () => 
     ["a name, which only POST sets", json({ name: "Renamed" })],
     ["seats, which only POST sets", json({ seats: 6 })],
     ["a body id", json({ id: "t2", x: 8 })],
+    ["a number body", "5"],
+    ["a string body", json("x")],
+    ["a null x", json({ x: null })],
+    ["an x of 1e999, which parses to Infinity", '{"x":1e999}'],
+    ["an x over the int range", json({ x: 99999999999 })],
+    ["a fractional y", json({ y: 0.1 })],
+    ["a y over 10000", json({ y: 10001 })],
+    ["a fractional rotation", json({ rotation: 90.5 })],
+    ["a boolean rotation", json({ rotation: true })],
+    ["a bad field next to a good one", json({ x: 40, y: "no" })],
   ];
 
   it.each(cases)("%s", async (_name, body) => {
@@ -138,6 +178,21 @@ describe("PATCH /tables/{tableId} rejects a bad body and writes nothing", () => 
     expect(foreign.status).toBe(404);
     expect(await foreign.json()).toEqual(await unknown.json());
     expect(await snapshot()).toEqual(before);
+  });
+
+  it("answers table_not_found for an id of 300 characters, as for any unknown id", async () => {
+    const before = await snapshot();
+    await expectRejected(await send("PATCH", `${VENUE}/tables/${"a".repeat(300)}`, json({ x: 8 })), "table_not_found", 404);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("changes only the fields sent and leaves the other tables alone", async () => {
+    const res = await send("PATCH", `${VENUE}/tables/t1`, json({ rotation: 270 }));
+    expect(res.status).toBe(200);
+    const { tables: list } = await res.json();
+    expect(list).toContainEqual(expect.objectContaining({ id: "t1", posX: 16, posY: 24, rotation: 270 }));
+    const [other] = (await snapshot()).filter((t) => t.venueId === OTHER);
+    expect(other).toMatchObject({ id: "b1", posX: 8, posY: 8, rotation: 90 });
   });
 
   it("answers venue_not_found for an unknown venue, even with the all-venues key", async () => {
@@ -163,6 +218,19 @@ describe("DELETE /tables/{tableId}", () => {
     expect(foreign.status).toBe(200);
     expect(await foreign.json()).toEqual(await unknown.json());
     expect(await snapshot()).toEqual(before);
+  });
+
+  it("answers 200 for an id of 300 characters, as for any unknown id", async () => {
+    const before = await snapshot();
+    expect((await send("DELETE", `${VENUE}/tables/${"a".repeat(300)}`)).status).toBe(200);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("deletes a known table, only in its own venue", async () => {
+    const res = await send("DELETE", `${VENUE}/tables/t1`);
+    expect(res.status).toBe(200);
+    expect((await res.json()).tables.some((t: { id: string }) => t.id === "t1")).toBe(false);
+    expect((await snapshot()).map((t) => `${t.venueId}/${t.id}`)).toEqual([`${OTHER}/b1`]);
   });
 
   it("answers venue_not_found for an unknown venue, even with the all-venues key", async () => {
