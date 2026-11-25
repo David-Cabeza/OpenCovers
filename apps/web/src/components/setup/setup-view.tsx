@@ -264,7 +264,7 @@ function TablesSection({ venueId }: { venueId: string }) {
     <Card>
       <CardHeader className="flex items-center justify-between gap-4">
         <div>
-          <CardTitle>{t("setup.tables.title")}</CardTitle>
+          <CardTitle as="h3">{t("setup.tables.title")}</CardTitle>
           <CardDescription>{t("setup.tables.description")}</CardDescription>
         </div>
         <Button
@@ -354,7 +354,7 @@ function ServicesSection({ venueId }: { venueId: string }) {
     <Card id="settings-services" className="scroll-mt-32">
       <CardHeader className="flex items-center justify-between gap-4">
         <div>
-          <CardTitle>{t("setup.services.title")}</CardTitle>
+          <CardTitle as="h3">{t("setup.services.title")}</CardTitle>
           <CardDescription>{t("setup.services.description")}</CardDescription>
         </div>
         <Button

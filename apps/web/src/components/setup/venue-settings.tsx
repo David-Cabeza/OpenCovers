@@ -94,7 +94,7 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("setup.venue.title")}</CardTitle>
+        <CardTitle as="h3">{t("setup.venue.title")}</CardTitle>
         <CardDescription>{t("setup.venue.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

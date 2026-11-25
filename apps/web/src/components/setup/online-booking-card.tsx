@@ -350,7 +350,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("onlinebooking.title")}</CardTitle>
+        <CardTitle as="h3">{t("onlinebooking.title")}</CardTitle>
         <CardDescription>{t("onlinebooking.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -773,7 +773,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
 
 
             <div className="space-y-4 border-t pt-6">
-              <h3 className="font-display text-lg">{t("onlinebooking.embed.title")}</h3>
+              <h4 className="font-display text-lg">{t("onlinebooking.embed.title")}</h4>
               {key ? (
                 <div className="space-y-2">
                   <Label htmlFor="ob-key">{t("onlinebooking.key.label")}</Label>

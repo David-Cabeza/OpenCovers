@@ -27,9 +27,16 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+type HeadingLevel = "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
+
+/** A heading, so screen readers can jump to it. `as` is the level; settings cards sit under an h2 and pass "h3". */
+function CardTitle({
+  as: Heading = "h2",
+  className,
+  ...props
+}: React.ComponentProps<"h2"> & { as?: HeadingLevel }) {
   return (
-    <div
+    <Heading
       data-slot="card-title"
       className={cn("leading-none font-semibold", className)}
       {...props}

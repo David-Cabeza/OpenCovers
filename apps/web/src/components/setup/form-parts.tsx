@@ -18,7 +18,7 @@ export function Group({
   return (
     <section className="space-y-3">
       <div>
-        <h3 className="font-display text-lg">{title}</h3>
+        <h4 className="font-display text-lg">{title}</h4>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
       {children}

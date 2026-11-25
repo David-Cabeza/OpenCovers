@@ -45,7 +45,7 @@ export function ApiKeysCard({ venueId }: { venueId: string }) {
     <Card>
       <CardHeader className="flex items-center justify-between gap-4">
         <div>
-          <CardTitle>{t("setup.keys.title")}</CardTitle>
+          <CardTitle as="h3">{t("setup.keys.title")}</CardTitle>
           <CardDescription>{t("setup.keys.description")}</CardDescription>
         </div>
         <Button size="sm" onClick={() => setOpen(true)}>

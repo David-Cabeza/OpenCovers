@@ -100,7 +100,7 @@ export function BookingPolicyCard({ venueId, role }: { venueId: string; role?: R
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("setup.policy.title")}</CardTitle>
+        <CardTitle as="h3">{t("setup.policy.title")}</CardTitle>
         <CardDescription>{t("setup.policy.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
