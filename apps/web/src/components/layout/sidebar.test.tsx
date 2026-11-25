@@ -34,4 +34,9 @@ describe("MobileNav", () => {
     expect(onSelect).toHaveBeenCalledWith("waitlist");
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("names the drawer after the product", async () => {
+    renderWithApp(<MobileNav open onOpenChange={() => {}} active="agenda" onSelect={() => {}} />);
+    expect(await screen.findByRole("dialog", { name: "OpenCovers" })).toBeInTheDocument();
+  });
 });
