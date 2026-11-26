@@ -4,21 +4,28 @@ import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { InviteGate } from "@/components/auth/invite-screen";
 import { Dashboard } from "@/components/dashboard";
+import { isAppPath, NotFound } from "@/components/not-found";
 import { authClient } from "@/lib/auth-client";
 import { takeInviteToken } from "@/lib/invite-link";
 
 export default function App({ inviteToken = null }: { inviteToken?: string | null }) {
   const { data: session, isPending, error, refetch } = authClient.useSession();
   const [token, setToken] = useState(inviteToken);
+  // An invitation opens from any path, as it always has.
+  const [unknownPath, setUnknownPath] = useState(() => !inviteToken && !isAppPath(window.location.pathname));
 
   useEffect(() => {
     const onHashChange = () => {
       const next = takeInviteToken();
-      if (next) setToken(next);
+      if (!next) return;
+      setToken(next);
+      setUnknownPath(false);
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  if (unknownPath) return <NotFound />;
 
   if (isPending) {
     return (

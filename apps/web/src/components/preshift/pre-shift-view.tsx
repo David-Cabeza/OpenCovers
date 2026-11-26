@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ClipboardListIcon, MessageSquareTextIcon, PrinterIcon, StarIcon, UsersIcon } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
+import { DietarySummary } from "@/components/dietary/dietary-summary";
 import { DayNav } from "@/components/day-nav";
 import { EmptyState } from "@/components/empty-state";
 import { LoadError } from "@/components/load-error";
@@ -213,6 +214,12 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
           )}
         </div>
       </div>
+      {reservation.dietary && (
+        <DietarySummary
+          dietary={reservation.dietary}
+          className="col-span-2 @[53rem]:col-span-4 @[53rem]:col-start-2 print:col-span-4 print:col-start-2"
+        />
+      )}
     </li>
   );
 }

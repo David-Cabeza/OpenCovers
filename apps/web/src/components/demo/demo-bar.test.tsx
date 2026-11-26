@@ -139,6 +139,16 @@ describe("the demo bar", () => {
     expect(screen.getByRole("link", { name: /Cliente/ })).toBeInTheDocument();
   });
 
+  it("carries a short tour title for phones, in both languages", () => {
+    search([]);
+    const english = renderWithApp(<DemoBar status={status} />);
+    expect(screen.getByText("Tour 0/4")).toBeInTheDocument();
+    english.unmount();
+    useUiStore.setState({ locale: "es" });
+    renderWithApp(<DemoBar status={status} />);
+    expect(screen.getByText("Guía 0/4")).toBeInTheDocument();
+  });
+
   it("works when the browser refuses storage", async () => {
     search([]);
     const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {

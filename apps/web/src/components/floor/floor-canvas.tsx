@@ -1,14 +1,16 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { MaximizeIcon, MinimizeIcon, RotateCwIcon } from "lucide-react";
+import { MaximizeIcon, MinimizeIcon, RotateCwIcon, TriangleAlertIcon, UtensilsIcon } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n";
+import { isAllergyRisk, type Dietary } from "@/lib/dietary";
 import { FloorTableCard } from "./floor-table-card";
 import { FloorItemShape } from "./floor-item-shape";
 import { guestsText } from "./guests-text";
 import { useFloorSkinGate } from "./skin-gate";
 import { FLOOR_SKINS } from "./skins";
 import { arrowMove, SNAP } from "./floor-keys";
+import { fitTableLabel, isShallow, TEXT_PX } from "./table-label";
 
 export interface CanvasTable {
   id: string;
@@ -22,6 +24,7 @@ export interface CanvasTable {
   reservationId?: string;
   partySize?: number;
   guestName?: string;
+  dietary?: Dietary;
 }
 
 export interface CanvasItem {
@@ -69,26 +72,6 @@ function tableSize(shape: string | undefined, seats: number): { w: number; h: nu
   if (shape === "oval") return { w: Math.min(56 + seats * 4, 96), h: 44 };
   const d = Math.min(46 + seats * 3, 60);
   return { w: d, h: d };
-}
-
-/**
- * The room a label drawn upright has on a table: the table's width when it lies flat, its depth when it stands on end,
- * and in between the chord a horizontal line makes across the turned table.
- */
-function labelRoom(size: { w: number; h: number }, rotation: number): number {
-  const across = Math.abs(Math.sin((rotation * Math.PI) / 180));
-  return Math.min(size.w, across < 0.001 ? size.w : size.h / across) - 6;
-}
-
-/** The width a line of text can take on a table. A round or oval top is narrower away from its middle line. */
-function textRoom(shape: string, size: { w: number; h: number }, rotation: number, lines: number): number {
-  if (shape === "round") {
-    const r = size.w / 2 - 2;
-    const reach = Math.min(lines * 5, r - 4);
-    return Math.floor(2 * Math.sqrt(r * r - reach * reach)) - 2;
-  }
-  if (shape === "oval") return Math.floor(labelRoom(size, rotation) * (lines > 2 ? 0.7 : 0.8));
-  return labelRoom(size, rotation);
 }
 
 const CHAIR_GAP = 8;
@@ -337,8 +320,8 @@ export function FloorCanvas({
   const scaled = scale < 1;
   // The handles keep their size on screen when the plan is shrunk, so their tap area stays 44 px.
   const handleStyle = scaled ? { scale: 1 / scale } : undefined;
-  // Table text keeps at least 11 px drawn, scaled plan or not; the plan geometry does not change.
-  const drawn = (px: number) => ({ fontSize: Math.max(px, 11 / Math.min(scale, 1)) });
+  // Table text is drawn at 11 px, scaled plan or not; the plan geometry does not change.
+  const textStyle = { fontSize: TEXT_PX / scale };
 
   useEffect(updateMore, [frameWidth, naturalWidth, scale]);
 
@@ -436,12 +419,20 @@ export function FloorCanvas({
           const shape = shapeOf(t.shape);
           const size = tableSize(shape, t.seats);
           const rotation = t.rotation ?? 0;
-          // A long or oval table is shallow: its name gets one line, and the guest and the party size share the next.
-          const shallow = shape === "long" || shape === "oval";
-          const nameLines = t.occupied || shallow ? 1 : 2;
-          const room = textRoom(shape, size, rotation, t.occupied && !shallow && t.guestName ? 3 : 2);
           const movableInView = mode === "view" && t.occupied;
           const seatable = mode === "view" && !t.occupied;
+          const shallow = isShallow(shape);
+          const pax = tr("floor.table.pax", { party: t.partySize ?? "?" });
+          const label = fitTableLabel(
+            { shape, ...size, rotation, scale },
+            {
+              name: t.name,
+              guest: t.guestName,
+              count: t.occupied ? pax : String(t.seats),
+              occupied: Boolean(t.occupied),
+            },
+          );
+          const written = label.name?.text === t.name;
           return (
             <FloorTableCard key={t.id} venueId={venueId} table={t} tableNames={tableNames} enabled={Boolean(movableInView)} onMoveRequest={onMoveRequest ? () => onMoveRequest(t.id) : undefined}>
             <div
@@ -454,6 +445,7 @@ export function FloorCanvas({
               tabIndex={seatable || movableInView || mode === "edit" ? 0 : undefined}
               aria-describedby={mode === "edit" ? keysHintId : undefined}
               // A free table is named by its own text, so the name always contains what is drawn on it.
+              // The mark's words follow the table's name, which keeps the drawn text first (WCAG 2.5.3).
               aria-label={
                 seatable
                   ? undefined
@@ -463,7 +455,7 @@ export function FloorCanvas({
                         guest: t.guestName ? `${t.guestName} ` : "",
                         pax: tr("floor.table.pax", { party: t.partySize ?? "?" }),
                         guests: guestsText(t.partySize),
-                      })
+                      }) + (t.dietary ? `. ${tr(isAllergyRisk(t.dietary) ? "dietary.floor.allergy" : "dietary.floor.diet")}` : "")
                     : mode === "edit"
                       ? t.name
                       : undefined
@@ -554,41 +546,46 @@ export function FloorCanvas({
                     className="flex flex-col items-center justify-center"
                     style={{ transform: `rotate(${-rotation}deg)` }}
                   >
-                    <span
-                      // The name is drawn upright, so on a turned table it has only the room a level line has across
-                      // it. A name that does not fit is cut with an ellipsis and stays whole in the tooltip.
-                      title={t.name}
-                      className={cn(
-                        "font-semibold leading-tight",
-                        t.name.length > 12 ? "text-[9px]" : t.name.length > 7 ? "text-[10px]" : "text-[11px]",
-                        nameLines === 1 ? "block truncate" : "line-clamp-2 overflow-visible text-balance [overflow-wrap:normal]",
-                      )}
-                      style={{ maxWidth: room, ...drawn(t.name.length > 12 ? 9 : t.name.length > 7 ? 10 : 11) }}
-                    >
-                      {t.name}
-                    </span>
+                    {/* The name is drawn upright, so on a turned table it has only the room a level line has across
+                        it. The whole name stays in the tooltip and is what a screen reader hears. */}
+                    {label.name && (
+                      <span
+                        title={t.name}
+                        aria-hidden={written ? undefined : true}
+                        className={cn(
+                          "font-semibold leading-tight",
+                          label.name.lines === 1 ? "block truncate" : "line-clamp-2 text-balance [overflow-wrap:normal]",
+                        )}
+                        style={{ maxWidth: label.name.maxWidth, ...textStyle }}
+                      >
+                        {label.name.text}
+                      </span>
+                    )}
+                    {!written && <span className="sr-only">{t.name}</span>}
                     {/* Blank text between the drawn parts is not rendered in a flex box, but it makes the drawn text read
                         "Mesa 6 Ana 4 pax", the start of the accessible name (WCAG 2.5.3). */}
                     {t.occupied && " "}
                     {t.occupied ? (
-                      <span
-                        className={cn(
-                          "flex max-w-full text-[10px] leading-tight",
-                          shallow ? "items-baseline justify-center gap-1" : "flex-col items-center",
-                        )}
-                        style={{ maxWidth: shallow ? room - 4 : room, ...drawn(10) }}
-                      >
-                        {t.guestName && <span className="max-w-full truncate font-medium">{t.guestName}</span>}
-                        {" "}
-                        <span className="shrink-0 whitespace-nowrap">
-                          {tr("floor.table.pax", { party: t.partySize ?? "?" })}
+                      label.count && (
+                        <span
+                          className={cn(
+                            "flex max-w-full leading-tight",
+                            shallow ? "items-baseline justify-center gap-1" : "flex-col items-center",
+                          )}
+                          style={{ maxWidth: label.detailWidth, ...textStyle }}
+                        >
+                          {label.guest && <span className="max-w-full truncate font-medium">{t.guestName}</span>}
+                          {" "}
+                          <span className="shrink-0 whitespace-nowrap">{pax}</span>
                         </span>
-                      </span>
+                      )
                     ) : (
                       <>
-                        <span aria-hidden="true" className="text-[10px] font-medium" style={drawn(10)}>
-                          {t.seats}
-                        </span>
+                        {label.count && (
+                          <span aria-hidden="true" className="font-medium leading-tight" style={textStyle}>
+                            {t.seats}
+                          </span>
+                        )}
                         {seatable && (
                           <span className="sr-only">
                             {tr("floor.table.seatable", { seats: tr("common.seats", { count: t.seats }) })}
@@ -599,6 +596,7 @@ export function FloorCanvas({
                   </div>
                 </div>
               </div>
+              {mode === "view" && t.occupied && t.dietary && <DietaryMark dietary={t.dietary} />}
               {mode === "edit" && (
                 <button
                   type="button"
@@ -648,5 +646,23 @@ export function FloorCanvas({
         </div>
       )}
     </div>
+  );
+}
+
+/** A mark on a table whose booking has allergies or a diet recorded. The table's card says which. */
+function DietaryMark({ dietary }: { dietary: Dietary }) {
+  const risk = isAllergyRisk(dietary);
+  const Icon = risk ? TriangleAlertIcon : UtensilsIcon;
+  return (
+    <span
+      aria-hidden="true"
+      data-slot="dietary-mark"
+      className={cn(
+        "pointer-events-none absolute -top-1 -right-1 z-10 flex size-7 items-center justify-center rounded-full border-2 shadow-sm",
+        risk ? "border-card bg-destructive text-background" : "border-foreground bg-card text-foreground",
+      )}
+    >
+      <Icon className="size-4" />
+    </span>
   );
 }

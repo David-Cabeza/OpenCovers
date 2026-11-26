@@ -4,6 +4,7 @@ export default defineMessages({
   en: {
     "agenda.title": "Agenda",
     "agenda.walkIn": "Walk-in",
+    "agenda.pastDay": "You can't book a past day",
     "agenda.loadWhat": "the agenda",
     "agenda.empty.title": "No reservations",
     "agenda.empty.description": "Nothing booked for this day yet.",
@@ -27,6 +28,7 @@ export default defineMessages({
     "agenda.changeTables": "Change tables",
     "agenda.assignTables": "Assign tables",
     "agenda.editDetails": "Edit consent, rating and note",
+    "agenda.editDetailsDietary": "Edit allergies, consent, rating and note",
     "agenda.viewTrace": "View trace",
     "agenda.online": "Online",
     "agenda.unassigned": "Unassigned",
@@ -38,6 +40,7 @@ export default defineMessages({
   es: {
     "agenda.title": "Agenda",
     "agenda.walkIn": "Cliente sin reserva",
+    "agenda.pastDay": "No se puede reservar en un día pasado",
     "agenda.loadWhat": "la agenda",
     "agenda.empty.title": "Sin reservas",
     "agenda.empty.description": "Aún no hay nada reservado para este día.",
@@ -61,6 +64,7 @@ export default defineMessages({
     "agenda.changeTables": "Cambiar mesas",
     "agenda.assignTables": "Asignar mesas",
     "agenda.editDetails": "Editar consentimiento, valoración y nota",
+    "agenda.editDetailsDietary": "Editar alergias, consentimiento, valoración y nota",
     "agenda.viewTrace": "Ver traza",
     "agenda.online": "En línea",
     "agenda.unassigned": "Sin asignar",
