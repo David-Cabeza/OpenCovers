@@ -29,6 +29,9 @@ export default defineMessages({
     "layout.serverBanner.message":
       "Can't reach the server. What you see may be out of date, and changes will not be saved until it comes back. Trying again every few seconds.",
     "layout.confirm.keep": "Keep",
+    "layout.notFound.title": "Page not found",
+    "layout.notFound.description": "There is nothing at this address.",
+    "layout.notFound.action": "Go to the agenda",
   },
   es: {
     "layout.nav.agenda": "Agenda",
@@ -58,5 +61,8 @@ export default defineMessages({
     "layout.serverBanner.message":
       "No se puede conectar con el servidor. Lo que ves puede estar desactualizado y los cambios no se guardarán hasta que vuelva. Lo intentamos de nuevo cada pocos segundos.",
     "layout.confirm.keep": "Conservar",
+    "layout.notFound.title": "Página no encontrada",
+    "layout.notFound.description": "No hay nada en esta dirección.",
+    "layout.notFound.action": "Ir a la agenda",
   },
 });

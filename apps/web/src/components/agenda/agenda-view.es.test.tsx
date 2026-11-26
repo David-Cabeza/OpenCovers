@@ -51,4 +51,18 @@ describe("AgendaView in Spanish", () => {
     expect(screen.queryByText("Booked")).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Seat" })).not.toBeInTheDocument();
   });
+
+  it("says in Spanish why a past day takes no new booking", () => {
+    window.history.replaceState(null, "", "/?date=2020-01-01");
+    mockApi({
+      "GET /v1/venues/v1/agenda": { body: { reservations: [] } },
+      "GET /v1/venues/v1/tables": { body: { tables: [] } },
+    });
+    renderWithApp(<AgendaView venueId="v1" />);
+
+    expect(screen.getByRole("button", { name: "Nueva reserva" })).toHaveAccessibleDescription(
+      "No se puede reservar en un día pasado",
+    );
+    window.history.replaceState(null, "", "/");
+  });
 });
