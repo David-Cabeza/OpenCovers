@@ -85,10 +85,10 @@ describe("the demo bar", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(4);
   });
 
-  it("names the time of the full evening, and the table to try", () => {
+  it("names the time of the full evening, and keeps the table on Automatic", () => {
     search([]);
     renderWithApp(<DemoBar status={status} />);
-    expect(screen.getByText(/Tomorrow at 21:00 no table is left.*pick Table 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Tomorrow at 21:00 no table is left.*keep the table on Automatic/)).toBeInTheDocument();
   });
 
   it("does not count a booking staff made as the diner's", async () => {
