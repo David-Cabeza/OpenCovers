@@ -152,7 +152,7 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
     <li
       data-slot="preshift-row"
       className={cn(
-        "grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-l-4 border-l-transparent px-4 py-3 @[53rem]:grid-cols-[4rem_minmax(0,13rem)_9rem_8rem_minmax(0,1fr)] @[53rem]:items-start @[53rem]:gap-x-4 print:grid-cols-[4rem_minmax(0,13rem)_9rem_8rem_minmax(0,1fr)] print:items-start print:gap-x-4 print:break-inside-avoid print:py-2",
+        "grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-l-4 border-l-transparent px-4 py-3 @[53rem]:grid-cols-[4rem_minmax(0,13rem)_9rem_8rem_minmax(0,1fr)] @[53rem]:items-start @[53rem]:gap-x-4 print:grid-cols-[3.5rem_minmax(0,1fr)_7rem_6rem_12rem] print:items-start print:gap-x-3 print:break-inside-avoid print:py-2",
         large && "border-l-warning",
       )}
     >
@@ -186,7 +186,7 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
         </div>
         <div className="flex min-w-0 flex-col gap-2 md:basis-auto">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 print:flex-nowrap">
+            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
               <span className="text-xs text-muted-foreground">{t("preshift.consent")}</span>
               <Pill tone={reservation.guest.consent === "granted" ? "success" : "muted"}>
                 {t(`common.consent.${reservation.guest.consent ?? "unknown"}`)}
