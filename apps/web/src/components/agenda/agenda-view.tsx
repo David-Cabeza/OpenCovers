@@ -14,6 +14,9 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Stat } from "@/components/stat";
 import { StatusBadge, statusLabel } from "./status-badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DietarySummary } from "@/components/dietary/dietary-summary";
+import { canEditSetup, useNavigation } from "@/components/layout/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +35,7 @@ import { EmptyState } from "@/components/empty-state";
 import { LoadError } from "@/components/load-error";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useAvailability } from "@/hooks/use-availability";
+import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
 import { useTables } from "@/hooks/use-tables";
 import { useT, type MessageKey } from "@/i18n";
 import { api, type Reservation } from "@/lib/api";
@@ -88,6 +92,10 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const [assigning, setAssigning] = useState<Reservation | null>(null);
   const [cancelling, setCancelling] = useState<Reservation | null>(null);
   const [tracing, setTracing] = useState<Reservation | null>(null);
+  const [withdrawing, setWithdrawing] = useState<Reservation | null>(null);
+  const canRecordDietary = useCanRecordDietary(venueId);
+  // Deleting a recorded value needs no config: the server sends one only while it takes them.
+  const canWrite = canEditSetup(useNavigation()?.role);
   const queryClient = useQueryClient();
   const { data, isPending, isError, error, isRefetching, refetch } = useAgenda(venueId, date);
   const reservations = data?.reservations ?? [];
@@ -136,6 +144,18 @@ export function AgendaView({ venueId }: { venueId: string }) {
       }
       toast.error(errorMessage(err, t("agenda.updateFailed")));
     },
+  });
+
+  // A body of `dietary: null` alone, which the engine takes on every status, so a withdrawal always works.
+  const withdraw = useMutation({
+    mutationFn: (id: string) => api.modifyReservation(venueId, id, { dietary: null }),
+    onSuccess: () => {
+      toast.success(t("dietary.deleted"));
+      invalidate();
+      void queryClient.invalidateQueries({ queryKey: ["reservation", venueId] });
+      setWithdrawing(null);
+    },
+    onError: (err) => toast.error(errorMessage(err, t("dietary.deleteFailed"))),
   });
 
   const active = reservations.filter((r) => ["booked", "seated", "attended"].includes(r.status));
@@ -208,6 +228,8 @@ export function AgendaView({ venueId }: { venueId: string }) {
                     onStatus={(status) => setStatus.mutate({ id: r.id, status })}
                     onEdit={() => setEditing(r)}
                     onTrace={() => setTracing(r)}
+                    editLabelKey={canRecordDietary ? "agenda.editDetailsDietary" : "agenda.editDetails"}
+                    onWithdraw={canWrite && r.dietary ? () => setWithdrawing(r) : undefined}
                   />
                 ))}
               </ul>
@@ -246,6 +268,18 @@ export function AgendaView({ venueId }: { venueId: string }) {
           if (!open) setEditing(null);
         }}
       />
+      <ConfirmDialog
+        open={withdrawing !== null}
+        title={t("dietary.deleteTitle")}
+        description={t("dietary.deleteDescription", {
+          time: withdrawing?.time ?? "",
+          name: withdrawing?.guest.name || t("agenda.rowGuestless"),
+        })}
+        confirmLabel={t("dietary.delete")}
+        pending={withdraw.isPending}
+        onConfirm={() => withdrawing && withdraw.mutate(withdrawing.id)}
+        onClose={() => setWithdrawing(null)}
+      />
       <ReservationTraceDialog
         venueId={venueId}
         reservation={tracing}
@@ -265,6 +299,8 @@ function ReservationRow({
   onStatus,
   onEdit,
   onTrace,
+  editLabelKey,
+  onWithdraw,
 }: {
   reservation: Reservation;
   tableNames: Map<string, string>;
@@ -273,6 +309,9 @@ function ReservationRow({
   onStatus: (status: string) => void;
   onEdit: () => void;
   onTrace: () => void;
+  editLabelKey: MessageKey;
+  /** Absent when there is nothing recorded to delete, or the role cannot write. */
+  onWithdraw?: () => void;
 }) {
   const t = useT();
   const actions = rowActions(reservation.status);
@@ -329,9 +368,14 @@ function ReservationRow({
               </DropdownMenuItem>
             )}
             {canEdit && (
-              <DropdownMenuItem onSelect={onEdit}>{t("agenda.editDetails")}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onEdit}>{t(editLabelKey)}</DropdownMenuItem>
             )}
             <DropdownMenuItem onSelect={onTrace}>{t("agenda.viewTrace")}</DropdownMenuItem>
+            {onWithdraw && (
+              <DropdownMenuItem variant="destructive" onSelect={onWithdraw}>
+                {t("dietary.delete")}
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -354,6 +398,10 @@ function ReservationRow({
         </span>
         <StatusBadge status={reservation.status} />
       </div>
+      {reservation.dietary && (
+        // Last in the row, after the menu that `md:order-last` moves to the end of the first line.
+        <DietarySummary dietary={reservation.dietary} className="order-last col-span-3 md:col-span-5 md:col-start-2" />
+      )}
     </li>
   );
 }
