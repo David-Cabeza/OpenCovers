@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 import type { Joined, PublicApi, PublicConfig, PublicDay, PublicWaitlistEntry, Result, WaitlistApi } from "../src/api";
-import { addDays, formatDate, todayLocal } from "../src/dates";
+import { addDays, formatDate, formatWeekdayShort, todayLocal } from "../src/dates";
 import { CATALOGS, translator } from "../src/messages";
 import { WaitlistJoin } from "../src/WaitlistJoin";
 import { WaitlistPage } from "../src/WaitlistPage";
@@ -223,7 +223,7 @@ function app(options: { enabled?: boolean; fullOffset?: number; join?: () => Pro
 
 // The form opens on the first available day, so the guest picks the full chip.
 const pickFull = async (user: ReturnType<typeof userEvent.setup>) =>
-  user.click(await screen.findByRole("button", { name: t("strip.dayFull", { date: formatDate(today, "en") }) }));
+  user.click(await screen.findByRole("button", { name: `${formatWeekdayShort(today, "en")} ${Number(today.slice(8))}, ${t("strip.dayFull", { date: formatDate(today, "en") })}` }));
 
 describe("the waitlist in the booking form", () => {
   it("offers the waitlist on a full day when the venue turned it on", async () => {

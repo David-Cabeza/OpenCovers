@@ -57,7 +57,7 @@ describe("FloorTableCard", () => {
 
   it("opens on hover for an occupied table and fetches that reservation", async () => {
     const { api, user } = setup([OCCUPIED]);
-    const node = await screen.findByLabelText("Table 1: Ana, 4 guests");
+    const node = await screen.findByLabelText("Table 1 Ana 4 pax, 4 guests");
     expect(api.calls("GET", "/v1/venues/v1/reservations/r1")).toHaveLength(0);
     await user.hover(node);
     const card = await screen.findByRole("dialog", { name: "Reservation for Ana" });
@@ -73,7 +73,7 @@ describe("FloorTableCard", () => {
 
   it("opens on keyboard focus and Enter moves focus into the card", async () => {
     const { user } = setup([OCCUPIED]);
-    const node = await screen.findByLabelText("Table 1: Ana, 4 guests");
+    const node = await screen.findByLabelText("Table 1 Ana 4 pax, 4 guests");
     act(() => node.focus());
     expect(node).toHaveFocus();
     const card = await screen.findByRole("dialog");
@@ -87,7 +87,7 @@ describe("FloorTableCard", () => {
 
   it("opens on tap for touch and closes with the close button", async () => {
     setup([OCCUPIED]);
-    const node = await screen.findByLabelText("Table 1: Ana, 4 guests");
+    const node = await screen.findByLabelText("Table 1 Ana 4 pax, 4 guests");
     fireEvent.pointerDown(node, { pointerType: "touch" });
     fireEvent.click(node);
     await screen.findByRole("dialog");
@@ -107,7 +107,7 @@ describe("FloorTableCard", () => {
 
   it("closes when a drag starts and does not reopen while dragging", async () => {
     const { user } = setup([OCCUPIED]);
-    const node = await screen.findByLabelText("Table 1: Ana, 4 guests");
+    const node = await screen.findByLabelText("Table 1 Ana 4 pax, 4 guests");
     await user.hover(node);
     await screen.findByRole("dialog");
     fireEvent.dragStart(node, { dataTransfer: { setData() {}, effectAllowed: "" } });
@@ -131,7 +131,7 @@ describe("FloorTableCard", () => {
       String(input).includes("/reservations/r1") ? new Promise<Response>(() => {}) : base(input, init),
     );
     renderWithApp(<FloorView venueId="v1" />);
-    const node = await screen.findByLabelText("Table 1: Ana, 4 guests");
+    const node = await screen.findByLabelText("Table 1 Ana 4 pax, 4 guests");
     await userEvent.setup().hover(node);
     const card = await screen.findByRole("dialog");
     expect(card).toHaveTextContent("Ana");
@@ -141,7 +141,7 @@ describe("FloorTableCard", () => {
 
   it("shows a one-line error when the reservation cannot be loaded", async () => {
     const { user } = setup([OCCUPIED], { status: 500, body: { code: "error" } });
-    const node = await screen.findByLabelText("Table 1: Ana, 4 guests");
+    const node = await screen.findByLabelText("Table 1 Ana 4 pax, 4 guests");
     await user.hover(node);
     expect(await screen.findByText("Could not load the reservation.")).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toHaveTextContent("Ana");

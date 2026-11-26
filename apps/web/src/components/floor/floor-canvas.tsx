@@ -420,7 +420,8 @@ export function FloorCanvas({
                   : mode === "view"
                     ? tr("floor.table.occupiedLabel", {
                         name: t.name,
-                        guest: t.guestName || tr("floor.table.reserved"),
+                        guest: t.guestName ? `${t.guestName} ` : "",
+                        pax: tr("floor.table.pax", { party: t.partySize ?? "?" }),
                         guests: guestsText(t.partySize),
                       })
                     : undefined
@@ -522,6 +523,9 @@ export function FloorCanvas({
                     >
                       {t.name}
                     </span>
+                    {/* Blank text between the drawn parts is not rendered in a flex box, but it makes the drawn text read
+                        "Mesa 6 Ana 4 pax", the start of the accessible name (WCAG 2.5.3). */}
+                    {t.occupied && " "}
                     {t.occupied ? (
                       <span
                         className={cn(
@@ -531,6 +535,7 @@ export function FloorCanvas({
                         style={{ maxWidth: shallow ? room - 4 : room }}
                       >
                         {t.guestName && <span className="max-w-full truncate font-medium">{t.guestName}</span>}
+                        {" "}
                         <span className="shrink-0 whitespace-nowrap">
                           {tr("floor.table.pax", { party: t.partySize ?? "?" })}
                         </span>
