@@ -27,6 +27,14 @@ info:
     trusted origin of the instance, and with `invalid_request` when its
     body is not `application/json`.
 
+    The staff reservation and waitlist writes take only the fields their
+    request schema lists (C94). An unknown field, a wrong type, a number
+    out of range, a body that is not a JSON object, malformed JSON or a
+    missing body fails with `invalid_request` and writes nothing, and the
+    error names the fields in `details.fields`. This holds for what a
+    client sends. Responses can gain fields, so a client ignores the ones
+    it does not know.
+
     Paths are relative to `/v1`, except `/w/embed.js`, `/w/{bookingKey}`
     and `/r`, which are served at the root of the widget origin.
 
@@ -411,6 +419,7 @@ paths:
 
         The key behaves as in a create. A repeat of the key returns the first
         reservation and writes nothing, even when the other arguments differ.
+        The body of the repeat still passes the checks of C94 first.
         A walk-in and a create share one key space, so the key of a create of
         the same venue returns that reservation. A key used for a modify, a
         cancel, a status change or a seat from the waitlist fails with
@@ -533,7 +542,8 @@ paths:
         without tables fails with `table_required`. A table that another
         booking holds fails with `slot_taken`. A table id that is not a table
         of the venue, or a repeated id, fails with `invalid_request`, as on
-        create.
+        create. A modify does not move a booking: `date`, `time` and `zone`
+        may only repeat its current values (C94).
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/reservationId"
@@ -560,6 +570,12 @@ paths:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/reservationId"
         - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: false
+        description: This write takes no field (C94). Send no body, or `{}`.
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NoFields" }
       responses:
         "200":
           description: The cancelled reservation
@@ -591,6 +607,7 @@ paths:
             schema:
               type: object
               required: [status]
+              additionalProperties: false
               properties:
                 status:
                   type: string
@@ -658,14 +675,11 @@ paths:
             schema:
               type: object
               required: [partySize]
+              additionalProperties: false
               properties:
-                partySize: { type: integer, minimum: 1 }
+                partySize: { type: integer, minimum: 1, maximum: 10000 }
                 zone: { type: string }
-                guest:
-                  type: object
-                  properties:
-                    name: { type: string }
-                    contact: { type: string }
+                guest: { $ref: "#/components/schemas/WaitlistGuestInput" }
       responses:
         "201":
           description: The waiting entries, the new one included
@@ -696,6 +710,12 @@ paths:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/entryId"
         - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: false
+        description: This write takes no field (C94). Send no body, or `{}`.
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NoFields" }
       responses:
         "200":
           description: The new reservation
@@ -723,6 +743,12 @@ paths:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/entryId"
         - $ref: "#/components/parameters/optionalIdempotencyKey"
+      requestBody:
+        required: false
+        description: This write takes no field (C94). Send no body, or `{}`.
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NoFields" }
       responses:
         "200":
           description: The waiting entries
@@ -4233,9 +4259,42 @@ components:
 
     GuestModify:
       type: object
+      additionalProperties: false
+      description: The name and the contact of a booking do not change on a modify.
       properties:
         consent:
           $ref: "#/components/schemas/Consent"
+
+    GuestInput:
+      type: object
+      additionalProperties: false
+      description: |
+        The guest of a create or walk-in. Each field is optional. The other
+        fields of `Guest` are set by the engine and fail here (C94).
+      properties:
+        name:
+          type: string
+        contact:
+          type: string
+          maxLength: 254
+          description: An email or a phone with its country code.
+        consent:
+          $ref: "#/components/schemas/Consent"
+
+    WaitlistGuestInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        contact:
+          type: string
+          maxLength: 254
+
+    NoFields:
+      type: object
+      additionalProperties: false
+      description: A body with no field.
 
     Reservation:
       type: object
@@ -4349,18 +4408,24 @@ components:
     ReservationCreate:
       type: object
       required: [date, time, partySize]
+      additionalProperties: false
+      description: |
+        Only these fields are taken (C94). The engine names the service from
+        the time and the attribution from the credential, so `service`,
+        `source`, `status`, `bookedVia`, `basis`, `ownerPrincipal` and any
+        other field fail with `invalid_request`. A text field that holds a
+        NUL character fails too.
       properties:
         date:
           type: string
           format: date
         time:
           type: string
+          pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"
         partySize:
           type: integer
           minimum: 1
-        service:
-          type: string
-          description: When omitted, the engine derives it from the time.
+          maximum: 10000
         zone:
           type: string
         tables:
@@ -4371,11 +4436,9 @@ components:
             conflict behavior.
           items: { type: string }
         guest:
-          $ref: "#/components/schemas/Guest"
+          $ref: "#/components/schemas/GuestInput"
         rating:
           $ref: "#/components/schemas/Rating"
-        source:
-          type: string
         commentary:
           $ref: "#/components/schemas/Commentary"
         reconfirmation:
@@ -4391,10 +4454,10 @@ components:
     WalkInCreate:
       type: object
       required: [partySize]
+      additionalProperties: false
       description: |
-        The body of a walk-in. Only `partySize` is required. A `date` or
-        `time` that is not a string, and `tables` that is not an array, are
-        ignored as if absent.
+        The body of a walk-in. Only `partySize` is required, and only these
+        fields are taken (C94).
       properties:
         date:
           type: string
@@ -4406,6 +4469,7 @@ components:
         partySize:
           type: integer
           minimum: 1
+          maximum: 10000
         zone:
           type: string
         tables:
@@ -4415,7 +4479,7 @@ components:
             the engine assigns them.
           items: { type: string }
         guest:
-          $ref: "#/components/schemas/Guest"
+          $ref: "#/components/schemas/GuestInput"
         rating:
           $ref: "#/components/schemas/Rating"
         commentary:
@@ -4456,17 +4520,37 @@ components:
     ReservationModify:
       type: object
       minProperties: 1
+      additionalProperties: false
+      description: |
+        Only these fields are taken (C94).
+
+        A modify does not move a booking. `date`, `time` and `zone` are not
+        changes: each is accepted when it equals, character for character,
+        what a read of the reservation returns (`date` as `YYYY-MM-DD`,
+        `time` as 24-hour `HH:MM` with two digits each, `zone` with the same
+        case, and the empty string for no zone), and then it changes
+        nothing. Any other string, another spelling of the same moment
+        included (`21:00:00`, `9:00`), fails with `invalid_request` and the
+        problem `unchangeable`, and nothing in the body is applied. The
+        values are compared inside the write transaction. A body that holds
+        only equal values answers 200 with the reservation unchanged, at the
+        same version, where the status accepts a modify. A repeat of a key
+        that already wrote is answered as a repeat, without comparing.
       properties:
         date:
           type: string
           format: date
+          description: May only repeat the current date.
         time:
           type: string
+          description: May only repeat the current time, as `HH:MM`.
         partySize:
           type: integer
           minimum: 1
+          maximum: 10000
         zone:
           type: string
+          description: May only repeat the current zone.
         tables:
           type: array
           items: { type: string }
@@ -6162,6 +6246,34 @@ components:
           description: |
             True when repeating the same request, unchanged, may succeed
             later. False when the caller must change something first.
+        details:
+          type: object
+          description: |
+            Present on an `invalid_request` of a staff reservation or
+            waitlist write that is about named fields (C94). It holds field
+            names and never a sent value.
+          required: [fields]
+          properties:
+            fields:
+              type: array
+              items:
+                type: object
+                required: [path, problem]
+                properties:
+                  path:
+                    type: string
+                    description: |
+                      The field, with a dot for a nested one, such as
+                      `guest.contact`. An unknown name that is not a plain
+                      identifier reads `?`.
+                  problem:
+                    type: string
+                    description: |
+                      `unknown` is a field the write does not take, `missing`
+                      a required field left out, `invalid` a wrong type or a
+                      value out of range, and `unchangeable` a `date`, `time`
+                      or `zone` of a modify that differs from the booking.
+                    enum: [unknown, missing, invalid, unchangeable]
 
     ErrorCode:
       type: string

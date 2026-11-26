@@ -57,7 +57,7 @@ function staffBook(v: Venue, n: number) {
     .request(`/v1/venues/${v.id}/reservations`, {
       method: "POST",
       headers: { apikey: v.admin, "content-type": "application/json", "Idempotency-Key": crypto.randomUUID() },
-      body: JSON.stringify({ date: DATE, time: "20:00", partySize: 2, guestName: `Guest ${n}` }),
+      body: JSON.stringify({ date: DATE, time: "20:00", partySize: 2, guest: { name: `Guest ${n}` } }),
     })
     .then(outcome);
 }

@@ -519,7 +519,7 @@ describe("F6: caps count inside the transaction", () => {
     const settled = await Promise.allSettled(Array.from({ length: 10 }, () => addWaitlist(db, venueId, { partySize: 2, guestName: "W" })));
     expect(settled.filter((r) => r.status === "fulfilled")).toHaveLength(3);
     expect(settled.filter((r) => r.status === "rejected").every((r) => (r as PromiseRejectedResult).reason instanceof DemoLimitError)).toBe(true);
-    const res = await app.request(`/v1/venues/${venueId}/waitlist`, json(cookie, { method: "POST", body: JSON.stringify({ partySize: 2, guestName: "W" }) }));
+    const res = await app.request(`/v1/venues/${venueId}/waitlist`, json(cookie, { method: "POST", body: JSON.stringify({ partySize: 2, guest: { name: "W" } }) }));
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ code: "demo_limit_reached", retryable: false });
   });

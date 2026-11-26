@@ -48,6 +48,8 @@ Every tool marked `optional` above takes an optional `idempotencyKey` and sends 
 
 Keys are scoped to the venue. A key used before for another kind of write, or for another reservation or waitlist entry, fails with `invalid_request`. A repeat of a create, walk-in, or `waitlist.add` key returns the first result even when the other arguments differ. A call that fails stores no key, so the same key can be sent again once the cause is fixed. Over HTTP the reservation routes and the waitlist seat require the header, and the waitlist add and cancel accept it, because callers that predate it send none. `reservation.erasure` and `venue.setConfig` take no key. A repeat of either changes nothing more.
 
+The HTTP API refuses a reservation or waitlist write that carries a field it does not take or a value out of range, such as a `partySize` over 10000, with `invalid_request` (C94). The tool error carries the code, not the names in `details.fields`. `reservation.modify` takes no `date`, `time` or `zone`: a booking cannot be moved yet. `reservation.cancel`, `reservation.status`, `waitlist.seat` and `waitlist.cancel` drop an argument they do not list before they call the API.
+
 A tool error reads `API error <status>: <code>` followed by ` (retryable)` or ` (not retryable)`, taken from the `retryable` field of the HTTP error. See [errors.md](errors.md).
 
 Reservation writes and `waitlist.seat` return the reservation. `waitlist.add` and `waitlist.cancel` return the waiting entries. Erasure needs an `admin` key, and a key without it gets `forbidden`. It returns the counts of erased reservations, guest records, and waitlist entries, and `blocklistEntriesKept`, the guest blocklist entries that match the erased guests and stay in place. Reads never mutate.

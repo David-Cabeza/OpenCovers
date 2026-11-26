@@ -156,13 +156,18 @@ describe("guest linking on booking", () => {
     expect(await guestsOf("g-bad")).toEqual([]);
   });
 
-  it("reads a contact sent as a number as the stored text", async () => {
+  it("refuses a contact sent as a number and keeps no guest", async () => {
     await seedVenue("g-number");
-    const number = await book("g-number", { contact: 600123456 });
-    const text = await book("g-number", { contact: "600 123 456" });
+    const res = await call("g-number", "/reservations", {
+      date: "2026-11-12",
+      time: "21:00",
+      partySize: 2,
+      tables: ["1"],
+      guest: { contact: 600123456 },
+    });
 
-    expect(number.guest.guestId).toBeDefined();
-    expect(text.guest.guestId).toBe(number.guest.guestId);
+    expect(res.status).toBe(400);
+    expect(await guestsOf("g-number")).toEqual([]);
   });
 
   it("does not match by name", async () => {
