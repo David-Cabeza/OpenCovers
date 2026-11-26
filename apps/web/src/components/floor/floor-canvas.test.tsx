@@ -228,7 +228,7 @@ describe("editing from the keyboard", () => {
     expect(onTableUpdate).toHaveBeenLastCalledWith("t3", { x: 48, y: 40 });
     fireEvent.keyDown(node, { key: "ArrowDown", shiftKey: true });
     expect(onTableUpdate).toHaveBeenLastCalledWith("t3", { x: 48, y: 72 });
-    expect(screen.getByRole("status").textContent).toBe("Mesa 3 moved to 48, 72");
+    expect(screen.getByRole("status").textContent).toBe("Mesa 3: position 48, 72");
   });
 
   it("moves an element the same way and ignores keys pressed on its handles", () => {
