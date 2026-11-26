@@ -156,7 +156,7 @@ function MembersCard({ venueId }: { venueId: string }) {
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{m.name}</div>
+                    <div className="line-clamp-2 break-words font-medium sm:line-clamp-1" title={m.name}>{m.name}</div>
                     <div className="truncate text-sm text-muted-foreground">{m.email}</div>
                   </div>
                 </div>

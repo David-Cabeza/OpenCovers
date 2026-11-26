@@ -337,6 +337,8 @@ export function FloorCanvas({
   const scaled = scale < 1;
   // The handles keep their size on screen when the plan is shrunk, so their tap area stays 44 px.
   const handleStyle = scaled ? { scale: 1 / scale } : undefined;
+  // Table text keeps at least 11 px drawn, scaled plan or not; the plan geometry does not change.
+  const drawn = (px: number) => ({ fontSize: Math.max(px, 11 / Math.min(scale, 1)) });
 
   useEffect(updateMore, [frameWidth, naturalWidth, scale]);
 
@@ -559,9 +561,9 @@ export function FloorCanvas({
                       className={cn(
                         "font-semibold leading-tight",
                         t.name.length > 12 ? "text-[9px]" : t.name.length > 7 ? "text-[10px]" : "text-[11px]",
-                        nameLines === 1 ? "block truncate" : "line-clamp-2 text-balance break-words",
+                        nameLines === 1 ? "block truncate" : "line-clamp-2 overflow-visible text-balance [overflow-wrap:normal]",
                       )}
-                      style={{ maxWidth: room }}
+                      style={{ maxWidth: room, ...drawn(t.name.length > 12 ? 9 : t.name.length > 7 ? 10 : 11) }}
                     >
                       {t.name}
                     </span>
@@ -574,7 +576,7 @@ export function FloorCanvas({
                           "flex max-w-full text-[10px] leading-tight",
                           shallow ? "items-baseline justify-center gap-1" : "flex-col items-center",
                         )}
-                        style={{ maxWidth: shallow ? room - 4 : room }}
+                        style={{ maxWidth: shallow ? room - 4 : room, ...drawn(10) }}
                       >
                         {t.guestName && <span className="max-w-full truncate font-medium">{t.guestName}</span>}
                         {" "}
@@ -584,7 +586,7 @@ export function FloorCanvas({
                       </span>
                     ) : (
                       <>
-                        <span aria-hidden="true" className="text-[10px] font-medium">
+                        <span aria-hidden="true" className="text-[10px] font-medium" style={drawn(10)}>
                           {t.seats}
                         </span>
                         {seatable && (

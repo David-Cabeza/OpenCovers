@@ -293,7 +293,7 @@ function ReservationRow({
           <AvatarFallback className="text-xs">{guestInitials(reservation.guest.name)}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <div className="truncate font-medium">{reservation.guest.name || "—"}</div>
+          <div className="line-clamp-2 break-words font-medium md:line-clamp-1" title={reservation.guest.name || undefined}>{reservation.guest.name || "—"}</div>
           {reservation.guest.contact && (
             <div className="truncate text-xs text-muted-foreground">{reservation.guest.contact}</div>
           )}
