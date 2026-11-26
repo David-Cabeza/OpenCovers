@@ -3,6 +3,7 @@ import { authClient } from "@/lib/auth-client";
 import { LoadError } from "@/components/load-error";
 import { useDemoStatus } from "@/lib/demo";
 import { DemoBar } from "./demo/demo-bar";
+import { DietaryHiddenBand } from "./dietary/dietary-hidden-band";
 import { ServerBanner } from "@/components/server-banner";
 import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { useVenues } from "@/hooks/use-venues";
@@ -22,6 +23,9 @@ import { SetupView } from "./setup/setup-view";
 import { TeamView } from "./team/team-view";
 import { EmptyVenues } from "./venue/empty-venues";
 import { WaitlistView } from "./waitlist/waitlist-view";
+
+/** The screens where service decisions are made. */
+const SERVICE_VIEWS: readonly ViewId[] = ["agenda", "preshift", "floor", "waitlist"];
 
 export function Dashboard() {
   const t = useT();
@@ -110,6 +114,7 @@ export function Dashboard() {
           <ServerBanner />
           {demo?.enabled && <DemoBar status={demo} />}
           <Topbar email={session?.user.email} onMenu={() => setNavOpen(true)} />
+          <DietaryHiddenBand venueId={venueId} onService={SERVICE_VIEWS.includes(active)} />
           <main
             ref={mainRef}
             id="main-content"

@@ -102,6 +102,8 @@ export interface VenueConfig {
   blockedDates: { from: string; to: string }[];
   /** Read only. Anything but `true` means the instance does not take `dietary` (C82). */
   dietaryEnabled?: boolean;
+  /** Read only. `true` means stored values exist that no answer returns. `false` or absent says nothing (C82). */
+  dietaryValuesHidden?: boolean;
 }
 
 export interface ApiKey {
