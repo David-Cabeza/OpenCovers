@@ -21,7 +21,7 @@ export function Section({ title, focus = false, children }: { title: string; foc
 }
 
 export const inputClass =
-  "block w-full rounded-oc border border-border bg-background px-3 py-2 text-base text-text " +
+  "block w-full rounded-oc border border-field bg-background px-3 py-2 text-base text-text " +
   "focus:outline-2 focus:outline-offset-1 focus:outline-primary aria-invalid:border-danger";
 const buttonClass =
   "inline-flex min-h-11 items-center justify-center rounded-oc px-4 py-2 font-medium " +
