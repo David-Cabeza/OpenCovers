@@ -32,8 +32,8 @@ export function Topbar({ email, onMenu }: { email?: string; onMenu?: () => void 
 
   return (
     <header className="print:hidden sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
-      <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="flex h-16 items-center justify-between gap-2 px-4 sm:gap-3 sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
           <Button
             variant="ghost"
             size="icon"
@@ -45,7 +45,7 @@ export function Topbar({ email, onMenu }: { email?: string; onMenu?: () => void 
           </Button>
           {venues.length > 0 && (
             <Select value={venueId ?? ""} onValueChange={setVenue}>
-              <SelectTrigger className="w-full min-w-0 sm:w-[220px] *:data-[slot=select-value]:block *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate" aria-label={t("layout.topbar.venue")}>
+              <SelectTrigger className="w-full min-w-0 px-2 sm:w-[220px] sm:px-3 *:data-[slot=select-value]:block *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate" aria-label={t("layout.topbar.venue")}>
                 <SelectValue placeholder={t("layout.topbar.venue")} />
               </SelectTrigger>
               <SelectContent>
@@ -59,7 +59,7 @@ export function Topbar({ email, onMenu }: { email?: string; onMenu?: () => void 
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-3">
           <LanguageSelect />
           <ThemeToggle />
           <DropdownMenu>

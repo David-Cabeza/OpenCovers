@@ -85,7 +85,7 @@ const FONT_LABELS: Record<Font, MessageKey> = {
 function withCode(text: string, parts: Record<string, string>) {
   return text.split(/(\{\w+\})/).map((piece, i) => {
     const name = /^\{(\w+)\}$/.exec(piece)?.[1];
-    return name && name in parts ? <code key={i}>{parts[name]}</code> : piece;
+    return name && name in parts ? <code key={i} className="[overflow-wrap:anywhere]">{parts[name]}</code> : piece;
   });
 }
 
@@ -593,11 +593,11 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
               </div>
             </Group>
 
-            <fieldset className="space-y-4">
+            <fieldset className="min-w-0 space-y-4">
               <legend className="font-display text-lg">{t("onlinebooking.look.legend")}</legend>
-              <div className="grid gap-6 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
                     {COLOR_KEYS.map((k) => (
                       <div key={k} className="flex items-center gap-2">
                         <input
@@ -607,7 +607,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                           onChange={(e) => setTheme({ colors: { ...form.theme.colors, [k]: e.target.value } })}
                           className="h-8 w-10 coarse:h-11 coarse:w-11 shrink-0 cursor-pointer rounded border border-input bg-transparent"
                         />
-                        <Label htmlFor={`ob-color-${k}`} className="font-normal">
+                        <Label htmlFor={`ob-color-${k}`} className="min-w-0 font-normal [overflow-wrap:anywhere]">
                           {t(COLOR_LABELS[k])}
                         </Label>
                       </div>
@@ -632,7 +632,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     </div>
                     {form.theme.darkColors && (
                       <>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
                           {COLOR_KEYS.map((k) => (
                             <div key={k} className="flex items-center gap-2">
                               <input
@@ -646,7 +646,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                                 }
                                 className="h-8 w-10 coarse:h-11 coarse:w-11 shrink-0 cursor-pointer rounded border border-input bg-transparent"
                               />
-                              <Label htmlFor={`ob-dark-color-${k}`} className="font-normal">
+                              <Label htmlFor={`ob-dark-color-${k}`} className="min-w-0 font-normal [overflow-wrap:anywhere]">
                                 {t("onlinebooking.dark.color", { color: t(COLOR_LABELS[k]).toLowerCase() })}
                               </Label>
                             </div>
@@ -735,6 +735,7 @@ export function OnlineBookingCard({ venueId }: { venueId: string }) {
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="h-auto min-h-8 max-w-full whitespace-normal py-1"
                     onClick={() => setForm({ ...form, theme: defaultThemeForm() })}
                   >
                     {t("onlinebooking.resetLook")}

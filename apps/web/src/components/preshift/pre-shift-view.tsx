@@ -157,7 +157,7 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
     >
       <div className="font-display text-xl tabular-nums">{reservation.time}</div>
       <div className="min-w-0">
-        <div className="truncate font-medium">{reservation.guest.name || "—"}</div>
+        <div className="line-clamp-2 break-words font-medium @[53rem]:line-clamp-1 print:line-clamp-1" title={reservation.guest.name || undefined}>{reservation.guest.name || "—"}</div>
         {reservation.guest.contact && (
           <div className="truncate text-xs text-muted-foreground">{reservation.guest.contact}</div>
         )}

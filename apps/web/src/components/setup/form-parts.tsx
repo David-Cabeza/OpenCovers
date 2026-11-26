@@ -71,7 +71,7 @@ export function StatusPanel({
 /** Save button fixed to the bottom of a long card, so it is reachable without scrolling back up. */
 export function SaveBar({ children, hint }: { children: ReactNode; hint?: string }) {
   return (
-    <div className="sticky bottom-0 z-[5] -mx-6 -mb-6 flex items-center gap-3 border-t bg-card/95 px-6 py-3 backdrop-blur">
+    <div className="sticky bottom-0 z-[5] -mx-6 -mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 border-t bg-card/95 px-6 py-3 backdrop-blur">
       {children}
       {hint && <span className="text-sm text-muted-foreground">{hint}</span>}
     </div>

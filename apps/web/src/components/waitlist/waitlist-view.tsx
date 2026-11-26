@@ -171,7 +171,7 @@ function WaitlistRow({
           <AvatarFallback className="text-xs">{guestInitials(entry.guestName)}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <div className="truncate font-medium">{entry.guestName || "—"}</div>
+          <div className="line-clamp-2 break-words font-medium md:line-clamp-1" title={entry.guestName || undefined}>{entry.guestName || "—"}</div>
           {entry.guestContact && (
             <div className="truncate text-xs text-muted-foreground">{entry.guestContact}</div>
           )}

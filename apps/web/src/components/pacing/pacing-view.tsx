@@ -146,7 +146,7 @@ function SlotColumn({ slot }: { slot: PacingSlot }) {
       <div className={cn("text-xs font-semibold tabular-nums", style.text)}>
         {slot.covers}/{slot.capacity}
       </div>
-      <div className="text-[11px] text-muted-foreground tabular-nums">{slot.time}</div>
+      <div className="text-xs text-muted-foreground tabular-nums">{slot.time}</div>
     </div>
   );
 }
