@@ -1,3 +1,4 @@
+import type { Dietary, DietaryInput } from "@/lib/dietary";
 import type { OnlineBooking, OnlineBookingSaved, OnlineBookingUpdate } from "@/lib/online-booking";
 import type { PublicProfile } from "@/lib/public-profile";
 import type { ReservationTraceDto } from "@/lib/reservation-trace";
@@ -99,6 +100,8 @@ export interface VenueConfig {
   maxAdvanceDays: number | null;
   maxActivePerGuestPerDay: number | null;
   blockedDates: { from: string; to: string }[];
+  /** Read only. Anything but `true` means the instance does not take `dietary` (C82). */
+  dietaryEnabled?: boolean;
 }
 
 export interface ApiKey {
@@ -186,6 +189,8 @@ export interface Reservation {
   };
   rating?: number | null;
   commentary?: string;
+  /** Only from the reservation itself, the agenda and the answers of writes. Absent when nothing was recorded. */
+  dietary?: Dietary;
   reconfirmation?: Reconfirmation;
   reconfirmationRecordedAt?: string | null;
   zone?: string;
@@ -229,6 +234,7 @@ export interface CreateReservationBody {
     contact?: string;
   };
   commentary?: string;
+  dietary?: DietaryInput;
 }
 
 export class ApiError extends Error {
@@ -520,6 +526,8 @@ export const api = {
       guest?: { consent?: Consent };
       rating?: number | null;
       commentary?: string;
+      /** Left out keeps the value, `null` deletes it. */
+      dietary?: DietaryInput | null;
     },
   ) =>
     request<Reservation>(`/v1/venues/${venueId}/reservations/${id}/modify`, {
@@ -548,6 +556,7 @@ export const api = {
       tables?: string[];
       zone?: string;
       guest?: { name?: string; contact?: string; consent?: Consent };
+      dietary?: DietaryInput;
     },
   ) =>
     request<Reservation>(`/v1/venues/${venueId}/reservations/walk-in`, {

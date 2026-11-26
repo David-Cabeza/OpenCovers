@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DietarySummary } from "@/components/dietary/dietary-summary";
 import {
   Dialog,
   DialogContent,
@@ -87,6 +88,8 @@ export function AssignTablesDialog({
               : ""}
           </DialogDescription>
         </DialogHeader>
+
+        {reservation?.dietary && <DietarySummary dietary={reservation.dietary} />}
 
         <div className="space-y-2">
           <Label id="assign-tables-label">{t("reservation.tables")}</Label>

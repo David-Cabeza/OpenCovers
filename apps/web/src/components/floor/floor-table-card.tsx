@@ -2,6 +2,7 @@ import { Fragment, useEffect, useId, useRef, useState, type ReactElement } from 
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRightLeftIcon, XIcon } from "lucide-react";
 import { StatusBadge } from "@/components/agenda/status-badge";
+import { DietarySummary } from "@/components/dietary/dietary-summary";
 import { ReconfirmationPill } from "@/components/preshift/pre-shift-view";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
@@ -248,6 +249,9 @@ function CardBody({
           <XIcon className="size-4" />
         </Button>
       </div>
+
+      {/* Above the details, so it is on screen before anything has to be scrolled to. */}
+      {r?.dietary && <DietarySummary dietary={r.dietary} />}
 
       {isError ? (
         <p role="alert" className="text-destructive">

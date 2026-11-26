@@ -5,6 +5,7 @@ import availability from "./availability";
 import common from "./common";
 import dates from "./dates";
 import demo from "./demo";
+import dietary from "./dietary";
 import elements from "./elements";
 import errors from "./errors";
 import floor from "./floor";
@@ -28,6 +29,7 @@ export const AREAS = {
   common,
   dates,
   demo,
+  dietary,
   elements,
   errors,
   floor,
@@ -50,6 +52,7 @@ const en = {
   ...common.en,
   ...dates.en,
   ...demo.en,
+  ...dietary.en,
   ...elements.en,
   ...errors.en,
   ...floor.en,
@@ -74,6 +77,7 @@ const es: Record<MessageKey, Message> = {
   ...common.es,
   ...dates.es,
   ...demo.es,
+  ...dietary.es,
   ...elements.es,
   ...errors.es,
   ...floor.es,

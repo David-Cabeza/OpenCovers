@@ -13,8 +13,10 @@ import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { FloorCanvas } from "@/components/floor/floor-canvas";
 import { FloorSkinToggle } from "@/components/floor/floor-skin-toggle";
 import { MoveDialog } from "@/components/floor/move-dialog";
+import { useAgenda } from "@/hooks/use-agenda";
 import { useFloor } from "@/hooks/use-floor";
 import { useFloorItems } from "@/hooks/use-floor-items";
+import { useVenueConfig } from "@/hooks/use-venue-config";
 import { api, type FloorTable } from "@/lib/api";
 import { useT } from "@/i18n";
 import { nowTime, todayIso } from "@/lib/date";
@@ -30,6 +32,11 @@ export function FloorView({ venueId }: { venueId: string }) {
   const queryClient = useQueryClient();
   const { data, isPending, isError, error, isRefetching, refetch } = useFloor(venueId, date, time);
   const { data: itemsData } = useFloorItems(venueId);
+
+  // The floor route carries no allergies, and the day's agenda does.
+  const agenda = useAgenda(venueId, date);
+  const config = useVenueConfig(venueId);
+  const dietaryById = new Map((agenda.data?.reservations ?? []).map((r) => [r.id, r.dietary]));
 
   const tables = data?.tables ?? [];
   const items = itemsData?.items ?? [];
@@ -98,6 +105,13 @@ export function FloorView({ venueId }: { venueId: string }) {
         </div>
       )}
 
+      {/* Said out loud, because a plan with no marks would look like a plan with nothing to mark. */}
+      {agenda.isError && !agenda.data && config.data?.dietaryEnabled === true && (
+        <p role="alert" className="rounded-lg border-2 border-destructive bg-danger-soft px-3 py-2 text-sm">
+          {t("dietary.floor.loadFailed")}
+        </p>
+      )}
+
       {isPending ? (
         <Loading><Skeleton className="h-[480px] w-full" /></Loading>
       ) : isError && !data ? (
@@ -117,7 +131,7 @@ export function FloorView({ venueId }: { venueId: string }) {
         />
       ) : (
         <FloorCanvas
-          tables={tables}
+          tables={tables.map((table) => ({ ...table, dietary: table.reservationId ? dietaryById.get(table.reservationId) : undefined }))}
           items={items}
           mode="view"
           venueId={venueId}

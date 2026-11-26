@@ -22,6 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConsentSelect } from "@/components/reservation/consent-select";
+import { DietaryFields, useDietaryForm } from "@/components/dietary/dietary-fields";
+import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
 import { useT } from "@/i18n";
 import { api, COMMENTARY_MAX, type Consent, type Reservation } from "@/lib/api";
 
@@ -60,18 +62,28 @@ export function EditReservationDialog({
     formState: { isSubmitting },
   } = useForm<EditValues>({ defaultValues: toValues(reservation) });
 
+  const canRecordDietary = useCanRecordDietary(venueId);
+  const dietary = useDietaryForm();
+  const resetDietary = dietary.reset;
+
   useEffect(() => {
     reset(toValues(reservation));
-  }, [reservation, reset]);
+    resetDietary(reservation?.dietary);
+  }, [reservation, reset, resetDietary]);
 
   async function onSubmit(values: EditValues) {
     if (!reservation) return;
+    const recorded = canRecordDietary ? dietary.take() : {};
+    if (!recorded) return;
     try {
       await api.modifyReservation(venueId, reservation.id, {
         guest: { consent: values.consent },
         rating: values.rating === NO_RATING ? null : Number(values.rating),
         commentary: values.commentary.trim(),
+        ...recorded,
       });
+      // The floor card keeps what it read for a while, and must not show the old allergies.
+      void queryClient.invalidateQueries({ queryKey: ["reservation", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       toast.success(t("reservation.edit.done"));
       onOpenChange(false);
@@ -84,7 +96,7 @@ export function EditReservationDialog({
     <Dialog open={reservation !== null} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("reservation.edit.title")}</DialogTitle>
+          <DialogTitle>{t(canRecordDietary ? "reservation.edit.titleDietary" : "reservation.edit.title")}</DialogTitle>
           <DialogDescription>
             {reservation?.guest.name
               ? t("reservation.edit.description", { name: reservation.guest.name })
@@ -93,6 +105,8 @@ export function EditReservationDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {canRecordDietary && <DietaryFields form={dietary} />}
+
           <div className="space-y-2">
             <Label htmlFor="edit-consent">{t("reservation.contactConsent")}</Label>
             <Controller
@@ -136,7 +150,7 @@ export function EditReservationDialog({
               {...register("commentary")}
             />
             <p className="text-sm text-muted-foreground">
-              {t("reservation.noteHint", { max: COMMENTARY_MAX })}
+              {t(canRecordDietary ? "reservation.noteHintDietary" : "reservation.noteHint", { max: COMMENTARY_MAX })}
             </p>
           </div>
 
