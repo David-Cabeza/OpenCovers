@@ -85,7 +85,22 @@ describe("a recorded value, where staff read the booking", () => {
     const shown = within(await row());
     expect(shown.getByText("Allergens: Peanuts, Milk (including lactose)")).toBeInTheDocument();
     expect(shown.getByText("Diet: Vegan")).toBeInTheDocument();
-    expect(shown.getByText("Detail: intolerance to onion")).toBeInTheDocument();
+    expect(shown.getByText("Allergy or diet note: intolerance to onion")).toBeInTheDocument();
+  });
+
+  it("says Diets when there are several", async () => {
+    setup(<AgendaView venueId="v1" />, { routes: agendaRoute(reservation({ dietary: { ...DIETARY, diets: ["vegan", "halal"] } })) });
+
+    expect(within(await row()).getByText("Diets: Vegan, Halal")).toBeInTheDocument();
+  });
+
+  it.each([
+    [true, "Allergies and diets, contact permission, rating and note"],
+    [false, "Contact permission, rating and note"],
+  ])("titles the edit dialog by what it holds, with the switch %s", async (enabled, title) => {
+    setup(<EditReservationDialog venueId="v1" reservation={reservation()} onOpenChange={() => {}} />, { enabled });
+
+    expect(await screen.findByRole("heading", { name: title })).toBeInTheDocument();
   });
 
   it("is shown even when the instance settings cannot be read", async () => {

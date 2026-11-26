@@ -43,7 +43,7 @@ describe("reservation dialogs in Spanish", () => {
     renderWithApp(<WalkInDialog venueId="v1" open onOpenChange={vi.fn()} tableId="t1" tableName="Mesa 1" />);
     expect(await screen.findByText("Sentar en Mesa 1")).toBeInTheDocument();
     expect(screen.getByText("Sienta en Mesa 1 a un cliente que acaba de llegar.")).toBeInTheDocument();
-    expect(screen.getByLabelText("Consentimiento de contacto")).toHaveTextContent("Sin preguntar");
+    expect(screen.getByLabelText("Permiso de contacto")).toHaveTextContent("Sin preguntar");
     expect(screen.queryByText("Seat at Mesa 1")).not.toBeInTheDocument();
   });
 
