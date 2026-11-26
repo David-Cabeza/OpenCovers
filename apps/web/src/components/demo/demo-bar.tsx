@@ -17,7 +17,7 @@ export function DemoBar({ status }: { status: DemoStatus }) {
   const { venueId, bookingKey, expiresAt, widgetOrigin } = status;
   if (!venueId) return null;
   return (
-    <div role="region" aria-label={t("demo.bar.label")} className="print:hidden border-b border-primary/30 bg-primary/10 text-sm max-lg:max-h-[45svh] max-lg:overflow-y-auto">
+    <div role="region" aria-label={t("demo.bar.label")} className="print:hidden border-b border-primary/30 bg-primary/10 text-sm max-lg:text-xs">
       <Checklist
         venueId={venueId}
         lead={
@@ -217,8 +217,9 @@ function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.R
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 px-4 pb-1 pt-1.5 sm:px-6">
-        {lead}
-        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1">
+        {/* An open tour takes the lead's room on a phone. Folding the tour brings it back. */}
+        <div className={cn(open && "max-sm:hidden")}>{lead}</div>
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 max-sm:w-full max-sm:justify-between max-sm:gap-x-2">
           {switcher}
           <button
             type="button"
@@ -231,7 +232,8 @@ function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.R
             className="flex items-center gap-2 py-1 coarse:min-h-11 text-sm font-medium"
           >
             <ChevronDownIcon className={cn("size-4 transition-transform", !open && "-rotate-90")} aria-hidden="true" />
-            {t("demo.tour.title", { done: count, total: steps.length })}
+            <span className="max-sm:hidden">{t("demo.tour.title", { done: count, total: steps.length })}</span>
+            <span className="sm:hidden">{t("demo.tour.short", { done: count, total: steps.length })}</span>
           </button>
         </div>
       </div>
@@ -250,7 +252,7 @@ function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.R
                   <span className="sr-only">{" "}{done[step.id] ? t("demo.tour.done") : t("demo.tour.notDone")}</span>
                 </span>
               </span>
-              {step.action && <span className="max-sm:pl-6">{step.action}</span>}
+              {step.action && <span>{step.action}</span>}
             </li>
           ))}
         </ol>
