@@ -13,7 +13,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -22,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConsentSelect } from "@/components/reservation/consent-select";
+import { isTooLong, LimitedTextarea } from "@/components/limited-textarea";
 import { DietaryFields, useDietaryForm } from "@/components/dietary/dietary-fields";
 import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
 import { useT } from "@/i18n";
@@ -59,6 +59,8 @@ export function EditReservationDialog({
     reset,
     control,
     register,
+    watch,
+    setFocus,
     formState: { isSubmitting },
   } = useForm<EditValues>({ defaultValues: toValues(reservation) });
 
@@ -75,6 +77,10 @@ export function EditReservationDialog({
     if (!reservation) return;
     const recorded = canRecordDietary ? dietary.take() : {};
     if (!recorded) return;
+    if (isTooLong(values.commentary, COMMENTARY_MAX)) {
+      setFocus("commentary");
+      return;
+    }
     try {
       await api.modifyReservation(venueId, reservation.id, {
         guest: { consent: values.consent },
@@ -143,15 +149,14 @@ export function EditReservationDialog({
 
           <div className="space-y-2">
             <Label htmlFor="edit-commentary">{t("reservation.note")}</Label>
-            <Textarea
+            <LimitedTextarea
               id="edit-commentary"
-              maxLength={COMMENTARY_MAX}
+              text={watch("commentary")}
+              limit={COMMENTARY_MAX}
+              hint={t(canRecordDietary ? "reservation.noteHintDietary" : "reservation.noteHint", { max: COMMENTARY_MAX })}
               placeholder={t("reservation.notePlaceholder")}
               {...register("commentary")}
             />
-            <p className="text-sm text-muted-foreground">
-              {t(canRecordDietary ? "reservation.noteHintDietary" : "reservation.noteHint", { max: COMMENTARY_MAX })}
-            </p>
           </div>
 
           <DialogFooter>
