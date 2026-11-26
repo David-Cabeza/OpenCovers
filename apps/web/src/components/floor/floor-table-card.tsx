@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactElement } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type ReactElement } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRightLeftIcon, XIcon } from "lucide-react";
 import { StatusBadge } from "@/components/agenda/status-badge";
@@ -271,7 +271,7 @@ function CardBody({
           <Row label={t("floor.card.tables")}>
             {(r.tables ?? []).map((id) => tableNames[id] ?? t("floor.card.table")).join(", ") || "—"}
           </Row>
-          <Row label={t("floor.card.contact")}>{r.guest.contact || "—"}</Row>
+          <Row label={t("floor.card.contact")}>{r.guest.contact ? <Contact value={r.guest.contact} /> : "—"}</Row>
           <Row label={t("floor.card.bookedVia")}>{r.bookedVia || "—"}</Row>
           {r.reconfirmation && r.reconfirmation !== "none" && (
             <Row label={t("floor.card.reconfirmation")}>
@@ -289,6 +289,16 @@ function CardBody({
       )}
     </div>
   );
+}
+
+// An email that does not fit breaks after the @ first, and mid-word only when a part is still too long.
+function Contact({ value }: { value: string }) {
+  return value.split(/(?<=@)/).map((part, i) => (
+    <Fragment key={i}>
+      {i > 0 && <wbr />}
+      {part}
+    </Fragment>
+  ));
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {

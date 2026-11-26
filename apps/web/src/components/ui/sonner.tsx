@@ -31,7 +31,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       closeButton
       containerAriaLabel={t("common.notifications")}
-      toastOptions={{ closeButtonAriaLabel: t("common.close") }}
+      // Sonner draws the close button at 20 px. The pseudo-element widens its hit area, not what is drawn: 24 px with
+      // a mouse and 44 px with a finger. Insets count from inside the 1 px border, and the coarse ones lean right
+      // because at 320 px the button sits 10 px from the screen edge.
+      toastOptions={{
+        closeButtonAriaLabel: t("common.close"),
+        classNames: { closeButton: "before:absolute before:-inset-[3px] coarse:before:-inset-y-[13px] coarse:before:-left-[11px] coarse:before:-right-[15px] before:content-['']" },
+      }}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
