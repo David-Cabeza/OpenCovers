@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { MaximizeIcon, MinimizeIcon, RotateCwIcon } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { FloorItemShape } from "./floor-item-shape";
 import { guestsText } from "./guests-text";
 import { useFloorSkinGate } from "./skin-gate";
 import { FLOOR_SKINS } from "./skins";
+import { arrowMove, SNAP } from "./floor-keys";
 
 export interface CanvasTable {
   id: string;
@@ -35,7 +36,6 @@ export interface CanvasItem {
 }
 
 const NODE = 80;
-const SNAP = 8;
 const MARGIN = 24;
 const MIN_HEIGHT = 480;
 // A plan that needs less shrinking than this to fit the screen is shrunk by default (a tablet). Below it the names
@@ -45,9 +45,12 @@ const AUTO_FIT_MIN = 0.7;
 // Edit handles are 20 px discs. Their tap area grows to 44 px, mostly outwards, so it takes little from the table or
 // element underneath and the areas of two handles on a 40 px element meet without overlapping.
 const HANDLE =
-  "absolute -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm before:absolute before:-top-4 before:-bottom-2 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-const HANDLE_LEFT = "-left-2 z-10 before:-left-4 before:-right-2 hover:bg-accent";
-const HANDLE_RIGHT = "-right-2 before:-left-2 before:-right-4 hover:bg-destructive hover:text-white";
+  "absolute -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm before:absolute before:-top-4 before:-bottom-[10px] before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const HANDLE_LEFT = "-left-2 z-10 before:-left-4 before:-right-[10px] hover:bg-accent";
+// Keyboard focus ring of a table or element in the editor: the opaque ring of the view-mode table.
+const FOCUS_RING =
+  "focus-visible:ring-[3px] focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const HANDLE_RIGHT = "-right-2 before:-left-[10px] before:-right-4 hover:bg-destructive hover:text-white";
 
 // Faint grain lines for wooden table tops, drawn with the theme's wood edge colour.
 const WOOD_GRAIN =
@@ -188,6 +191,7 @@ export function FloorCanvas({
   onDeleteItem?: (itemId: string) => void;
 }) {
   const tr = useT();
+  const keysHintId = useId();
   const skin = FLOOR_SKINS[useFloorSkinGate().skin];
   const canvasRef = useRef<HTMLDivElement>(null);
   const [posOverrides, setPosOverrides] = useState<Record<string, { x: number; y: number }>>({});
@@ -200,6 +204,7 @@ export function FloorCanvas({
   // While something is dragged or resized the scale stays put, so the plan does not shrink or grow under the finger.
   const [heldScale, setHeldScale] = useState<number | null>(null);
   const [more, setMore] = useState({ left: false, right: false });
+  const [announcement, setAnnouncement] = useState("");
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -257,6 +262,18 @@ export function FloorCanvas({
     }
     dragRef.current = null;
     setHeldScale(null);
+  }
+
+  // Arrow keys move the focused object one grid step (Shift: four) and save it the way the end of a drag does.
+  function onObjectKeyDown(e: React.KeyboardEvent, kind: "table" | "item", id: string, name: string, x: number, y: number) {
+    if (mode !== "edit" || e.target !== e.currentTarget) return;
+    const to = arrowMove(e.key, e.shiftKey, x, y);
+    if (!to) return;
+    e.preventDefault();
+    setPosOverrides((prev) => ({ ...prev, [`${kind}:${id}`]: to }));
+    if (kind === "table") onTableUpdate?.(id, { x: to.x, y: to.y });
+    else onItemUpdate?.(id, { x: to.x, y: to.y });
+    setAnnouncement(tr("floor.edit.moved", { name, x: to.x, y: to.y }));
   }
 
   function startResize(e: React.PointerEvent, item: CanvasItem) {
@@ -318,11 +335,23 @@ export function FloorCanvas({
   const zoom = zoomChoice ?? (fit >= AUTO_FIT_MIN ? "fit" : "actual");
   const scale = heldScale ?? (zoom === "fit" ? fit : 1);
   const scaled = scale < 1;
+  // The handles keep their size on screen when the plan is shrunk, so their tap area stays 44 px.
+  const handleStyle = scaled ? { scale: 1 / scale } : undefined;
 
   useEffect(updateMore, [frameWidth, naturalWidth, scale]);
 
   return (
     <div className="overflow-hidden rounded-xl border bg-floor">
+      {mode === "edit" && (
+        <>
+          <p id={keysHintId} className="sr-only">
+            {tr("floor.edit.keysHint")}
+          </p>
+          <div role="status" aria-live="polite" className="sr-only">
+            {announcement}
+          </div>
+        </>
+      )}
       <div className="relative">
       <div ref={frameRef} data-testid="floor-frame" className="overflow-x-auto overscroll-x-contain" onScroll={updateMore}>
       <div style={scaled ? { width: naturalWidth * scale, height: naturalHeight * scale, overflow: "hidden" } : undefined}>
@@ -342,11 +371,17 @@ export function FloorCanvas({
           const pos = posOf("item", item.id, item.posX, item.posY);
           const size = sizeOf(item.id, item.width, item.height);
           const rotation = item.rotation ?? 0;
+          const itemName = item.label || item.type;
           return (
             <div
               key={item.id}
               style={{ left: pos.x, top: pos.y, width: size.w, height: size.h }}
-              className={cn("absolute select-none", mode === "edit" && "cursor-move touch-none")}
+              className={cn("absolute select-none", mode === "edit" && cn("cursor-move touch-none outline-none", FOCUS_RING))}
+              role={mode === "edit" ? "group" : undefined}
+              tabIndex={mode === "edit" ? 0 : undefined}
+              aria-label={mode === "edit" ? itemName : undefined}
+              aria-describedby={mode === "edit" ? keysHintId : undefined}
+              onKeyDown={(e) => onObjectKeyDown(e, "item", item.id, itemName, pos.x, pos.y)}
               onPointerDown={(e) => startDrag(e, "item", item.id, item.posX, item.posY)}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -362,7 +397,8 @@ export function FloorCanvas({
                 <>
                   <button
                     type="button"
-                    aria-label={tr("floor.rotate")}
+                    aria-label={tr("floor.rotateNamed", { name: itemName })}
+                    style={handleStyle}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => rotate(item.id, rotation, "item")}
                     className={cn(HANDLE, HANDLE_LEFT)}
@@ -371,7 +407,8 @@ export function FloorCanvas({
                   </button>
                   <button
                     type="button"
-                    aria-label={tr("common.delete")}
+                    aria-label={tr("floor.deleteNamed", { name: itemName })}
+                    style={handleStyle}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => onDeleteItem?.(item.id)}
                     className={cn(HANDLE, HANDLE_RIGHT)}
@@ -409,10 +446,11 @@ export function FloorCanvas({
               style={{ left: pos.x, top: pos.y, width: NODE, height: NODE }}
               className={cn(
                 "group absolute select-none outline-none",
-                mode === "edit" ? "cursor-move touch-none" : movableInView ? "cursor-grab" : "cursor-pointer",
+                mode === "edit" ? cn("cursor-move touch-none", FOCUS_RING) : movableInView ? "cursor-grab" : "cursor-pointer",
               )}
-              role={seatable || movableInView ? "button" : undefined}
-              tabIndex={seatable || movableInView ? 0 : undefined}
+              role={seatable || movableInView ? "button" : mode === "edit" ? "group" : undefined}
+              tabIndex={seatable || movableInView || mode === "edit" ? 0 : undefined}
+              aria-describedby={mode === "edit" ? keysHintId : undefined}
               // A free table is named by its own text, so the name always contains what is drawn on it.
               aria-label={
                 seatable
@@ -424,7 +462,9 @@ export function FloorCanvas({
                         pax: tr("floor.table.pax", { party: t.partySize ?? "?" }),
                         guests: guestsText(t.partySize),
                       })
-                    : undefined
+                    : mode === "edit"
+                      ? t.name
+                      : undefined
               }
               onKeyDown={
                 seatable
@@ -434,7 +474,9 @@ export function FloorCanvas({
                         onSeat?.(t.id);
                       }
                     }
-                  : undefined
+                  : mode === "edit"
+                    ? (e) => onObjectKeyDown(e, "table", t.id, t.name, pos.x, pos.y)
+                    : undefined
               }
               draggable={movableInView}
               onDragStart={
@@ -558,7 +600,8 @@ export function FloorCanvas({
               {mode === "edit" && (
                 <button
                   type="button"
-                  aria-label={tr("floor.rotate")}
+                  aria-label={tr("floor.rotateNamed", { name: t.name })}
+                  style={handleStyle}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => rotate(t.id, rotation, "table")}
                   className={cn(HANDLE, HANDLE_LEFT)}

@@ -207,3 +207,41 @@ describe("editing room elements", () => {
     expect(onItemUpdate).toHaveBeenCalledWith("i1", { width: 200, height: 64 });
   });
 });
+
+describe("editing from the keyboard", () => {
+  const tbl = { id: "t3", name: "Mesa 3", seats: 4, posX: 40, posY: 40 };
+  const item = { id: "i1", type: "bar", label: "Bar", posX: 40, posY: 40, width: 160, height: 48 };
+
+  it("makes each table and element a named tab stop and names its handles", () => {
+    renderWithApp(<FloorCanvas tables={[tbl]} items={[item]} mode="edit" />);
+    for (const name of ["Mesa 3", "Bar"]) expect(screen.getByRole("group", { name }).tabIndex).toBe(0);
+    expect(screen.getByRole("button", { name: "Rotate Mesa 3" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Rotate Bar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Delete Bar" })).toBeTruthy();
+  });
+
+  it("moves a table one grid step with an arrow, four with Shift, and says where it went", () => {
+    const onTableUpdate = vi.fn();
+    renderWithApp(<FloorCanvas tables={[tbl]} mode="edit" onTableUpdate={onTableUpdate} />);
+    const node = screen.getByRole("group", { name: "Mesa 3" });
+    fireEvent.keyDown(node, { key: "ArrowRight" });
+    expect(onTableUpdate).toHaveBeenLastCalledWith("t3", { x: 48, y: 40 });
+    fireEvent.keyDown(node, { key: "ArrowDown", shiftKey: true });
+    expect(onTableUpdate).toHaveBeenLastCalledWith("t3", { x: 48, y: 72 });
+    expect(screen.getByRole("status").textContent).toBe("Mesa 3: position 48, 72");
+  });
+
+  it("moves an element the same way and ignores keys pressed on its handles", () => {
+    const onItemUpdate = vi.fn();
+    renderWithApp(<FloorCanvas tables={[]} items={[item]} mode="edit" onItemUpdate={onItemUpdate} />);
+    fireEvent.keyDown(screen.getByRole("button", { name: "Rotate Bar" }), { key: "ArrowLeft" });
+    expect(onItemUpdate).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole("group", { name: "Bar" }), { key: "ArrowLeft" });
+    expect(onItemUpdate).toHaveBeenCalledWith("i1", { x: 32, y: 40 });
+  });
+
+  it("leaves view mode alone", () => {
+    renderWithApp(<FloorCanvas tables={[tbl]} mode="view" />);
+    expect(screen.queryByRole("group", { name: "Mesa 3" })).toBeNull();
+  });
+});
