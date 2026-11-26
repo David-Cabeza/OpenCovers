@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { BlocklistReason } from "../lib/blocklist";
 import type { Consent } from "../lib/consent";
+import type { StoredDietary } from "../lib/dietary";
 import type { ContactKey } from "../lib/contact";
 import type { Rating } from "../lib/rating";
 import type { Reconfirmation } from "../lib/reconfirmation";
@@ -201,6 +202,8 @@ export const reservations = pgTable(
     reconfirmation: text("reconfirmation").$type<Reconfirmation>().notNull().default("none"),
     reconfirmationRecordedAt: timestamp("reconfirmation_recorded_at", { withTimezone: true }),
     commentary: text("commentary").notNull().default(""),
+    // Allergies and diets (ADR-0027). Health data. Null means nothing declared.
+    dietary: jsonb("dietary").$type<StoredDietary>(),
     erased: boolean("erased").notNull().default(false),
     guestLocale: text("guest_locale"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -213,11 +216,12 @@ export const reservations = pgTable(
       sql`${t.guestLocale} IS NULL OR ${t.guestLocale} IN ('es', 'en', 'ca', 'fr', 'de', 'it', 'pt')`,
     ),
     check("reservations_commentary_length", sql`char_length(${t.commentary}) <= 500`),
+    check("reservations_dietary_object", sql`${t.dietary} IS NULL OR jsonb_typeof(${t.dietary}) = 'object'`),
     index("idx_reservations_venue_date").on(t.venueId, t.date),
     index("idx_reservations_venue_guest").on(t.venueId, t.guestId),
     index("idx_reservations_unlinked_retention")
       .on(t.venueId, t.endsAt, t.id)
-      .where(sql`${t.guestId} is null and ${t.erased} = false and (${t.guestName} <> '' or ${t.guestContact} <> '' or ${t.commentary} <> '')`),
+      .where(sql`${t.guestId} is null and ${t.erased} = false and (${t.guestName} <> '' or ${t.guestContact} <> '' or ${t.commentary} <> '' or ${t.dietary} is not null)`),
   ],
 );
 

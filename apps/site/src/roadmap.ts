@@ -395,7 +395,7 @@ export const today: Today[] = [
   { area: "Locales en servicio", works: "Ninguno.", preview: "", missing: "El primero." },
 ];
 
-export const todayLegend = "73 de los 82 casos de conformidad pasan; 8 están a medias y decimos por qué; 1, alergias y dietas, está escrito y sin construir.";
+export const todayLegend = "73 de los 82 casos de conformidad pasan; 9 están a medias y decimos por qué. Uno es alergias y dietas: está en la API, apagado por defecto, y falta en las herramientas MCP y en la app de sala.";
 
 export const notPlanned: string[] = [
   "Paridad de funciones con las plataformas consolidadas. Llevan años de oficio en depósitos, marketing a clientes, integraciones de TPV y soporte a escala. Igualamos solo lo que la sala usa en cada servicio.",

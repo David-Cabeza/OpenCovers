@@ -72,6 +72,8 @@ services:
       RATE_LIMIT_PUBLIC_DAYS: ${RATE_LIMIT_PUBLIC_DAYS:-}
       # Remote MCP (ADR-0014). The API refuses to start with MCP_REMOTE=on and DEMO_MODE=1, so the demo keeps it off.
       MCP_REMOTE: ${MCP_REMOTE:-off}
+      # Allergies and diets on a reservation (ADR-0027). Off until the demo step of that record.
+      DIETARY: ${DIETARY:-off}
       PUBLIC_POW_DIFFICULTY: ${PUBLIC_POW_DIFFICULTY:-}
       PUBLIC_CHALLENGE_SECRET: ${PUBLIC_CHALLENGE_SECRET:-}
       # Unset, the API serves no widget page. Set, it serves it only for requests to that host (ADR-0017, Q1).

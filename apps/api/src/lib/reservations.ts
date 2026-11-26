@@ -15,6 +15,7 @@ import { countBlocklistEntries } from "./blocklist";
 import { blockedRange } from "./booking-policy";
 import { normalizeCommentary } from "./commentary";
 import { consentColumns, type Consent } from "./consent";
+import { recordDietary, sameDietary, type DietaryValue, type StoredDietary } from "./dietary";
 import { normalizeContact, venueCountry } from "./contact";
 import { linkGuest } from "./guests";
 import { sandboxGuestsFull, sandboxReservationsFull } from "../demo/limits";
@@ -56,6 +57,8 @@ export interface CreateReservationInput {
   consent?: Consent;
   rating?: Rating | null;
   commentary?: string;
+  /** ADR-0027: the staff create and walk-in only. */
+  dietary?: DietaryValue | null;
   reconfirmation?: Reconfirmation;
   bookedVia?: string;
   basis?: string;
@@ -95,6 +98,7 @@ export interface WalkInInput {
   consent?: Consent;
   rating?: Rating | null;
   commentary?: string;
+  dietary?: DietaryValue | null;
   bookedVia?: string;
   basis?: string;
   ownerPrincipal?: string;
@@ -108,6 +112,10 @@ export interface ModifyReservationInput {
   rating?: Rating | null;
   commentary?: string;
   reconfirmation?: Reconfirmation;
+  /** ADR-0027: undefined keeps the value, null clears it, a value replaces it whole. */
+  dietary?: DietaryValue | null;
+  /** The body held only `dietary: null`. A withdrawal is accepted on every status, the one exception to C4. */
+  dietaryWithdrawal?: boolean;
   selfService?: SelfServiceWrite & { version: number; rules: OnlineRules };
   origin?: Origin | null;
 }
@@ -142,6 +150,8 @@ export interface Reservation {
   reconfirmationRecordedAt: string | null;
   guestLocale: string | null;
   tableIds: string[];
+  /** As stored. Only the answers that `dietaryViews` builds show it (ADR-0027, decision 7). */
+  dietary: StoredDietary | null;
 }
 
 export interface Event {
@@ -757,6 +767,7 @@ function toReservation(
     reconfirmationRecordedAt: row.reconfirmationRecordedAt ? row.reconfirmationRecordedAt.toISOString() : null,
     guestLocale: row.guestLocale,
     tableIds,
+    dietary: row.dietary,
   };
 }
 
@@ -953,6 +964,7 @@ export async function createReservation(
         ...consentColumns(input.consent ?? "unknown"),
         ...ratingColumns(input.rating ?? null),
         commentary: normalizeCommentary(input.commentary ?? ""),
+        dietary: recordDietary(input.dietary ?? null, input.origin),
         ...reconfirmationColumns(input.reconfirmation ?? "none"),
       });
       for (const tableId of tableIds) {
@@ -1011,6 +1023,7 @@ export async function walkIn(
       consent: input.consent,
       rating: input.rating,
       commentary: input.commentary,
+      dietary: input.dietary,
       bookedVia: input.bookedVia,
       basis: input.basis,
       ownerPrincipal: input.ownerPrincipal,
@@ -1021,6 +1034,9 @@ export async function walkIn(
 }
 
 type ReservationRow = typeof reservations.$inferSelect;
+
+/** The key of a modify that carried `dietary` and changed nothing. The trace reads keys by kind and never this one. */
+const UNCHANGED_MODIFY = "modify_unchanged";
 
 async function lockForGuest(tx: DbTx, venueId: string, id: string, linkId: string, cancelKey?: string) {
   await tx
@@ -1076,7 +1092,7 @@ export async function modifyReservation(
       const existing = await claimKey(tx, venueId, key);
       if (guest) await lockForGuest(tx, venueId, id, guest.linkId);
       if (existing) {
-        if (existing.kind !== "modify" || existing.reservationId !== id) {
+        if (!["modify", UNCHANGED_MODIFY].includes(existing.kind) || existing.reservationId !== id) {
           throw new ReservationError("invalid_request");
         }
         return existing.version;
@@ -1094,7 +1110,7 @@ export async function modifyReservation(
         assertChangeable(current, guest);
         if (current.version !== guest.version) throw new ReservationError("reservation_changed");
       }
-      if (!MODIFIABLE_STATUSES.includes(current.status)) {
+      if (!input.dietaryWithdrawal && !MODIFIABLE_STATUSES.includes(current.status)) {
         throw new ReservationError("invalid_transition");
       }
 
@@ -1158,7 +1174,8 @@ export async function modifyReservation(
       const commentaryChanged = commentary !== undefined && commentary !== current.commentary;
       const reconfirmationChanged =
         input.reconfirmation !== undefined && input.reconfirmation !== current.reconfirmation;
-      if ((consentChanged || ratingChanged || commentaryChanged || reconfirmationChanged) && current.erased) {
+      const dietaryChanged = input.dietary !== undefined && !sameDietary(current.dietary, input.dietary);
+      if ((consentChanged || ratingChanged || commentaryChanged || reconfirmationChanged || dietaryChanged) && current.erased) {
         throw new ReservationError("invalid_request");
       }
       if (reconfirmationChanged && current.status !== "booked") {
@@ -1171,8 +1188,16 @@ export async function modifyReservation(
         !consentChanged &&
         !ratingChanged &&
         !commentaryChanged &&
-        !reconfirmationChanged
+        !reconfirmationChanged &&
+        !dietaryChanged
       ) {
+        // C82: without a stored key a late retry would apply its `dietary` after all, and so restore a withdrawn value
+        // or clear a newer one.
+        if (input.dietary !== undefined) {
+          await tx
+            .insert(idempotencyKeys)
+            .values({ key, venueId, reservationId: id, kind: UNCHANGED_MODIFY, version: current.version });
+        }
         return current.version;
       }
 
@@ -1185,6 +1210,7 @@ export async function modifyReservation(
           ...(consentChanged ? consentColumns(input.consent!) : {}),
           ...(ratingChanged ? ratingColumns(input.rating!) : {}),
           ...(commentaryChanged ? { commentary } : {}),
+          ...(dietaryChanged ? { dietary: recordDietary(input.dietary!, input.origin) } : {}),
           ...(reconfirmationChanged ? reconfirmationColumns(input.reconfirmation!) : {}),
         })
         .where(eq(reservations.id, id));

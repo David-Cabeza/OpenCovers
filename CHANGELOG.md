@@ -6,6 +6,12 @@ All notable changes to OpenCovers are listed here. The format follows [Keep a Ch
 
 Feature PRs append their entries here. The release PR moves them under a version heading.
 
+### Added
+
+- Allergies and diets on a reservation, `dietary` (C82, [ADR-0027](docs/adr/0027-allergies-and-dietary-needs.md)), behind the instance switch `DIETARY=on|off`, off by default. It is health data, and the legal review still gates use with real guests. Create, walk-in and modify take it, and get, the agenda and the answers of reservation writes return it. List, search, events, webhooks, emails, logs and the public channel never carry it. Erasure and retention clear it. `GET /v1/venues/{venueId}/config` reads `dietaryEnabled`. The MCP tools do not take the field yet. Run the database migration (0050).
+- With `DIETARY` off, a create, walk-in or modify whose body holds a `dietary` other than `null` fails with `400 invalid_request` and writes nothing. Before this change the field was ignored. A client reads `dietaryEnabled` before it sends the field.
+- The public create and the self-service modify refuse a body that names `dietary`.
+
 ### Changed
 
 - `POST /v1/venues/{venueId}/tables` applies the `id` rule to new tables only. A table the venue stored before the rule, with a space, `:` or more than 64 characters in its id, can be edited again.
@@ -16,6 +22,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 
 ### Security
 
+- The API's error log no longer holds the bound parameters of a failed database query, the database's row detail, or the text of a request body that is not valid JSON. All three could hold guest data.
 - `GET`, `POST` and `DELETE /v1/auth/keys` now require an `admin` API key that holds the all-venues grant (`*`). An `admin` key granted only named venues gets `403 forbidden` there, so it can no longer act on keys outside its venues. It still manages its own venues' keys through `/v1/venues/{venueId}/keys`.
 
 ## MCP 0.3.0 - package `@opencovers/mcp`

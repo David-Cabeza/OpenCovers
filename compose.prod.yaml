@@ -43,6 +43,8 @@ services:
       RATE_LIMIT_PUBLIC_DAYS: ${RATE_LIMIT_PUBLIC_DAYS:-}
       # Remote MCP over OAuth (ADR-0014). Off by default. On, the API refuses to start unless PUBLIC_URL is https.
       MCP_REMOTE: ${MCP_REMOTE:-off}
+      # Allergies and diets on a reservation (ADR-0027). Health data, off by default.
+      DIETARY: ${DIETARY:-off}
       RATE_LIMIT_OAUTH_AUTHORIZE: ${RATE_LIMIT_OAUTH_AUTHORIZE:-}
       RATE_LIMIT_OAUTH_TOKEN: ${RATE_LIMIT_OAUTH_TOKEN:-}
       PUBLIC_POW_DIFFICULTY: ${PUBLIC_POW_DIFFICULTY:-}

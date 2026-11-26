@@ -14,6 +14,7 @@ import * as schema from "../db/schema";
 import type { CountryCode } from "libphonenumber-js";
 import type { DateRange } from "./booking-policy";
 import { consentColumns } from "./consent";
+import { dietaryEnabled } from "./dietary";
 import { appendEvents, type NewEvent } from "./events";
 import type { Origin } from "./origin";
 import { countBlocklistEntries, guestContactKeys } from "./blocklist";
@@ -43,6 +44,8 @@ export interface VenueConfig {
   maxAdvanceDays: number | null;
   maxActivePerGuestPerDay: number | null;
   blockedDates: DateRange[];
+  /** Read only: the instance switch `DIETARY`, the same for every venue (ADR-0027). */
+  dietaryEnabled: boolean;
 }
 
 export type ConfigResult =
@@ -98,6 +101,7 @@ export async function getConfig(db: Db, venueId: string): Promise<VenueConfig | 
     maxAdvanceDays: venue.maxAdvanceDays,
     maxActivePerGuestPerDay: venue.maxActivePerGuestPerDay,
     blockedDates: venue.blockedDates,
+    dietaryEnabled: dietaryEnabled(),
   };
 }
 
@@ -193,6 +197,7 @@ export async function setConfig(
         maxAdvanceDays,
         maxActivePerGuestPerDay,
         blockedDates,
+        dietaryEnabled: dietaryEnabled(),
       },
     };
   });
@@ -363,6 +368,7 @@ export async function eraseReservations(
         ...consentColumns("unknown"),
         ...ratingColumns(null),
         commentary: "",
+        dietary: null,
         ...reconfirmationColumns("none"),
         erased: true,
       })
