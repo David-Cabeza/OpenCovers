@@ -45,7 +45,7 @@ const AUTO_FIT_MIN = 0.7;
 // Edit handles are 20 px discs. Their tap area grows to 44 px, mostly outwards, so it takes little from the table or
 // element underneath and the areas of two handles on a 40 px element meet without overlapping.
 const HANDLE =
-  "absolute -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm before:absolute before:-top-4 before:-bottom-2 before:content-[''] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+  "absolute -top-2 flex size-5 items-center justify-center rounded-full border border-foreground/40 bg-card text-[10px] text-foreground shadow-sm before:absolute before:-top-4 before:-bottom-2 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const HANDLE_LEFT = "-left-2 z-10 before:-left-4 before:-right-2 hover:bg-accent";
 const HANDLE_RIGHT = "-right-2 before:-left-2 before:-right-4 hover:bg-destructive hover:text-white";
 

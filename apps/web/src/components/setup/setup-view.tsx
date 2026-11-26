@@ -93,7 +93,7 @@ function SectionTabs({
 
   return (
     <div className="sticky top-16 z-[5] -mx-4 border-b bg-background/95 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <div role="tablist" aria-label={t("setup.nav")} className="flex gap-2 overflow-x-auto py-2">
+      <div role="tablist" aria-label={t("setup.nav")} className="-mx-1 flex gap-2 overflow-x-auto px-1 py-2">
         {sections.map((section, index) => {
           const selected = section.id === active;
           return (
@@ -112,7 +112,7 @@ function SectionTabs({
               onKeyDown={(e) => onKeyDown(e, index)}
               className={cn(
                 "shrink-0 rounded-full border px-3.5 py-1.5 text-sm max-sm:min-h-11 coarse:min-h-11 font-medium transition-colors",
-                "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 selected
                   ? "border-primary bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground",

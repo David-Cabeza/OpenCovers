@@ -117,7 +117,7 @@ export function CreateKeyDialog({
               <select
                 id="key-role"
                 {...register("role")}
-                className="flex h-9 coarse:h-11 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="flex h-9 coarse:h-11 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="read">{t("setup.keys.roleRead")}</option>
                 <option value="write">{t("setup.keys.roleWrite")}</option>

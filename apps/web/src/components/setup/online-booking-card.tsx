@@ -164,7 +164,7 @@ function Chip({
           "inline-flex items-center rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
           !verbatim && "first-letter:uppercase",
           "hover:bg-muted peer-checked:border-primary peer-checked:bg-accent peer-checked:text-accent-foreground",
-          "peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50",
+          "peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background",
         )}
       >
         {children}
