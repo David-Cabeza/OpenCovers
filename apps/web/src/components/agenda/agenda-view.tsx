@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarPlusIcon,
@@ -85,6 +85,7 @@ function nextQuarterHour(): string {
 
 export function AgendaView({ venueId }: { venueId: string }) {
   const t = useT();
+  const pastDayId = useId();
   const [date, setDate] = useDayParam();
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
@@ -170,15 +171,25 @@ export function AgendaView({ venueId }: { venueId: string }) {
         title={t("agenda.title")}
         description={<span className="first-letter:uppercase">{longDate(date)}</span>}
         actions={
-          <>
+          <div className="relative flex flex-wrap items-center gap-2">
             <DayNav date={date} onChange={setDate} />
-            <Button disabled={isPast} onClick={() => setNewOpen(true)}>
+            <Button disabled={isPast} aria-describedby={isPast ? pastDayId : undefined} onClick={() => setNewOpen(true)}>
               {t("reservation.new.title")}
             </Button>
             <Button variant="outline" onClick={() => setWalkInOpen(true)}>
               {t("agenda.walkIn")}
             </Button>
-          </>
+            {isPast && (
+              // Visible text, as a disabled button gets no tooltip. From `sm` up it sits in the gap under the header,
+              // so the day arrows stay put when the day turns past.
+              <p
+                id={pastDayId}
+                className="w-full text-sm leading-4 text-muted-foreground sm:absolute sm:inset-x-0 sm:top-full sm:mt-1 sm:text-right"
+              >
+                {t("agenda.pastDay")}
+              </p>
+            )}
+          </div>
         }
       />
 
