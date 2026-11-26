@@ -50,11 +50,15 @@ export function parseDays(value: unknown): number[] | null {
 // `rect` is the older name of `rectangle`, still in stored data and the demo template.
 const TABLE_SHAPES = ["round", "oval", "square", "rectangle", "long", "rect"] as const;
 
-// Starts with a letter or digit, so an id is never `.` or `..` in a URL path.
-const TABLE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+// The rule for a new id. Starts with a letter or digit, so it is never `.` or `..` in a URL path.
+const NEW_TABLE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+// A table stored before that rule can have any id, so the body takes any id the database can look up (no NUL) and
+// `upsertTable` applies the rule. 2704 is the byte limit of a PostgreSQL btree entry, which the primary key is.
+const MAX_STORED_TABLE_ID_LENGTH = 2704;
 
 export const TABLE_FIELDS = {
-  id: text(64, TABLE_ID),
+  id: text(MAX_STORED_TABLE_ID_LENGTH, /^[^\0]+$/),
   name: text(80, /\S/),
   seats: integer(1, 200),
   zone: optional(text(80)),
@@ -96,14 +100,17 @@ export async function upsertTable(
   db: Db,
   venueId: string,
   input: { id: string; name: string; seats: number; zone?: string; shape?: string },
-): Promise<{ ok: true } | VenueNotFound> {
+): Promise<{ ok: true } | VenueNotFound | { ok: false; code: "invalid_request" }> {
   return db.transaction(async (tx) => {
     if (!(await venueExists(tx as unknown as Db, venueId))) return { ok: false, code: "venue_not_found" } as const;
     const [known] = await tx
       .select({ id: tables.id })
       .from(tables)
       .where(and(eq(tables.venueId, venueId), eq(tables.id, input.id)));
-    if (!known) await enforceSandboxCap(tx as unknown as Db, venueId, "tables");
+    if (!known) {
+      if (!NEW_TABLE_ID.test(input.id)) return { ok: false, code: "invalid_request" } as const;
+      await enforceSandboxCap(tx as unknown as Db, venueId, "tables");
+    }
     await tx
       .insert(tables)
       .values({
