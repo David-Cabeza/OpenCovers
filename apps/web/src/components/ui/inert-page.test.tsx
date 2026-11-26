@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it } from "vitest"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select"
 
 describe("modal menu", () => {
   it("makes the page behind inert while open and gives focus back to the trigger", async () => {
@@ -27,6 +28,32 @@ describe("modal menu", () => {
     await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument())
     expect(root).not.toHaveAttribute("inert")
     await waitFor(() => expect(trigger).toHaveFocus())
+    root.remove()
+  })
+})
+
+describe("select", () => {
+  it("never leaves the page inert, closed or after use", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    window.HTMLElement.prototype.hasPointerCapture ??= () => false
+    window.HTMLElement.prototype.releasePointerCapture ??= () => {}
+    window.HTMLElement.prototype.scrollIntoView ??= () => {}
+    const root = document.createElement("div")
+    root.id = "root"
+    document.body.appendChild(root)
+    const { unmount } = render(
+      <Select defaultValue="a">
+        <SelectTrigger aria-label="Venue"><SelectValue /></SelectTrigger>
+        <SelectContent><SelectItem value="a">A</SelectItem><SelectItem value="b">B</SelectItem></SelectContent>
+      </Select>,
+      { container: root.appendChild(document.createElement("div")) },
+    )
+    expect(root).not.toHaveAttribute("inert")
+    await user.click(screen.getByRole("combobox", { name: "Venue" }))
+    await user.click(await screen.findByRole("option", { name: "B" }))
+    await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument())
+    expect(root).not.toHaveAttribute("inert")
+    unmount()
     root.remove()
   })
 })
