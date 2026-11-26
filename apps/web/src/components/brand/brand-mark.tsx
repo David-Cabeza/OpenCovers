@@ -1,3 +1,4 @@
+import type { ComponentPropsWithoutRef } from "react";
 import { cn } from "cn";
 
 const SEATS = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -34,12 +35,10 @@ export function BrandMark({ className }: { className?: string }) {
 export function BrandLogo({
   className,
   showWordmark = true,
-}: {
-  className?: string;
-  showWordmark?: boolean;
-}) {
+  ...rest
+}: { showWordmark?: boolean } & ComponentPropsWithoutRef<"span">) {
   return (
-    <span className={cn("inline-flex items-center gap-2 text-primary", className)}>
+    <span {...rest} className={cn("inline-flex items-center gap-2 text-primary", className)}>
       <BrandMark className="size-8" />
       {showWordmark && (
         <span className="font-display text-xl leading-none text-foreground">{"OpenCovers"}</span>

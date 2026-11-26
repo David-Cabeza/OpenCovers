@@ -105,13 +105,13 @@ export function EditReservationDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>{t("reservation.edit.rating")}</Label>
+            <Label htmlFor="edit-rating">{t("reservation.edit.rating")}</Label>
             <Controller
               name="rating"
               control={control}
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger id="edit-rating" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
