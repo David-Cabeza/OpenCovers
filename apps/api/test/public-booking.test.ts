@@ -687,9 +687,9 @@ describe("C43 / C55 guest locale on the public create (ADR-0024)", () => {
     const publicId = await staffId(v, contact);
     expect(await stored(publicId)).toBeNull();
 
-    const made = await staffPost(v, "/reservations", {
-      date: SATURDAY, time: "21:00", partySize: 2, guest: { name: "Staff", contact: "staff@example.com" }, guestLocale: "en", locale: "en",
-    });
+    const staffBooking = { date: SATURDAY, time: "21:00", partySize: 2, guest: { name: "Staff", contact: "staff@example.com" } };
+    expect((await staffPost(v, "/reservations", { ...staffBooking, guestLocale: "en", locale: "en" })).status).toBe(400);
+    const made = await staffPost(v, "/reservations", staffBooking);
     expect(made.status).toBe(200);
     const staffRes = (await made.json()) as any;
     expect(staffRes.guestLocale).toBeNull();
@@ -698,12 +698,14 @@ describe("C43 / C55 guest locale on the public create (ADR-0024)", () => {
     const list = (await (await staffGet(v, "/reservations")).json()) as any;
     expect(list.reservations.map((r: any) => r.guestLocale)).toEqual([null]);
 
-    const walk = await staffPost(v, "/reservations/walk-in", { partySize: 2, date: SATURDAY, time: "21:00", guestLocale: "fr" });
+    const walkBody = { partySize: 2, date: SATURDAY, time: "21:00" };
+    expect((await staffPost(v, "/reservations/walk-in", { ...walkBody, guestLocale: "fr" })).status).toBe(400);
+    const walk = await staffPost(v, "/reservations/walk-in", walkBody);
     expect(walk.status).toBe(200);
     expect(await stored(((await walk.json()) as any).id)).toBeNull();
 
-    const modified = await staffPost(v, `/reservations/${publicId}/modify`, { partySize: 3, guestLocale: "de" });
-    expect(modified.status).toBe(200);
+    expect((await staffPost(v, `/reservations/${publicId}/modify`, { partySize: 3, guestLocale: "de" })).status).toBe(400);
+    expect((await staffPost(v, `/reservations/${publicId}/modify`, { partySize: 3 })).status).toBe(200);
     expect(await stored(publicId)).toBeNull();
   });
 
@@ -755,7 +757,8 @@ describe("C43 / C55 guest locale on the public create (ADR-0024)", () => {
     });
     expect(ok.status).toBe(200);
     expect(await stored(id)).toBe("pt");
-    expect((await staffPost(v, `/reservations/${id}/modify`, { partySize: 2, guestLocale: "fr" })).status).toBe(200);
+    expect((await staffPost(v, `/reservations/${id}/modify`, { partySize: 2, guestLocale: "fr" })).status).toBe(400);
+    expect((await staffPost(v, `/reservations/${id}/modify`, { partySize: 2 })).status).toBe(200);
     expect(await stored(id)).toBe("pt");
   });
 

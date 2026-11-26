@@ -194,11 +194,10 @@ describe("public channel never takes a start in the past (C62)", () => {
       date: "2020-01-01",
       time: "20:00",
       partySize: 2,
-      guestName: "Staff Entry",
-      guestContact: nextContact(),
+      guest: { name: "Staff Entry", contact: nextContact() },
     });
     expect(created.status).toBe(200);
-    const early = await staff(v, "/reservations/walk-in", { date: "2020-01-01", time: "20:30", partySize: 2, guestName: "Walk In", guestContact: nextContact() });
+    const early = await staff(v, "/reservations/walk-in", { date: "2020-01-01", time: "20:30", partySize: 2, guest: { name: "Walk In", contact: nextContact() } });
     expect(early.status).toBe(200);
   });
 

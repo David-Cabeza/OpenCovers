@@ -364,9 +364,11 @@ describe("C75 waitlist leave", () => {
 });
 
 describe("C76 staff waitlist with dates", () => {
-  it("carries date, window and source on every answer, and a staff add is a same-day entry whatever it sends", async () => {
+  it("carries date, window and source on every answer, and a staff add is a same-day entry and takes none of them", async () => {
     const v = await makeVenue();
-    const added = await staff(v, "POST", "/waitlist", { partySize: 2, date: ahead(3), source: "widget", windowStart: "20:00", guest: { name: "Eva" } });
+    const refused = await staff(v, "POST", "/waitlist", { partySize: 2, date: ahead(3), source: "widget", windowStart: "20:00", guest: { name: "Eva" } });
+    expect(refused.status).toBe(400);
+    const added = await staff(v, "POST", "/waitlist", { partySize: 2, guest: { name: "Eva" } });
     expect(added.status).toBe(201);
     const [entry] = (await added.json()).entries;
     expect(entry).toMatchObject({ date: null, windowStart: null, windowEnd: null, source: "staff" });
