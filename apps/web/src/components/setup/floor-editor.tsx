@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { errorMessage } from "@/lib/error-message";
 import { useT } from "@/i18n";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -63,10 +65,16 @@ export function FloorEditor({ venueId }: { venueId: string }) {
     onError: (err) => toast.error(errorMessage(err, t("setup.floor.addFailed"))),
   });
 
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
   const deleteItem = useMutation({
     mutationFn: (itemId: string) => api.deleteFloorItem(venueId, itemId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["floor-items", venueId] });
+      setDeleting(null);
+    },
+    onError: (err) => {
+      setDeleting(null);
+      toast.error(errorMessage(err, t("setup.floor.deleteFailed")));
     },
   });
 
@@ -107,10 +115,22 @@ export function FloorEditor({ venueId }: { venueId: string }) {
             mode="edit"
             onTableUpdate={(tableId, layout) => positionTable.mutate({ tableId, layout })}
             onItemUpdate={(itemId, layout) => updateItem.mutate({ itemId, layout })}
-            onDeleteItem={(itemId) => deleteItem.mutate(itemId)}
+            onDeleteItem={(itemId) => {
+              const item = items.find((i) => i.id === itemId);
+              setDeleting({ id: itemId, name: item?.label || item?.type || "" });
+            }}
           />
         )}
       </CardContent>
+      <ConfirmDialog
+        open={deleting !== null}
+        title={t("floor.edit.deleteTitle", { name: deleting?.name ?? "" })}
+        description={t("floor.edit.deleteDescription")}
+        confirmLabel={t("common.delete")}
+        pending={deleteItem.isPending}
+        onConfirm={() => deleting && deleteItem.mutate(deleting.id)}
+        onClose={() => setDeleting(null)}
+      />
     </Card>
   );
 }

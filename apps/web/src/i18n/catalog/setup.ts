@@ -97,6 +97,7 @@ export default defineMessages({
     "setup.floor.description": "Drag tables and room elements to arrange your dining room.",
     "setup.floor.addElement": "Add element",
     "setup.floor.addFailed": "Could not add element.",
+    "setup.floor.deleteFailed": "Could not delete the element.",
 
     // API keys
     "setup.keys.title": "API keys",
@@ -272,6 +273,7 @@ export default defineMessages({
     "setup.floor.description": "Arrastra las mesas y los elementos para organizar tu sala.",
     "setup.floor.addElement": "Añadir elemento",
     "setup.floor.addFailed": "No se pudo añadir el elemento.",
+    "setup.floor.deleteFailed": "No se pudo eliminar el elemento.",
 
     "setup.keys.title": "Claves de API",
     "setup.keys.description": "Claves para que plataformas y agentes de IA accedan a este local.",
