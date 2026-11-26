@@ -25,6 +25,7 @@ import { addKey } from "../src/lib/api-keys";
 import { auth } from "../src/lib/auth";
 import { challengeConfigFromEnv, issueChallenge, solve } from "../src/lib/public-challenge";
 import { runRetention } from "../src/lib/retention";
+import { addDays, localDateTime } from "../src/lib/time";
 import { runWebhookDeliveries, webhookDepsFromEnv } from "../src/lib/webhooks";
 import { saturdayAhead } from "./dates";
 
@@ -712,6 +713,71 @@ describe("the instance switch", () => {
     expect(await v.stored(created.id)).toBeNull();
     process.env.DIETARY = "on";
     expect(await v.read(`/reservations/${created.id}`)).not.toHaveProperty("dietary");
+  });
+});
+
+describe("the hidden values flag of the venue config", () => {
+  const flag = async (v: Awaited<ReturnType<typeof makeVenue>>) => (await v.read("/config")).dietaryValuesHidden;
+
+  it("is true only with the switch off and a value on this venue, and says nothing else about it", async () => {
+    const v = await makeVenue();
+    const neighbour = await makeVenue();
+    await v.create();
+    const held = await v.create({ dietary: VALUE });
+    expect(await flag(v)).toBe(false);
+
+    process.env.DIETARY = "off";
+    for (const key of [v.keys.reader, v.keys.admin]) {
+      const config = await (await v.call("GET", "/config", undefined, { key })).json();
+      expect(config.dietaryValuesHidden).toBe(true);
+      expectNoValue(config);
+      expect(JSON.stringify(config)).not.toContain(held.id);
+    }
+    expect(await flag(neighbour)).toBe(false);
+
+    const put = await v.call("PUT", "/config", { dietaryValuesHidden: false }, { key: v.keys.admin });
+    expect(put.status).toBe(200);
+    expect((await put.json()).dietaryValuesHidden).toBe(true);
+    const ignored = await neighbour.call("PUT", "/config", { dietaryValuesHidden: true }, { key: neighbour.keys.admin });
+    expect((await ignored.json()).dietaryValuesHidden).toBe(false);
+
+    expect((await v.modify(held.id, { dietary: null })).status).toBe(200);
+    expect(await flag(v)).toBe(false);
+  });
+
+  it("counts booked and seated reservations and no finished one", async () => {
+    const v = await makeVenue();
+    const held = await v.create({ dietary: VALUE });
+    const status = (next: string) => v.post(`/reservations/${held.id}/status`, { status: next });
+    process.env.DIETARY = "off";
+    expect(await flag(v)).toBe(true);
+    await status("seated");
+    expect(await flag(v)).toBe(true);
+    await status("attended");
+    expect(await flag(v)).toBe(false);
+
+    for (const end of ["cancel", "no_show"] as const) {
+      process.env.DIETARY = "on";
+      const ended = await v.create({ dietary: VALUE });
+      process.env.DIETARY = "off";
+      expect(await flag(v)).toBe(true);
+      if (end === "cancel") await v.post(`/reservations/${ended.id}/cancel`, {});
+      else await v.post(`/reservations/${ended.id}/status`, { status: "no_show" });
+      expect(await flag(v)).toBe(false);
+      expect(await v.stored(ended.id)).not.toBeNull();
+    }
+  });
+
+  // The two zones are 26 hours apart, so at any hour one of them is on another date than UTC.
+  it.each(["Pacific/Kiritimati", "Etc/GMT+12"])("counts from yesterday in the venue's time zone, %s", async (timezone) => {
+    const v = await makeVenue({ timezone });
+    const held = await v.create({ dietary: VALUE });
+    process.env.DIETARY = "off";
+    const today = localDateTime(new Date(), timezone).date;
+    for (const [daysBack, hidden] of [[2, false], [1, true], [0, true]] as const) {
+      await db.update(reservations).set({ date: addDays(today, -daysBack) }).where(eq(reservations.id, held.id));
+      expect(await flag(v)).toBe(hidden);
+    }
   });
 });
 
