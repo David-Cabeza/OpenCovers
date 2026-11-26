@@ -6,6 +6,20 @@ All notable changes to OpenCovers are listed here. The format follows [Keep a Ch
 
 Feature PRs append their entries here. The release PR moves them under a version heading.
 
+### Breaking
+
+- The staff reservation and waitlist writes refuse what they do not fully understand ([ADR-0029](docs/adr/0029-contract-rules-for-writes.md), C94): create, walk-in, modify, status and cancel of a reservation, and add, seat and cancel of a waitlist entry. They answer `400 invalid_request`, write nothing and store no idempotency key. For named fields the answer adds `details.fields`. There is no warning window. Requests that used to answer success and now fail:
+  - A field the write does not take, at the top level or inside `guest`. Such as `source`, `service`, `status`, `bookedVia`, `basis`, `ownerPrincipal`, `guest.guestId`, `date` on a waitlist add, `reconfirmation` on a walk-in (already refused), `guest.name` or `guest.contact` on a modify, and any field on a cancel, seat or waitlist cancel.
+  - A wrong type, `null` included, where the field takes none: `zone: null`, `guest: null`, `guest.contact: null`, a number as a name or a zone, a walk-in `date` or `time` that is not a string, and `tables` that is not a list of strings.
+  - `partySize` that is zero, negative or over 10000. A create, walk-in, modify and waitlist add used to take zero or a negative number, a modify also a string, and a modify and waitlist add a party over 10000. A create or walk-in over 10000 now answers `invalid_request` instead of `party_size_too_large`.
+  - `guest.contact` over 254 characters.
+  - A modify whose `date`, `time` or `zone` differs from the booking. It used to answer `200` and ignore them.
+  - A modify body that is a JSON array, and a cancel, seat or waitlist cancel body other than empty or `{}`.
+  - A phone sent as a JSON number in `guest.contact`, which used to be read as text.
+  - A retry, with a key already used, whose body is one of the above: it answers `400` instead of the first result.
+
+  Migration: send only the fields in the request schema of `openapi.yaml`, leave a field out instead of sending `null` (`rating: null` and `dietary: null` keep their meaning), and do not rely on a modify to move a booking. A modify may still repeat the current `date`, `time` and `zone`. A malformed or missing body, a fractional `partySize` and other input that answered a plain-text `500` now answer `400`.
+
 ### Added
 
 - Allergies and diets on a reservation, `dietary` (C82, [ADR-0027](docs/adr/0027-allergies-and-dietary-needs.md)), behind the instance switch `DIETARY=on|off`, off by default. It is health data, and the legal review still gates use with real guests. Create, walk-in and modify take it, and get, the agenda and the answers of reservation writes return it. List, search, events, webhooks, emails, logs and the public channel never carry it. Erasure and retention clear it. `GET /v1/venues/{venueId}/config` reads `dietaryEnabled`. The MCP tools do not take the field yet. Run the database migration (0050).

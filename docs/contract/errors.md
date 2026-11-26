@@ -6,7 +6,7 @@ Every error response is `{"code": "...", "message": "...", "retryable": true|fal
 
 ## Request errors
 
-- `invalid_request`: the request is malformed or fails validation. A body over 16 KB under `/v1/public/` or over 256 KB elsewhere gets it, and so does a staff write made with a session cookie whose body is not `application/json`. Not retryable.
+- `invalid_request`: the request is malformed or fails validation. A body over 16 KB under `/v1/public/` or over 256 KB elsewhere gets it, and so does a staff write made with a session cookie whose body is not `application/json`. A staff reservation or waitlist write also gets it for a field it does not take, a wrong type, a number out of range, a body that is not a JSON object, malformed JSON or a missing body, and for a `date`, `time` or `zone` on a modify that differs from the booking (C94). Its `details.fields` lists `{ "path", "problem" }`, with `problem` one of `unknown`, `missing`, `invalid` or `unchangeable`. It names fields and never repeats a sent value. `details` is absent when no single field is at fault, such as a body that is not an object. Not retryable.
 - `venue_not_found`: the venue does not exist, or the caller cannot see it. Indistinguishable from not found. Not retryable.
 - `reservation_not_found`: the reservation does not exist, or the caller cannot see it. Not retryable.
 - `waitlist_entry_not_found`: the waitlist entry does not exist, or the caller cannot see it. Not retryable.

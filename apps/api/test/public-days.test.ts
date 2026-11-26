@@ -99,8 +99,7 @@ async function fill(v: Venue, date: string) {
           date,
           time,
           partySize: 4,
-          guestName: "Staff Entry",
-          guestContact: `fill${++ips}@example.com`,
+          guest: { name: "Staff Entry", contact: `fill${++ips}@example.com` },
         }),
       });
     }
@@ -196,7 +195,7 @@ describe("C63 public day status", () => {
         await app.request(`/v1/venues/${v.id}/reservations`, {
           method: "POST",
           headers: { apikey: v.admin, "content-type": "application/json", "Idempotency-Key": crypto.randomUUID() },
-          body: JSON.stringify({ date: today(), time, partySize: 4, guestName: "S", guestContact: `t${++ips}@example.com` }),
+          body: JSON.stringify({ date: today(), time, partySize: 4, guest: { name: "S", contact: `t${++ips}@example.com` } }),
         });
       }
     }

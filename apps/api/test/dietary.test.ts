@@ -374,7 +374,6 @@ describe("modify", () => {
         { dietary: VALUE },
         { dietary: { allergens: ["eggs"], consented: true } },
         { dietary: null, commentary: "x" },
-        { dietary: null, unknownField: 1 },
       ]) {
         const res = await v.modify(created.id, body);
         expect(res.status).toBe(409);
@@ -524,10 +523,16 @@ describe("where the value never goes", () => {
     const v = await makeVenue();
     // A seat books the current time, whatever hour the test runs at.
     await db.update(services).set({ openStart: "00:00", openEnd: "24:00" }).where(eq(services.venueId, v.id));
-    const added = await (await v.post("/waitlist", { partySize: 2, dietary: VALUE })).json();
-    expectNoValue(added);
+    // Neither waitlist write takes the field (C94), and the refusal repeats nothing of it.
+    const refusedAdd = await v.post("/waitlist", { partySize: 2, dietary: VALUE });
+    expect(refusedAdd.status).toBe(400);
+    expectNoValue(await refusedAdd.text());
+    const added = await (await v.post("/waitlist", { partySize: 2 })).json();
     const entry = added.entries[0].id;
-    const seated = await (await v.post(`/waitlist/${entry}/seat`, { dietary: VALUE }, { idem: "seat-1" })).json();
+    const refusedSeat = await v.post(`/waitlist/${entry}/seat`, { dietary: VALUE }, { idem: "seat-1" });
+    expect(refusedSeat.status).toBe(400);
+    expectNoValue(await refusedSeat.text());
+    const seated = await (await v.post(`/waitlist/${entry}/seat`, {}, { idem: "seat-1" })).json();
     expectNoValue(seated);
     expect(await v.stored(seated.id)).toBeNull();
     await v.modify(seated.id, { dietary: VALUE });
@@ -630,10 +635,14 @@ describe("where the value never goes", () => {
       await v.post("/reservations/walk-in", broken),
       await v.modify(kept.id, broken),
     ]) {
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(400);
       expect(await res.text()).not.toContain("qj7");
     }
-    expect(logged).toHaveLength(3);
+    expect(logged).toHaveLength(0);
+    // A route that still fails on a body that does not parse reports it, without the text.
+    const config = await v.call("PUT", "/config", broken, { key: v.keys.admin });
+    expect(config.status).toBe(500);
+    expect(logged).toHaveLength(1);
     expect(logText()).toContain("SyntaxError");
     expect(logText()).not.toContain("qj7");
   });

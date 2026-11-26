@@ -1,3 +1,5 @@
+import type { FieldProblem, Problem } from "./body";
+
 // retryable: repeating the same request, unchanged, may succeed later.
 // False when the caller must change something first (inputs, credentials, state).
 export const ERRORS = {
@@ -66,4 +68,18 @@ export type ErrorCode = keyof typeof ERRORS;
 
 export function errorBody(code: ErrorCode) {
   return { code, message: code, retryable: ERRORS[code].retryable };
+}
+
+const PROBLEM_TEXT: Record<Problem, string> = {
+  unknown: "Unknown field",
+  missing: "Missing field",
+  invalid: "Invalid field",
+  unchangeable: "Field cannot be changed",
+};
+
+/** `invalid_request` for an authenticated route, naming what is wrong (C94). It carries names, never a sent value. */
+export function invalidBodyError(fields: FieldProblem[]) {
+  if (fields.length === 0) return { ...errorBody("invalid_request"), message: "The body must be a JSON object" };
+  const message = fields.map((f) => `${PROBLEM_TEXT[f.problem]}: ${f.path}`).join(". ");
+  return { ...errorBody("invalid_request"), message, details: { fields } };
 }

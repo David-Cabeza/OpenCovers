@@ -12,6 +12,7 @@ import {
 } from "../db/schema";
 import * as schema from "../db/schema";
 import { countBlocklistEntries } from "./blocklist";
+import type { FieldProblem } from "./body";
 import { blockedRange } from "./booking-policy";
 import { normalizeCommentary } from "./commentary";
 import { consentColumns, type Consent } from "./consent";
@@ -26,6 +27,7 @@ import type { Origin } from "./origin";
 import { ratingColumns, type Rating } from "./rating";
 import { reconfirmationColumns, type Reconfirmation } from "./reconfirmation";
 import { linkWorks, mintLink, revokeForCancel, rotateLink } from "./self-service";
+import { movedFields, type Slot } from "./staff-writes";
 import {
   addDays,
   formatTime,
@@ -116,6 +118,8 @@ export interface ModifyReservationInput {
   dietary?: DietaryValue | null;
   /** The body held only `dietary: null`. A withdrawal is accepted on every status, the one exception to C4. */
   dietaryWithdrawal?: boolean;
+  /** C94: date, time and zone the body repeats. Each must equal the stored one, or nothing is written. */
+  restated?: Partial<Slot>;
   selfService?: SelfServiceWrite & { version: number; rules: OnlineRules };
   origin?: Origin | null;
 }
@@ -290,7 +294,7 @@ export type WriteErrorCode =
 /** `selfServiceToken` is set only by a public create: the new link, or null on a repeat for a booking no longer `booked`. */
 export type WriteResult =
   | { ok: true; id: string; version: number; selfServiceToken?: string | null }
-  | { ok: false; code: WriteErrorCode };
+  | { ok: false; code: WriteErrorCode; fields?: FieldProblem[] };
 
 export type CancelResult =
   | { ok: true; hash: string }
@@ -315,7 +319,10 @@ const ALLOWED_TRANSITIONS: Record<StatusTransition, string[]> = {
 };
 
 class ReservationError extends Error {
-  constructor(readonly code: WriteErrorCode) {
+  constructor(
+    readonly code: WriteErrorCode,
+    readonly fields?: FieldProblem[],
+  ) {
     super(code);
   }
 }
@@ -1123,6 +1130,12 @@ export async function modifyReservation(
           .limit(1)
       )[0];
       if (!current) throw new ReservationError("reservation_not_found");
+      if (input.restated) {
+        const [{ timezone }] = await tx.select({ timezone: venues.timezone }).from(venues).where(eq(venues.id, venueId));
+        const stored = { date: current.date, time: formatTime(current.startsAt, timezone), zone: current.zone };
+        const moved = movedFields(input.restated, stored);
+        if (moved.length > 0) throw new ReservationError("invalid_request", moved);
+      }
       if (guest) {
         assertChangeable(current, guest);
         if (current.version !== guest.version) throw new ReservationError("reservation_changed");
@@ -1252,7 +1265,7 @@ export async function modifyReservation(
     // A guest's party never uses the ceiling, so a table taken by a concurrent write leaves no fitting table.
     if (isExclusionViolation(error)) return { ok: false, code: guest ? "no_suitable_table" : "slot_taken" };
     if (isLockFailure(error)) return { ok: false, code: "venue_busy" };
-    if (error instanceof ReservationError) return { ok: false, code: error.code };
+    if (error instanceof ReservationError) return { ok: false, code: error.code, fields: error.fields };
     throw error;
   }
 }
