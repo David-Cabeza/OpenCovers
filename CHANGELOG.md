@@ -6,6 +6,10 @@ All notable changes to OpenCovers are listed here. The format follows [Keep a Ch
 
 Feature PRs append their entries here. The release PR moves them under a version heading.
 
+### Fixed
+
+- The floor plan (`GET /v1/venues/{venueId}/floor`) shows a table as occupied from the exact minute its booking starts. It used to show it as free during that minute, so a booking at 21:00, or a walk-in just seated, read as a free table. The end stays excluded.
+
 ### Breaking
 
 - The staff reservation and waitlist writes refuse what they do not fully understand ([ADR-0029](docs/adr/0029-contract-rules-for-writes.md), C94): create, walk-in, modify, status and cancel of a reservation, and add, seat and cancel of a waitlist entry. They answer `400 invalid_request`, write nothing and store no idempotency key. For named fields the answer adds `details.fields`. There is no warning window. Requests that used to answer success and now fail:
