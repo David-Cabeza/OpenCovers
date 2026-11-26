@@ -89,6 +89,23 @@ describe("ServiceFormDialog weekdays", () => {
   });
 });
 
+describe("ServiceFormDialog name", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("says a name over 200 characters is too long and sends nothing", async () => {
+    const user = userEvent.setup();
+    const posts = mockApi();
+    renderDialog();
+
+    await user.click(screen.getByLabelText("Name"));
+    await user.paste("s".repeat(201));
+    await user.click(screen.getByRole("button", { name: "Add service" }));
+
+    expect(await screen.findByText("Name can be up to 200 characters.")).toBeInTheDocument();
+    expect(posts).toHaveLength(0);
+  });
+});
+
 describe("formatDays", () => {
   it("names the set compactly", () => {
     expect(formatDays([1, 2, 3, 4, 5, 6, 7])).toBe("Every day");
