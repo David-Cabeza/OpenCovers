@@ -239,12 +239,12 @@ describe("AgendaView actions", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(new RegExp(longDate("2030-01-01"), "i"))).toBeInTheDocument();
     await waitFor(() => expect(within(dialog).getByLabelText("Time")).toHaveValue("20:00"));
-    await user.click(within(dialog).getByRole("button", { name: /Table 2/ }));
     await user.type(within(dialog).getByLabelText("Guest name"), "Pat");
     await user.click(within(dialog).getByRole("button", { name: "Create reservation" }));
 
     await waitFor(() => expect(api.writes()).toHaveLength(1));
-    expect(api.writes()[0].body).toMatchObject({ date: "2030-01-01", time: "20:00", tables: ["t2"] });
+    expect(api.writes()[0].body).toMatchObject({ date: "2030-01-01", time: "20:00" });
+    expect(api.writes()[0].body).not.toHaveProperty("tables");
     expect(await screen.findByText("Pat")).toBeInTheDocument();
   });
 

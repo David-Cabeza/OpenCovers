@@ -61,7 +61,8 @@ export function NewReservationDialog({
   const { data } = useTables(venueId);
   const tables = data?.tables ?? [];
   const { data: agenda } = useAgenda(venueId, date);
-  const [selected, setSelected] = useState<string[]>([]);
+  // null: the server assigns the tables. An array: the host chooses them.
+  const [selected, setSelected] = useState<string[] | null>(null);
   const [time, setTime] = useState(initialTime);
   const [tableError, setTableError] = useState<string | null>(null);
 
@@ -80,7 +81,7 @@ export function NewReservationDialog({
   const totalSeats = useMemo(
     () =>
       tables
-        .filter((t) => selected.includes(t.id))
+        .filter((t) => selected?.includes(t.id))
         .reduce((sum, t) => sum + t.seats, 0),
     [tables, selected],
   );
@@ -98,13 +99,13 @@ export function NewReservationDialog({
   }, [agenda, time]);
 
   useEffect(() => {
-    setSelected((prev) => (prev.some((id) => busy.has(id)) ? prev.filter((id) => !busy.has(id)) : prev));
+    setSelected((prev) => (prev?.some((id) => busy.has(id)) ? prev.filter((id) => !busy.has(id)) : prev));
   }, [busy]);
 
   useEffect(() => {
     if (open) {
       reset({ partySize, name: "", contact: "", commentary: "" });
-      setSelected([]);
+      setSelected(null);
       setTableError(null);
     }
   }, [open, partySize, reset]);
@@ -113,29 +114,34 @@ export function NewReservationDialog({
     if (open) setTime(initialTime);
   }, [open, initialTime]);
 
+  function chooseMode(manual: boolean) {
+    setSelected(manual ? [] : null);
+    setTableError(null);
+  }
+
   function toggleTable(id: string) {
     if (busy.has(id)) return;
     setTableError(null);
     setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+      prev?.includes(id) ? prev.filter((x) => x !== id) : [...(prev ?? []), id],
     );
   }
 
   async function onSubmit(values: FormValues) {
-    if (selected.length === 0) {
+    if (selected?.length === 0) {
       setTableError(t("reservation.selectTable"));
       return;
     }
-    if (values.partySize > totalSeats) {
+    if (selected && values.partySize > totalSeats) {
       setTableError(t("reservation.partyTooLarge"));
       return;
     }
     try {
-      await api.createReservation(venueId, {
+      const created = await api.createReservation(venueId, {
         date,
         time,
         partySize: values.partySize,
-        tables: selected,
+        tables: selected ?? undefined,
         guest: {
           name: values.name || undefined,
           contact: values.contact || undefined,
@@ -144,11 +150,19 @@ export function NewReservationDialog({
       });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
-      toast.success(t("reservation.new.done"));
+      const assigned = (created.tables ?? []).map((id) => tables.find((tbl) => tbl.id === id)?.name ?? id).join(", ");
+      toast.success(t("reservation.new.done"), {
+        description: assigned ? `${t("reservation.tables")}: ${assigned}` : t("agenda.unassigned"),
+      });
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof ApiError && err.code === "slot_taken") {
-        setTableError(errorMessage(err, t("reservation.new.failed")));
+      if (err instanceof ApiError && ["slot_taken", "no_suitable_table", "party_size_too_large"].includes(err.code)) {
+        // With no chosen tables, the API's "those tables do not fit" has nothing to point at.
+        setTableError(
+          err.code === "no_suitable_table" && !selected
+            ? t("reservation.noFreeTable")
+            : errorMessage(err, t("reservation.new.failed")),
+        );
         void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
         return;
       }
@@ -192,6 +206,7 @@ export function NewReservationDialog({
                 valueAsNumber: true,
                 required: t("reservation.partySizeRequired"),
                 min: { value: 1, message: t("reservation.atLeastOne") },
+                onChange: () => setTableError(null),
               })}
             />
             {errors.partySize && (
@@ -201,11 +216,32 @@ export function NewReservationDialog({
 
           <div className="space-y-2">
             <Label id="new-reservation-tables-label">{t("reservation.tables")}</Label>
+            {tables.length > 0 && (
+              <div
+                role="radiogroup"
+                aria-labelledby="new-reservation-tables-label"
+                aria-describedby={tableError ? "new-reservation-tables-error" : undefined}
+                className="flex flex-wrap gap-x-5"
+              >
+                {[false, true].map((manual) => (
+                  <label key={String(manual)} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm sm:min-h-9 coarse:min-h-11">
+                    <input
+                      type="radio"
+                      name="new-reservation-table-mode"
+                      className="size-4 accent-primary"
+                      checked={manual === (selected !== null)}
+                      onChange={() => chooseMode(manual)}
+                    />
+                    {t(manual ? "reservation.tablesChoose" : "reservation.tablesAuto")}
+                  </label>
+                ))}
+              </div>
+            )}
             {tables.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {t("reservation.noTables")}
               </p>
-            ) : (
+            ) : selected && (
               <div
                 role="group"
                 aria-labelledby="new-reservation-tables-label"
@@ -244,18 +280,20 @@ export function NewReservationDialog({
                 {tableError}
               </p>
             )}
-            <p
-              className={
-                watchedPartySize > totalSeats && selected.length > 0
-                  ? "text-sm text-destructive"
-                  : "text-sm text-muted-foreground"
-              }
-            >
-              {t("reservation.selected", {
-                seats: t("common.seats", { count: totalSeats }),
-                guests: t("common.guests", { count: watchedPartySize }),
-              })}
-            </p>
+            {selected && (
+              <p
+                className={
+                  watchedPartySize > totalSeats && selected.length > 0
+                    ? "text-sm text-destructive"
+                    : "text-sm text-muted-foreground"
+                }
+              >
+                {t("reservation.selected", {
+                  seats: t("common.seats", { count: totalSeats }),
+                  guests: t("common.guests", { count: watchedPartySize }),
+                })}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

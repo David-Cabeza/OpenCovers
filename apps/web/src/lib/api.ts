@@ -222,7 +222,8 @@ export interface CreateReservationBody {
   date: string;
   time: string;
   partySize: number;
-  tables: string[];
+  /** Omitted: the server assigns the tables. */
+  tables?: string[];
   guest?: {
     name?: string;
     contact?: string;

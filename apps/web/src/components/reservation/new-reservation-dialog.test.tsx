@@ -35,6 +35,10 @@ function setup(
   return { api, onOpenChange, user: userEvent.setup() };
 }
 
+async function chooseManually(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("radio", { name: "Choose table" }));
+}
+
 async function submit(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "Create reservation" }));
 }
@@ -46,7 +50,8 @@ describe("NewReservationDialog", () => {
 
   it("sends the party size as a number with date, time, guest, note and tables", async () => {
     const { api, onOpenChange, user } = setup();
-    await user.click(await screen.findByRole("button", { name: "Table 2 · 4" }));
+    await chooseManually(user);
+    await user.click(screen.getByRole("button", { name: "Table 2 · 4" }));
     await user.clear(screen.getByLabelText("Party size"));
     await user.type(screen.getByLabelText("Party size"), "3");
     await user.type(screen.getByLabelText("Guest name"), "Jane Doe");
@@ -71,7 +76,8 @@ describe("NewReservationDialog", () => {
 
   it("sends the prefilled party size as a number when the host does not touch it", async () => {
     const { api, user } = setup({}, TABLES, 2);
-    await user.click(await screen.findByRole("button", { name: "Table 1 · 2" }));
+    await chooseManually(user);
+    await user.click(screen.getByRole("button", { name: "Table 1 · 2" }));
     await submit(user);
 
     await waitFor(() => expect(api.writes()).toHaveLength(1));
@@ -82,7 +88,8 @@ describe("NewReservationDialog", () => {
 
   it("sums the seats of several selected tables", async () => {
     const { api, user } = setup();
-    await user.click(await screen.findByRole("button", { name: "Table 1 · 2" }));
+    await chooseManually(user);
+    await user.click(screen.getByRole("button", { name: "Table 1 · 2" }));
     await user.click(screen.getByRole("button", { name: "Table 2 · 4" }));
     expect(screen.getByText("6 seats selected for 2 guests.")).toBeInTheDocument();
     await user.clear(screen.getByLabelText("Party size"));
@@ -105,7 +112,8 @@ describe("NewReservationDialog", () => {
 
   it("does not require a guest name or contact", async () => {
     const { api, user } = setup();
-    await user.click(await screen.findByRole("button", { name: "Table 1 · 2" }));
+    await chooseManually(user);
+    await user.click(screen.getByRole("button", { name: "Table 1 · 2" }));
     await submit(user);
 
     await waitFor(() => expect(api.writes()).toHaveLength(1));
@@ -114,7 +122,8 @@ describe("NewReservationDialog", () => {
 
   it("refuses a party larger than the selected tables and sends nothing", async () => {
     const { api, user } = setup();
-    await user.click(await screen.findByRole("button", { name: "Table 1 · 2" }));
+    await chooseManually(user);
+    await user.click(screen.getByRole("button", { name: "Table 1 · 2" }));
     await user.clear(screen.getByLabelText("Party size"));
     await user.type(screen.getByLabelText("Party size"), "5");
     await submit(user);
@@ -127,7 +136,7 @@ describe("NewReservationDialog", () => {
 
   it("asks for a table when none is selected and sends nothing", async () => {
     const { api, user } = setup();
-    await screen.findByRole("button", { name: "Table 1 · 2" });
+    await chooseManually(user);
     await submit(user);
 
     expect(await screen.findByText("Select at least one table.")).toBeInTheDocument();
@@ -136,7 +145,7 @@ describe("NewReservationDialog", () => {
 
   it("shows the missing table inside the dialog and clears it when a table is chosen", async () => {
     const { user } = setup();
-    await screen.findByRole("button", { name: "Table 1 · 2" });
+    await chooseManually(user);
     await submit(user);
 
     const alert = await screen.findByRole("alert");
@@ -157,6 +166,7 @@ describe("NewReservationDialog", () => {
       ],
     };
     const { user } = setup({ "GET /v1/venues/v1/agenda": { body: agenda } });
+    await chooseManually(user);
     const busy = await screen.findByRole("button", { name: /Table 1 · 2/ });
     await waitFor(() => expect(busy).toHaveAttribute("aria-disabled", "true"));
     expect(busy).toHaveAccessibleDescription("Busy · Irene");
@@ -167,7 +177,8 @@ describe("NewReservationDialog", () => {
 
   it("rejects an empty party size before calling the server", async () => {
     const { api, user } = setup();
-    await user.click(await screen.findByRole("button", { name: "Table 1 · 2" }));
+    await chooseManually(user);
+    await user.click(screen.getByRole("button", { name: "Table 1 · 2" }));
     await user.clear(screen.getByLabelText("Party size"));
     await submit(user);
 
@@ -177,7 +188,8 @@ describe("NewReservationDialog", () => {
 
   it("rejects a party of zero before calling the server", async () => {
     const { api, user } = setup();
-    await user.click(await screen.findByRole("button", { name: "Table 1 · 2" }));
+    await chooseManually(user);
+    await user.click(screen.getByRole("button", { name: "Table 1 · 2" }));
     await user.clear(screen.getByLabelText("Party size"));
     await user.type(screen.getByLabelText("Party size"), "0");
     await submit(user);
@@ -187,12 +199,45 @@ describe("NewReservationDialog", () => {
   });
 
   it("tells the host when the venue has no tables yet", async () => {
-    const { api, user } = setup({}, []);
+    setup({}, []);
     expect(await screen.findByText("This venue has no tables yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+  });
+
+  it("leaves the tables to the server by default and says which ones it gave", async () => {
+    const { api, onOpenChange, user } = setup({ [CREATE]: { body: { id: "r1", tables: ["t2"] } } });
+    expect(await screen.findByRole("radio", { name: "Automatic" })).toBeChecked();
+    expect(screen.queryByRole("button", { name: "Table 1 · 2" })).not.toBeInTheDocument();
     await submit(user);
 
-    expect(await screen.findByText("Select at least one table.")).toBeInTheDocument();
-    expect(api.writes()).toHaveLength(0);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(api.writes()[0].body).not.toHaveProperty("tables");
+    expect(await screen.findByText("Tables: Table 2")).toBeInTheDocument();
+  });
+
+  it("drops the chosen tables when the host goes back to automatic", async () => {
+    const { api, user } = setup();
+    await chooseManually(user);
+    await user.click(screen.getByRole("button", { name: "Table 1 · 2" }));
+    await user.click(screen.getByRole("radio", { name: "Automatic" }));
+    await submit(user);
+
+    await waitFor(() => expect(api.writes()).toHaveLength(1));
+    expect(api.writes()[0].body).not.toHaveProperty("tables");
+  });
+
+  it.each([
+    ["no_suitable_table", "No free table for this party at that time."],
+    ["party_size_too_large", "The party is too large for that time."],
+  ])("shows %s inside the dialog without a chosen table, until the party changes", async (code, text) => {
+    const { onOpenChange, user } = setup({ [CREATE]: { status: 409, body: { code } } });
+    await screen.findByRole("radio", { name: "Automatic" });
+    await submit(user);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(text);
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    await user.type(screen.getByLabelText("Party size"), "1");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it.each([
@@ -202,7 +247,8 @@ describe("NewReservationDialog", () => {
     "shows the %s error and keeps the dialog open",
     async (code, text) => {
       const { onOpenChange, user } = setup({ [CREATE]: { status: 409, body: { code } } });
-      await user.click(await screen.findByRole("button", { name: "Table 1 · 2" }));
+      await chooseManually(user);
+      await user.click(screen.getByRole("button", { name: "Table 1 · 2" }));
       await submit(user);
 
       expect(await screen.findByText(text)).toBeInTheDocument();
