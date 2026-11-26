@@ -1077,7 +1077,8 @@ async function guestTables(tx: DbTx, venueId: string, current: ReservationRow, p
   const held = await tx
     .select({ seats: tables.seats })
     .from(tableAllocations)
-    .innerJoin(tables, eq(tables.id, tableAllocations.tableId))
+    // A table id is unique inside its venue only.
+    .innerJoin(tables, and(eq(tables.venueId, tableAllocations.venueId), eq(tables.id, tableAllocations.tableId)))
     .where(eq(tableAllocations.reservationId, current.id));
   if (held.length > 0 && held.reduce((sum, t) => sum + t.seats, 0) >= partySize) return undefined;
   await lockPlanner(tx, venueId);

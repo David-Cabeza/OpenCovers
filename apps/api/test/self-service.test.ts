@@ -830,3 +830,15 @@ describe("C49 and C50 email on guest writes", () => {
     }
   });
 });
+
+describe("the seats of a guest party increase", () => {
+  it("counts only this venue's tables, even when another venue uses the same table id", async () => {
+    const mine = await makeVenue({ seats: [2] });
+    const other = await makeVenue({ seats: [4] });
+    await db.insert(tables).values({ id: `${mine.id}-t0`, venueId: other.id, name: "same id", seats: 4 });
+    const booking = await book(mine);
+    const res = await modify(booking.token, { version: 1, partySize: 4 });
+    expect((await res.json()).code).toBe("no_suitable_table");
+    expect(res.status).toBe(409);
+  });
+});
