@@ -1,13 +1,14 @@
 // Allergies and diets on a reservation (ADR-0027, C82). Health data: it is read from the reservation row only by the
 // answers that call `dietaryViews`, and never goes into an event, a webhook, an email, the trace or a log.
 
-import { count, isNotNull } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../db/schema";
 import { reservations } from "../db/schema";
 import { INVALID, parseFields, type Check } from "./body";
 import type { Origin } from "./origin";
 import { actorLabel, memberNames } from "./reservation-trace";
+import { addDays, localDateTime } from "./time";
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -115,6 +116,28 @@ export async function dietaryViews(
         recordedBy: actorLabel(d.recordedBy?.channel ?? null, d.recordedBy?.actor ?? null, names),
       },
   );
+}
+
+/**
+ * `dietaryValuesHidden` of the venue config (C82): the switch is off and a booked or seated reservation of this venue,
+ * dated yesterday or later, holds a value. Yesterday stays in because a service can run past midnight. It is a boolean
+ * and not a count to say as little as possible about health data (ADR-0027, decision 11).
+ */
+export async function dietaryValuesHidden(db: Pick<Db, "select">, venueId: string, timezone: string): Promise<boolean> {
+  if (dietaryEnabled()) return false;
+  const [held] = await db
+    .select({ one: sql`1` })
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.venueId, venueId),
+        gte(reservations.date, addDays(localDateTime(new Date(), timezone).date, -1)),
+        inArray(reservations.status, ["booked", "seated"]),
+        isNotNull(reservations.dietary),
+      ),
+    )
+    .limit(1);
+  return held !== undefined;
 }
 
 /** How many reservations of the instance hold a value, shown or hidden. */

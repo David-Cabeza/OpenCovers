@@ -2,6 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Reservation } from "@/lib/api";
+import type { Dietary } from "@/lib/dietary";
 import { mockApi, renderWithApp, resetApiMocks } from "@/test/mock-api";
 import { PreShiftView } from "./pre-shift-view";
 
@@ -48,6 +49,35 @@ describe("PreShiftView", () => {
     expect(screen.getByText("With notes").nextElementSibling).toHaveTextContent("1");
     expect(screen.getByText("8 large")).toBeInTheDocument();
     expect(screen.getByText("Nut allergy")).toBeInTheDocument();
+  });
+
+  it("counts the bookings marked as allergy, among the upcoming ones only, on screen and on the printed line", async () => {
+    const dietary = (value: Partial<Dietary>): Dietary => ({
+      allergens: [],
+      diets: [],
+      note: "",
+      consented: true,
+      recordedAt: "2026-11-20T10:00:00Z",
+      recordedBy: null,
+      ...value,
+    });
+    setup([
+      reservation({ id: "a", guest: { name: "Ana", consent: "unknown" }, dietary: dietary({ allergens: ["peanuts"] }) }),
+      reservation({ id: "b", status: "seated", dietary: dietary({ note: "intolerance to onion" }) }),
+      reservation({ id: "c", dietary: dietary({ diets: ["vegan"] }) }),
+      reservation({ id: "d", status: "cancelled", dietary: dietary({ allergens: ["milk"] }) }),
+      reservation({ id: "e" }),
+    ]);
+    await screen.findByText("Ana");
+    expect(screen.getByText("With allergies").nextElementSibling).toHaveTextContent(/^2$/);
+    expect(screen.getByText(/With allergies: 2/)).toBeInTheDocument();
+  });
+
+  it("shows no allergy figure when no booking is marked, so it never reads as no allergies", async () => {
+    setup([reservation()]);
+    await screen.findByText("Jane Doe");
+    expect(screen.getByText("With notes")).toBeInTheDocument();
+    expect(screen.queryByText(/With allergies/)).not.toBeInTheDocument();
   });
 
   it("marks a booking without tables as unassigned and shows the reconfirmation state", async () => {

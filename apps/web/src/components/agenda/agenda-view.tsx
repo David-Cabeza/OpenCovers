@@ -35,7 +35,6 @@ import { EmptyState } from "@/components/empty-state";
 import { LoadError } from "@/components/load-error";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useAvailability } from "@/hooks/use-availability";
-import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
 import { useTables } from "@/hooks/use-tables";
 import { useT, type MessageKey } from "@/i18n";
 import { api, type Reservation } from "@/lib/api";
@@ -94,7 +93,6 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const [cancelling, setCancelling] = useState<Reservation | null>(null);
   const [tracing, setTracing] = useState<Reservation | null>(null);
   const [withdrawing, setWithdrawing] = useState<Reservation | null>(null);
-  const canRecordDietary = useCanRecordDietary(venueId);
   // Deleting a recorded value needs no config: the server sends one only while it takes them.
   const canWrite = canEditSetup(useNavigation()?.role);
   const queryClient = useQueryClient();
@@ -239,7 +237,6 @@ export function AgendaView({ venueId }: { venueId: string }) {
                     onStatus={(status) => setStatus.mutate({ id: r.id, status })}
                     onEdit={() => setEditing(r)}
                     onTrace={() => setTracing(r)}
-                    editLabelKey={canRecordDietary ? "agenda.editDetailsDietary" : "agenda.editDetails"}
                     onWithdraw={canWrite && r.dietary ? () => setWithdrawing(r) : undefined}
                   />
                 ))}
@@ -310,7 +307,6 @@ function ReservationRow({
   onStatus,
   onEdit,
   onTrace,
-  editLabelKey,
   onWithdraw,
 }: {
   reservation: Reservation;
@@ -320,7 +316,6 @@ function ReservationRow({
   onStatus: (status: string) => void;
   onEdit: () => void;
   onTrace: () => void;
-  editLabelKey: MessageKey;
   /** Absent when there is nothing recorded to delete, or the role cannot write. */
   onWithdraw?: () => void;
 }) {
@@ -379,7 +374,7 @@ function ReservationRow({
               </DropdownMenuItem>
             )}
             {canEdit && (
-              <DropdownMenuItem onSelect={onEdit}>{t(editLabelKey)}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onEdit}>{t("agenda.editDetails")}</DropdownMenuItem>
             )}
             <DropdownMenuItem onSelect={onTrace}>{t("agenda.viewTrace")}</DropdownMenuItem>
             {onWithdraw && (

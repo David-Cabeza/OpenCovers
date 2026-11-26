@@ -4951,6 +4951,19 @@ components:
             venue of the instance, and a `PUT` ignores it. A client asks a
             guest for allergies or diets only when it reads `true`, and
             otherwise notifies the venue out of band.
+        dietaryValuesHidden:
+          type: boolean
+          readOnly: true
+          description: |
+            ADR-0027, C82. Read only. `true` when the instance switch `DIETARY`
+            is off and a `booked` or `seated` reservation of this venue, dated
+            yesterday or later in its time zone, holds a stored `dietary` value
+            that no answer returns. Staff must then not read an empty screen as
+            nobody having an allergy. It is `false` with the switch on. `false`
+            with the switch off says only that no such reservation holds a
+            value, never that nobody has an allergy. It carries no value, count,
+            name or reservation id, and a `PUT` ignores it. An engine without
+            the field says nothing about stored values.
         phoneCountry:
           type: string
           nullable: true

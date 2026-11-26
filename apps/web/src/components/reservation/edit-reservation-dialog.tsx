@@ -13,7 +13,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -22,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConsentSelect } from "@/components/reservation/consent-select";
+import { isTooLong, LimitedTextarea } from "@/components/limited-textarea";
 import { DietaryFields, useDietaryForm } from "@/components/dietary/dietary-fields";
 import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
 import { useT } from "@/i18n";
@@ -47,10 +47,17 @@ export function EditReservationDialog({
   venueId,
   reservation,
   onOpenChange,
+  startOnDietary,
+  onSaved,
+  onCloseAutoFocus,
 }: {
   venueId: string;
   reservation: Reservation | null;
   onOpenChange: (open: boolean) => void;
+  /** Opens with the allergy and diet fields out and focused. */
+  startOnDietary?: boolean;
+  onSaved?: () => void;
+  onCloseAutoFocus?: (event: Event) => void;
 }) {
   const t = useT();
   const queryClient = useQueryClient();
@@ -59,6 +66,8 @@ export function EditReservationDialog({
     reset,
     control,
     register,
+    watch,
+    setFocus,
     formState: { isSubmitting },
   } = useForm<EditValues>({ defaultValues: toValues(reservation) });
 
@@ -75,6 +84,10 @@ export function EditReservationDialog({
     if (!reservation) return;
     const recorded = canRecordDietary ? dietary.take() : {};
     if (!recorded) return;
+    if (isTooLong(values.commentary, COMMENTARY_MAX)) {
+      setFocus("commentary");
+      return;
+    }
     try {
       await api.modifyReservation(venueId, reservation.id, {
         guest: { consent: values.consent },
@@ -86,6 +99,7 @@ export function EditReservationDialog({
       void queryClient.invalidateQueries({ queryKey: ["reservation", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       toast.success(t("reservation.edit.done"));
+      onSaved?.();
       onOpenChange(false);
     } catch (err) {
       toast.error(errorMessage(err, t("reservation.edit.failed")));
@@ -94,7 +108,7 @@ export function EditReservationDialog({
 
   return (
     <Dialog open={reservation !== null} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{t(canRecordDietary ? "reservation.edit.titleDietary" : "reservation.edit.title")}</DialogTitle>
           <DialogDescription>
@@ -105,7 +119,7 @@ export function EditReservationDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {canRecordDietary && <DietaryFields form={dietary} />}
+          {canRecordDietary && <DietaryFields form={dietary} startOpen={startOnDietary} />}
 
           <div className="space-y-2">
             <Label htmlFor="edit-consent">{t("reservation.contactConsent")}</Label>
@@ -143,15 +157,14 @@ export function EditReservationDialog({
 
           <div className="space-y-2">
             <Label htmlFor="edit-commentary">{t("reservation.note")}</Label>
-            <Textarea
+            <LimitedTextarea
               id="edit-commentary"
-              maxLength={COMMENTARY_MAX}
+              text={watch("commentary")}
+              limit={COMMENTARY_MAX}
+              hint={t(canRecordDietary ? "reservation.noteHintDietary" : "reservation.noteHint", { max: COMMENTARY_MAX })}
               placeholder={t("reservation.notePlaceholder")}
               {...register("commentary")}
             />
-            <p className="text-sm text-muted-foreground">
-              {t(canRecordDietary ? "reservation.noteHintDietary" : "reservation.noteHint", { max: COMMENTARY_MAX })}
-            </p>
           </div>
 
           <DialogFooter>

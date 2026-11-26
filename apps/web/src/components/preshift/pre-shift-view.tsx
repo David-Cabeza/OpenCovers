@@ -25,6 +25,7 @@ import { useT, type MessageKey } from "@/i18n";
 import type { Reconfirmation, WaitlistEntry } from "@/lib/api";
 import { longDate } from "@/lib/date";
 import { useDayParam } from "@/lib/day-param";
+import { isAllergyRisk } from "@/lib/dietary";
 import { buildPreShift, LARGE_PARTY_MIN, totalCovers, type PreShiftRow } from "@/lib/pre-shift";
 
 const ALL_SERVICES = "all";
@@ -53,6 +54,7 @@ export function PreShiftView({ venueId }: { venueId: string }) {
   const entries = waitlist.data?.entries ?? [];
   const largeCount = rows.filter((r) => r.large).length;
   const noteCount = rows.filter((r) => r.commentary).length;
+  const allergyCount = rows.filter(({ reservation: { dietary } }) => dietary && isAllergyRisk(dietary)).length;
 
   return (
     <div className="space-y-6">
@@ -116,7 +118,7 @@ export function PreShiftView({ venueId }: { venueId: string }) {
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 print:hidden">
+          <div className={cn("grid grid-cols-2 gap-3 print:hidden", allergyCount > 0 ? "lg:grid-cols-5" : "lg:grid-cols-4")}>
             <Stat label={t("preshift.stat.reservations")} value={rows.length} />
             <Stat label={t("preshift.stat.covers")} value={totalCovers(rows)} />
             <Stat
@@ -125,11 +127,19 @@ export function PreShiftView({ venueId }: { venueId: string }) {
               tone={largeCount > 0 ? "warning" : "default"}
             />
             <Stat label={t("preshift.stat.notes")} value={noteCount} />
+            {allergyCount > 0 && (
+              <div className="col-span-2 grid lg:col-span-1">
+                <Stat label={t("preshift.stat.allergies")} value={allergyCount} tone="danger" />
+              </div>
+            )}
           </div>
           <p className="hidden text-sm print:block">
             {t("preshift.reservations", { count: rows.length })} ·{" "}
             {t("preshift.covers", { count: totalCovers(rows) })}
             {largeCount > 0 && ` · ${t("preshift.largeCount", { count: largeCount, min: LARGE_PARTY_MIN })}`}
+            {allergyCount > 0 && (
+              <strong> · {t("preshift.allergyCount", { count: allergyCount })}</strong>
+            )}
           </p>
 
           <ul className="@container divide-y overflow-hidden rounded-xl border bg-card print:rounded-none print:border-x-0">
@@ -152,7 +162,7 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
     <li
       data-slot="preshift-row"
       className={cn(
-        "grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-l-4 border-l-transparent px-4 py-3 @[53rem]:grid-cols-[4rem_minmax(0,13rem)_9rem_8rem_minmax(0,1fr)] @[53rem]:items-start @[53rem]:gap-x-4 print:grid-cols-[4rem_minmax(0,13rem)_9rem_8rem_minmax(0,1fr)] print:items-start print:gap-x-4 print:break-inside-avoid print:py-2",
+        "grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-l-4 border-l-transparent px-4 py-3 @[53rem]:grid-cols-[4rem_minmax(0,13rem)_9rem_8rem_minmax(0,1fr)] @[53rem]:items-start @[53rem]:gap-x-4 print:grid-cols-[3.5rem_minmax(0,1fr)_7rem_6rem_12rem] print:items-start print:gap-x-3 print:break-inside-avoid print:py-2",
         large && "border-l-warning",
       )}
     >
@@ -186,7 +196,7 @@ function PreShiftRowView({ row }: { row: PreShiftRow }) {
         </div>
         <div className="flex min-w-0 flex-col gap-2 md:basis-auto">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 print:flex-nowrap">
+            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
               <span className="text-xs text-muted-foreground">{t("preshift.consent")}</span>
               <Pill tone={reservation.guest.consent === "granted" ? "success" : "muted"}>
                 {t(`common.consent.${reservation.guest.consent ?? "unknown"}`)}

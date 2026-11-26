@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { isTooLong, LimitedTextarea } from "@/components/limited-textarea";
 import { DietaryFields, useDietaryForm } from "@/components/dietary/dietary-fields";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
@@ -76,6 +76,7 @@ export function NewReservationDialog({
     handleSubmit,
     reset,
     watch,
+    setFocus,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: { partySize, name: "", contact: "", commentary: "" },
@@ -136,6 +137,10 @@ export function NewReservationDialog({
   async function onSubmit(values: FormValues) {
     const recorded = canRecordDietary ? dietary.take() : {};
     if (!recorded) return;
+    if (isTooLong(values.commentary, COMMENTARY_MAX)) {
+      setFocus("commentary");
+      return;
+    }
     if (selected?.length === 0) {
       setTableError(t("reservation.selectTable"));
       return;
@@ -325,15 +330,14 @@ export function NewReservationDialog({
 
           <div className="space-y-2">
             <Label htmlFor="reservation-commentary">{t("reservation.note")}</Label>
-            <Textarea
+            <LimitedTextarea
               id="reservation-commentary"
-              maxLength={COMMENTARY_MAX}
+              text={watch("commentary")}
+              limit={COMMENTARY_MAX}
+              hint={t(canRecordDietary ? "reservation.noteHintDietary" : "reservation.noteHint", { max: COMMENTARY_MAX })}
               placeholder={t("reservation.notePlaceholder")}
               {...register("commentary")}
             />
-            <p className="text-sm text-muted-foreground">
-              {t(canRecordDietary ? "reservation.noteHintDietary" : "reservation.noteHint", { max: COMMENTARY_MAX })}
-            </p>
           </div>
 
           <DialogFooter>
