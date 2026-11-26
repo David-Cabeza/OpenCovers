@@ -4,7 +4,7 @@ import { idempotencyKeys, venues, waitlist } from "../db/schema";
 import * as schema from "../db/schema";
 import { claimKey } from "./idempotency";
 import type { Origin } from "./origin";
-import { walkIn, type WriteErrorCode } from "./reservations";
+import { boundLockWaits, isLockFailure, walkIn, type WriteErrorCode } from "./reservations";
 import { localDateTime } from "./time";
 import { enforceSandboxCap } from "../demo/limits";
 
@@ -135,7 +135,8 @@ export async function seatWaitlist(
   key: string,
   origin: Origin | null,
 ): Promise<SeatResult> {
-  return db.transaction(async (tx): Promise<SeatResult> => {
+  const seat = db.transaction(async (tx): Promise<SeatResult> => {
+    await boundLockWaits(tx);
     // Key lock first, then the entry row, the order cancelWaitlist takes them in.
     const stored = await claimKey(tx, venueId, key);
     const row = (
@@ -177,6 +178,10 @@ export async function seatWaitlist(
       .set({ status: "seated", reservationId: result.id })
       .where(and(eq(waitlist.venueId, venueId), eq(waitlist.id, entryId)));
     return { ok: true, reservationId: result.id };
+  });
+  return seat.catch((error): SeatResult => {
+    if (isLockFailure(error)) return { ok: false, code: "venue_busy" };
+    throw error;
   });
 }
 

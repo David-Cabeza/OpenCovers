@@ -85,6 +85,7 @@ A sign-up with a bad `X-Invitation-Token` fails on the auth route with `403` and
 - `idempotency_in_flight`: a write with this key is already running. Retryable. Send it again with the same key after a short wait. The engine does not return it today: a duplicate sent while the first request runs waits for it and then replays its result (`apps/api/src/lib/idempotency.ts`, concurrent cases in `apps/api/test/idempotent-writes.test.ts`). A client still handles it, because the code is part of the contract.
 - `unknown_outcome`: the engine cannot tell whether the write landed. The client must retry with the same key or read back. Retryable. The engine does not return it today either.
 - `transient`: a downstream dependency failed temporarily. Retryable.
+- `venue_busy`: a create, walk-in, modify, cancel, status change or seat from the waitlist, on any channel, waited 5 seconds for another write of the venue and gave up, or the database aborted it to break a deadlock. `503`. Nothing was written and the idempotency key is not stored, so send the same request with the same key after a short wait. It is not `slot_taken`: the engine has not decided whether the table is free. Retryable.
 
 ## Notices and erasure
 

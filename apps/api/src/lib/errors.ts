@@ -42,6 +42,8 @@ export const ERRORS = {
   blocklist_limit_reached: { status: 409, retryable: false },
   rate_limited: { status: 429, retryable: true },
   transient: { status: 500, retryable: true },
+  // A reservation write that waited too long for another write of the venue, or lost a deadlock. Nothing was written.
+  venue_busy: { status: 503, retryable: true },
   // The next seven are in the vocabulary but no route emits them yet.
   booking_declined: { status: 409, retryable: false },
   idempotency_in_flight: { status: 409, retryable: true },
