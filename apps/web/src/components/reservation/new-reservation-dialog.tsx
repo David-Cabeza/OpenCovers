@@ -15,10 +15,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useAgenda } from "@/hooks/use-agenda";
 import { useTables } from "@/hooks/use-tables";
 import { useT } from "@/i18n";
-import { api, COMMENTARY_MAX } from "@/lib/api";
+import { ApiError, api, COMMENTARY_MAX } from "@/lib/api";
 import { longDate } from "@/lib/date";
+
+/** The API holds a table this long when the venue sets no turn time; it does not expose the venue's own. */
+const HELD_MINUTES = 120;
+
+const minutesOf = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
 
 interface FormValues {
   partySize: number;
@@ -51,8 +60,10 @@ export function NewReservationDialog({
   const queryClient = useQueryClient();
   const { data } = useTables(venueId);
   const tables = data?.tables ?? [];
+  const { data: agenda } = useAgenda(venueId, date);
   const [selected, setSelected] = useState<string[]>([]);
   const [time, setTime] = useState(initialTime);
+  const [tableError, setTableError] = useState<string | null>(null);
 
   const {
     register,
@@ -74,10 +85,27 @@ export function NewReservationDialog({
     [tables, selected],
   );
 
+  // Tables held by a booked or seated reservation whose hold overlaps the chosen time, with the guest's name.
+  const busy = useMemo(() => {
+    const map = new Map<string, string>();
+    const at = minutesOf(time);
+    for (const r of agenda?.reservations ?? []) {
+      if (r.status !== "booked" && r.status !== "seated") continue;
+      if (Math.abs(minutesOf(r.time) - at) >= HELD_MINUTES) continue;
+      for (const id of r.tables ?? []) map.set(id, r.guest.name ?? "");
+    }
+    return map;
+  }, [agenda, time]);
+
+  useEffect(() => {
+    setSelected((prev) => (prev.some((id) => busy.has(id)) ? prev.filter((id) => !busy.has(id)) : prev));
+  }, [busy]);
+
   useEffect(() => {
     if (open) {
       reset({ partySize, name: "", contact: "", commentary: "" });
       setSelected([]);
+      setTableError(null);
     }
   }, [open, partySize, reset]);
 
@@ -86,6 +114,8 @@ export function NewReservationDialog({
   }, [open, initialTime]);
 
   function toggleTable(id: string) {
+    if (busy.has(id)) return;
+    setTableError(null);
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
@@ -93,11 +123,11 @@ export function NewReservationDialog({
 
   async function onSubmit(values: FormValues) {
     if (selected.length === 0) {
-      toast.error(t("reservation.selectTable"));
+      setTableError(t("reservation.selectTable"));
       return;
     }
     if (values.partySize > totalSeats) {
-      toast.error(t("reservation.partyTooLarge"));
+      setTableError(t("reservation.partyTooLarge"));
       return;
     }
     try {
@@ -117,6 +147,11 @@ export function NewReservationDialog({
       toast.success(t("reservation.new.done"));
       onOpenChange(false);
     } catch (err) {
+      if (err instanceof ApiError && err.code === "slot_taken") {
+        setTableError(errorMessage(err, t("reservation.new.failed")));
+        void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
+        return;
+      }
       toast.error(errorMessage(err, t("reservation.new.failed")));
     }
   }
@@ -140,7 +175,10 @@ export function NewReservationDialog({
                 type="time"
                 required
                 value={time}
-                onChange={(e) => setTime(e.target.value)}
+                onChange={(e) => {
+                  setTime(e.target.value);
+                  setTableError(null);
+                }}
               />
             </div>
           )}
@@ -162,25 +200,49 @@ export function NewReservationDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>{t("reservation.tables")}</Label>
+            <Label id="new-reservation-tables-label">{t("reservation.tables")}</Label>
             {tables.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {t("reservation.noTables")}
               </p>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {tables.map((tbl) => (
-                  <Button
-                    key={tbl.id}
-                    type="button"
-                    variant={selected.includes(tbl.id) ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => toggleTable(tbl.id)}
-                  >
-                    {tbl.name} · {tbl.seats}
-                  </Button>
-                ))}
+              <div
+                role="group"
+                aria-labelledby="new-reservation-tables-label"
+                aria-invalid={tableError ? true : undefined}
+                aria-describedby={tableError ? "new-reservation-tables-error" : undefined}
+                className="flex flex-wrap gap-2"
+              >
+                {tables.map((tbl) => {
+                  const isBusy = busy.has(tbl.id);
+                  const why = [t("reservation.tableBusy"), busy.get(tbl.id)].filter(Boolean).join(" · ");
+                  return (
+                    <Button
+                      key={tbl.id}
+                      type="button"
+                      variant={selected.includes(tbl.id) ? "default" : "outline"}
+                      size="sm"
+                      aria-pressed={selected.includes(tbl.id)}
+                      aria-disabled={isBusy || undefined}
+                      aria-describedby={isBusy ? `new-reservation-busy-${tbl.id}` : undefined}
+                      className={isBusy ? "h-auto flex-col gap-0 py-1 cursor-not-allowed border-dashed bg-muted text-muted-foreground" : undefined}
+                      onClick={() => toggleTable(tbl.id)}
+                    >
+                      {tbl.name} · {tbl.seats}
+                      {isBusy && (
+                        <span id={`new-reservation-busy-${tbl.id}`} className="text-xs font-normal">
+                          {why}
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })}
               </div>
+            )}
+            {tableError && (
+              <p id="new-reservation-tables-error" role="alert" className="text-sm text-destructive">
+                {tableError}
+              </p>
             )}
             <p
               className={
