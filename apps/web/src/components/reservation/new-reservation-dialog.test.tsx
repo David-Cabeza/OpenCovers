@@ -134,6 +134,37 @@ describe("NewReservationDialog", () => {
     expect(api.writes()).toHaveLength(0);
   });
 
+  it("shows the missing table inside the dialog and clears it when a table is chosen", async () => {
+    const { user } = setup();
+    await screen.findByRole("button", { name: "Table 1 · 2" });
+    await submit(user);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Select at least one table.");
+    const group = screen.getByRole("group", { name: "Tables" });
+    expect(group).toHaveAttribute("aria-invalid", "true");
+    expect(group).toHaveAttribute("aria-describedby", alert.id);
+    await user.click(screen.getByRole("button", { name: "Table 1 · 2" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(group).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("marks tables held at the chosen time, refuses them, and follows the time", async () => {
+    const agenda = {
+      reservations: [
+        { id: "r9", time: "20:00", status: "booked", partySize: 2, tables: ["t1"], guest: { name: "Irene" } },
+        { id: "r8", time: "13:00", status: "cancelled", partySize: 2, tables: ["t2"], guest: { name: "Ana" } },
+      ],
+    };
+    const { user } = setup({ "GET /v1/venues/v1/agenda": { body: agenda } });
+    const busy = await screen.findByRole("button", { name: /Table 1 · 2/ });
+    await waitFor(() => expect(busy).toHaveAttribute("aria-disabled", "true"));
+    expect(busy).toHaveAccessibleDescription("Busy · Irene");
+    expect(screen.getByRole("button", { name: "Table 2 · 4" })).not.toHaveAttribute("aria-disabled");
+    await user.click(busy);
+    expect(busy).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("rejects an empty party size before calling the server", async () => {
     const { api, user } = setup();
     await user.click(await screen.findByRole("button", { name: "Table 1 · 2" }));
