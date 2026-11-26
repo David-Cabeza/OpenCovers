@@ -1,0 +1,4 @@
+DROP INDEX "idx_reservations_unlinked_retention";--> statement-breakpoint
+ALTER TABLE "reservations" ADD COLUMN "dietary" jsonb;--> statement-breakpoint
+CREATE INDEX "idx_reservations_unlinked_retention" ON "reservations" USING btree ("venue_id","ends_at","id") WHERE "reservations"."guest_id" is null and "reservations"."erased" = false and ("reservations"."guest_name" <> '' or "reservations"."guest_contact" <> '' or "reservations"."commentary" <> '' or "reservations"."dietary" is not null);--> statement-breakpoint
+ALTER TABLE "reservations" ADD CONSTRAINT "reservations_dietary_object" CHECK ("reservations"."dietary" IS NULL OR jsonb_typeof("reservations"."dietary") = 'object');

@@ -227,8 +227,8 @@ paths:
       operationId: reservation.agenda
       summary: List the reservations for a venue on one day, grouped by service
       description: |
-        Each reservation carries `dietary` under the rules of C82 (ADR-0027,
-        not built yet). The staff app's pre-shift view reads this route.
+        Each reservation carries `dietary` under the rules of C82 (ADR-0027).
+        The staff app's pre-shift view reads this route.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - name: date
@@ -310,7 +310,7 @@ paths:
       description: |
         The guest is derived from the authenticated principal of the channel.
         A caller with no guest principal gets an empty list. The answer never
-        carries `dietary` (ADR-0027, C82, not built yet).
+        carries `dietary` (ADR-0027, C82).
       parameters:
         - $ref: "#/components/parameters/venueId"
       responses:
@@ -441,7 +441,7 @@ paths:
       summary: Search reservations across a date range
       description: |
         The answer never carries `dietary`, so a range query returns no
-        allergies or diets (ADR-0027, C82, not built yet). Read one
+        allergies or diets (ADR-0027, C82). Read one
         reservation or the agenda for them.
       parameters:
         - $ref: "#/components/parameters/venueId"
@@ -527,8 +527,8 @@ paths:
         Party size and tables can change on `booked` and `seated` reservations.
         A modify that changes only `guest.consent` and/or `rating` is also
         accepted on `attended`. `cancelled` and `no_show` reject every modify
-        with `invalid_transition`, except, once C82 is built (ADR-0027), a
-        modify whose only field is `dietary: null`. A body with only consent or rating sends no
+        with `invalid_transition`, except a modify whose only field is
+        `dietary: null` (C82). A body with only consent or rating sends no
         email to the guest. A modify that would leave a `seated` reservation
         without tables fails with `table_required`. A table that another
         booking holds fails with `slot_taken`. A table id that is not a table
@@ -1711,7 +1711,7 @@ paths:
         the reservation's consent to `unknown`, its rating to null, its
         commentary to an empty string, its reconfirmation to `none`, and its
         `guestLocale` to null (ADR-0024). Retention resets them the same way.
-        Once C82 is built (ADR-0027), both also remove its `dietary`, and the
+        Both also remove its `dietary` (C82), and the
         counts and the `erased` event stay as they are, with no value.
 
         `guestId` is the guest record id, as returned in `guest.guestId`.
@@ -2919,7 +2919,7 @@ paths:
         with `slot_taken`, whatever the venue's ceiling. A body that names
         `tables`, `rating` or `reconfirmation` fails with
         `invalid_request`. So will a body that names `dietary`, whatever
-        the instance switch says, once C82 is built (ADR-0027). No public
+        the instance switch says (C82). No public
         answer carries it.
 
         Language (ADR-0024, C43, C67). An optional `locale`, one of the
@@ -3294,7 +3294,7 @@ paths:
         `partySize`, `commentary` and `guest.consent` can change. A body that
         names `date`, `time`, `tables`, `zone`, `rating` or `reconfirmation`
         fails with `invalid_request`, and so will one that names `dietary`
-        once C82 is built (ADR-0027). To move a booking a guest cancels and
+        (C82). To move a booking a guest cancels and
         books again.
 
         The checks run in this order. A malformed body or an
@@ -4136,14 +4136,13 @@ components:
 
         It is not for health data. Do not record allergies, medical
         conditions, or diet needs in it. The engine cannot tell that a note
-        holds some. Allergies and diets go in `dietary` (ADR-0027, C82), which
-        is accepted and not built yet.
+        holds some. Allergies and diets go in `dietary` (ADR-0027, C82).
 
     DietaryAllergen:
       type: string
       enum: [gluten, crustaceans, eggs, fish, peanuts, soybeans, milk, nuts, celery, mustard, sesame, sulphites, lupin, molluscs]
       description: |
-        Not built yet (ADR-0027, C82 is a gap). The 14 allergens of
+        The 14 allergens of
         Regulation (EU) No 1169/2011, Annex II, in that order. `gluten` is
         cereals containing gluten and `nuts` is tree nuts.
 
@@ -4151,7 +4150,7 @@ components:
       type: string
       enum: [vegetarian, vegan, halal, kosher]
       description: |
-        Not built yet (ADR-0027, C82 is a gap). A diet the guest declared.
+        A diet the guest declared (ADR-0027, C82).
         The list is pending the owner's confirmation. There is no
         gluten-free or lactose-free code: the allergens `gluten` and `milk`
         cover them. `halal` and `kosher` can reveal religious belief, and the
@@ -4162,11 +4161,9 @@ components:
       required: [consented]
       additionalProperties: false
       description: |
-        Not built yet (ADR-0027, C82 is a gap). Until it is, the staff
-        routes ignore `dietary` and store nothing, so read
-        `VenueConfig.dietaryEnabled` before you send it or ask a guest for
-        it. When the field is absent or not `true`, notify the venue out of
-        band.
+        Read `VenueConfig.dietaryEnabled` before you send it or ask a guest
+        for it (ADR-0027, C82). When the field is absent or not `true`, notify
+        the venue out of band: an engine older than this field ignores it.
 
         The allergies and diets the guest declared for this booking, with the
         writer's attestation that the guest authorized this use. It is health
@@ -4176,10 +4173,10 @@ components:
         At least one allergen, one diet or a non-empty note is required: an
         object with none fails with `invalid_request`, so send `null` to clear
         the value. A repeated code is kept once. An unknown code, a key the
-        object does not list, a note over 200 characters after trimming, and
-        a `consented` that is not `true` fail with `invalid_request`. With the
-        instance switch `DIETARY` off, any object fails with
-        `invalid_request`.
+        object does not list, a note over 200 characters after trimming or
+        holding a NUL or an unpaired surrogate, and a `consented` that is not
+        `true` fail with `invalid_request`. With the instance switch `DIETARY`
+        off, any object fails with `invalid_request`.
       properties:
         allergens:
           type: array
@@ -4205,8 +4202,8 @@ components:
       required: [allergens, diets, note, consented, recordedAt, recordedBy]
       readOnly: true
       description: |
-        Not built yet (ADR-0027, C82 is a gap). A stored `DietaryInput`, as
-        `Reservation.dietary` returns it.
+        A stored `DietaryInput`, as `Reservation.dietary` returns it
+        (ADR-0027, C82).
       properties:
         allergens:
           type: array
@@ -4292,8 +4289,8 @@ components:
           allOf:
             - $ref: "#/components/schemas/Dietary"
           description: |
-            Not built yet (ADR-0027, C82 is a gap). The allergies and diets the
-            guest declared, carried only by `reservation.get`,
+            The allergies and diets the guest declared (ADR-0027, C82),
+            carried only by `reservation.get`,
             `reservation.agenda`, and the reservation returned by create,
             walk-in, modify, cancel and status, over HTTP and MCP. Never in
             `reservation.list` or `reservation.search`. Absent when nothing was
@@ -4388,8 +4385,8 @@ components:
             - $ref: "#/components/schemas/DietaryInput"
           nullable: true
           description: |
-            Not built yet (ADR-0027, C82 is a gap). Needs a `write` or `admin`
-            key or role. Null is the same as no field.
+            Needs a `write` or `admin` key or role (ADR-0027, C82). Null is the
+            same as no field.
 
     WalkInCreate:
       type: object
@@ -4428,8 +4425,8 @@ components:
             - $ref: "#/components/schemas/DietaryInput"
           nullable: true
           description: |
-            Not built yet (ADR-0027, C82 is a gap). Needs a `write` or `admin`
-            key or role. Null is the same as no field.
+            Needs a `write` or `admin` key or role (ADR-0027, C82). Null is the
+            same as no field.
 
     PacingSlot:
       type: object
@@ -4486,7 +4483,7 @@ components:
             - $ref: "#/components/schemas/DietaryInput"
           nullable: true
           description: |
-            Not built yet (ADR-0027, C82 is a gap). Omitted keeps the value.
+            Omitted keeps the value (ADR-0027, C82).
             Null clears it, and a modify whose only field is `dietary: null`
             is accepted on every status, `cancelled` and `no_show` included,
             so a guest's withdrawal always works. An object replaces the whole
@@ -4858,9 +4855,8 @@ components:
           type: boolean
           readOnly: true
           description: |
-            Not built yet (ADR-0027, C82 is a gap), so today it is absent.
-            Read only. `true` when the instance switch `DIETARY` is `on`, so
-            the create, walk-in and modify routes take `dietary` and the reads
+            ADR-0027, C82. Read only. `true` when the instance switch `DIETARY`
+            is `on`, so the create, walk-in and modify routes take `dietary` and the reads
             of C82 return it. `false` when it is off. It is the same for every
             venue of the instance, and a `PUT` ignores it. A client asks a
             guest for allergies or diets only when it reads `true`, and

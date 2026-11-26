@@ -115,7 +115,7 @@ import {
   upsertService,
   upsertTable,
 } from "./lib/catalog";
-import { parseBody } from "./lib/body";
+import { INVALID, parseBody } from "./lib/body";
 import {
   cancelReservation,
   createReservation,
@@ -131,12 +131,15 @@ import {
   listByDate,
   listByPrincipal,
   modifyReservation,
+  type Reservation,
   searchReservations,
   setStatus,
   walkIn,
 } from "./lib/reservations";
 import { isConsent } from "./lib/consent";
 import { isCommentary } from "./lib/commentary";
+import { dietaryField, dietaryViews } from "./lib/dietary";
+import { loggable } from "./lib/loggable";
 import { isRating } from "./lib/rating";
 import { isReconfirmation } from "./lib/reconfirmation";
 import { createVenue, erase, getConfig, setConfig } from "./lib/venue";
@@ -253,7 +256,7 @@ app.onError((err, c) => {
   if (err instanceof DemoLimitError) {
     return c.json({ code: "demo_limit_reached", message: "demo_limit_reached", kind: err.kind, retryable: false }, 409);
   }
-  console.error(err);
+  console.error(loggable(err));
   return c.text("Internal Server Error", 500);
 });
 
@@ -934,6 +937,8 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
   ) {
     return error(c, "invalid_request");
   }
+  const dietary = dietaryField(body.dietary);
+  if (dietary === INVALID) return error(c, "invalid_request");
   const result = await createReservation(
     db,
     venueId,
@@ -948,6 +953,7 @@ app.post("/v1/venues/:venueId/reservations", async (c) => {
       consent: body.guest?.consent,
       rating: body.rating,
       commentary: body.commentary,
+      dietary,
       reconfirmation: body.reconfirmation,
       bookedVia: c.get("principal") as string,
       basis: "service",
@@ -977,6 +983,8 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
   ) {
     return error(c, "invalid_request");
   }
+  const dietary = dietaryField(body.dietary);
+  if (dietary === INVALID) return error(c, "invalid_request");
   const result = await walkIn(
     db,
     venueId,
@@ -991,6 +999,7 @@ app.post("/v1/venues/:venueId/reservations/walk-in", async (c) => {
       consent: body.guest?.consent,
       rating: body.rating,
       commentary: body.commentary,
+      dietary,
       bookedVia: c.get("principal") as string,
       origin: c.get("origin"),
       basis: "service",
@@ -1073,11 +1082,23 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
   ) {
     return error(c, "invalid_request");
   }
+  const dietary = dietaryField(body.dietary);
+  if (dietary === INVALID) return error(c, "invalid_request");
   const result = await modifyReservation(
     db,
     venueId,
     id,
-    { partySize: body.partySize, tableIds: body.tables, consent: body.guest?.consent, rating: body.rating, commentary: body.commentary, reconfirmation: body.reconfirmation, origin: c.get("origin") },
+    {
+      partySize: body.partySize,
+      tableIds: body.tables,
+      consent: body.guest?.consent,
+      rating: body.rating,
+      commentary: body.commentary,
+      reconfirmation: body.reconfirmation,
+      dietary,
+      dietaryWithdrawal: dietary === null && Object.keys(body).length === 1,
+      origin: c.get("origin"),
+    },
     key,
   );
   if (result.ok && (body.partySize !== undefined || body.tables !== undefined)) {
@@ -1096,7 +1117,7 @@ app.post("/v1/venues/:venueId/reservations/:id/cancel", async (c) => {
   const reservation = await getReservation(db, venueId, id);
   if (!reservation) return error(c, "reservation_not_found");
   void notifyReservation(db, venueId, id, reservation.version, "cancellation");
-  return c.json(toApi(reservation, venueId), 200);
+  return c.json((await withDietary([reservation], venueId))[0], 200);
 });
 
 // The only staff route that returns a self-service token (ADR-0017). The read role is refused by the middleware.
@@ -1143,7 +1164,7 @@ app.get("/v1/venues/:venueId/reservations/:id", async (c) => {
   const id = c.req.param("id");
   const reservation = await getReservation(db, venueId, id);
   if (!reservation) return error(c, "reservation_not_found");
-  return c.json(toApi(reservation, venueId));
+  return c.json((await withDietary([reservation], venueId))[0]);
 });
 
 app.get("/v1/venues/:venueId/reservations/:id/trace", async (c) => {
@@ -1164,7 +1185,7 @@ app.get("/v1/venues/:venueId/agenda", async (c) => {
   const date = c.req.query("date");
   if (!date || !isDate(date)) return error(c, "invalid_request");
   const reservations = await listByDate(db, venueId, date);
-  return c.json({ reservations: reservations.map((r) => toApi(r, venueId)) });
+  return c.json({ reservations: await withDietary(reservations, venueId) });
 });
 
 app.get("/v1/venues/:venueId/events", async (c) => {
@@ -1440,10 +1461,19 @@ async function writeResponse(c: any, result: any, venueId: string) {
   if (!result.ok) return error(c, result.code);
   const reservation = await getReservation(db, venueId, result.id);
   if (!reservation) return error(c, "reservation_not_found");
-  return c.json(toApi(reservation, venueId), 200);
+  return c.json((await withDietary([reservation], venueId))[0], 200);
 }
 
-function toApi(reservation: any, venueId: string) {
+/**
+ * The answers that carry `dietary` (ADR-0027, decision 7): get, the agenda, and the reservation a create, walk-in,
+ * modify, cancel or status returns. Every other answer is `toApi` alone, which never copies it.
+ */
+async function withDietary(reservations: Reservation[], venueId: string) {
+  const views = await dietaryViews(db, venueId, reservations.map((r) => r.dietary));
+  return reservations.map((r, i) => ({ ...toApi(r, venueId), ...(views[i] ? { dietary: views[i] } : {}) }));
+}
+
+function toApi(reservation: Reservation, venueId: string) {
   return {
     id: reservation.id,
     venueId,

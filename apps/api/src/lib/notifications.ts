@@ -6,6 +6,7 @@ import { mailIdentity, mayEmail } from "../demo/limits";
 import { resolveEmailLocale } from "./email-messages";
 import { emailVenue } from "./email-venue";
 import { icsUid } from "./ics";
+import { loggable } from "./loggable";
 import { getOnlineBooking } from "./online-booking";
 import { buildEmail, sendEmail, type EmailKind } from "./mailer";
 import { formatTime } from "./time";
@@ -93,7 +94,7 @@ export async function notifyReservation(
       .values({ id: crypto.randomUUID(), venueId, reservationId, kind, version })
       .onConflictDoNothing();
   } catch (err) {
-    console.error(`notification ${kind} failed`, err);
+    console.error(`notification ${kind} failed`, loggable(err));
   }
 }
 

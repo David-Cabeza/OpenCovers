@@ -3,6 +3,8 @@ import app from "./app";
 import { db } from "./db/client";
 import { mcpRemote } from "./lib/auth";
 import { blocklistKeys } from "./lib/blocklist";
+import { countStoredDietary, dietaryEnabled } from "./lib/dietary";
+import { loggable } from "./lib/loggable";
 import { runRetention } from "./lib/retention";
 import { challengeConfigFromEnv, describeChallenge } from "./lib/public-challenge";
 import { describeRateLimit, rateLimitConfigFromEnv } from "./lib/rate-limit";
@@ -13,15 +15,21 @@ import { runWebhookDeliveries, webhookDepsFromEnv } from "./lib/webhooks";
 import { describeWidgetServing, widgetServingFromEnv } from "./lib/widget-page";
 
 const signup = signupMode();
+const dietary = dietaryEnabled();
 const demo = demoSettings();
 // ADR-0022 decision 10: the demo never runs over a real instance, and a real instance never inherits sandboxes.
 await assertDemoDatabase(db, demo.enabled);
+// ADR-0027: with the switch off the stored values stay, hidden, and the operator is told how many, never which.
+const dietaryLine = dietary
+  ? "dietary: on"
+  : `dietary: off (reservations holding a stored value: ${await countStoredDietary(db)})`;
 const rateLimit = rateLimitConfigFromEnv();
 const challenge = describeChallenge(challengeConfigFromEnv());
 const port = Number(process.env.PORT ?? 3000);
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`opencovers api listening on port ${info.port} (sign-up: ${signup}, trust proxy: ${rateLimit.trustProxy}, remote MCP: ${mcpRemote ? "on" : "off"})`);
   console.log(describeDemo(demo));
+  console.log(dietaryLine);
   console.log(describeRateLimit(rateLimit));
   console.log(describeWidgetServing(widgetServingFromEnv()));
   console.log(challenge.line);
@@ -31,7 +39,7 @@ serve({ fetch: app.fetch, port }, (info) => {
 
 const RETENTION_INTERVAL_MS = 60 * 60 * 1000;
 setInterval(() => {
-  runRetention(db).catch((err) => console.error("retention failed", err));
+  runRetention(db).catch((err) => console.error("retention failed", loggable(err)));
 }, RETENTION_INTERVAL_MS);
 
 const WEBHOOK_INTERVAL_MS = 5_000;
@@ -46,7 +54,7 @@ setInterval(async () => {
   try {
     await runWebhookDeliveries(db, webhookDeps);
   } catch (err) {
-    console.error("webhook delivery failed", err);
+    console.error("webhook delivery failed", loggable(err));
   } finally {
     delivering = false;
   }

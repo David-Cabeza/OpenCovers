@@ -49,7 +49,7 @@ async function sourceOf(db: Db, bookedVia: string): Promise<TraceSource> {
 }
 
 /** A staff user id is shown by display name, only for a member of this venue. A name that looks like an email is dropped. */
-async function memberNames(db: Db, venueId: string, userIds: string[]): Promise<Map<string, string>> {
+export async function memberNames(db: Db, venueId: string, userIds: string[]): Promise<Map<string, string>> {
   if (userIds.length === 0) return new Map();
   const rows = await db
     .select({ id: user.id, name: user.name })
@@ -57,6 +57,12 @@ async function memberNames(db: Db, venueId: string, userIds: string[]): Promise<
     .innerJoin(user, eq(user.id, venueMemberships.userId))
     .where(and(eq(venueMemberships.venueId, venueId), inArray(venueMemberships.userId, userIds), isNotNull(user.name)));
   return new Map(rows.filter((r) => r.name.trim() !== "" && !r.name.includes("@")).map((r) => [r.id, r.name]));
+}
+
+/** The `actor` label of a recorded origin: a member's display name, a key id, or null for a guest or unknown. */
+export function actorLabel(channel: EventChannel | null, actor: string | null, names: Map<string, string>): string | null {
+  if (channel === "staff") return actor ? (names.get(actor) ?? null) : null;
+  return channel ? actor : null;
 }
 
 export async function getReservationTrace(
@@ -110,7 +116,7 @@ export async function getReservationTrace(
       occurredAt: e.occurredAt.toISOString(),
       idempotencyKey: keyOf(e.type, e.version, e.channel === "widget" || (e.channel === null && source === "widget")),
       channel: (e.channel as EventChannel | null) ?? (e.type === "created" ? source : null),
-      actor: e.channel === "staff" ? (e.actor ? (names.get(e.actor) ?? null) : null) : e.channel ? e.actor : null,
+      actor: actorLabel(e.channel as EventChannel | null, e.actor, names),
       recorded: e.channel !== null,
     })),
   };

@@ -1,10 +1,10 @@
 # ADR-0027: Allergies and dietary needs on a reservation
 
-- Status: Accepted (contract only, not built)
+- Status: Accepted (engine and HTTP API built; MCP tools, staff app and demo not built)
 - Date: 2026-11-24, accepted 2026-11-26
 - Deciders: David Cabeza (owner). The legal reviewer still answers the questions below before any use with real guests.
 
-The owner accepted this record on 2026-11-26. Step 1, this record and the contract (`docs/contract/openapi.yaml`, `docs/contract/mcp.md`, conformance case C82), is written. The engine does not store the field yet: C82 is a gap in `docs/contract/conformance-status.md`. The later steps are listed at the end.
+The owner accepted this record on 2026-11-26. Step 1, this record and the contract (`docs/contract/openapi.yaml`, `docs/contract/mcp.md`, conformance case C82), is written, and step 2, the engine and HTTP API, is built. C82 is partial in `docs/contract/conformance-status.md` until the MCP tools take the field. The later steps are listed at the end.
 
 ## Context
 
@@ -65,7 +65,7 @@ These are the owner's decisions, recorded on 2026-11-26.
    - `note`: optional text for what the lists cannot say, such as "intolerance to onion". The engine trims it. After trimming it holds at most 200 characters. An empty note after trimming counts as no note.
    - `consented`: required, exactly `true`.
    - A repeated code is kept once.
-   - An unknown code, a list that is not a list of strings, a note that is not a string or is longer than 200 characters, a missing or non-`true` `consented`, and a key the object does not list fail with `invalid_request`.
+   - An unknown code, a list that is not a list of strings, a note that is not a string, is longer than 200 characters or holds a NUL or an unpaired surrogate, a missing or non-`true` `consented`, and a key the object does not list fail with `invalid_request`.
    - An object with no allergen, no diet and no note (`{"consented": true}` or `{"allergens": [], "consented": true}`) fails with `invalid_request`. To clear the value, send `null`.
 3. **Shape of a read.** `allergens` and `diets` are always present, possibly empty, each in the order of its list above. `note` is the trimmed note, or an empty string. `consented` is `true`. `recordedAt` is when the value was last set. `recordedBy` names who set it, with the label rules of the trace's `actor`: a member's display name for a staff session (null when it is not known), and `key_` plus 12 hex characters for a key. A reservation with no value has no `dietary` key.
 4. **Absent means nothing declared.** It never means "no allergies". An absent value can also mean the switch is off or the answer is one that never carries the field. No surface may say "no allergies", "none" or an equivalent. The staff app shows nothing when the field is absent.
@@ -105,7 +105,7 @@ Each can be answered yes or no, or by choosing an option. The owner's decisions 
 Each step is one pull request. The steps up to the demo can land before the review. No instance turns the switch on for real guests before the review answers.
 
 1. This record and the contract. Done.
-2. API: the `DIETARY` switch and its startup check, the `.env.example` entry, the migration and columns, validation, the read rules of decision 7, `dietaryEnabled` in the config, clearing in retention and erasure, the startup count, and tests for C82. Then C82 leaves GAP and `CHANGELOG.md` gets its entry.
+2. API: the `DIETARY` switch and its startup check, the `.env.example` entry, the migration and columns, validation, the read rules of decision 7, `dietaryEnabled` in the config, clearing in retention and erasure, the startup count, and tests for C82. Then C82 leaves GAP and `CHANGELOG.md` gets its entry. Done: the value is one jsonb column, `reservations.dietary`, and C82 is partial until step 3.
 3. MCP: the field on `reservation.create`, `reservation.walk_in` and `reservation.modify`, returned where the API returns it, and a new npm release.
 4. Staff app: allergen and diet buttons and the note on the create, walk-in and edit dialogs, the attestation checkbox, the value in the agenda, the pre-shift view and the floor card, nothing shown when absent, and a clear button for a withdrawal.
 5. Hosted demo: `DIETARY: "on"` in `compose.demo.yaml`, invented values in the demo template (`apps/api/src/demo/template.ts`, ADR-0022), the notice next to the field in the demo ("invented data only, never a real allergy"), and the demo terms and site privacy wording in `apps/site` that say so.

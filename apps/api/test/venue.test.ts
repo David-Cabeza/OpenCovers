@@ -59,6 +59,7 @@ describe("venue config and erasure", () => {
         maxAdvanceDays: null,
         maxActivePerGuestPerDay: null,
         blockedDates: [],
+        dietaryEnabled: false,
       },
     });
 
@@ -123,6 +124,7 @@ describe("venue config and erasure", () => {
       maxAdvanceDays: null,
       maxActivePerGuestPerDay: null,
       blockedDates: [],
+      dietaryEnabled: false,
     });
 
     const again = await erase(db, "erase", "carlos@example.com");
