@@ -28,7 +28,12 @@ export function DietarySummary({ dietary, className }: { dietary: Dietary; class
           </p>
         )}
         {dietary.diets.length > 0 && (
-          <p>{t("dietary.shown.diets", { list: dietary.diets.map((code) => t(`dietary.diet.${code}`)).join(", ") })}</p>
+          <p>
+            {t("dietary.shown.diets", {
+              count: dietary.diets.length,
+              list: dietary.diets.map((code) => t(`dietary.diet.${code}`)).join(", "),
+            })}
+          </p>
         )}
         {dietary.note && <p className="whitespace-pre-line">{t("dietary.shown.note", { note: dietary.note })}</p>}
       </div>

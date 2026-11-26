@@ -210,7 +210,7 @@ describe("AgendaView actions", () => {
     const { user } = setup(reservation({ status: "attended" }));
     await openRowMenu(user);
 
-    expect(await screen.findByRole("menuitem", { name: /Edit consent/ })).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Edit details" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Seat" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Cancel" })).not.toBeInTheDocument();
   });
@@ -279,7 +279,7 @@ describe("AgendaView actions", () => {
     });
     await openRowMenu(user);
 
-    await user.click(await screen.findByRole("menuitem", { name: /Edit consent/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit details" }));
     await user.clear(await screen.findByLabelText("Note"));
     await user.type(screen.getByLabelText("Note"), "Quiet table");
     await user.click(screen.getByRole("button", { name: "Save" }));

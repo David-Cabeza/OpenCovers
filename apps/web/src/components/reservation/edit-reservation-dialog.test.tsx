@@ -51,7 +51,7 @@ describe("EditReservationDialog", () => {
 
   it("names the consent select by its label", () => {
     setup();
-    expect(screen.getByRole("combobox", { name: "Contact consent" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Contact permission" })).toBeInTheDocument();
   });
 
   it("names the rating select by its label", () => {
