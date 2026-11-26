@@ -65,34 +65,19 @@ describe("table shapes", () => {
     }
   });
 
-  it("gives a name on a diagonal long table the chord across it, between its depth and its length", () => {
+  it("gives a name on a diagonal long table less than the chord across it, so its corners stay inside", () => {
     renderWithApp(<FloorCanvas tables={[{ ...table("long", 6), name: "Barra", rotation: 45 }]} mode="view" />);
     const room = parseFloat(screen.getByText("Barra").style.maxWidth);
     expect(room).toBeGreaterThan(36 - 6);
-    expect(room).toBeLessThan(110 - 6);
-    expect(room).toBeCloseTo(36 / Math.sin(Math.PI / 4) - 6, 2);
+    expect(room).toBeLessThan(36 / Math.sin(Math.PI / 4) - 6);
   });
 
   it("lets the name of a free table take two lines at most, inside the table, and keeps it whole in a tooltip", () => {
-    renderWithApp(<FloorCanvas tables={[{ ...table("square", 2), name: "Terraza 1" }]} mode="view" />);
-    const name = screen.getByText("Terraza 1");
+    renderWithApp(<FloorCanvas tables={[{ ...table("square", 2), name: "Terraza fondo 1" }]} mode="view" />);
+    const name = screen.getByText("Terraza fondo 1");
     expect(name.className).toContain("line-clamp-2");
-    expect(name).toHaveAttribute("title", "Terraza 1");
+    expect(name).toHaveAttribute("title", "Terraza fondo 1");
     expect(parseFloat(name.style.maxWidth)).toBe(52 - 6);
-  });
-
-  it("writes a longer name smaller, so a name like Terraza 1 stays on one line", () => {
-    renderWithApp(
-      <FloorCanvas
-        tables={[
-          { ...table("square", 2), id: "a", name: "Mesa 1" },
-          { ...table("square", 2), id: "b", name: "Terraza 1" },
-        ]}
-        mode="view"
-      />,
-    );
-    expect(screen.getByText("Mesa 1").className).toContain("text-[11px]");
-    expect(screen.getByText("Terraza 1").className).toContain("text-[10px]");
   });
 
   it("keeps the name of an occupied table on one line, over the guest and the party size", () => {
@@ -243,5 +228,51 @@ describe("editing from the keyboard", () => {
   it("leaves view mode alone", () => {
     renderWithApp(<FloorCanvas tables={[tbl]} mode="view" />);
     expect(screen.queryByRole("group", { name: "Mesa 3" })).toBeNull();
+  });
+});
+
+describe("text on a small or shrunk table", () => {
+  /** Draws one table on a plan shrunk to `scale`: the table plus the margin is 104 px wide. */
+  function shrunk(scale: number, extra: object) {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(private readonly cb: () => void) {}
+        observe() {
+          this.cb();
+        }
+        disconnect() {}
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(Math.ceil(104 * scale));
+    renderWithApp(<FloorCanvas tables={[{ ...table("square", 2), name: "Terraza 1", ...extra }]} mode="view" />);
+    const showAll = screen.queryByRole("button", { name: "Show all" });
+    if (showAll) fireEvent.click(showAll);
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("shortens the name of a free table and keeps the whole one for screen readers and the tooltip", () => {
+    shrunk(0.7, {});
+    expect(screen.getByText("T1")).toHaveAttribute("title", "Terraza 1");
+    expect(screen.getByText("T1")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("button", { name: "Terraza 1, 2 seats, seat a walk-in" })).toBeInTheDocument();
+  });
+
+  it("drops the guest before the party size, and still names the guest", () => {
+    shrunk(0.7, { occupied: true, guestName: "Dan", partySize: 2 });
+    expect(screen.getByText("T1")).toBeInTheDocument();
+    expect(screen.getByText("2 pax")).toBeInTheDocument();
+    expect(screen.queryByText("Dan")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Terraza 1 Dan 2 pax, 2 guests" })).toBeInTheDocument();
+  });
+
+  it("keeps only the short name on a tiny table", () => {
+    shrunk(0.3, { occupied: true, guestName: "Dan", partySize: 2 });
+    expect(screen.getByText("T1")).toHaveAttribute("title", "Terraza 1");
+    expect(screen.queryByText("2 pax")).not.toBeInTheDocument();
   });
 });
