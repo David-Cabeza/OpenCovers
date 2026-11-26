@@ -12,8 +12,11 @@ import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { FloorCanvas } from "@/components/floor/floor-canvas";
 import { FloorSkinToggle } from "@/components/floor/floor-skin-toggle";
+import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
 import { MoveDialog } from "@/components/floor/move-dialog";
 import { useAgenda } from "@/hooks/use-agenda";
+import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
+import { useDietaryShortcut } from "@/hooks/use-dietary-shortcut";
 import { useFloor } from "@/hooks/use-floor";
 import { useFloorItems } from "@/hooks/use-floor-items";
 import { useVenueConfig } from "@/hooks/use-venue-config";
@@ -36,6 +39,8 @@ export function FloorView({ venueId }: { venueId: string }) {
   // The floor route carries no allergies, and the day's agenda does.
   const agenda = useAgenda(venueId, date);
   const config = useVenueConfig(venueId);
+  const canRecordDietary = useCanRecordDietary(venueId);
+  const shortcut = useDietaryShortcut(venueId);
   const dietaryById = new Map((agenda.data?.reservations ?? []).map((r) => [r.id, r.dietary]));
 
   const tables = data?.tables ?? [];
@@ -146,6 +151,7 @@ export function FloorView({ venueId }: { venueId: string }) {
             const table = tables.find((t) => t.id === tableId);
             if (table?.reservationId) setMoveFrom(table);
           }}
+          onDietaryRequest={canRecordDietary ? (reservationId) => void shortcut.open(reservationId) : undefined}
         />
       )}
 
@@ -155,6 +161,13 @@ export function FloorView({ venueId }: { venueId: string }) {
         pending={move.isPending}
         onMove={(reservationId, targetTableId) => move.mutate({ reservationId, targetTableId })}
         onClose={() => setMoveFrom(null)}
+      />
+
+      <EditReservationDialog
+        venueId={venueId}
+        reservation={shortcut.reservation}
+        startOnDietary
+        onOpenChange={(open) => !open && shortcut.close()}
       />
 
       <WalkInDialog

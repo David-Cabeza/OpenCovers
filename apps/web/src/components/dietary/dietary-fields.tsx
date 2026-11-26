@@ -55,11 +55,11 @@ export function useDietaryForm(): DietaryForm {
   };
 }
 
-export function DietaryFields({ form }: { form: DietaryForm }) {
+export function DietaryFields({ form, startOpen = false }: { form: DietaryForm; startOpen?: boolean }) {
   const t = useT();
   const id = useId();
   const { draft, stored, consentMissing, edit } = form;
-  const [asked, setAsked] = useState(false);
+  const [asked, setAsked] = useState(startOpen);
   const open = asked || Boolean(stored) || !isEmptyDietary(draft);
   const first = useRef<HTMLButtonElement>(null);
   const tick = useRef<HTMLInputElement>(null);

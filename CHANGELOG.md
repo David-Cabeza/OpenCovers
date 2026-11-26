@@ -26,6 +26,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 - With `DIETARY` off, a create, walk-in or modify whose body holds a `dietary` other than `null` fails with `400 invalid_request` and writes nothing. Before this change the field was ignored. A client reads `dietaryEnabled` before it sends the field.
 - The public create and the self-service modify refuse a body that names `dietary`.
 - The staff app shows allergies and diets in the agenda, the pre-shift view, the floor plan, the table card and the table assignment dialog, and takes them on create, walk-in and edit with an unticked consent box. It can delete them on any reservation. Nothing appears unless the instance has `DIETARY=on`, and a reservation with nothing recorded shows nothing.
+- With the same switch, staff who can write get a shortcut to a booking's allergies and diets after seating a guest from the waitlist and on the occupied table card of the floor plan.
 
 ### Changed
 

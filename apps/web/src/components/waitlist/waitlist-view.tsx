@@ -1,9 +1,9 @@
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { errorMessage } from "@/lib/error-message";
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
-import { ArmchairIcon, PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
+import { ArmchairIcon, PlusIcon, Trash2Icon, UsersIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,11 @@ import { EmptyState } from "@/components/empty-state";
 import { LoadError } from "@/components/load-error";
 import { PageHeader } from "@/components/layout/page-header";
 import { Pill } from "@/components/pill";
+import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
 import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { Stat } from "@/components/stat";
+import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
+import { useDietaryShortcut } from "@/hooks/use-dietary-shortcut";
 import { useWaitlist } from "@/hooks/use-waitlist";
 import { useT } from "@/i18n";
 import { api, type WaitlistEntry } from "@/lib/api";
@@ -28,6 +31,13 @@ export function WaitlistView({ venueId }: { venueId: string }) {
   const { data, isPending, isError, error, isRefetching, refetch } = useWaitlist(venueId, filterDate || undefined);
   const [addOpen, setAddOpen] = useState(false);
   const [removing, setRemoving] = useState<WaitlistEntry | null>(null);
+  // The last booking seated from here. A toast would be gone before a busy host gets to it, so the shortcut to its
+  // allergies stays on the page until it is used or dismissed.
+  const [seated, setSeated] = useState<{ id: string; venueId: string; name: string } | null>(null);
+  const canRecordDietary = useCanRecordDietary(venueId);
+  const shortcut = useDietaryShortcut(venueId);
+  const addButton = useRef<HTMLButtonElement>(null);
+  const saved = useRef(false);
   // First come, first seated: the queue is shown oldest first.
   const entries = [...(data?.entries ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
@@ -38,8 +48,9 @@ export function WaitlistView({ venueId }: { venueId: string }) {
   };
 
   const seat = useMutation({
-    mutationFn: (id: string) => api.seatWaitlist(venueId, id),
-    onSuccess: () => {
+    mutationFn: ({ id }: WaitlistEntry) => api.seatWaitlist(venueId, id),
+    onSuccess: (reservation, entry) => {
+      setSeated({ id: reservation.id, venueId: reservation.venueId, name: entry.guestName });
       toast.success(t("waitlist.seated"));
       invalidate();
     },
@@ -62,11 +73,24 @@ export function WaitlistView({ venueId }: { venueId: string }) {
         title={t("waitlist.title")}
         description={t("waitlist.subtitle")}
         actions={
-          <Button onClick={() => setAddOpen(true)}>
+          <Button ref={addButton} onClick={() => setAddOpen(true)}>
             <PlusIcon /> {t("common.add")}
           </Button>
         }
       />
+
+      {/* The view is not remounted when the venue changes. */}
+      {canRecordDietary && seated?.venueId === venueId && (
+        <SeatedNotice
+          key={seated.id}
+          name={seated.name}
+          onRecord={() => void shortcut.open(seated.id)}
+          onDismiss={() => {
+            setSeated(null);
+            addButton.current?.focus();
+          }}
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Input
@@ -114,7 +138,7 @@ export function WaitlistView({ venueId }: { venueId: string }) {
                 key={e.id}
                 entry={e}
                 position={index + 1}
-                onSeat={() => seat.mutate(e.id)}
+                onSeat={() => seat.mutate(e)}
                 onRemove={() => setRemoving(e)}
               />
             ))}
@@ -139,6 +163,49 @@ export function WaitlistView({ venueId }: { venueId: string }) {
         onClose={() => setRemoving(null)}
       />
       <AddWaitlistDialog venueId={venueId} open={addOpen} onOpenChange={setAddOpen} />
+      <EditReservationDialog
+        venueId={venueId}
+        reservation={shortcut.reservation}
+        startOnDietary
+        onOpenChange={(open) => !open && shortcut.close()}
+        onSaved={() => {
+          saved.current = true;
+          setSeated(null);
+        }}
+        // Saving takes the notice away, and with it the button the dialog would return focus to.
+        onCloseAutoFocus={(event) => {
+          if (!saved.current) return;
+          saved.current = false;
+          event.preventDefault();
+          addButton.current?.focus();
+        }}
+      />
+    </div>
+  );
+}
+
+function SeatedNotice({ name, onRecord, onDismiss }: { name: string; onRecord: () => void; onDismiss: () => void }) {
+  const t = useT();
+  const textId = useId();
+  const record = useRef<HTMLButtonElement>(null);
+
+  // The seated row leaves the list, and would take the keyboard focus with it.
+  useEffect(() => {
+    const active = document.activeElement;
+    if (active === document.body || active?.closest('[data-slot="waitlist-row"]')) record.current?.focus();
+  }, []);
+
+  return (
+    <div data-slot="seated-notice" className="flex flex-wrap items-center gap-2 rounded-xl border bg-card px-4 py-3">
+      <p id={textId} className="min-w-0 flex-1 basis-48 break-words text-sm">
+        {name ? t("dietary.shortcut.seated", { name }) : t("dietary.shortcut.seatedUnnamed")}
+      </p>
+      <Button ref={record} variant="outline" size="sm" aria-describedby={textId} onClick={onRecord}>
+        {t("dietary.shortcut.record")}
+      </Button>
+      <Button variant="ghost" size="icon" aria-label={t("common.close")} onClick={onDismiss}>
+        <XIcon className="size-4" />
+      </Button>
     </div>
   );
 }

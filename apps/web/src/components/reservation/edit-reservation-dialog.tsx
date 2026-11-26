@@ -47,10 +47,17 @@ export function EditReservationDialog({
   venueId,
   reservation,
   onOpenChange,
+  startOnDietary,
+  onSaved,
+  onCloseAutoFocus,
 }: {
   venueId: string;
   reservation: Reservation | null;
   onOpenChange: (open: boolean) => void;
+  /** Opens with the allergy and diet fields out and focused. */
+  startOnDietary?: boolean;
+  onSaved?: () => void;
+  onCloseAutoFocus?: (event: Event) => void;
 }) {
   const t = useT();
   const queryClient = useQueryClient();
@@ -86,6 +93,7 @@ export function EditReservationDialog({
       void queryClient.invalidateQueries({ queryKey: ["reservation", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       toast.success(t("reservation.edit.done"));
+      onSaved?.();
       onOpenChange(false);
     } catch (err) {
       toast.error(errorMessage(err, t("reservation.edit.failed")));
@@ -94,7 +102,7 @@ export function EditReservationDialog({
 
   return (
     <Dialog open={reservation !== null} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{t(canRecordDietary ? "reservation.edit.titleDietary" : "reservation.edit.title")}</DialogTitle>
           <DialogDescription>
@@ -105,7 +113,7 @@ export function EditReservationDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {canRecordDietary && <DietaryFields form={dietary} />}
+          {canRecordDietary && <DietaryFields form={dietary} startOpen={startOnDietary} />}
 
           <div className="space-y-2">
             <Label htmlFor="edit-consent">{t("reservation.contactConsent")}</Label>
