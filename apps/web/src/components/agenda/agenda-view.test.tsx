@@ -61,6 +61,23 @@ describe("AgendaView actions", () => {
     expect(screen.getByText("Booked")).toBeInTheDocument();
   });
 
+  it("says why a past day takes no new booking", async () => {
+    window.history.replaceState(null, "", "/?date=2020-01-01");
+    setup(reservation());
+
+    const button = screen.getByRole("button", { name: "New reservation" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription("You can't book a past day");
+    expect(screen.getByText("You can't book a past day")).toBeVisible();
+  });
+
+  it("gives no past-day reason for today", async () => {
+    setup(reservation());
+
+    expect(screen.getByRole("button", { name: "New reservation" })).toBeEnabled();
+    expect(screen.queryByText("You can't book a past day")).not.toBeInTheDocument();
+  });
+
   it("marks a booking made through the widget as online", async () => {
     setup(reservation({ bookedVia: "widget" }));
     expect(await screen.findByText("Online")).toBeInTheDocument();

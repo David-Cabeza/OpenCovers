@@ -4,6 +4,7 @@ export default defineMessages({
   en: {
     "agenda.title": "Agenda",
     "agenda.walkIn": "Walk-in",
+    "agenda.pastDay": "You can't book a past day",
     "agenda.loadWhat": "the agenda",
     "agenda.empty.title": "No reservations",
     "agenda.empty.description": "Nothing booked for this day yet.",
@@ -38,6 +39,7 @@ export default defineMessages({
   es: {
     "agenda.title": "Agenda",
     "agenda.walkIn": "Cliente sin reserva",
+    "agenda.pastDay": "No se puede reservar en un día pasado",
     "agenda.loadWhat": "la agenda",
     "agenda.empty.title": "Sin reservas",
     "agenda.empty.description": "Aún no hay nada reservado para este día.",
