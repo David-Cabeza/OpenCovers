@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useId, useRef, useState, type ReactElement } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRightLeftIcon, XIcon } from "lucide-react";
+import { ArrowRightLeftIcon, PencilIcon, XIcon } from "lucide-react";
 import { StatusBadge } from "@/components/agenda/status-badge";
 import { DietarySummary } from "@/components/dietary/dietary-summary";
 import { ReconfirmationPill } from "@/components/preshift/pre-shift-view";
@@ -39,6 +39,7 @@ export function FloorTableCard({
   tableNames,
   enabled,
   onMoveRequest,
+  onDietaryRequest,
   children,
 }: {
   venueId?: string;
@@ -47,6 +48,8 @@ export function FloorTableCard({
   enabled: boolean;
   /** Adds a "Move to…" button to the card, which closes it and calls this. */
   onMoveRequest?: () => void;
+  /** Adds a button to write the booking's allergies and diets, which closes the card and calls this. */
+  onDietaryRequest?: (reservationId: string) => void;
   children: ReactElement;
 }) {
   const t = useT();
@@ -200,6 +203,14 @@ export function FloorTableCard({
                 }
               : undefined
           }
+          onDietaryRequest={
+            onDietaryRequest
+              ? () => {
+                  closeToTable();
+                  onDietaryRequest(reservationId as string);
+                }
+              : undefined
+          }
         />
       </PopoverContent>
     </Popover>
@@ -214,6 +225,7 @@ function CardBody({
   open,
   onClose,
   onMoveRequest,
+  onDietaryRequest,
 }: {
   venueId: string;
   reservationId: string;
@@ -222,6 +234,7 @@ function CardBody({
   open: boolean;
   onClose: () => void;
   onMoveRequest?: () => void;
+  onDietaryRequest?: () => void;
 }) {
   const t = useT();
   const { data, isPending, isError } = useQuery({
@@ -284,6 +297,13 @@ function CardBody({
           )}
           {r.commentary && <Row label={t("floor.card.notes")}>{r.commentary}</Row>}
         </dl>
+      )}
+
+      {/* The statuses the engine lets a booking's allergies be written on. */}
+      {onDietaryRequest && r && ["booked", "seated", "attended"].includes(r.status) && (
+        <Button type="button" variant="outline" size="sm" className="w-full" onClick={onDietaryRequest}>
+          <PencilIcon className="size-4" /> {t(r.dietary ? "dietary.shortcut.edit" : "dietary.shortcut.record")}
+        </Button>
       )}
 
       {onMoveRequest && (

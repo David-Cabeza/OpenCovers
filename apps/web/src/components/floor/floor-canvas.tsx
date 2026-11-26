@@ -153,6 +153,7 @@ export function FloorCanvas({
   onSeat,
   onMove,
   onMoveRequest,
+  onDietaryRequest,
   onTableUpdate,
   onItemUpdate,
   onDeleteItem,
@@ -166,6 +167,8 @@ export function FloorCanvas({
   onMove?: (reservationId: string, targetTableId: string) => void;
   /** Called from "Move to…" in a seated table's card, for moving it without dragging. */
   onMoveRequest?: (tableId: string) => void;
+  /** Called from a seated table's card to write that booking's allergies and diets. */
+  onDietaryRequest?: (reservationId: string) => void;
   onTableUpdate?: (tableId: string, layout: { x?: number; y?: number; rotation?: number }) => void;
   onItemUpdate?: (
     itemId: string,
@@ -434,7 +437,7 @@ export function FloorCanvas({
           );
           const written = label.name?.text === t.name;
           return (
-            <FloorTableCard key={t.id} venueId={venueId} table={t} tableNames={tableNames} enabled={Boolean(movableInView)} onMoveRequest={onMoveRequest ? () => onMoveRequest(t.id) : undefined}>
+            <FloorTableCard key={t.id} venueId={venueId} table={t} tableNames={tableNames} enabled={Boolean(movableInView)} onMoveRequest={onMoveRequest ? () => onMoveRequest(t.id) : undefined} onDietaryRequest={onDietaryRequest}>
             <div
               style={{ left: pos.x, top: pos.y, width: NODE, height: NODE }}
               className={cn(

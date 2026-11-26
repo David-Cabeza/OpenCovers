@@ -27,6 +27,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 - The public create and the self-service modify refuse a body that names `dietary`.
 - `GET /v1/venues/{venueId}/config` and the answer of its `PUT` read `dietaryValuesHidden`, a boolean: `DIETARY` is off and a `booked` or `seated` reservation of the venue, dated yesterday or later, holds a stored value that no answer returns. It carries no value, count or reservation id, and a `PUT` ignores it. No request changes behaviour. The staff app does not show it yet.
 - The staff app shows allergies and diets in the agenda, the pre-shift view, the floor plan, the table card and the table assignment dialog, and takes them on create, walk-in and edit with an unticked consent box. It can delete them on any reservation. Nothing appears unless the instance has `DIETARY=on`, and a reservation with nothing recorded shows nothing.
+- With the same switch, staff who can write get a shortcut to a booking's allergies and diets after seating a guest from the waitlist and on the occupied table card of the floor plan.
 
 ### Changed
 
