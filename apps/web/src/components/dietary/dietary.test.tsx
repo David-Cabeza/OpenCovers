@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgendaView } from "@/components/agenda/agenda-view";
@@ -230,6 +230,63 @@ describe("writing it on a new booking", () => {
     await user.click(screen.getByRole("button", { name: "Seat guest" }));
     await waitFor(() => expect(api.writes()).toHaveLength(1));
     expect(api.writes()[0].body).not.toHaveProperty("dietary");
+  });
+});
+
+describe("a note over its limit", () => {
+  const NOTE = "Other allergy or diet detail";
+  const LAST = " do not serve nut desserts";
+
+  it.each([
+    ["a new booking", <NewReservationDialog venueId="v1" date="2026-11-20" time="20:30" partySize={2} open onOpenChange={() => {}} />, "Create reservation"],
+    ["a walk-in", <WalkInDialog venueId="v1" open onOpenChange={() => {}} />, "Seat guest"],
+    ["an edit", <EditReservationDialog venueId="v1" reservation={reservation()} onOpenChange={() => {}} />, "Save"],
+  ])("is kept whole and blocks saving %s until it is shortened", async (_, dialog, button) => {
+    const { api, user } = setup(dialog);
+    await user.click(await screen.findByRole("button", { name: ADD }));
+    const note = screen.getByLabelText(NOTE);
+    const long = "x".repeat(200) + LAST;
+
+    await user.click(note);
+    await user.paste(long);
+    await user.click(screen.getByRole("checkbox", { name: TICK }));
+
+    expect(note).toHaveValue(long);
+    expect(screen.getByText("226 of 200")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Too long to save. Shorten it to 200 characters or fewer.");
+    expect(note).toBeInvalid();
+    expect(note).toHaveAccessibleDescription(/Too long to save.*226 of 200.*most important thing first/);
+
+    // Twice: focus has to come back every time, not only the first.
+    for (let i = 0; i < 2; i++) {
+      await user.click(screen.getByRole("button", { name: button }));
+      expect(note).toHaveFocus();
+    }
+    expect(api.writes()).toHaveLength(0);
+
+    // Shortened from the start, without emptying it, which would drop the tick.
+    fireEvent.change(note, { target: { value: LAST } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(note).toBeValid();
+    await user.click(screen.getByRole("button", { name: button }));
+
+    await waitFor(() => expect(api.writes()).toHaveLength(1));
+    expect(api.writes()[0].body).toMatchObject({ dietary: { note: LAST.trim() } });
+  });
+
+  it.each([
+    ["spaces around it do not count", `  ${"x".repeat(200)}  `, "200 of 200", false],
+    ["a line break counts as one", `${"x".repeat(99)}\n${"x".repeat(100)}`, "200 of 200", false],
+    ["an emoji counts as two, as in the API", `${"x".repeat(199)}\u{1F95C}`, "201 of 200", true],
+  ])("counts the way the API does: %s", async (_, text, counter, over) => {
+    const { user } = setup(<WalkInDialog venueId="v1" open onOpenChange={() => {}} />);
+    await user.click(await screen.findByRole("button", { name: ADD }));
+
+    await user.click(screen.getByLabelText(NOTE));
+    await user.paste(text);
+
+    expect(screen.getByText(counter)).toBeInTheDocument();
+    expect(screen.queryByRole("alert") !== null).toBe(over);
   });
 });
 

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useId, useRef, useState, type Ref } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type Ref, type RefObject } from "react";
 import { CheckIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { isTooLong, LimitedTextarea } from "@/components/limited-textarea";
 import { useT } from "@/i18n";
 import {
   ALLERGENS,
@@ -21,6 +21,7 @@ export interface DietaryForm {
   draft: DietaryDraft;
   /** A save was tried without the tick. */
   consentMissing: boolean;
+  noteRef: RefObject<HTMLTextAreaElement | null>;
   edit: (patch: Partial<DietaryDraft>) => void;
   reset: (stored?: Dietary) => void;
   /** The `dietary` to put in a request body, to be spread into it. Null means do not send the request yet. */
@@ -32,9 +33,11 @@ export function useDietaryForm(): DietaryForm {
     draft: draftFrom(),
     consentMissing: false,
   }));
+  const noteRef = useRef<HTMLTextAreaElement>(null);
   const reset = useCallback((stored?: Dietary) => setState({ stored, draft: draftFrom(stored), consentMissing: false }), []);
   return {
     ...state,
+    noteRef,
     reset,
     edit: (patch) =>
       setState((prev) => {
@@ -44,6 +47,10 @@ export function useDietaryForm(): DietaryForm {
         return { ...prev, draft, consentMissing: false };
       }),
     take: () => {
+      if (isTooLong(state.draft.note, DIETARY_NOTE_MAX)) {
+        noteRef.current?.focus();
+        return null;
+      }
       const change = dietaryChange(state.draft, state.stored);
       if (change.kind === "needsConsent") {
         setState((prev) => ({ ...prev, consentMissing: true }));
@@ -58,7 +65,7 @@ export function useDietaryForm(): DietaryForm {
 export function DietaryFields({ form }: { form: DietaryForm }) {
   const t = useT();
   const id = useId();
-  const { draft, stored, consentMissing, edit } = form;
+  const { draft, stored, consentMissing, noteRef, edit } = form;
   const [asked, setAsked] = useState(false);
   const open = asked || Boolean(stored) || !isEmptyDietary(draft);
   const first = useRef<HTMLButtonElement>(null);
@@ -131,17 +138,16 @@ export function DietaryFields({ form }: { form: DietaryForm }) {
 
       <div className="space-y-2">
         <Label htmlFor={`${id}-note`}>{t("dietary.note")}</Label>
-        <Textarea
+        <LimitedTextarea
           id={`${id}-note`}
-          maxLength={DIETARY_NOTE_MAX}
+          ref={noteRef}
+          text={draft.note}
+          limit={DIETARY_NOTE_MAX}
+          hint={t("dietary.noteHint", { max: DIETARY_NOTE_MAX })}
           autoComplete="off"
-          aria-describedby={`${id}-note-hint`}
           value={draft.note}
           onChange={(e) => edit({ note: e.target.value })}
         />
-        <p id={`${id}-note-hint`} className="text-sm text-muted-foreground">
-          {t("dietary.noteHint", { max: DIETARY_NOTE_MAX })}
-        </p>
       </div>
 
       {needsTick && (

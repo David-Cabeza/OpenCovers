@@ -44,7 +44,6 @@ describe("EditReservationDialog", () => {
 
     expect(screen.getByText("Update the details recorded for Jane Doe.")).toBeInTheDocument();
     expect(screen.getByLabelText("Note")).toHaveValue("Window seat");
-    expect(screen.getByLabelText("Note")).toHaveAttribute("maxlength", "500");
     expect(
       screen.getByText("Up to 500 characters. Do not enter health data such as allergies."),
     ).toBeInTheDocument();
@@ -110,13 +109,19 @@ describe("EditReservationDialog", () => {
     expect((api.writes()[1].body as { rating: unknown }).rating).toBeNull();
   });
 
-  it("stops the note at 500 characters", async () => {
-    const { user } = setup();
+  it("keeps a note over 500 characters whole and does not save it", async () => {
+    const { api, user } = setup();
+    const note = screen.getByLabelText("Note");
 
-    await user.clear(screen.getByLabelText("Note"));
-    await user.type(screen.getByLabelText("Note"), "x".repeat(520));
+    await user.clear(note);
+    await user.paste("x".repeat(520));
+    expect(note).toHaveValue("x".repeat(520));
+    expect(screen.getByText("520 of 500")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(screen.getByLabelText("Note")).toHaveValue("x".repeat(500));
+    expect(note).toHaveFocus();
+    expect(screen.getByRole("alert")).toHaveTextContent("Shorten it to 500 characters or fewer.");
+    expect(api.writes()).toHaveLength(0);
   });
 
   it("shows the API error and keeps the dialog open", async () => {
