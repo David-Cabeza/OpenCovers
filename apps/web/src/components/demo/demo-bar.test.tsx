@@ -142,6 +142,28 @@ describe("the demo bar", () => {
     await user.click(screen.getByRole("button", { name: /Take the tour/ }));
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
   });
+
+  it("remembers the fold per sandbox, and starts open for a first visit", async () => {
+    search([]);
+    const user = userEvent.setup();
+    const first = renderWithApp(<DemoBar status={status} />);
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    await user.click(screen.getByRole("button", { name: /Take the tour/ }));
+    expect(window.localStorage.getItem("oc-demo-folded:v1")).toBe("1");
+    first.unmount();
+    renderWithApp(<DemoBar status={status} />);
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: /Take the tour/ }));
+    expect(window.localStorage.getItem("oc-demo-folded:v1")).toBe("0");
+  });
+
+  it("folds itself once all four steps are done, unless the visitor chose", async () => {
+    search([reservation({ id: "a" }), reservation({ id: "b", status: "cancelled" })]);
+    window.localStorage.setItem("oc-demo-checklist:v1", JSON.stringify(["agenda", "trace"]));
+    renderWithApp(<DemoBar status={status} />);
+    expect(await screen.findByText("Take the tour (4 of 4 done)")).toBeInTheDocument();
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+  });
 });
 
 describe("the agenda this tab already loaded", () => {
