@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LoadError } from "@/components/load-error";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { FloorCanvas } from "@/components/floor/floor-canvas";
 import { useTables } from "@/hooks/use-tables";
 import { useFloorItems } from "@/hooks/use-floor-items";
@@ -97,7 +97,7 @@ export function FloorEditor({ venueId }: { venueId: string }) {
       </CardHeader>
       <CardContent>
         {isPending ? (
-          <Skeleton className="h-[480px] w-full" />
+          <Loading><Skeleton className="h-[480px] w-full" /></Loading>
         ) : isError && !tablesData ? (
           <LoadError compact what={t("setup.tables.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : (

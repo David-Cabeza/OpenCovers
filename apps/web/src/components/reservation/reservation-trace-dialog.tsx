@@ -42,7 +42,7 @@ export function ReservationTraceDialog({
         </DialogHeader>
 
         {isPending ? (
-          <div className="space-y-3" role="status" aria-label={t("reservation.trace.loading")}>
+          <div className="space-y-3" role="status" aria-busy="true" aria-label={t("reservation.trace.loading")}>
             <Skeleton className="h-14 w-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />

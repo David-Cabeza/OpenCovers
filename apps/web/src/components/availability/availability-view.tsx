@@ -7,7 +7,7 @@ import { canEditSetup, useNavigation } from "@/components/layout/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { useAvailability } from "@/hooks/use-availability";
 import { useT } from "@/i18n";
 import { longDate } from "@/lib/date";
@@ -71,7 +71,7 @@ export function AvailabilityView({ venueId }: { venueId: string }) {
       />
 
       {isPending ? (
-        <Skeleton className="h-64 w-full" />
+        <Loading><Skeleton className="h-64 w-full" /></Loading>
       ) : isError && !data ? (
         <LoadError what={t("availability.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : services.length === 0 ? (

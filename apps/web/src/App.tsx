@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ServerUnreachable } from "@/components/auth/server-unreachable";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { InviteGate } from "@/components/auth/invite-screen";
 import { Dashboard } from "@/components/dashboard";
@@ -23,7 +23,7 @@ export default function App({ inviteToken = null }: { inviteToken?: string | nul
   if (isPending) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <Skeleton className="h-10 w-64" />
+        <Loading><Skeleton className="h-10 w-64" /></Loading>
       </div>
     );
   }

@@ -7,16 +7,31 @@ import {
   OctagonXIcon,
   TriangleAlertIcon,
 } from "lucide-react"
+import { useT } from "@/i18n"
 import { useTheme } from "@/lib/theme"
-import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { toast, Toaster as Sonner, type ToasterProps } from "sonner"
+
+// An error toast often carries the only explanation of what failed, so it stays until it is dismissed. The same
+// message replaces itself instead of piling up while the same failure repeats.
+const toastError = toast.error
+toast.error = (message, data) =>
+  toastError(message, {
+    duration: Infinity,
+    id: typeof message === "string" ? `error:${message}` : undefined,
+    ...data,
+  })
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { resolvedTheme } = useTheme()
+  const t = useT()
 
   return (
     <Sonner
       theme={resolvedTheme}
       className="toaster group"
+      closeButton
+      containerAriaLabel={t("common.notifications")}
+      toastOptions={{ closeButtonAriaLabel: t("common.close") }}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,

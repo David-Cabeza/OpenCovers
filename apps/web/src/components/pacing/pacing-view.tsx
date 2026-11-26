@@ -49,7 +49,7 @@ export function PacingView({ venueId }: { venueId: string }) {
       />
 
       {isPending ? (
-        <div role="status" aria-label={t("common.loading")} className="flex h-64 items-end gap-2">
+        <div role="status" aria-busy="true" aria-label={t("common.loading")} className="flex h-64 items-end gap-2">
           {[40, 65, 90, 75, 55, 80, 60, 35, 50, 70].map((h, i) => (
             <Skeleton key={i} className="w-full" style={{ height: `${h}%` }} />
           ))}

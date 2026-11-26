@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadError } from "@/components/load-error";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { useVenueConfig } from "@/hooks/use-venue-config";
 import { api, type Role } from "@/lib/api";
 
@@ -99,7 +99,7 @@ export function VenueSettings({ venueId, role }: { venueId: string; role?: Role 
       </CardHeader>
       <CardContent className="space-y-6">
         {isPending ? (
-          <Skeleton className="h-24 w-full" />
+          <Loading><Skeleton className="h-24 w-full" /></Loading>
         ) : isError && !data ? (
           <LoadError compact what={t("setup.venue.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : (

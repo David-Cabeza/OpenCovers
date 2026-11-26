@@ -78,6 +78,7 @@ describe("AgendaView actions", () => {
     expect(api.writes()[0].body).toEqual({ status: "seated" });
     expect(api.writes()[0].headers["Idempotency-Key"]).toBeTruthy();
     expect(await screen.findByText("Seated")).toBeInTheDocument();
+    expect(await screen.findByText("Status changed to Seated")).toBeInTheDocument();
     expect(api.calls("GET", "/v1/venues/v1/agenda").length).toBeGreaterThan(agendaCallsBefore);
   });
 

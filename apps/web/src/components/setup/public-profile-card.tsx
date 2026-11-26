@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadError } from "@/components/load-error";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { useT } from "@/i18n";
 import { usePublicProfile } from "@/hooks/use-public-profile";
 import { api } from "@/lib/api";
@@ -141,7 +141,7 @@ export function PublicProfileCard({ venueId }: { venueId: string }) {
       </CardHeader>
       <CardContent className="space-y-6">
         {isPending ? (
-          <Skeleton className="h-24 w-full" />
+          <Loading><Skeleton className="h-24 w-full" /></Loading>
         ) : isError && !data ? (
           <LoadError compact what={t("publicprofile.loadWhat")} error={loadError} retrying={isRefetching} onRetry={() => void refetch()} />
         ) : (

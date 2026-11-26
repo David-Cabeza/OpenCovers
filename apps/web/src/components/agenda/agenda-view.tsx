@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { DayNav } from "@/components/day-nav";
 import { PageHeader } from "@/components/layout/page-header";
 import { Stat } from "@/components/stat";
-import { StatusBadge } from "./status-badge";
+import { StatusBadge, statusLabel } from "./status-badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { AssignTablesDialog } from "@/components/reservation/assign-tables-dialog";
 import { CancelReservationDialog } from "@/components/reservation/cancel-reservation-dialog";
 import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
@@ -120,7 +120,10 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       api.setStatus(venueId, id, status),
-    onSuccess: () => invalidate(),
+    onSuccess: (_, { status }) => {
+      toast.success(t("agenda.statusChanged", { status: statusLabel(status) }));
+      invalidate();
+    },
     onError: (err, { id }) => {
       if (isApiError(err, "table_required")) {
         toast.error(errorMessage(err, t("agenda.assignFirst")));
@@ -157,14 +160,14 @@ export function AgendaView({ venueId }: { venueId: string }) {
       />
 
       {isPending ? (
-        <div className="space-y-3">
+        <Loading className="space-y-3">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[0, 1, 2, 3].map((n) => (
               <Skeleton key={n} className="h-24" />
             ))}
           </div>
           <Skeleton className="h-64 w-full" />
-        </div>
+        </Loading>
       ) : isError && !data ? (
         <LoadError what={t("agenda.loadWhat")} error={error} retrying={isRefetching} onRetry={() => void refetch()} />
       ) : reservations.length === 0 ? (
