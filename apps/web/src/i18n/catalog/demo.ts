@@ -3,7 +3,7 @@ import { defineMessages } from "../define";
 export default defineMessages({
   en: {
     "demo.signIn.title": "Try the demo",
-    "demo.signIn.description": "Sign in to get your own sandbox restaurant, ready to use. No password: we email you a link.",
+    "demo.signIn.description": "Sign in to get your own sandbox restaurant, ready to use. It is deleted after 14 days without use. No password: we email you a link.",
     "demo.signIn.submit": "Email me a sign-in link",
     "demo.signIn.preparing": "Preparing your link…",
     "demo.signIn.tryAgainIn": "Try again in {seconds}s",
