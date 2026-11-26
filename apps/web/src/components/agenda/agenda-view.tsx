@@ -25,6 +25,7 @@ import { AssignTablesDialog } from "@/components/reservation/assign-tables-dialo
 import { CancelReservationDialog } from "@/components/reservation/cancel-reservation-dialog";
 import { EditReservationDialog } from "@/components/reservation/edit-reservation-dialog";
 import { ReservationTraceDialog } from "@/components/reservation/reservation-trace-dialog";
+import { Pill } from "@/components/pill";
 import { NewReservationDialog } from "@/components/reservation/new-reservation-dialog";
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { EmptyState } from "@/components/empty-state";
@@ -105,6 +106,8 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
     void queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
+    // The floor plan shows the same bookings, and keeps what it loaded for 30 s, so a table would stay taken.
+    void queryClient.invalidateQueries({ queryKey: ["floor", venueId] });
   };
 
   const cancel = useMutation({
@@ -293,7 +296,10 @@ function ReservationRow({
           <AvatarFallback className="text-xs">{guestInitials(reservation.guest.name)}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <div className="line-clamp-2 break-words font-medium md:line-clamp-1" title={reservation.guest.name || undefined}>{reservation.guest.name || "—"}</div>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2">
+            <span className="line-clamp-2 min-w-0 break-words font-medium md:line-clamp-1" title={reservation.guest.name || undefined}>{reservation.guest.name || "—"}</span>
+            {reservation.bookedVia === "widget" && <Pill tone="info" className="shrink-0 py-0.5">{t("agenda.online")}</Pill>}
+          </div>
           {reservation.guest.contact && (
             <div className="truncate text-xs text-muted-foreground">{reservation.guest.contact}</div>
           )}

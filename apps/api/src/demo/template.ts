@@ -59,6 +59,12 @@ export interface DemoTemplate {
   commentary: string;
   waitlist: { name: string; local: string; partySize: number }[];
   walkIn: { name: string; partySize: number };
+  /**
+   * One evening on which every table is taken, so Availability shows a time that is not free for any party size and
+   * the tour can show the no-double-booking rule. `day` is days from today; the bookings that would overlap it are
+   * left out of the plan.
+   */
+  fullService: { day: number; time: string; guestName: string; commentary: string; clearMinutes: number };
   pendingInvitation: { role: "read"; email: string };
 }
 
@@ -145,6 +151,8 @@ export const DEMO_TEMPLATE: DemoTemplate = {
     { name: "Cristina Nieto", local: "cristina.nieto", partySize: 2 },
   ],
   walkIn: { name: "Mesa de barra", partySize: 2 },
+  // Tomorrow at 21:00 (the tour names it). `clearMinutes` is wider than the longest turn time, so nothing else holds a table.
+  fullService: { day: 1, time: "21:00", guestName: "Cena de empresa", commentary: "Ejemplo de servicio completo", clearMinutes: 150 },
   pendingInvitation: { role: "read", email: "sala@example.com" },
 };
 
@@ -178,11 +186,14 @@ export interface PlannedReservation {
 /** The bookings that fill the agenda, relative to `now`. Deterministic: the same day gives the same plan. */
 export function planReservations(template: DemoTemplate, now: Date = new Date()): PlannedReservation[] {
   const plan: PlannedReservation[] = [];
+  const full = template.fullService;
+  const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
   let g = 0;
   for (let day = 0; day < template.bookingDays; day += 1) {
     const date = dateInTz(template.venue.timezone, day, now);
     template.slots.forEach((time, i) => {
       if ((i + day) % 2 === 1 && day > 0) return;
+      if (day === full.day && Math.abs(minutes(time) - minutes(full.time)) < full.clearMinutes) return;
       const guest = template.guests[g % template.guests.length]!;
       const partySize = template.parties[g % template.parties.length]!;
       g += 1;
@@ -197,6 +208,21 @@ export function planReservations(template: DemoTemplate, now: Date = new Date())
       });
     });
   }
+  // One booking per table, each as large as its table, so no table is left for anyone else at that time.
+  const date = dateInTz(template.venue.timezone, full.day, now);
+  [...template.tables]
+    .sort((a, b) => b.seats - a.seats)
+    .forEach((table, n) => {
+      plan.push({
+        day: full.day,
+        date,
+        time: full.time,
+        partySize: table.seats,
+        guestName: `${full.guestName} ${n + 1}`,
+        contact: `cena.empresa.${n + 1}@example.com`,
+        commentary: full.commentary,
+      });
+    });
   return plan;
 }
 

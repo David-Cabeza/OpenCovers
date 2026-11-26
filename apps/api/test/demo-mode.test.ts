@@ -197,6 +197,15 @@ describe("sandbox provisioning", () => {
     expect(((await agenda.json()) as { reservations: unknown[] }).reservations.length).toBeGreaterThan(0);
     const floor = await app.request(`/v1/venues/${venueId}/floor-items`, json(cookie));
     expect(((await floor.json()) as { items: unknown[] }).items.length).toBe(DEMO_TEMPLATE.floorItems.length);
+
+    // The full service: at its time, no party size from 1 to 8 finds a table, and the day before it is not blocked.
+    for (const partySize of [1, 2, 4, 8]) {
+      const res = await app.request(`/v1/venues/${venueId}/availability?date=${tomorrow}&partySize=${partySize}`, json(cookie));
+      const { availability } = (await res.json()) as { availability: Record<string, { time: string; available: boolean }[]> };
+      const slot = availability["Cenas"]!.find((s) => s.time === DEMO_TEMPLATE.fullService.time);
+      expect(slot, `party of ${partySize}`).toMatchObject({ available: false });
+      expect(availability["Cenas"]!.some((s) => s.available)).toBe(true);
+    }
     const waitlist = await app.request(`/v1/venues/${venueId}/waitlist`, json(cookie));
     expect(((await waitlist.json()) as { entries: unknown[] }).entries.length).toBe(DEMO_TEMPLATE.waitlist.length);
     const invitations = await app.request(`/v1/venues/${venueId}/invitations`, json(cookie));

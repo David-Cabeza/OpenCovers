@@ -77,12 +77,18 @@ describe("the demo bar", () => {
     document.documentElement.classList.remove("dark");
   });
 
-  it("lists the tour with a trace step, and ticks steps from real bookings", async () => {
+  it("lists the tour, and ticks steps from real bookings", async () => {
     search([reservation({ id: "a" }), reservation({ id: "b", status: "cancelled" })]);
     renderWithApp(<DemoBar status={status} />);
     expect(await screen.findByText("Take the tour (2 of 4 done)")).toBeInTheDocument();
-    expect(screen.getByText(/Open its trace from the booking's menu/)).toBeInTheDocument();
+    expect(screen.getByText(/open View trace in its menu/)).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(4);
+  });
+
+  it("names the time of the full evening, and the table to try", () => {
+    search([]);
+    renderWithApp(<DemoBar status={status} />);
+    expect(screen.getByText(/Tomorrow at 21:00 no table is left.*pick Table 1/)).toBeInTheDocument();
   });
 
   it("does not count a booking staff made as the diner's", async () => {
@@ -102,16 +108,26 @@ describe("the demo bar", () => {
     expect(screen.getByText("Take the tour (1 of 4 done)")).toBeInTheDocument();
   });
 
-  it("keeps the trace step as its own manual tick, apart from the agenda step", async () => {
+  it("keeps the double-booking step as its own manual tick, apart from the agenda step", async () => {
     search([]);
     const user = userEvent.setup();
     renderWithApp(<DemoBar status={status} />);
-    const [agenda, trace] = screen.getAllByRole("button", { name: "Mark as done" });
-    await user.click(trace!);
+    const [agenda, rule] = screen.getAllByRole("button", { name: "Mark as done" });
+    await user.click(rule!);
     expect(screen.getByText("Take the tour (1 of 4 done)")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Mark as done" })).toHaveLength(1);
     expect(agenda).toBeInTheDocument();
-    expect(JSON.parse(window.localStorage.getItem("oc-demo-checklist:v1")!)).toEqual(["trace"]);
+    expect(JSON.parse(window.localStorage.getItem("oc-demo-checklist:v1")!)).toEqual(["rule"]);
+  });
+
+  it("opens the agenda on the day of the diner's booking, not today", async () => {
+    search([reservation({ id: "a", date: "2026-12-05" }), reservation({ id: "b", date: "2026-12-01" })]);
+    const user = userEvent.setup();
+    renderWithApp(<DemoBar status={status} />);
+    await screen.findByText("Take the tour (1 of 4 done)");
+    await user.click(screen.getByRole("button", { name: "Open agenda" }));
+    expect(new URLSearchParams(window.location.search).get("date")).toBe("2026-12-05");
+    window.history.replaceState(null, "", "/");
   });
 
   it("speaks Spanish", async () => {
@@ -159,7 +175,7 @@ describe("the demo bar", () => {
 
   it("folds itself once all four steps are done, unless the visitor chose", async () => {
     search([reservation({ id: "a" }), reservation({ id: "b", status: "cancelled" })]);
-    window.localStorage.setItem("oc-demo-checklist:v1", JSON.stringify(["agenda", "trace"]));
+    window.localStorage.setItem("oc-demo-checklist:v1", JSON.stringify(["agenda", "rule"]));
     renderWithApp(<DemoBar status={status} />);
     expect(await screen.findByText("Take the tour (4 of 4 done)")).toBeInTheDocument();
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);

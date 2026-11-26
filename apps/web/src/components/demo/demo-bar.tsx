@@ -4,6 +4,7 @@ import { CheckCircle2Icon, ChevronDownIcon, CircleIcon, ExternalLinkIcon } from 
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { shiftIso, todayIso } from "@/lib/date";
+import { useDayParam } from "@/lib/day-param";
 import { useT } from "@/i18n";
 import { DEPLOY_YOURSELF_URL, dinerLink, formatExpiry, type DemoStatus } from "@/lib/demo";
 import { cn } from "cn";
@@ -16,7 +17,7 @@ export function DemoBar({ status }: { status: DemoStatus }) {
   const { venueId, bookingKey, expiresAt, widgetOrigin } = status;
   if (!venueId) return null;
   return (
-    <div role="region" aria-label={t("demo.bar.label")} className="print:hidden border-b border-primary/30 bg-primary/10 text-sm">
+    <div role="region" aria-label={t("demo.bar.label")} className="print:hidden border-b border-primary/30 bg-primary/10 text-sm max-lg:max-h-[45svh] max-lg:overflow-y-auto">
       <Checklist
         venueId={venueId}
         lead={
@@ -66,10 +67,10 @@ function ViewSwitch({ bookingKey, widgetOrigin }: { bookingKey: string | null; w
   );
 }
 
-type StepId = "book" | "agenda" | "trace" | "cancel";
+type StepId = "book" | "agenda" | "cancel" | "rule";
 
 /** Steps the app cannot read from anywhere, so the visitor ticks them. */
-const MANUAL: StepId[] = ["agenda", "trace"];
+const MANUAL: StepId[] = ["agenda", "rule"];
 
 const STORAGE_PREFIX = "oc-demo-checklist:";
 
@@ -112,8 +113,9 @@ function writeTicked(venueId: string, ticked: StepId[]) {
 }
 
 /**
- * Booking and cancelling are read from the bookings the guest widget made. "Find it in the agenda" and "open its
- * trace" (the agenda row's menu) cannot be read from anywhere, so the visitor ticks them.
+ * Booking and cancelling are read from the bookings the guest widget made. "Find it in the agenda and open its trace"
+ * and "try the double booking" cannot be read from anywhere, so the visitor ticks them. The seed marks tomorrow at
+ * 21:00 as full (`fullService` in the demo template), and the last step names that time.
  */
 function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.ReactNode; switcher: React.ReactNode }) {
   const t = useT();
@@ -123,6 +125,7 @@ function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.R
   const [wide] = useState(() => window.matchMedia?.("(min-width: 640px)").matches ?? true);
   const [ticked, setTicked] = useState<StepId[]>(() => readTicked(venueId));
   const nav = useNavigation();
+  const [, setDay] = useDayParam();
   useEffect(() => {
     setTicked(readTicked(venueId));
     setFolded(readFolded(venueId));
@@ -154,12 +157,19 @@ function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.R
     seen.current = widget.length;
   }, [data, widget.length, venueId, queryClient]);
   const cancelled = widget.some((r) => r.status === "cancelled");
+  // The visitor may have booked another day, so the agenda and the floor plan open on their latest booking that is
+  // still on (the widget keeps no creation time, so "latest" is the last date and time), or today without one.
+  const live = widget.filter((r) => r.status !== "cancelled");
+  const mine = [...(live.length > 0 ? live : widget)]
+    .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
+    .at(-1);
+  const mineDay = mine?.date ?? todayIso();
 
   const done: Record<StepId, boolean> = {
     book: booked,
     agenda: ticked.includes("agenda"),
-    trace: ticked.includes("trace"),
     cancel: cancelled,
+    rule: ticked.includes("rule"),
   };
 
   function toggle(id: StepId) {
@@ -168,16 +178,24 @@ function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.R
     writeTicked(venueId, next);
   }
 
-  const manual = (id: StepId, openAgenda: boolean) => (
+  const openButton = (label: string, day: string) => (
+    <Button
+      type="button"
+      size="xs"
+      variant="outline"
+      className="max-sm:h-9 max-sm:px-3 coarse:h-11"
+      onClick={() => {
+        void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
+        setDay(day);
+        nav?.goTo("agenda");
+      }}
+    >
+      {label}
+    </Button>
+  );
+  const manual = (id: StepId, opener: React.ReactNode) => (
     <span className="flex flex-wrap gap-2">
-      {openAgenda && (
-        <Button type="button" size="xs" variant="outline" className="max-sm:h-9 max-sm:px-3 coarse:h-11" onClick={() => {
-            void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
-            nav?.goTo("agenda");
-          }}>
-          {t("demo.tour.openAgenda")}
-        </Button>
-      )}
+      {opener}
       <Button type="button" size="xs" variant="ghost" className="max-sm:h-9 max-sm:px-3 coarse:h-11" onClick={() => toggle(id)}>
         {done[id] ? t("demo.tour.untick") : t("demo.tour.markDone")}
       </Button>
@@ -186,11 +204,14 @@ function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.R
 
   const steps: { id: StepId; text: string; action?: React.ReactNode }[] = [
     { id: "book", text: t("demo.tour.book") },
-    { id: "agenda", text: t("demo.tour.agenda"), action: manual("agenda", true) },
-    { id: "trace", text: t("demo.tour.trace"), action: manual("trace", false) },
+    { id: "agenda", text: t("demo.tour.agenda"), action: manual("agenda", openButton(t("demo.tour.openAgenda"), mineDay)) },
     { id: "cancel", text: t("demo.tour.cancel") },
+    { id: "rule", text: t("demo.tour.rule"), action: manual("rule", openButton(t("demo.tour.openTomorrow"), shiftIso(todayIso(), 1))) },
   ];
   const count = Object.values(done).filter(Boolean).length;
+  // Below 1024 px only the first step left shows (the count in the title says where the visitor is), so the tour
+  // leaves room for the app.
+  const current = (steps.find((step) => !done[step.id]) ?? steps[steps.length - 1]!).id;
   const open = folded === null ? wide && count < steps.length : !folded;
 
   return (
@@ -217,7 +238,7 @@ function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.R
       {open && (
         <ol id="demo-checklist" className="space-y-1.5 border-t border-primary/20 px-4 pb-2 pt-1.5 sm:px-6">
           {steps.map((step) => (
-            <li key={step.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <li key={step.id} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1", step.id !== current && "max-lg:hidden")}>
               <span className="inline-flex items-start gap-2">
                 {done[step.id] ? (
                   <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />

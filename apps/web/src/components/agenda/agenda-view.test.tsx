@@ -61,6 +61,17 @@ describe("AgendaView actions", () => {
     expect(screen.getByText("Booked")).toBeInTheDocument();
   });
 
+  it("marks a booking made through the widget as online", async () => {
+    setup(reservation({ bookedVia: "widget" }));
+    expect(await screen.findByText("Online")).toBeInTheDocument();
+  });
+
+  it("shows no online mark on a booking staff made", async () => {
+    setup(reservation());
+    await screen.findByText("Jane Doe");
+    expect(screen.queryByText("Online")).not.toBeInTheDocument();
+  });
+
   it("seats a booked reservation and refreshes the list", async () => {
     const { api, state, user } = setup(reservation(), {
       "POST /v1/venues/v1/reservations/r1/status": () => {
