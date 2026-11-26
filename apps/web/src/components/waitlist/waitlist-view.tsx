@@ -166,8 +166,8 @@ function WaitlistRow({
       >
         {position}
       </span>
-      <div className="flex min-w-0 items-center gap-3">
-        <Avatar className="size-9">
+      <div className="flex min-w-0 items-center gap-3 max-sm:col-span-2">
+        <Avatar className="size-9 max-sm:hidden">
           <AvatarFallback className="text-xs">{guestInitials(entry.guestName)}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">
@@ -177,7 +177,7 @@ function WaitlistRow({
           )}
         </div>
       </div>
-      <div className="flex items-center justify-end gap-1 md:order-last">
+      <div className="flex items-center justify-end gap-1 max-sm:order-last max-sm:col-span-3 md:order-last">
         <Button variant="outline" size="sm" onClick={onSeat}>
           {t("waitlist.seat")}
         </Button>
