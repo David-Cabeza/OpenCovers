@@ -158,7 +158,7 @@ function WaitlistRow({
   return (
     <li
       data-slot="waitlist-row"
-      className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-muted/40 md:grid-cols-[2rem_minmax(0,1fr)_4rem_7rem_8rem_auto] md:gap-x-4"
+      className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-muted/40 md:grid-cols-[2rem_minmax(0,1fr)_3rem_7rem_6rem_auto] md:gap-x-3 xl:grid-cols-[2rem_minmax(0,1fr)_4rem_7rem_8rem_auto] xl:gap-x-4"
     >
       <span
         aria-label={t("waitlist.position", { position })}

@@ -61,7 +61,8 @@ describe("FloorTableCard", () => {
     expect(api.calls("GET", "/v1/venues/v1/reservations/r1")).toHaveLength(0);
     await user.hover(node);
     const card = await screen.findByRole("dialog", { name: "Reservation for Ana" });
-    expect(await screen.findByText("ana@example.test")).toBeInTheDocument();
+    // The email may wrap after the @, so a narrow card does not cut it mid-word.
+    expect((await screen.findByText("ana@example.test")).innerHTML).toBe("ana@<wbr>example.test");
     expect(card).toHaveTextContent("Window seat, birthday");
     expect(card).toHaveTextContent("Seated");
     expect(card).toHaveTextContent("Reconfirmed");
