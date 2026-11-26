@@ -121,7 +121,7 @@ This is the decision above.
 
 The maintainer settled these on 2026-11-12.
 
-- Allergies and diet. Phase 10 does not store them as a structured field on the guest record. A guest has a free-text note, with an on-screen warning not to record health details. Allergies stay as a note on each reservation. A structured field waits for the legal review of Phase 7, because allergies can reveal health information. That reading is general knowledge and a lawyer must confirm it.
+- Allergies and diet. Phase 10 does not store them as a structured field on the guest record. A guest has a free-text note, with an on-screen warning not to record health details. Allergies stay as a note on each reservation. A structured field waits for the legal review of Phase 7, because allergies can reveal health information. That reading is general knowledge and a lawyer must confirm it. Amended on 2026-11-26: the structured field is per reservation, in [ADR-0027](0027-allergies-and-dietary-needs.md). See the amendment at the end.
 - Guest record lifetime. A guest record reuses `venues.retention_days` (default 400). That many days after the last visit, the guest's personal fields are cleared and the visits stay as anonymous rows. The default is a starting value, and the legal review may change it.
 - `guestId` in erasure. It becomes the guest record id, which is what the contract already says. The contact match stays as a fallback for one version and is documented as deprecated. No contract version bump, because the project is pre-alpha with no stable version. Known consumers are told when the change ships.
 - A walk-in with no contact does not create a guest.
@@ -133,3 +133,12 @@ The maintainer settled these on 2026-11-12.
 
 - Who is the data controller in a group, each venue or the group. This is decided in Phase 15, before any sharing.
 - The legal review of retention periods and of health-related notes.
+
+## Amendment 2026-11-26: allergies and diet go on the reservation
+
+The owner decided on 2026-11-26 that an allergy told when booking must be visible on the reservation, as a safety matter. [ADR-0027](0027-allergies-and-dietary-needs.md) records the design. It changes the resolved question on allergies and diet above in two ways:
+
+- Allergies and diet get a structured field, `dietary`, on each reservation: closed lists of allergens and diets, a short note, and an attestation that the guest consented. It is not a note any more.
+- The guest record still holds none of it. Nothing about health or diet accumulates across visits, and the guest's free-text note keeps its warning not to record health details.
+
+The field sits behind the instance switch `DIETARY`, off by default. The legal review of health data is still pending and still gates any use with real guests. Erasure and retention of a reservation clear the field, as they clear `commentary`, so decision 8 above needs no new rule.
