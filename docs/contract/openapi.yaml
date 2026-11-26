@@ -1007,8 +1007,13 @@ paths:
         it. It answers `200`, new table or not, with the venue's tables.
 
         The body is a JSON object with only the fields of `TableUpsert`.
-        `id` is 1 to 64 letters, digits, `.`, `_` or `-`, starting with a
-        letter or digit. `name` is 1 to 80 characters with at least one that
+        A new `id`, one that no table of this venue has, is 1 to 64
+        letters, digits, `.`, `_` or `-`, starting with a letter or digit.
+        The `id` of a table this venue already stores is accepted as stored,
+        so a table made before that rule can still be replaced. A table of
+        another venue does not count. No `id` over 2704 characters or with a
+        NUL character is accepted. The other fields have the same rules for
+        a new and a stored table. `name` is 1 to 80 characters with at least one that
         is not a space. `seats` is an integer from 1 to 200. `zone`, when
         sent, is a string of at most 80 characters, empty included. `shape`,
         when sent, is one of `round`, `oval`, `square`, `rectangle`, `long`
@@ -4851,7 +4856,11 @@ components:
       properties:
         id:
           type: string
-          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+          minLength: 1
+          maxLength: 2704
+          description: >-
+            A new id must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`. The id of
+            a table the venue already stores is accepted as stored.
         name:
           type: string
           minLength: 1
