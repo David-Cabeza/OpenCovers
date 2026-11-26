@@ -15,6 +15,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConsentSelect } from "@/components/reservation/consent-select";
+import { DietaryFields, useDietaryForm } from "@/components/dietary/dietary-fields";
+import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
 import { useT } from "@/i18n";
 import { api, type Consent } from "@/lib/api";
 
@@ -48,11 +50,19 @@ export function WalkInDialog({
     formState: { errors, isSubmitting },
   } = useForm<WalkInValues>({ defaultValues: { partySize: 2, name: "", contact: "", consent: "unknown" } });
 
+  const canRecordDietary = useCanRecordDietary(venueId);
+  const dietary = useDietaryForm();
+  const resetDietary = dietary.reset;
+
   useEffect(() => {
-    if (open) reset({ partySize: 2, name: "", contact: "", consent: "unknown" });
-  }, [open, reset]);
+    if (!open) return;
+    reset({ partySize: 2, name: "", contact: "", consent: "unknown" });
+    resetDietary();
+  }, [open, reset, resetDietary]);
 
   async function onSubmit(values: WalkInValues) {
+    const recorded = canRecordDietary ? dietary.take() : {};
+    if (!recorded) return;
     try {
       await api.walkIn(venueId, {
         partySize: values.partySize,
@@ -62,6 +72,7 @@ export function WalkInDialog({
           contact: values.contact || undefined,
           consent: values.consent,
         },
+        dietary: recorded.dietary ?? undefined,
       });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
@@ -128,6 +139,8 @@ export function WalkInDialog({
               )}
             />
           </div>
+
+          {canRecordDietary && <DietaryFields form={dietary} />}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

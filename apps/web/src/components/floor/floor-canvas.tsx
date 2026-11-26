@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { MaximizeIcon, MinimizeIcon, RotateCwIcon } from "lucide-react";
+import { MaximizeIcon, MinimizeIcon, RotateCwIcon, TriangleAlertIcon, UtensilsIcon } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n";
+import { isAllergyRisk, type Dietary } from "@/lib/dietary";
 import { FloorTableCard } from "./floor-table-card";
 import { FloorItemShape } from "./floor-item-shape";
 import { guestsText } from "./guests-text";
@@ -22,6 +23,7 @@ export interface CanvasTable {
   reservationId?: string;
   partySize?: number;
   guestName?: string;
+  dietary?: Dietary;
 }
 
 export interface CanvasItem {
@@ -454,6 +456,7 @@ export function FloorCanvas({
               tabIndex={seatable || movableInView || mode === "edit" ? 0 : undefined}
               aria-describedby={mode === "edit" ? keysHintId : undefined}
               // A free table is named by its own text, so the name always contains what is drawn on it.
+              // The mark's words follow the table's name, which keeps the drawn text first (WCAG 2.5.3).
               aria-label={
                 seatable
                   ? undefined
@@ -463,7 +466,7 @@ export function FloorCanvas({
                         guest: t.guestName ? `${t.guestName} ` : "",
                         pax: tr("floor.table.pax", { party: t.partySize ?? "?" }),
                         guests: guestsText(t.partySize),
-                      })
+                      }) + (t.dietary ? `. ${tr(isAllergyRisk(t.dietary) ? "dietary.floor.allergy" : "dietary.floor.diet")}` : "")
                     : mode === "edit"
                       ? t.name
                       : undefined
@@ -599,6 +602,7 @@ export function FloorCanvas({
                   </div>
                 </div>
               </div>
+              {mode === "view" && t.occupied && t.dietary && <DietaryMark dietary={t.dietary} />}
               {mode === "edit" && (
                 <button
                   type="button"
@@ -648,5 +652,23 @@ export function FloorCanvas({
         </div>
       )}
     </div>
+  );
+}
+
+/** A mark on a table whose booking has allergies or a diet recorded. The table's card says which. */
+function DietaryMark({ dietary }: { dietary: Dietary }) {
+  const risk = isAllergyRisk(dietary);
+  const Icon = risk ? TriangleAlertIcon : UtensilsIcon;
+  return (
+    <span
+      aria-hidden="true"
+      data-slot="dietary-mark"
+      className={cn(
+        "pointer-events-none absolute -top-1 -right-1 z-10 flex size-7 items-center justify-center rounded-full border-2 shadow-sm",
+        risk ? "border-card bg-destructive text-background" : "border-foreground bg-card text-foreground",
+      )}
+    >
+      <Icon className="size-4" />
+    </span>
   );
 }

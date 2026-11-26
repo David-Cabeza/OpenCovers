@@ -1,6 +1,6 @@
 # ADR-0027: Allergies and dietary needs on a reservation
 
-- Status: Accepted (engine and HTTP API built; MCP tools, staff app and demo not built)
+- Status: Accepted (engine, HTTP API and staff app built; MCP tools and demo not built)
 - Date: 2026-11-24, accepted 2026-11-26
 - Deciders: David Cabeza (owner). The legal reviewer still answers the questions below before any use with real guests.
 
@@ -107,7 +107,7 @@ Each step is one pull request. The steps up to the demo can land before the revi
 1. This record and the contract. Done.
 2. API: the `DIETARY` switch and its startup check, the `.env.example` entry, the migration and columns, validation, the read rules of decision 7, `dietaryEnabled` in the config, clearing in retention and erasure, the startup count, and tests for C82. Then C82 leaves GAP and `CHANGELOG.md` gets its entry. Done: the value is one jsonb column, `reservations.dietary`, and C82 is partial until step 3.
 3. MCP: the field on `reservation.create`, `reservation.walk_in` and `reservation.modify`, returned where the API returns it, and a new npm release.
-4. Staff app: allergen and diet buttons and the note on the create, walk-in and edit dialogs, the attestation checkbox, the value in the agenda, the pre-shift view and the floor card, nothing shown when absent, and a clear button for a withdrawal.
+4. Staff app: allergen and diet buttons and the note on the create, walk-in and edit dialogs, the attestation checkbox, the value in the agenda, the pre-shift view and the floor card, nothing shown when absent, and a clear button for a withdrawal. Done. The floor plan also marks the occupied table, from the agenda, so staff know which card to open, and the table assignment dialog shows the value.
 5. Hosted demo: `DIETARY: "on"` in `compose.demo.yaml`, invented values in the demo template (`apps/api/src/demo/template.ts`, ADR-0022), the notice next to the field in the demo ("invented data only, never a real allergy"), and the demo terms and site privacy wording in `apps/site` that say so.
 6. After the legal review: the consent wording, the diet list, any kitchen role, and the switch for real guests.
 

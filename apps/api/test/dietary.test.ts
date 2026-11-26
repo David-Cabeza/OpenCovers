@@ -404,7 +404,10 @@ describe("modify", () => {
     expect(answers.every((res) => res.status === 200)).toBe(true);
     const events = (await v.events(created.id)).map((e) => e.version);
     expect(events).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(new Set(versions).size).toBe(codes.length);
+    // An answer reads the reservation after its own commit, so two can show the same later version. The events above
+    // are what prove one version per write.
+    expect(versions.every((version) => version >= 2 && version <= 9)).toBe(true);
+    expect(Math.max(...versions)).toBe(9);
   });
 
   it("applies nothing of a replayed body and answers with the value as it reads now", async () => {

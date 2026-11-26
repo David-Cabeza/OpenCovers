@@ -15,7 +15,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DietaryFields, useDietaryForm } from "@/components/dietary/dietary-fields";
 import { useAgenda } from "@/hooks/use-agenda";
+import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
 import { useTables } from "@/hooks/use-tables";
 import { useT } from "@/i18n";
 import { ApiError, api, COMMENTARY_MAX } from "@/lib/api";
@@ -65,6 +67,9 @@ export function NewReservationDialog({
   const [selected, setSelected] = useState<string[] | null>(null);
   const [time, setTime] = useState(initialTime);
   const [tableError, setTableError] = useState<string | null>(null);
+  const canRecordDietary = useCanRecordDietary(venueId);
+  const dietary = useDietaryForm();
+  const resetDietary = dietary.reset;
 
   const {
     register,
@@ -107,8 +112,9 @@ export function NewReservationDialog({
       reset({ partySize, name: "", contact: "", commentary: "" });
       setSelected(null);
       setTableError(null);
+      resetDietary();
     }
-  }, [open, partySize, reset]);
+  }, [open, partySize, reset, resetDietary]);
 
   useEffect(() => {
     if (open) setTime(initialTime);
@@ -128,6 +134,8 @@ export function NewReservationDialog({
   }
 
   async function onSubmit(values: FormValues) {
+    const recorded = canRecordDietary ? dietary.take() : {};
+    if (!recorded) return;
     if (selected?.length === 0) {
       setTableError(t("reservation.selectTable"));
       return;
@@ -147,6 +155,8 @@ export function NewReservationDialog({
           contact: values.contact || undefined,
         },
         commentary: values.commentary.trim() || undefined,
+        // A new reservation has nothing to delete, so the form never gives `null` here.
+        dietary: recorded.dietary ?? undefined,
       });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
@@ -311,6 +321,8 @@ export function NewReservationDialog({
             </div>
           </div>
 
+          {canRecordDietary && <DietaryFields form={dietary} />}
+
           <div className="space-y-2">
             <Label htmlFor="reservation-commentary">{t("reservation.note")}</Label>
             <Textarea
@@ -320,7 +332,7 @@ export function NewReservationDialog({
               {...register("commentary")}
             />
             <p className="text-sm text-muted-foreground">
-              {t("reservation.noteHint", { max: COMMENTARY_MAX })}
+              {t(canRecordDietary ? "reservation.noteHintDietary" : "reservation.noteHint", { max: COMMENTARY_MAX })}
             </p>
           </div>
 
