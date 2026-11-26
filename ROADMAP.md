@@ -4,7 +4,7 @@
 
 OpenCovers is pre-alpha. No restaurant runs on it yet.
 
-What exists: the booking engine and its HTTP API, a staff app, a guest booking widget, an MCP server with 18 tools on npm, signed webhooks, a production Docker Compose stack, and a hosted demo with invented data. The database, not the application, refuses a double booking. 73 of the 81 conformance cases pass and 8 are partial.
+What exists: the booking engine and its HTTP API, a staff app, a guest booking widget, an MCP server with 18 tools on npm, signed webhooks, a production Docker Compose stack, and a hosted demo with invented data. The database, not the application, refuses a double booking. 73 of the 82 conformance cases pass and 8 are partial. C82, allergies and diets, is written and not built.
 
 What is missing before a real venue can use it: a legal review of the texts a guest sees, automatic backups with a rehearsed restore, alerts, tests in a real browser, and someone to call when something breaks. The demo's terms and privacy notice were written without a lawyer's review.
 
@@ -145,7 +145,7 @@ For 2027:
 - **Launching or announcing a managed cloud.** [ADR-0020](docs/adr/0020-monetization-and-premium-floor-plan.md) names it as the first paid offer and does not schedule it. In 2027 there is a free instance for up to ten founding venues and a written decision in September. What a venue needs to run a service stays free and open.
 - **"Payments available."** 2027 brings a decision record and, at most, one deposit with one willing venue.
 - **Guest marketing:** segments, campaigns, win-back, birthdays, surveys that route to reviews, gift cards. It conflicts with the rule of storing the minimum.
-- **Allergies and diet.** Health data, blocked until a legal opinion of its own.
+- **Allergies and diet with real guests.** The owner decided on 2026-11-26 to build the field as a safety matter, behind a switch that is off by default ([ADR-0027](docs/adr/0027-allergies-and-dietary-needs.md)). It is health data, so use with real guests waits for a legal opinion of its own.
 - **Shared guests across venues, private dining, ticketed events.**
 - **Wallet passes, a theme registry, a PWA, plugins that run code, editable email templates.**
 - **Our own AI:** voice, no-show prediction, notes. The MCP door lets someone else's agent in.

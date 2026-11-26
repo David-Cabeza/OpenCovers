@@ -108,7 +108,7 @@ Acceptance: conformance case C58.
 
 ### REQ-G1 Minimum data
 
-The engine stores only the guest data a booking needs: name, a contact, party size, notes, and a principal reference. Beyond the booking it keeps one guest record per person per venue, as decided in [ADR-0003](adr/0003-guest-identity.md). Today that record holds the normalized email or phone, a display name, and the time of the latest visit. It holds nothing a booking does not already carry. A booking never depends on it.
+The engine stores only the guest data a booking needs: name, a contact, party size, notes, and a principal reference. When the instance turns it on, a reservation also carries the allergies and diets the guest declared for that booking (REQ-N8), and the guest record never does. Beyond the booking it keeps one guest record per person per venue, as decided in [ADR-0003](adr/0003-guest-identity.md). Today that record holds the normalized email or phone, a display name, and the time of the latest visit. It holds nothing a booking does not already carry. A booking never depends on it.
 
 Acceptance: a booking can be made and honoured without a guest record. A booking with no contact, or with a contact that does not normalize, creates none. Erasure removes the guest record with the reservations linked to it.
 
@@ -176,7 +176,7 @@ Acceptance: a reservation created without a rating reads back null. A create wit
 
 ### REQ-N6 Per-reservation booking note
 
-Each reservation can carry a short free-text note for staff, up to 500 characters, such as an occasion. Absent means an empty string. Staff or a key with `write` can set it on create and walk-in and change or clear it on modify. Erasure and retention clear it. The note is not for health data. The engine cannot tell whether a note holds any, so the contract states the rule and the engine adds no allergy or diet field until a legal review of health data is done. The note stays on the reservation and is never copied to a guest record, an email, or a webhook payload.
+Each reservation can carry a short free-text note for staff, up to 500 characters, such as an occasion. Absent means an empty string. Staff or a key with `write` can set it on create and walk-in and change or clear it on modify. Erasure and retention clear it. The note is not for health data. The engine cannot tell whether a note holds any, so the contract states the rule. Allergies and diets go in the separate field of REQ-N8. The note stays on the reservation and is never copied to a guest record, an email, or a webhook payload.
 
 Acceptance: a reservation created without a note reads back an empty string. A create with a note reads it back, trimmed. A modify that changes the note bumps the version once and emits one `modified` event, and the same value changes nothing. An empty string clears it. A value that is not a string or is longer than 500 characters fails with `invalid_request`. Erasure leaves an empty string.
 
@@ -187,6 +187,12 @@ Each reservation records where the guest stands on reconfirming it: `none` (not 
 Acceptance: conformance case C25. A reservation created without it reads back `none` and no recorded time. A modify that changes it bumps the version once and emits one `modified` event, and the same value changes nothing. A value outside the set, and a walk-in that carries it, fail with `invalid_request`. A change on a reservation that is not `booked` fails with `invalid_transition`. Erasure leaves `none` and no recorded time.
 
 The text of any reconfirmation message and the legal basis for sending it are pending review. This requirement defines the stored signal only.
+
+### REQ-N8 Per-reservation allergies and diets
+
+Not built yet ([ADR-0027](adr/0027-allergies-and-dietary-needs.md), accepted 2026-11-26). Each reservation can carry `dietary`: allergens from the 14 of Regulation (EU) No 1169/2011 Annex II, diets from a closed list, a note of at most 200 characters, and `"consented": true`, the writer's attestation that the guest authorized this use. The engine records when and by whom it was set. Staff or a key with `write` set it on create, walk-in and modify, and `null` clears it on any status. Get, the agenda and the answers of reservation writes return it. List, search, events, webhooks, emails, logs and the public channel never do. Absent means nothing was declared, never "no allergies". The instance switch `DIETARY` is off by default. With it off, a write carrying a value fails with `invalid_request`, no answer carries it, and the venue config reads `dietaryEnabled: false`. Erasure and retention clear it. The legal review of health data still gates use with real guests.
+
+Acceptance: conformance case C82.
 
 ## Erasure
 
@@ -370,7 +376,7 @@ Acceptance: conformance cases C48, C49 and C50.
 
 ### REQ-P8 Guest data on the public channel
 
-The public channel collects the minimum of REQ-G1: a name, one contact that normalizes, the party size, date and time, an optional note that is not for health data, and consent only when the venue asks, never recorded as a refusal. It shows the guest's contact masked and never another guest's data, a table, a zone, an internal id or attribution. The guest blocklist applies to a public create as to any create.
+The public channel collects the minimum of REQ-G1: a name, one contact that normalizes, the party size, date and time, an optional note that is not for health data, and consent only when the venue asks, never recorded as a refusal. It never collects or shows allergies or diets (REQ-N8). It shows the guest's contact masked and never another guest's data, a table, a zone, an internal id or attribution. The guest blocklist applies to a public create as to any create.
 
 Acceptance: conformance cases C48, C54 and C55.
 

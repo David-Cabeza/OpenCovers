@@ -395,14 +395,14 @@ export const today: Today[] = [
   { area: "Locales en servicio", works: "Ninguno.", preview: "", missing: "El primero." },
 ];
 
-export const todayLegend = "73 de los 81 casos de conformidad pasan; 8 están a medias y decimos por qué.";
+export const todayLegend = "73 de los 82 casos de conformidad pasan; 8 están a medias y decimos por qué; 1, alergias y dietas, está escrito y sin construir.";
 
 export const notPlanned: string[] = [
   "Paridad de funciones con las plataformas consolidadas. Llevan años de oficio en depósitos, marketing a clientes, integraciones de TPV y soporte a escala. Igualamos solo lo que la sala usa en cada servicio.",
   "Lanzar o anunciar una nube gestionada. En 2027 hay una instancia gratuita para un máximo de diez locales fundadores y una decisión escrita en septiembre. Lo que un local necesita para operar seguirá abierto y gratuito.",
   "Decir que hay pagos. 2027 trae la decisión de diseño y, como mucho, un depósito con un local voluntario y su propia cuenta.",
   "Marketing a clientes. Segmentos, campañas, recuperación, cumpleaños, encuestas que derivan a reseñas y tarjetas regalo chocan con la regla de guardar el dato mínimo.",
-  "Alergias y dieta. Es dato de salud y está bloqueado hasta tener un dictamen propio.",
+  "Alergias y dieta con clientes reales. El campo se construye por seguridad, tras la decisión del 26 de noviembre de 2026, con un interruptor apagado por defecto. Es dato de salud, así que su uso con clientes reales espera a un dictamen propio.",
   "Clientes compartidos entre locales, comedor privado y eventos con entrada.",
   "Pases de Wallet, registro de temas, modo PWA y plugins que ejecutan código.",
   "IA propia. Ni voz, ni predicción de no presentados. La puerta para agentes deja entrar la de otros.",

@@ -19,7 +19,7 @@ Built so far: stages 0 to 7, 9, 10, 12 and 15 of the staged table in section 7 (
 | 7 | Rate limits | Extend ADR-0007 with three rules for `/v1/public`: reads per address, booking creates per address, and token use per address. Add a per-venue ceiling on public creates. | No limit on public reads, as ADR-0012 chose for the JSON-LD route. |
 | 8 | Bot protection | A honeypot field and a signed form challenge with a minimum fill time and a small proof of work, on by default. Turnstile or hCaptcha only as an operator opt-in. | A mandatory third-party CAPTCHA. |
 | 9 | Slot hoarding | A cap on open future online bookings per contact (default 2), the existing ADR-0013 per-day cap, online lead time and horizon. The public channel never uses the overbooking ceiling. | Email verification before a booking counts. |
-| 10 | Guest data collected | Name, one contact, party size, date and time, an optional note, and consent only when the venue turns the question on. No allergy or diet field until the legal review. | A structured allergy field. |
+| 10 | Guest data collected | Name, one contact, party size, date and time, an optional note, and consent only when the venue turns the question on. No allergy or diet field until the legal review. Amended 2026-11-26: staff and keys record allergies and diets in `dietary` ([ADR-0027](0027-allergies-and-dietary-needs.md)), and the public channel still neither collects nor shows it. | A structured allergy field. |
 | 11 | Per-venue settings | A new admin resource `online-booking`, separate from `config` and from the public profile. Themes are validated data only. | More fields on `PUT /config`. |
 | 12 | Confirmation mode | Auto-confirm only in the first release (Q2). Every online booking is `booked` at once when there is room. `confirmationMode` accepts only `auto`, and `approval` stays reserved. A `pending` status that holds tables is deferred to stage 14. | A `pending` status in the first release, or an approval flag on `booked`. |
 | 13 | Attribution | `bookedVia: "widget"`, `ownerPrincipal: "widget"`, `basis: "service"`, set by the route. | Per-key principals. |
@@ -39,7 +39,7 @@ Facts this design rests on, read in the code and the docs on `main` at `1d3c5e9`
 - Lead time, horizon, blocked dates and the per-guest per-day cap already exist (`leadTimeMinutes`, ADR-0013). Services carry party limits and weekdays (ADR-0015).
 - The status vocabulary is closed: `booked`, `seated`, `attended`, `no_show`, `cancelled` (REQ-B6). There is no pending state.
 - Consent is per reservation and tri-state, `unknown`, `granted` or `denied` (REQ-N4). Its text and legal basis wait for a legal review.
-- The booking note holds up to 500 characters and is not for health data. No allergy or diet field exists until a legal review (REQ-N6, ADR-0003).
+- The booking note holds up to 500 characters and is not for health data. No allergy or diet field exists until a legal review (REQ-N6, ADR-0003). Amended 2026-11-26: ADR-0027 adds `dietary` for staff and keys only.
 - `notifyReservation` sends `confirmation`, `cancellation` and `notice` emails once per reservation and version, and only when the venue sets `notificationsEnabled` (off by default, REQ-N2).
 - Webhook and feed events carry ids, a type and a version, and no guest data (`docs/contract/webhooks.md`).
 - `apps/web/Caddyfile` sends `X-Frame-Options: DENY` and a CSP with `frame-ancestors 'none'` on every response it serves, the API routes included.
@@ -250,7 +250,7 @@ The caps key on the contact, and the engine does not verify contacts. A hoarder 
 | Note | Optional. Up to 500 characters (REQ-N6). The widget shows, next to the field, that it is not for allergies or health information. |
 | Consent | Only when the venue sets `askConsent`. Then one checkbox, unticked by default. Ticked sends `granted`. Unticked sends `unknown`, not `denied`, because an untouched box is not a refusal. With `askConsent` off the widget sends nothing and the reservation reads `unknown`. |
 
-The widget does not collect allergies, diet, occasion as a field, birthday, address, or marketing preferences. Allergies stay out until the legal review that ADR-0003 and REQ-N6 already wait for. The consent checkbox stays off by default because its text and legal basis wait for the same review (REQ-N4). The public create refuses `rating`, `reconfirmation`, `tables` and `zone`.
+The widget does not collect allergies, diet, occasion as a field, birthday, address, or marketing preferences. Allergies stay out until the legal review that ADR-0003 and REQ-N6 already wait for. Since 2026-11-26 staff and keys can record them in `dietary` (ADR-0027), but a public create or a self-service modify that names `dietary` fails with `invalid_request`, and the guest view never shows it. The consent checkbox stays off by default because its text and legal basis wait for the same review (REQ-N4). The public create refuses `rating`, `reconfirmation`, `tables` and `zone`.
 
 ### What the widget and the link show back
 
@@ -373,7 +373,7 @@ Stages 2 to 4 are the API. Stages 5 and 6 make the exit criterion reachable with
 - **A `pending` status in the first release.** Deferred to stage 14 (Q2). It changes REQ-B6, every status transition, the agenda, the event feed and the tables a pending booking holds.
 - **An approval flag on `booked`.** Rejected (Q2). The booking would hold its table and look unapproved, but nothing would stop staff from seating it. It gives the appearance of control without the control.
 - **Online settings on `PUT /config`.** Rejected, for the reason ADR-0012 gives for the public profile.
-- **A structured allergy field in the widget.** Rejected until the legal review of health data.
+- **A structured allergy field in the widget.** Rejected until the legal review of health data. ADR-0027 adds the field for staff and keys on 2026-11-26 and keeps it out of the widget (its question 6).
 
 ## Open questions for the maintainer
 
@@ -568,3 +568,12 @@ Section 2 says "No table or zone choice", and the availability row of its table 
 - **Order of precedence.** (1) `data-lang` on the script tag, when it is one of the supported codes. (2) The `lang` of the host page's `<html>` element, reduced to the part before the first `-` or `_` and lower-cased, when that is exactly a supported code. (3) No `lang`, and the venue's `locale` applies. `?scheme=auto` and `lang` can both be present.
 - **Privacy and safety.** The script reads one fixed-vocabulary value from the page, the `<html>` `lang`, and writes into the URL only the matching entry of its own list, never the attribute or page text, as it does for `data-scheme`. Nothing but a height crosses `postMessage`, as before. The list in the script is a fifth place that must match the locales (`LOCALES`, `CATALOGS`); the locales test reads `embed.js` and fails when they differ.
 - **Not changed.** The confirmation email and the self-service link are not affected by this change.
+
+## Amendment 2026-11-26: allergies and diet stay off the public channel
+
+The owner decided on 2026-11-26 that an allergy told when booking must be visible on the reservation. [ADR-0027](0027-allergies-and-dietary-needs.md) adds `dietary` to a reservation, behind the instance switch `DIETARY` (off by default), with the legal review still pending. It changes decision 10 and section 4 for staff and keys only:
+
+- Staff, and keys with `write` or `admin`, set `dietary` on create, walk-in and modify. Staff reads carry it in `reservation.get` and the agenda.
+- The public channel does not take it. A body that names `dietary` on `POST /v1/public/{bookingKey}/reservations` or `POST /v1/public/self-service/modify` fails with `invalid_request`, whatever the switch says.
+- No answer under `/v1/public/` carries it, the guest view of the self-service link included. The widget's note keeps its hint that it is not for allergies or health information.
+- Stage 11 is unchanged. A widget question for allergies or diet needs its own decision after the legal review answers ADR-0027 question 6.
