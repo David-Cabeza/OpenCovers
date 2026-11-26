@@ -3,6 +3,8 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { db } from "./db/client";
 import {
+  ACCOUNT_KEY_FIELDS,
+  ACCOUNT_KEY_REVOKE_FIELDS,
   addKey,
   addVenueKey,
   authenticate,
@@ -11,6 +13,8 @@ import {
   listVenueKeys,
   revokeKey,
   revokeVenueKey,
+  VENUE_KEY_FIELDS,
+  VENUE_KEY_REVOKE_FIELDS,
 } from "./lib/api-keys";
 import {
   AUDIT_DEFAULT_LIMIT,
@@ -891,28 +895,19 @@ app.get("/v1/auth/keys", async (c) => {
 app.post("/v1/auth/keys", async (c) => {
   const admin = await authorizeAdmin(c);
   if (admin instanceof Response) return admin;
-  const body = await c.req.json();
-  if (
-    typeof body.key !== "string" ||
-    typeof body.principal !== "string" ||
-    !isRole(body.role)
-  ) {
-    return error(c, "invalid_request");
-  }
-  const venues = body.venues === undefined ? ["*"] : body.venues;
-  if (!Array.isArray(venues) || venues.some((v: unknown) => typeof v !== "string")) {
-    return error(c, "invalid_request");
-  }
-  await addKey(db, body.key, body.principal, venues, body.role);
+  const input = hasQuery(c) ? null : await parseBody(c.req, ACCOUNT_KEY_FIELDS);
+  if (!input) return error(c, "invalid_request");
+  const result = await addKey(db, input.key, input.principal, input.venues ?? ["*"], input.role);
+  if (!result.ok) return error(c, result.code);
   return c.json({ ok: true });
 });
 
 app.delete("/v1/auth/keys", async (c) => {
   const admin = await authorizeAdmin(c);
   if (admin instanceof Response) return admin;
-  const body = await c.req.json();
-  if (typeof body.key !== "string") return error(c, "invalid_request");
-  await revokeKey(db, body.key);
+  const input = hasQuery(c) ? null : await parseBody(c.req, ACCOUNT_KEY_REVOKE_FIELDS);
+  if (!input) return error(c, "invalid_request");
+  await revokeKey(db, input.key);
   return c.json({ ok: true });
 });
 
@@ -1368,26 +1363,20 @@ app.get("/v1/venues/:venueId/keys", adminOnly, async (c) => {
 
 app.post("/v1/venues/:venueId/keys", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
-  const body = await c.req.json();
-  if (
-    typeof body.key !== "string" ||
-    body.key === "" ||
-    typeof body.principal !== "string" ||
-    body.principal === "" ||
-    (body.role !== "read" && body.role !== "write")
-  ) {
-    return error(c, "invalid_request");
-  }
-  await addVenueKey(db, venueId, body.key, body.principal, body.role, await creatorId(c));
+  const input = hasQuery(c) ? null : await parseBody(c.req, VENUE_KEY_FIELDS);
+  if (!input) return error(c, "invalid_request");
+  const result = await addVenueKey(db, venueId, input.key, input.principal, input.role, await creatorId(c));
+  if (!result.ok) return error(c, result.code);
   const keys = await listVenueKeys(db, venueId);
   return c.json({ keys }, 201);
 });
 
 app.delete("/v1/venues/:venueId/keys", adminOnly, async (c) => {
   const venueId = c.req.param("venueId");
-  const body = await c.req.json();
-  if (typeof body.hash !== "string") return error(c, "invalid_request");
-  await revokeVenueKey(db, venueId, body.hash);
+  const input = hasQuery(c) ? null : await parseBody(c.req, VENUE_KEY_REVOKE_FIELDS);
+  if (!input) return error(c, "invalid_request");
+  const result = await revokeVenueKey(db, venueId, input.hash);
+  if (!result.ok) return error(c, result.code);
   const keys = await listVenueKeys(db, venueId);
   return c.json({ keys });
 });
@@ -1620,6 +1609,11 @@ async function sessionUser(c: any) {
 
 // The staff member behind a request, or null when a key made it. Only a
 // session names a person, so a key's creations stay unattributed.
+/** The key routes take no query parameter: a key in a URL ends up in logs (C81). */
+function hasQuery(c: any): boolean {
+  return Object.keys(c.req.queries()).length > 0;
+}
+
 async function creatorId(c: any): Promise<string | null> {
   if (c.req.header("apikey")) return null;
   return (await sessionUser(c))?.id ?? null;

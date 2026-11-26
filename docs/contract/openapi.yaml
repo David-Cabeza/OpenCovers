@@ -1351,22 +1351,29 @@ paths:
         true }` and holds no key value, so the caller keeps the key it chose.
         The engine stores only its SHA-256 hash.
 
-        `key` and `principal` must be strings and `role` one of `read`,
-        `write` or `admin`, or the call fails with `invalid_request`.
-        Unlike the venue route, an empty `key` or `principal` is accepted
-        here. `venues` is a list of venue ids, and `["*"]` (the default when
-        it is left out) grants every venue, present and future. Anything but
-        a list of strings fails with `invalid_request`. The venue ids are not
+        The body is a JSON object with `key`, `principal`, `role` and an
+        optional `venues`, and nothing else. `key` and `principal` follow the
+        venue route (C81): `key` is 32 to 256 visible ASCII characters with
+        no space, `principal` 1 to 200 characters, not all spaces. `role` is
+        one of `read`, `write` or `admin`. `venues` is a list of venue ids of
+        1 to 200 characters, and `["*"]` (the default when it is left out)
+        grants every venue, present and future. A body that is missing,
+        malformed, `null` or not an object, a field that breaks these rules,
+        a field not listed, and any query parameter (the key travels in the
+        body only, never in a URL that logs keep) fail with
+        `invalid_request`, and nothing is written. The venue ids are not
         checked against existing venues, so a grant can name a venue that
         does not exist, and an empty list registers a key that reaches no
-        venue.
+        venue. The length rule applies to new registrations only: a key
+        stored before it keeps working.
 
-        A `key` already registered keeps its `principal` and `role`, the
-        listed venues are added to its grants, and the call answers `200`
-        either way. The route records no staff member as the maker. It takes
-        no `Idempotency-Key` and ignores one, and a repeat gives the same
-        state. A sandbox venue's cap on keys is not applied here. Not
-        exposed through MCP.
+        A key is registered once. A `key` already registered with the same
+        `principal` and `role` answers `200` again and adds the listed
+        venues to its grants, so a repeat gives the same state. With another
+        `principal` or `role` it fails with `409 key_conflict` and changes
+        nothing. The route records no staff member as the maker. It takes no
+        `Idempotency-Key` and ignores one. A sandbox venue's cap on keys is
+        not applied here. Not exposed through MCP.
       requestBody:
         required: true
         content:
@@ -1390,10 +1397,15 @@ paths:
       description: |
         Takes the `key` itself in a JSON body (unlike the venue route, which
         takes a `hash`) and deletes every grant of that key and the key. It
-        stops working on every venue. A body with no string `key` fails with
-        `invalid_request`, and a `key` in the query is not read and the call
-        fails. A key that is not registered changes nothing and still
-        answers `200`, so the answer does not tell whether the key existed.
+        stops working on every venue. The body is a JSON object with a
+        string `key` of up to 8192 characters, not all spaces, and nothing
+        else; any other body fails with `invalid_request`. A `key` in the query, or any query parameter,
+        fails with `invalid_request` too and revokes nothing, even with a
+        valid body: a key sent in a URL may be in a log, so treat it as
+        exposed and rotate it. A key stored before the length rule of C81
+        can still be revoked. A key that is not registered changes nothing
+        and still answers `200`, so the answer does not tell whether the key
+        existed.
 
         The next request that sends the revoked key fails with
         `unauthorized`, on any venue, with no cache and no delay. An `admin`
@@ -1459,28 +1471,39 @@ paths:
         return it: the response holds only the venue's keys by `hash`, so
         the caller makes the key, keeps it, and hands it to the agent. The
         key is shown nowhere afterwards. Make it long and random (the
-        hardening guide says at least 32 random bytes), the engine checks
-        only that it is a non-empty string.
+        hardening guide says at least 32 random bytes).
 
-        `key`, `principal` and `role` are all required. `key` and `principal`
-        must be non-empty strings. `role` must be `read` or `write`, so
-        `admin` fails with `invalid_request`, as does a missing or empty
-        field. Nothing is written when it fails. `principal` is the name the
-        key's requests carry in attribution, not a credential.
+        The body is a JSON object with `key`, `principal` and `role`, all
+        required, and nothing else (C81). `key` is 32 to 256 visible ASCII
+        characters (`!` to `~`, no space), so it fits the `apikey` header.
+        `principal` is 1 to 200 characters, not all spaces. `role` is `read`
+        or `write`, so `admin` fails. A body that is missing, malformed,
+        `null` or not an object, a field that breaks these rules, a field
+        not listed, and any query parameter (the key travels in the body
+        only) fail with `invalid_request`, and nothing is written. An unknown
+        venue fails with `venue_not_found`, also for an `admin` key that
+        holds the all-venues grant `*`, and nothing is written. The length
+        rule applies to new registrations only: a key stored before it,
+        shorter or longer, keeps working and can be revoked. `principal` is
+        the name the key's requests carry in attribution, not a credential.
 
-        A `key` that is already registered is not replaced: its stored
-        `principal` and `role` stay as they were, this venue is added to its
-        grants, and the call still answers `201`. So the answer's entry can
-        show a different `principal` and `role` than the ones sent. A key
-        value is registered once per instance, whichever venue made it.
+        A key value is registered once per instance, whichever venue made
+        it. A `key` already registered with the same `principal` and `role`
+        answers `201` with the venue's keys and grants this venue if it did
+        not hold it, so a repeat gives the same answer and adds no second
+        grant. With another `principal` or `role` it fails with
+        `409 key_conflict` and changes nothing. The error names no
+        principal, role or venue of the stored key.
 
         Admin only, through a staff session or an `admin` key. A `read` or
         `write` key or role fails with `forbidden`. A key made with a
         session records the staff member who made it, and removing that
         member from the venue revokes it (C32). The call takes no
-        `Idempotency-Key` and ignores one, and the same body gives the same
-        state, so a retry is safe. A sandbox venue at its cap of keys
-        answers `409` with `demo_limit_reached`. Not exposed through MCP.
+        `Idempotency-Key` and ignores one: a key is idempotent by its value,
+        and the same body gives the same answer, so a retry is safe. A
+        sandbox venue at its cap of keys answers `409` with
+        `demo_limit_reached`, except for a repeat of a key it already holds.
+        Not exposed through MCP.
       parameters:
         - $ref: "#/components/parameters/venueId"
       requestBody:
@@ -1501,8 +1524,9 @@ paths:
       summary: Revoke a key's access to the venue
       description: |
         Takes the `hash` of a listed key in a JSON body, never the key
-        itself and never a query parameter (a `hash` in the query is not
-        read and the call fails). It removes the key's grant on this venue.
+        itself and never a query parameter (a `hash` or any other query
+        parameter fails with `invalid_request` and revokes nothing). It
+        removes the key's grant on this venue.
         When that was the key's last grant the key is deleted, otherwise it
         stays valid on its other venues. To cut a key off everywhere,
         revoke it on each venue or use `DELETE /auth/keys`.
@@ -1514,8 +1538,11 @@ paths:
         `admin` key included, and then fails with `unauthorized`.
 
         A `hash` that is not a key of this venue, or of a key granted only to
-        another venue, changes nothing and still answers `200`. A body with
-        no string `hash` fails with `invalid_request`. The call takes no
+        another venue, changes nothing and still answers `200` with the same
+        keys. The body is a JSON object with `hash`, 64 lower-case hex
+        characters, and nothing else; any other body fails with
+        `invalid_request` (C81). An unknown venue fails with
+        `venue_not_found`, also for an all-venues `admin` key. The call takes no
         `Idempotency-Key` and ignores one, and a repeat gives the same
         state. Admin only, through a staff session or an `admin` key. A
         `read` or `write` key or role fails with `forbidden`. Not exposed
@@ -4958,30 +4985,48 @@ components:
     VenueKeyCreate:
       type: object
       required: [key, principal, role]
+      additionalProperties: false
       description: |
-        A body that is not valid JSON, a `null` body and a missing body fail
-        with a `500` that has no contract error body, not `invalid_request`.
+        A body that is missing, not valid JSON, `null` or not an object
+        fails with `invalid_request`, and so does a field not listed.
       properties:
-        key:
-          type: string
-          minLength: 1
-          writeOnly: true
-          description: |
-            The secret the caller chose. Sent once, here. It is never in a
-            response or a listing.
-          example: oc_example_not_a_real_key
-        principal: { type: string, minLength: 1, example: reservations-agent }
+        key: { $ref: "#/components/schemas/NewKey" }
+        principal: { $ref: "#/components/schemas/KeyPrincipal" }
         role: { type: string, enum: [read, write] }
+
+    NewKey:
+      type: string
+      minLength: 32
+      maxLength: 256
+      pattern: "^[!-~]{32,256}$"
+      writeOnly: true
+      description: |
+        The secret the caller chose, 32 to 256 visible ASCII characters with
+        no space, so it fits the `apikey` header. Sent once, here. It is
+        never in a response or a listing. Generate it from at least 32
+        random bytes, for example `openssl rand -base64 32`. The rule holds
+        for new registrations only: a key stored before it keeps working.
+      example: oc_example_not_a_real_key_0123456789
+
+    KeyPrincipal:
+      type: string
+      minLength: 1
+      maxLength: 200
+      pattern: "\\S"
+      description: The name the key's requests carry in attribution, not all spaces.
+      example: reservations-agent
 
     VenueKeyRevoke:
       type: object
       required: [hash]
+      additionalProperties: false
       description: |
-        A body that is not valid JSON, a `null` body and a missing body fail
-        with a `500` that has no contract error body, not `invalid_request`.
+        A body that is missing, not valid JSON, `null` or not an object
+        fails with `invalid_request`, and so does a field not listed.
       properties:
         hash:
           type: string
+          pattern: "^[0-9a-f]{64}$"
           description: The `hash` of a key from the listing.
           example: "0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -4995,20 +5040,17 @@ components:
     AccountKeyCreate:
       type: object
       required: [key, principal, role]
+      additionalProperties: false
       description: |
-        A body that is not valid JSON, a `null` body and a missing body fail
-        with a `500` that has no contract error body, not `invalid_request`.
+        A body that is missing, not valid JSON, `null` or not an object
+        fails with `invalid_request`, and so does a field not listed.
       properties:
-        key:
-          type: string
-          writeOnly: true
-          description: The secret the caller chose. Never in a response.
-          example: oc_example_not_a_real_key
-        principal: { type: string, example: reservations-agent }
+        key: { $ref: "#/components/schemas/NewKey" }
+        principal: { $ref: "#/components/schemas/KeyPrincipal" }
         role: { type: string, enum: [read, write, admin] }
         venues:
           type: array
-          items: { type: string }
+          items: { type: string, minLength: 1, maxLength: 200 }
           default: ["*"]
           description: |
             Venue ids, or `*` for every venue, present and future. Not checked
@@ -5017,14 +5059,20 @@ components:
     AccountKeyRevoke:
       type: object
       required: [key]
+      additionalProperties: false
       description: |
-        A body that is not valid JSON, a `null` body and a missing body fail
-        with a `500` that has no contract error body, not `invalid_request`.
+        A body that is missing, not valid JSON, `null` or not an object
+        fails with `invalid_request`, and so does a field not listed.
       properties:
         key:
           type: string
+          minLength: 1
+          maxLength: 8192
+          pattern: "\\S"
           writeOnly: true
-          description: The key itself, not its hash.
+          description: |
+            The key itself, not its hash. Not held to the length rule of
+            `NewKey`, so a key stored before that rule can be revoked.
           example: oc_example_not_a_real_key
 
     ErasureResult:
@@ -5989,6 +6037,7 @@ components:
         - waitlist_entry_not_found
         - table_not_found
         - floor_item_not_found
+        - key_conflict
         - webhook_not_found
         - webhook_url_rejected
         - webhook_limit_reached

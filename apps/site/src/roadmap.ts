@@ -395,7 +395,7 @@ export const today: Today[] = [
   { area: "Locales en servicio", works: "Ninguno.", preview: "", missing: "El primero." },
 ];
 
-export const todayLegend = "72 de los 80 casos de conformidad pasan; 8 están a medias y decimos por qué.";
+export const todayLegend = "73 de los 81 casos de conformidad pasan; 8 están a medias y decimos por qué.";
 
 export const notPlanned: string[] = [
   "Paridad de funciones con las plataformas consolidadas. Llevan años de oficio en depósitos, marketing a clientes, integraciones de TPV y soporte a escala. Igualamos solo lo que la sala usa en cada servicio.",

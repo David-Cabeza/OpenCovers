@@ -60,7 +60,8 @@ await db
   .onConflictDoNothing();
 
 const key = `oc_demo_${randomBytes(18).toString("hex")}`;
-await addVenueKey(db, VENUE_ID, key, "demo-agent", "write", account.id);
+const made = await addVenueKey(db, VENUE_ID, key, "demo-agent", "write", account.id);
+if (!made.ok) throw new Error(`could not register the demo key: ${made.code}`);
 
 const config = {
   mcpServers: {

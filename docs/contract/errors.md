@@ -103,6 +103,10 @@ A sign-up with a bad `X-Invitation-Token` fails on the auth route with `403` and
 
 - `floor_item_not_found`: the floor plan item does not exist, or belongs to another venue. Indistinguishable from not found. `404`. Not retryable.
 
+## Keys
+
+- `key_conflict`: the key is already registered with another `principal` or `role`, so nothing changed. A key value is registered once per instance. The answer does not say which field differs, who holds the key or which venues it reaches. Register a new random key instead. `POST /v1/venues/{venueId}/keys` and `POST /v1/auth/keys` only (C81). `409`. Not retryable.
+
 ## Webhooks
 
 - `webhook_not_found`: the webhook does not exist, or belongs to another venue. Indistinguishable from not found. Not retryable.

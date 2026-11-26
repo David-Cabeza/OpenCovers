@@ -87,20 +87,20 @@ describe("/v1/auth/keys needs an all-venues admin key", () => {
     expect(keys).toContainEqual({ principal: "v1-admin", role: "admin" });
 
     const created = await call("POST", { apikey: KEYS.root }, {
-      key: "t18-new-read-v2",
+      key: "t18-new-read-v2-0123456789abcdefghijklmnop",
       principal: "new-reader",
       role: "read",
       venues: [V2],
     });
     expect(created.status).toBe(200);
     expect(await created.json()).toEqual({ ok: true });
-    expect((await agenda(V2, "t18-new-read-v2")).status).toBe(200);
-    expect((await agenda(V1, "t18-new-read-v2")).status).toBe(404);
+    expect((await agenda(V2, "t18-new-read-v2-0123456789abcdefghijklmnop")).status).toBe(200);
+    expect((await agenda(V1, "t18-new-read-v2-0123456789abcdefghijklmnop")).status).toBe(404);
 
-    const revoked = await call("DELETE", { apikey: KEYS.root }, { key: "t18-new-read-v2" });
+    const revoked = await call("DELETE", { apikey: KEYS.root }, { key: "t18-new-read-v2-0123456789abcdefghijklmnop" });
     expect(revoked.status).toBe(200);
     expect(await revoked.json()).toEqual({ ok: true });
-    expect((await agenda(V2, "t18-new-read-v2")).status).toBe(401);
+    expect((await agenda(V2, "t18-new-read-v2-0123456789abcdefghijklmnop")).status).toBe(401);
   });
 
   it("keeps the documented errors for read and write keys, unknown keys and staff sessions", async () => {
@@ -136,14 +136,14 @@ describe("/v1/auth/keys needs an all-venues admin key", () => {
     const created = await app.request(`/v1/venues/${V1}/keys`, {
       method: "POST",
       headers: { apikey: KEYS.scoped, "Content-Type": "application/json" },
-      body: JSON.stringify({ key: "t18-v1-agent", principal: "v1-agent", role: "write" }),
+      body: JSON.stringify({ key: "t18-v1-agent-0123456789abcdefghijklmnop", principal: "v1-agent", role: "write" }),
     });
     expect(created.status).toBe(201);
     const { keys } = await created.json();
     const agent = keys.find((k: { principal: string }) => k.principal === "v1-agent");
     expect(agent).toMatchObject({ role: "write" });
-    expect((await agenda(V1, "t18-v1-agent")).status).toBe(200);
-    expect((await agenda(V2, "t18-v1-agent")).status).toBe(404);
+    expect((await agenda(V1, "t18-v1-agent-0123456789abcdefghijklmnop")).status).toBe(200);
+    expect((await agenda(V2, "t18-v1-agent-0123456789abcdefghijklmnop")).status).toBe(404);
 
     const elsewhere = await app.request(`/v1/venues/${V2}/keys`, { headers: { apikey: KEYS.scoped } });
     expect(elsewhere.status).toBe(404);
@@ -154,7 +154,7 @@ describe("/v1/auth/keys needs an all-venues admin key", () => {
       body: JSON.stringify({ hash: agent.hash }),
     });
     expect(revoked.status).toBe(200);
-    expect((await agenda(V1, "t18-v1-agent")).status).toBe(401);
+    expect((await agenda(V1, "t18-v1-agent-0123456789abcdefghijklmnop")).status).toBe(401);
   });
 
   it("does not let a venue-limited admin key reach another venue through a key it mints", async () => {
