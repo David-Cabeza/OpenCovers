@@ -378,6 +378,8 @@ Erasure by guest id and by principal, and retention, remove the value with the r
 
 With `DIETARY` unset or `off`, `dietaryEnabled` reads `false`, a create, walk-in or modify whose body holds a `dietary` object fails with `invalid_request` before the key is looked up and writes nothing, `dietary: null` is accepted, and no answer carries the field. Values stored while the switch was on stay stored and hidden. `null`, erasure and retention still clear them, and turning the switch on shows them again. Any other value of `DIETARY` stops the API at startup.
 
+`GET /v1/venues/{venueId}/config`, and the answer of its `PUT`, read the boolean `dietaryValuesHidden`, so that hidden values are not taken for no values. It is `true` only when the switch is off and a reservation of that venue that is `booked` or `seated`, dated yesterday or later in the venue's time zone, holds a stored value. Yesterday counts because a service can run past midnight. A reservation that is `attended`, `cancelled`, `no_show` or older does not count, and neither does another venue's. With the switch on it is `false`. `false` never says that nobody has an allergy. The field carries no value, count, name or reservation id, and a `PUT` ignores it. An engine without it says nothing about stored values.
+
 ## C94. Strict bodies on staff reservation and waitlist writes
 
 Rule (a) of [ADR-0029](../adr/0029-contract-rules-for-writes.md). It covers the staff create, walk-in, modify, status and cancel of a reservation, and the staff add, seat and cancel of a waitlist entry. It does not cover the public routes, `PUT /config`, erasure or query parameters. Each write takes only the fields its request schema in `openapi.yaml` lists, inside `guest` and `dietary` too.

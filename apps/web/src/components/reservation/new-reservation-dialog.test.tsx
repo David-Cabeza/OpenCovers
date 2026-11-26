@@ -100,14 +100,21 @@ describe("NewReservationDialog", () => {
     expect(api.writes()[0].body).toMatchObject({ partySize: 6, tables: ["t1", "t2"] });
   });
 
-  it("limits the note to 500 characters and warns about health data", async () => {
-    const { user } = setup();
-    expect(await screen.findByLabelText("Note")).toHaveAttribute("maxlength", "500");
+  it("warns about health data, and does not create with a note over 500 characters", async () => {
+    const { api, user } = setup();
+    const note = await screen.findByLabelText("Note");
     expect(
       screen.getByText("Up to 500 characters. Do not enter health data such as allergies."),
     ).toBeInTheDocument();
-    await user.type(screen.getByLabelText("Note"), "x".repeat(520));
-    expect((screen.getByLabelText("Note") as HTMLTextAreaElement).value).toHaveLength(500);
+
+    await user.click(note);
+    await user.paste("x".repeat(520));
+    expect(note).toHaveValue("x".repeat(520));
+    await user.click(screen.getByRole("button", { name: "Create reservation" }));
+
+    expect(note).toHaveFocus();
+    expect(screen.getByRole("alert")).toHaveTextContent("Shorten it to 500 characters or fewer.");
+    expect(api.writes()).toHaveLength(0);
   });
 
   it("does not require a guest name or contact", async () => {
