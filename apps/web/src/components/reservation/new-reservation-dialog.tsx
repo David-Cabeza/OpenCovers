@@ -261,7 +261,7 @@ export function NewReservationDialog({
                       aria-pressed={selected.includes(tbl.id)}
                       aria-disabled={isBusy || undefined}
                       aria-describedby={isBusy ? `new-reservation-busy-${tbl.id}` : undefined}
-                      className={isBusy ? "h-auto flex-col gap-0 py-1 cursor-not-allowed border-dashed bg-muted text-muted-foreground" : undefined}
+                      className={isBusy ? "h-auto sm:h-auto coarse:h-auto flex-col gap-0 py-1 cursor-not-allowed border-dashed bg-muted text-muted-foreground" : undefined}
                       onClick={() => toggleTable(tbl.id)}
                     >
                       {tbl.name} · {tbl.seats}
