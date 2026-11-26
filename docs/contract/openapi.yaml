@@ -4489,7 +4489,9 @@ components:
             so a guest's withdrawal always works. An object replaces the whole
             value and is accepted on `booked`, `seated` and `attended`. A
             change bumps the version once, emits one `modified` event with no
-            value and sends no email.
+            value and sends no email. A modify that carries `dietary` and changes
+            nothing keeps its `Idempotency-Key` too, so a late retry applies
+            nothing.
 
     Event:
       type: object

@@ -1035,6 +1035,9 @@ export async function walkIn(
 
 type ReservationRow = typeof reservations.$inferSelect;
 
+/** The key of a modify that carried `dietary` and changed nothing. The trace reads keys by kind and never this one. */
+const UNCHANGED_MODIFY = "modify_unchanged";
+
 async function lockForGuest(tx: DbTx, venueId: string, id: string, linkId: string, cancelKey?: string) {
   await tx
     .select({ id: reservations.id })
@@ -1089,7 +1092,7 @@ export async function modifyReservation(
       const existing = await claimKey(tx, venueId, key);
       if (guest) await lockForGuest(tx, venueId, id, guest.linkId);
       if (existing) {
-        if (existing.kind !== "modify" || existing.reservationId !== id) {
+        if (!["modify", UNCHANGED_MODIFY].includes(existing.kind) || existing.reservationId !== id) {
           throw new ReservationError("invalid_request");
         }
         return existing.version;
@@ -1188,6 +1191,13 @@ export async function modifyReservation(
         !reconfirmationChanged &&
         !dietaryChanged
       ) {
+        // C82: without a stored key a late retry would apply its `dietary` after all, and so restore a withdrawn value
+        // or clear a newer one.
+        if (input.dietary !== undefined) {
+          await tx
+            .insert(idempotencyKeys)
+            .values({ key, venueId, reservationId: id, kind: UNCHANGED_MODIFY, version: current.version });
+        }
         return current.version;
       }
 

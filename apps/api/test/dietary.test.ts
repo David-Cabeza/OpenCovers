@@ -427,6 +427,32 @@ describe("modify", () => {
     expect(await v.events(first.id)).toHaveLength(3);
   });
 
+  it("applies nothing on the late retry of a modify that changed nothing", async () => {
+    const v = await makeVenue();
+    const created = await v.create({ dietary: VALUE });
+    expect((await (await v.modify(created.id, { dietary: VALUE }, { idem: "unchanged-value" })).json()).version).toBe(1);
+    await v.modify(created.id, { dietary: null });
+    const restore = await v.modify(created.id, { dietary: VALUE }, { idem: "unchanged-value" });
+    expect(restore.status).toBe(200);
+    expect(await restore.json()).not.toHaveProperty("dietary");
+    expect(await v.stored(created.id)).toBeNull();
+
+    expect((await (await v.modify(created.id, { dietary: null }, { idem: "unchanged-null" })).json()).version).toBe(2);
+    await v.modify(created.id, { dietary: VALUE }, { idem: "recorded" });
+    const wipe = await (await v.modify(created.id, { dietary: null }, { idem: "unchanged-null" })).json();
+    expect(wipe.version).toBe(3);
+    expect(wipe.dietary.note).toBe(VALUE.note);
+
+    const trace = await v.read(`/reservations/${created.id}/trace`);
+    expect(trace.entries.map((e: { version: number; idempotencyKey: string }) => [e.version, e.idempotencyKey])).toEqual([
+      [1, expect.any(String)],
+      [2, expect.any(String)],
+      [3, "recorded"],
+    ]);
+    expect(JSON.stringify(trace)).not.toContain("unchanged-");
+    await expectInvalid(await v.post(`/reservations/${created.id}/status`, { status: "seated" }, { idem: "unchanged-null" }));
+  });
+
   it("keeps no value in the idempotency storage", async () => {
     const v = await makeVenue();
     const created = await v.create({ dietary: VALUE });
