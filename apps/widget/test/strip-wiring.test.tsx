@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 import type { DayStatus, PublicApi, PublicConfig, PublicDay } from "../src/api";
-import { addDays, formatDate, todayLocal } from "../src/dates";
+import { addDays, formatDate, formatWeekdayShort, todayLocal } from "../src/dates";
 import { translator } from "../src/messages";
 
 afterEach(cleanup);
@@ -55,8 +55,12 @@ function setup(options: { daysFail?: boolean } = {}) {
   return { dayCalls, availabilityCalls };
 }
 
+/** The chip's name starts with the text drawn on it (WCAG 2.5.3): weekday and day number, then date and state. */
+const chipName = (date: string, kind: "Available" | "Full" | "Closed") =>
+  `${formatWeekdayShort(date, "en")} ${Number(date.slice(8))}, ${t(`strip.day${kind}`, { date: formatDate(date, "en") })}`;
+
 const chip = (offset: number, kind: "Available" | "Full" | "Closed") =>
-  screen.findByRole("button", { name: t(`strip.day${kind}`, { date: formatDate(d(offset), "en") }) });
+  screen.findByRole("button", { name: chipName(d(offset), kind) });
 
 describe("the day strip in the form", () => {
   it("opens on the first available day with one /days and one /availability request", async () => {
@@ -74,7 +78,7 @@ describe("the day strip in the form", () => {
     expect(await chip(2, "Closed")).toBeTruthy();
     const group = screen.getByRole("group", { name: t("strip.label") });
     expect(within(group).getAllByRole("button")).toHaveLength(12);
-    expect(screen.getByRole("button", { name: t("strip.dayFull", { date: formatDate(d(0), "en") }) }).getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: chipName(d(0), "Full") }).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("shows no free times for a full chip and a button to the next free day", async () => {

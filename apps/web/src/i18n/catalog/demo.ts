@@ -26,7 +26,7 @@ export default defineMessages({
     "demo.bar.label": "Demo sandbox",
     "demo.bar.title": "Demo:",
     "demo.bar.sandbox": "This is your own sandbox restaurant.",
-    "demo.bar.expires": "It is deleted on {date}.",
+    "demo.bar.expires": "It is deleted on {date} unless you sign in again.",
     "demo.bar.deploy": "Deploy it yourself",
     "demo.bar.view": "View",
     "demo.bar.restaurant": "Restaurant",
@@ -45,7 +45,7 @@ export default defineMessages({
   },
   es: {
     "demo.signIn.title": "Prueba la demo",
-    "demo.signIn.description": "Inicia sesión y tendrás tu propio restaurante de pruebas, listo para usar. Sin contraseña: te enviamos un enlace por email.",
+    "demo.signIn.description": "Inicia sesión y tendrás tu propio restaurante de pruebas, listo para usar. Se borra a los 14 días sin uso. Sin contraseña: te enviamos un enlace por email.",
     "demo.signIn.submit": "Envíame un enlace de acceso",
     "demo.signIn.preparing": "Preparando tu enlace…",
     "demo.signIn.tryAgainIn": "Inténtalo de nuevo en {seconds} s",

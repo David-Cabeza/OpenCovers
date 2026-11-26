@@ -54,7 +54,7 @@ describe("FloorView in Spanish", () => {
     expect(await screen.findByRole("heading", { name: "Plano de sala" })).toBeInTheDocument();
     expect(await screen.findByText("4 comensales en mesas")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Mesa 1, 2 plazas, sentar a un cliente sin reserva" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Mesa 3: Ana, 4 comensales")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mesa 3 Ana 4 pax, 4 comensales")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ambiente" })).toBeInTheDocument();
     expect(screen.queryByText("Floor plan")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /walk-in/ })).not.toBeInTheDocument();
@@ -82,7 +82,7 @@ describe("FloorView in Spanish", () => {
       "GET /v1/venues/v1/reservations/r1": { body: RESERVATION },
     });
     renderWithApp(<FloorView venueId="v1" />);
-    const node = await screen.findByLabelText("Mesa 1: Ana, 4 comensales");
+    const node = await screen.findByLabelText("Mesa 1 Ana 4 pax, 4 comensales");
     act(() => node.focus());
     const card = await screen.findByRole("dialog", { name: "Reserva de Ana" });
     expect(await within(card).findByText("Cuándo")).toBeInTheDocument();

@@ -64,7 +64,7 @@ describe("FloorView", () => {
 
   it("does not offer walk-in seating on an occupied table and names who is there", async () => {
     setup([table({ occupied: true, reservationId: "r1", guestName: "Ana", partySize: 2 })]);
-    expect(await screen.findByLabelText("Table 1: Ana, 2 guests")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Table 1 Ana 2 pax, 2 guests")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Seat a walk-in/ })).not.toBeInTheDocument();
   });
 
@@ -105,7 +105,7 @@ describe("FloorView", () => {
     }
 
     async function openMove() {
-      const node = await screen.findByLabelText("Table 1: Ana, 4 guests");
+      const node = await screen.findByLabelText("Table 1 Ana 4 pax, 4 guests");
       act(() => node.focus());
       fireEvent.click(await screen.findByRole("button", { name: "Move to…" }));
     }
@@ -124,7 +124,7 @@ describe("FloorView", () => {
 
     it("opens after a tap on a touch screen", async () => {
       setupMove(tables);
-      const node = await screen.findByLabelText("Table 1: Ana, 4 guests");
+      const node = await screen.findByLabelText("Table 1 Ana 4 pax, 4 guests");
       fireEvent.pointerDown(node, { pointerType: "touch" });
       fireEvent.click(node);
       fireEvent.click(await screen.findByRole("button", { name: "Move to…" }));

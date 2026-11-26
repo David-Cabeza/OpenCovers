@@ -76,7 +76,8 @@ export function DayStrip(props: {
               <button
                 key={day.date}
                 type="button"
-                aria-label={t(NAME[status], { date: formatDate(day.date, locale) })}
+                // Starts with the text drawn on the chip (weekday and number), so the name contains what is visible.
+                aria-label={`${formatWeekdayShort(day.date, locale)} ${Number(day.date.slice(8))}, ${t(NAME[status], { date: formatDate(day.date, locale) })}`}
                 aria-pressed={selectable ? isSelected : undefined}
                 aria-disabled={selectable ? undefined : true}
                 onClick={() => selectable && props.onSelect(day.date)}
@@ -90,6 +91,8 @@ export function DayStrip(props: {
                 <span aria-hidden="true" className="text-xs uppercase">
                   {formatWeekdayShort(day.date, locale)}
                 </span>
+                {/* Invisible in a flex column, but it makes the drawn text read "jue 26" for the name check. */}
+                {" "}
                 <span aria-hidden="true" className="text-base font-medium">
                   {Number(day.date.slice(8))}
                 </span>
