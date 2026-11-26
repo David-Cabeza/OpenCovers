@@ -107,7 +107,11 @@ export function ServiceFormDialog({
               id="service-name"
               placeholder={t("setup.service.namePlaceholder")}
               disabled={editing}
-              {...register("name", { required: t("setup.form.nameRequired") })}
+              // A stored name cannot be edited here, so only a new one is held to the API's bound.
+              {...register("name", {
+                required: t("setup.form.nameRequired"),
+                maxLength: editing ? undefined : { value: 200, message: t("setup.service.nameMax", { max: 200 }) },
+              })}
             />
             {errors.name && (
               <p className="text-sm text-destructive">{errors.name.message}</p>

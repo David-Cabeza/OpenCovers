@@ -25,6 +25,11 @@ interface TableFormValues {
   shape: string;
 }
 
+// The limits of `TableUpsert` in docs/contract/openapi.yaml.
+const TABLE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const MAX_TEXT = 80;
+const MAX_SEATS = 200;
+
 interface TableFormDialogProps {
   venueId: string;
   open: boolean;
@@ -56,10 +61,23 @@ export function TableFormDialog({
         name: initial?.name ?? "",
         seats: initial?.seats ?? 2,
         zone: initial?.zone ?? "",
-        shape: initial?.shape ?? "round",
+        // `rect` is the older name of `rectangle`; the list below has no option for it.
+        shape: initial?.shape === "rect" ? "rectangle" : (initial?.shape ?? "round"),
       });
     }
   }, [open, initial, reset]);
+
+  const invalid = (field: keyof TableFormValues) =>
+    errors[field] ? { "aria-invalid": true, "aria-describedby": `table-${field}-error` } : {};
+
+  const fieldError = (field: keyof TableFormValues) =>
+    errors[field] && (
+      <p id={`table-${field}-error`} className="text-sm text-destructive">
+        {errors[field].message}
+      </p>
+    );
+
+  const seatsRange = t("setup.table.seatsRange", { max: MAX_SEATS });
 
   async function onSubmit(values: TableFormValues) {
     try {
@@ -95,7 +113,8 @@ export function TableFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* noValidate: the browser's own bubble would speak the browser's language, not the app's. */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="table-id">{t("setup.table.id")}</Label>
@@ -103,22 +122,33 @@ export function TableFormDialog({
                 id="table-id"
                 placeholder="t1" // i18n-ok
                 disabled={editing}
-                {...register("id", { required: t("setup.table.idRequired") })}
+                {...invalid("id")}
+                // An existing id cannot be edited, and one stored before the rule must not block the form.
+                {...register(
+                  "id",
+                  editing
+                    ? {}
+                    : {
+                        required: t("setup.table.idRequired"),
+                        pattern: { value: TABLE_ID, message: t("setup.table.idInvalid") },
+                      },
+                )}
               />
-              {errors.id && (
-                <p className="text-sm text-destructive">{errors.id.message}</p>
-              )}
+              {fieldError("id")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="table-name">{t("setup.form.name")}</Label>
               <Input
                 id="table-name"
                 placeholder={t("setup.table.namePlaceholder")}
-                {...register("name", { required: t("setup.form.nameRequired") })}
+                {...invalid("name")}
+                {...register("name", {
+                  required: t("setup.form.nameRequired"),
+                  pattern: { value: /\S/, message: t("setup.form.nameRequired") },
+                  maxLength: { value: MAX_TEXT, message: t("setup.table.nameMax", { max: MAX_TEXT }) },
+                })}
               />
-              {errors.name && (
-                <p className="text-sm text-destructive">{errors.name.message}</p>
-              )}
+              {fieldError("name")}
             </div>
           </div>
 
@@ -129,15 +159,17 @@ export function TableFormDialog({
                 id="table-seats"
                 type="number"
                 min={1}
+                max={MAX_SEATS}
+                {...invalid("seats")}
                 {...register("seats", {
                   required: t("setup.table.seatsRequired"),
                   valueAsNumber: true,
-                  min: { value: 1, message: t("setup.table.seatsMin") },
+                  min: { value: 1, message: seatsRange },
+                  max: { value: MAX_SEATS, message: seatsRange },
+                  validate: (value) => Number.isInteger(value) || seatsRange,
                 })}
               />
-              {errors.seats && (
-                <p className="text-sm text-destructive">{errors.seats.message}</p>
-              )}
+              {fieldError("seats")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="table-shape">{t("setup.table.shape")}</Label>
@@ -157,7 +189,15 @@ export function TableFormDialog({
 
           <div className="space-y-2">
             <Label htmlFor="table-zone">{t("setup.table.zone")}</Label>
-            <Input id="table-zone" placeholder={t("setup.table.zonePlaceholder")} {...register("zone")} />
+            <Input
+              id="table-zone"
+              placeholder={t("setup.table.zonePlaceholder")}
+              {...invalid("zone")}
+              {...register("zone", {
+                maxLength: { value: MAX_TEXT, message: t("setup.table.zoneMax", { max: MAX_TEXT }) },
+              })}
+            />
+            {fieldError("zone")}
           </div>
 
           <DialogFooter>
