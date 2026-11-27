@@ -1170,9 +1170,9 @@ paths:
         whether a reservation holds it at one moment. The moment is `date`
         and `time` read in the venue's time zone. Either one left out is
         today's date or the current time of day in that zone. A table is
-        `occupied` when an active hold on it starts before the moment and
-        ends after it, so a hold that starts exactly then does not count, and
-        one that ends exactly then does not either. An occupied table also
+        `occupied` when an active hold on it starts at or before the moment
+        and ends after it, so a hold that starts exactly then counts, and one
+        that ends exactly then does not. An occupied table also
         carries the `reservationId`, `partySize` and `guestName` of that
         reservation. A free table has none of the three.
 

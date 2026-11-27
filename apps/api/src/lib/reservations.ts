@@ -1,4 +1,4 @@
-import { and, count, eq, gt, gte, inArray, lt, ne, notExists, sql } from "drizzle-orm";
+import { and, count, eq, gt, gte, inArray, lt, lte, ne, notExists, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   events,
@@ -1523,7 +1523,7 @@ export async function getFloorPlan(
             eq(tableAllocations.venueId, venueId),
             eq(tableAllocations.tableId, t.id),
             eq(tableAllocations.active, true),
-            lt(tableAllocations.startsAt, point),
+            lte(tableAllocations.startsAt, point),
             gt(tableAllocations.endsAt, point),
           ),
         )
