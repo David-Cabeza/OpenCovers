@@ -431,6 +431,10 @@ interface SlotRequest {
   zone: string;
   walkIn: boolean;
   durationMinutes?: number;
+  /** The tables the caller named. None, or an empty list, leaves the choice to the engine. */
+  tableIds?: string[];
+  /** A reservation to leave out of the table search and the ceiling, so it never counts against itself. */
+  exceptId?: string;
 }
 
 function bookingWindow(venue: VenueRow, request: SlotRequest) {
@@ -655,25 +659,60 @@ async function tableReasons(
   };
 }
 
+/** Whether the overbooking ceiling takes the party. A read only looks; a write takes the lock first (C24). */
+type OverbookRoom = (startsAt: Date, endsAt: Date, covers: number, exceptId?: string) => Promise<boolean>;
+
+/**
+ * Places a reservation: its service, window and tables (ADR-0028, section 1). Create and the availability reads all
+ * place through here. It reads and never writes. `venue` and `serviceRows` are the channel's view (`applyChannel`).
+ *
+ * `reasons` are the time and service rules the slot breaks, in order. `refusal` is the first code that refuses it
+ * before any table is searched: those rules, then the named tables. The search is `findTables`, apart, so that a write
+ * can check its guest caps and take the planner lock first. It answers no tables when the ceiling takes the party.
+ */
+async function placeSlot(db: Db | DbTx, venue: ChannelVenue, serviceRows: ServiceRow[], request: SlotRequest) {
+  const { partySize, zone, tableIds, exceptId } = request;
+  const { startsAt, endsAt } = bookingWindow(venue, request);
+  const { service, reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
+  reasons.push(...serviceReasons(service, request));
+  let refusal: WriteErrorCode | null = reasons[0]?.code ?? (service ? null : "outside_hours");
+  if (!refusal && tableIds?.length) {
+    if (!(await knownDistinctTables(db, venue.id, tableIds))) {
+      refusal = "invalid_request";
+    } else if (partySize > (await totalSeats(db, venue.id, tableIds))) {
+      refusal = "party_size_too_large";
+    } else if (zone !== "") {
+      const inZone = await db
+        .select({ id: tables.id })
+        .from(tables)
+        .where(and(eq(tables.venueId, venue.id), inArray(tables.id, tableIds), eq(tables.zone, zone)));
+      if (inZone.length !== tableIds.length) refusal = "invalid_request";
+    }
+  }
+  const findTables = async (
+    exec: Db | DbTx,
+    overbookRoom: OverbookRoom,
+  ): Promise<{ ok: true; tableIds: string[] } | { ok: false; reason: Reason }> => {
+    const fit = await tableReasons(exec, venue.id, startsAt, endsAt, partySize, zone, exceptId);
+    const overbooks =
+      !fit.ok &&
+      fit.reason.code === "no_suitable_table" &&
+      !request.walkIn &&
+      (await overbookRoom(startsAt, endsAt, partySize, exceptId));
+    return overbooks ? { ok: true, tableIds: [] } : fit;
+  };
+  return { service, startsAt, endsAt, reasons, refusal, findTables };
+}
+
 async function evaluateSlot(
   db: Db,
   venue: ChannelVenue,
   serviceRows: ServiceRow[],
   request: SlotRequest,
 ): Promise<Reason[]> {
-  const { startsAt, endsAt } = bookingWindow(venue, request);
-  const { service, reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
-  reasons.push(...serviceReasons(service, request));
-  const fit = await tableReasons(db, venue.id, startsAt, endsAt, request.partySize, request.zone);
-  if (fit.ok) return reasons;
-  if (
-    fit.reason.code === "no_suitable_table" &&
-    !request.walkIn &&
-    (await hasOverbookRoom(db, venue.id, venue.overbookingCeiling, startsAt, endsAt, request.partySize))
-  ) {
-    return reasons;
-  }
-  return [...reasons, fit.reason];
+  const { reasons, findTables } = await placeSlot(db, venue, serviceRows, request);
+  const found = await findTables(db, (...slot) => hasOverbookRoom(db, venue.id, venue.overbookingCeiling, ...slot));
+  return found.ok ? reasons : [...reasons, found.reason];
 }
 
 // Explicit table ids must be distinct tables of this venue (venue isolation: another venue's id is unknown).
@@ -687,7 +726,7 @@ async function knownDistinctTables(db: Db | DbTx, venueId: string, tableIds: str
   return rows.length === tableIds.length;
 }
 
-async function totalSeats(db: Db, venueId: string, tableIds: string[]) {
+async function totalSeats(db: Db | DbTx, venueId: string, tableIds: string[]) {
   if (tableIds.length === 0) return 0;
   const rows = await db
     .select({ seats: tables.seats })
@@ -732,7 +771,7 @@ async function hasOverbookRoom(
 /**
  * The check of a write. It takes no ceiling: it reads it under the overbooking lock, held to commit, so the value is
  * the one in force when the write commits (C24). A venue row read before the lock may be out of date. This ignores the
- * channel, so a public write must be refused before it gets here.
+ * channel, so a public write must never ask it.
  */
 async function claimOverbookRoom(
   tx: DbTx,
@@ -874,33 +913,12 @@ export async function createReservation(
     zone,
     walkIn: input.initialStatus === "seated",
     durationMinutes: input.durationMinutes,
+    tableIds: input.tableIds,
   };
-  const { startsAt, endsAt } = bookingWindow(venue, request);
-  const { service, reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
-  reasons.push(...serviceReasons(service, request));
   // A refusal binds a first attempt only. The key is looked up first, so a replay of a create that succeeded
   // returns the stored answer whatever the rules or the clock say now (C2, C58).
-  let refusal: WriteErrorCode | null = reasons[0]?.code ?? (service ? null : "outside_hours");
+  const { service, startsAt, endsAt, refusal, findTables } = await placeSlot(db, venue, serviceRows, request);
   const autoAssign = !input.tableIds || input.tableIds.length === 0;
-  if (!refusal && !autoAssign) {
-    if (!(await knownDistinctTables(db, venueId, input.tableIds as string[]))) {
-      refusal = "invalid_request";
-    } else if (input.partySize > (await totalSeats(db, venueId, input.tableIds as string[]))) {
-      refusal = "party_size_too_large";
-    } else if (zone !== "") {
-      const inZone = await db
-        .select({ id: tables.id })
-        .from(tables)
-        .where(
-          and(
-            eq(tables.venueId, venueId),
-            inArray(tables.id, input.tableIds as string[]),
-            eq(tables.zone, zone),
-          ),
-        );
-      if (inZone.length !== (input.tableIds as string[]).length) refusal = "invalid_request";
-    }
-  }
   const id = crypto.randomUUID();
   const contactKey = input.guestContact != null ? normalizeContact(String(input.guestContact), venueCountry(venue)) : null;
   try {
@@ -974,23 +992,19 @@ export async function createReservation(
       let tableIds = input.tableIds ?? [];
       if (autoAssign) {
         await lockPlanner(tx, venueId);
-        const fit = await tableReasons(tx, venueId, startsAt, endsAt, input.partySize, zone);
-        if (fit.ok) {
-          tableIds = fit.tableIds;
+        const found = await findTables(tx, async (...slot) =>
+          channel.kind === "public" ? false : claimOverbookRoom(tx, venueId, ...slot),
+        );
+        if (found.ok) {
+          tableIds = found.tableIds;
         } else if (
           channel.kind === "public" &&
-          (fit.reason.code === "no_suitable_table" || (zone !== "" && fit.reason.code === "party_size_too_large"))
+          (found.reason.code === "no_suitable_table" || (zone !== "" && found.reason.code === "party_size_too_large"))
         ) {
           // In a zone the party may exceed the zone's seats: that is also a taken slot, and never carries a count (C66).
           throw new ReservationError("slot_taken");
-        } else if (
-          fit.reason.code === "no_suitable_table" &&
-          !request.walkIn &&
-          (await claimOverbookRoom(tx, venueId, startsAt, endsAt, input.partySize))
-        ) {
-          tableIds = [];
         } else {
-          throw new ReservationError(fit.reason.code);
+          throw new ReservationError(found.reason.code);
         }
       }
       await tx.insert(reservations).values({
