@@ -104,6 +104,12 @@ Every reservation write and every waitlist write takes an idempotency key scoped
 
 Acceptance: conformance case C58.
 
+### REQ-B9 Move a booking
+
+Not built ([ADR-0028](adr/0028-move-a-reservation.md), proposed 2026-11-27). Staff and integrators with `write` or `admin` move a `booked` reservation to another date, time or zone with a modify that carries the version they read. The move keeps the reservation id, guest, history and self-service link. It runs the rules of a staff create for the new slot and never counts the booking against itself, and a refusal changes nothing. Consumers see one `modified` event that names the changed fields, and the trace keeps the placement before and after. Availability and the explanation can leave one reservation out, so a client checks a move before sending it. Today a modify with a different date, time or zone fails with `invalid_request`. A guest still cancels and books again.
+
+Acceptance: conformance cases C83 to C92.
+
 ## Guest and client
 
 ### REQ-G1 Minimum data

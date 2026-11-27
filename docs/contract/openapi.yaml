@@ -40,6 +40,15 @@ info:
     client sends. Responses can gain fields, so a client ignores the ones
     it does not know.
 
+    An `x-planned` entry on an operation or a schema describes a part of
+    the contract that is specified and not built. Its conformance cases are
+    GAP in docs/contract/conformance-status.md. Until they pass, a
+    conforming engine refuses or ignores what the entry lists, as its text
+    says, so a client must not send it. Moving a booking to another date or
+    time (docs/adr/0028-move-a-reservation.md, C83 to C92) is planned this
+    way: today a modify with a different `date`, `time` or `zone` fails
+    with `invalid_request` and the problem `unchangeable` (C94).
+
     Paths are relative to `/v1`, except `/w/embed.js`, `/w/{bookingKey}`
     and `/r`, which are served at the root of the widget origin.
 
@@ -175,6 +184,26 @@ paths:
           required: false
           description: Filter to one service. When omitted, the response is grouped by service.
           schema: { type: string }
+      x-planned:
+        cases: [C92]
+        adr: docs/adr/0028-move-a-reservation.md
+        description: |
+          Not built. Today the engine ignores `reservationId` and counts that
+          reservation's own tables, so do not send it yet. Once built, the
+          grid answers as if that reservation did not exist: its tables are
+          free and its covers do not count toward the overbooking ceiling. It
+          uses the reservation's zone, and for a date other than the
+          reservation's own it shows a time as unavailable when the guest
+          already holds `maxActivePerGuestPerDay` active bookings that date.
+          A reservation that is not `booked` fails with `409
+          invalid_transition`, and an unknown one or one of another venue
+          with `reservation_not_found`.
+        parameters:
+          - name: reservationId
+            in: query
+            required: false
+            description: The reservation a move would change, left out of the answer.
+            schema: { type: string }
       responses:
         "200":
           description: The bookable slots, keyed by service name
@@ -226,6 +255,32 @@ paths:
           required: false
           description: Only tables in this zone count, as in a create with `zone`.
           schema: { type: string }
+      x-planned:
+        cases: [C92]
+        adr: docs/adr/0028-move-a-reservation.md
+        description: |
+          Not built. Today the engine ignores `reservationId` and counts that
+          reservation's own tables, so do not send it yet. Once built, the
+          explanation answers as if that reservation did not exist: its
+          tables are free, its covers do not count toward the overbooking
+          ceiling, and the slot it holds reads as free when no other rule
+          blocks it. It uses the reservation's zone unless `zone` is given.
+          For a date other than the reservation's own it applies the guest
+          cap, with the reason `guest_booking_limit` after the service limit
+          and before the table reasons. `available` is true exactly when a
+          modify that moves the reservation to the same date, time, party
+          size and zone, without `tables` and with the stored version, would
+          succeed, and the first reason is the code it would fail with.
+          `nearest` uses the same exclusion. A reservation that is not
+          `booked` fails with `409 invalid_transition`, and an unknown one or
+          one of another venue with `reservation_not_found`. The answer still
+          holds no guest data, reservation id or table id.
+        parameters:
+          - name: reservationId
+            in: query
+            required: false
+            description: The reservation a move would change, left out of the answer.
+            schema: { type: string }
       responses:
         "200":
           description: The explanation
@@ -548,7 +603,39 @@ paths:
         booking holds fails with `slot_taken`. A table id that is not a table
         of the venue, or a repeated id, fails with `invalid_request`, as on
         create. A modify does not move a booking: `date`, `time` and `zone`
-        may only repeat its current values (C94).
+        may only repeat its current values (C94). Moving is planned and not
+        built: see `x-planned` here and on `ReservationModify`.
+      x-planned:
+        cases: [C83, C84, C85, C86, C87, C88, C89, C90]
+        adr: docs/adr/0028-move-a-reservation.md
+        description: |
+          Not built. Once built, a `date` or `time` that differs from the
+          booking moves a `booked` reservation, and needs `version`. A
+          `zone` that differs places it in that zone. The move runs the
+          staff create's rules for the new slot in the create's order:
+          `outside_hours`, `lead_time_violation`, `beyond_booking_horizon`,
+          `date_blocked`, the service's `party_size_too_small` or
+          `party_size_too_large`, `guest_booking_limit` (only when the date
+          changes), then the tables. The reservation never counts against
+          itself. Without `tables` it keeps the tables it holds when they lie
+          in its zone, seat the party and are free for the new window, then
+          takes the free combination a create would assign, then the
+          overbooking ceiling, and otherwise fails with
+          `party_size_too_large` or `no_suitable_table`. On a `booked`
+          reservation, named `tables` must seat the party
+          (`party_size_too_large`), and a change of date, time or party size
+          recomputes the end from the turn times. A change of date or time
+          resets `reconfirmation` to `none` unless the body sets it, and
+          moves the self-service link's expiry to 48 hours after the new end
+          without rotating the link. Only `booked` changes date, time or
+          zone; any other status fails with `invalid_transition`. A sent
+          `version` that is not the stored one fails with
+          `reservation_changed` and writes nothing. One `confirmation` email
+          goes out when the date, the time or the party size changes,
+          unless `notifyGuest` is `false`, and none for a change of tables
+          or zone alone. One `modified` event carries `changed`. A refused
+          modify writes nothing and stores no key. Equal `date`, `time` and
+          `zone` stay accepted without `version`.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/reservationId"
@@ -3871,6 +3958,19 @@ components:
         `no_suitable_table`. The codes are the error codes a create returns
         for the same rule. `no_suitable_table` is absent when the venue's
         `overbookingCeiling` leaves room for the party.
+      x-planned:
+        cases: [C92]
+        adr: docs/adr/0028-move-a-reservation.md
+        description: |
+          Not built. With `reservationId`, for a date other than the
+          reservation's own, the code `guest_booking_limit` comes after the
+          service limit and before the table reasons, with these details.
+        properties:
+          details:
+            type: object
+            required: [maxActivePerGuestPerDay]
+            properties:
+              maxActivePerGuestPerDay: { type: integer }
       required: [code, message, details]
       properties:
         code:
@@ -4546,21 +4646,50 @@ components:
         only equal values answers 200 with the reservation unchanged, at the
         same version, where the status accepts a modify. A repeat of a key
         that already wrote is answered as a repeat, without comparing.
+      x-planned:
+        cases: [C83, C87, C90]
+        adr: docs/adr/0028-move-a-reservation.md
+        description: |
+          Not built. Today the route refuses `version` and `notifyGuest` as
+          unknown fields (C94). Once built, `date` (`YYYY-MM-DD`) and `time`
+          (`HH:MM`) that differ from the booking move it, `zone` that differs
+          places it in that zone, and `""` removes the zone. A field left out
+          keeps its value. Another format fails with `invalid_request` and
+          the problem `invalid`. Equal values remain no change and need no
+          `version`. A body whose only fields are `version` and
+          `notifyGuest` fails with `invalid_request`.
+        properties:
+          version:
+            type: integer
+            minimum: 1
+            description: |
+              The version a read returned. Required when `date` or `time`
+              differs from the booking, else `invalid_request` with
+              `details.fields` `[{ "path": "version", "problem": "missing" }]`.
+              When sent on any modify it must equal the stored version, else
+              `reservation_changed` and nothing is written.
+          notifyGuest:
+            type: boolean
+            default: true
+            description: |
+              `false` sends no email for this modify. Otherwise one
+              `confirmation` goes to the guest when the date, the time or the
+              party size changes (C90).
       properties:
         date:
           type: string
           format: date
-          description: May only repeat the current date.
+          description: May only repeat the current date until C83 is built.
         time:
           type: string
-          description: May only repeat the current time, as `HH:MM`.
+          description: May only repeat the current time, as `HH:MM`, until C83 is built.
         partySize:
           type: integer
           minimum: 1
           maximum: 10000
         zone:
           type: string
-          description: May only repeat the current zone.
+          description: May only repeat the current zone until C83 is built.
         tables:
           type: array
           items: { type: string }
@@ -4607,6 +4736,23 @@ components:
         occurredAt:
           type: string
           format: date-time
+      x-planned:
+        cases: [C91]
+        adr: docs/adr/0028-move-a-reservation.md
+        description: Not built. Today no event carries `changed`.
+        properties:
+          changed:
+            type: array
+            items:
+              type: string
+              enum: [date, time, service, partySize, zone, tables]
+            description: |
+              On every `modified` event, and only there: the names of the
+              fields whose read value the write changed, in the order of the
+              enum, never their values. Empty when only other fields
+              changed, so it never names consent, rating, the note,
+              reconfirmation or `dietary`. An event written before the field
+              has none, which means unknown: read the reservation.
 
     ReservationTrace:
       type: object
@@ -4653,6 +4799,37 @@ components:
           description: >
             False when the event was stored without an origin. Then `actor` is null and `channel` is derived
             from the booking's creator for a `created` entry, or null.
+      x-planned:
+        cases: [C91]
+        adr: docs/adr/0028-move-a-reservation.md
+        description: Not built. Today no entry carries `placement`.
+        properties:
+          placement:
+            type: object
+            description: |
+              On the entry of a `modified` event that changed the date, time,
+              service, party size, zone or tables: the values before and
+              after that write. Absent on other entries and on events written
+              before the field. No guest data. Retention deletes it with its
+              event, and erasure leaves it. Not in the feed or a webhook.
+            required: [from, to]
+            properties:
+              from: { $ref: "#/components/schemas/TracePlacement" }
+              to: { $ref: "#/components/schemas/TracePlacement" }
+
+    TracePlacement:
+      description: Planned with C91, not built. One placement of a reservation in its trace.
+      type: object
+      required: [date, time, service, partySize, zone, tables]
+      properties:
+        date: { type: string, format: date }
+        time: { type: string, example: "21:30" }
+        service: { type: string }
+        partySize: { type: integer }
+        zone: { type: string }
+        tables:
+          type: array
+          items: { type: string }
 
     Role:
       type: string

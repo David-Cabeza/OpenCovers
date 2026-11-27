@@ -4,7 +4,7 @@
 - Date: 2026-11-26
 - Deciders: David Cabeza (owner)
 
-ADR-0028 is reserved for moving a reservation to another date or time, which is not built.
+[ADR-0028](0028-move-a-reservation.md) specifies moving a reservation to another date or time (C83 to C92), which is not built.
 
 ## Context
 

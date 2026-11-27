@@ -4,7 +4,7 @@
 
 OpenCovers is pre-alpha. No restaurant runs on it yet.
 
-What exists: the booking engine and its HTTP API, a staff app, a guest booking widget, an MCP server with 18 tools on npm, signed webhooks, a production Docker Compose stack, and a hosted demo with invented data. The database, not the application, refuses a double booking. 74 of the 83 conformance cases pass and 9 are partial. One of those is allergies and diets (C82): built in the API and the staff app behind a switch that is off by default, not yet in the MCP tools.
+What exists: the booking engine and its HTTP API, a staff app, a guest booking widget, an MCP server with 18 tools on npm, signed webhooks, a production Docker Compose stack, and a hosted demo with invented data. The database, not the application, refuses a double booking. 74 of the 93 conformance cases pass and 9 are partial. The other 10 specify moving a booking to another date or time (C83 to C92, [ADR-0028](docs/adr/0028-move-a-reservation.md)), which is not built yet. One of those is allergies and diets (C82): built in the API and the staff app behind a switch that is off by default, not yet in the MCP tools.
 
 What is missing before a real venue can use it: a legal review of the texts a guest sees, automatic backups with a rehearsed restore, alerts, tests in a real browser, and someone to call when something breaks. The demo's terms and privacy notice were written without a lawyer's review.
 
@@ -77,7 +77,7 @@ Until the end of 2026. Goal: take the decisions the year hangs on, and open the 
 - **Remote MCP, part 3** (#371, #67). Blocked on: nothing.
 - **Reviewed texts applied** (C2): the link in the confirmation email and the consent question (ADR-0017 stages 8 and 11), so that C43, C44, C50, C51, C55 and C70 pass. Blocked on: legal.
 - **A trust page.** The guest data model, retention, erasure, processors, known gaps and the legal status of each text, each with a link to its test or its date. Blocked on: nothing.
-- **Move a booking to another date.** The contract does not allow it today. Blocked on: owner, for the contract decision.
+- **Move a booking to another date.** Done when staff and integrators change a booking's date and time without cancelling it, and C83 to C92 pass. The contract is written ([ADR-0028](docs/adr/0028-move-a-reservation.md)). Blocked on: nothing.
 - **A guest screen in the staff app** (#374). Blocked on: nothing.
 - **A printable service sheet and a pre-shift check.** Blocked on: nothing.
 - **The project name.** It is provisional until 31 January. Blocked on: owner.
