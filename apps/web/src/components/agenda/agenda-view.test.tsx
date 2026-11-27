@@ -336,6 +336,30 @@ describe("AgendaView table assignment", () => {
     expect(api.writes()[0].body).toEqual({ tables: ["t2"] });
   });
 
+  it("keeps a half-made selection when the agenda refreshes, and compares it with what it opened with", async () => {
+    let stored = reservation({ partySize: 2, guest: { name: "Ana", consent: "unknown" }, tables: ["t1"] });
+    const api = mockApi({
+      [AGENDA]: () => ({ body: { reservations: [stored] } }),
+      [TABLES_ROUTE]: () => ({ body: { tables: TABLES } }),
+    });
+    const { queryClient } = renderWithApp(<AgendaView venueId="v1" />);
+    const user = userEvent.setup();
+
+    await openRowMenu(user, "Ana");
+    await user.click(await screen.findByRole("menuitem", { name: "Change tables" }));
+    await user.click(await screen.findByRole("button", { name: /Table 2/ }));
+    stored = { ...stored, version: 2, tables: ["t2"] };
+    await queryClient.refetchQueries({ queryKey: ["agenda", "v1"] });
+
+    expect(screen.getByRole("button", { name: /Table 1/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Table 2/ })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: /Table 2/ }));
+    await user.click(screen.getByRole("button", { name: "Save tables" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(api.writes()).toHaveLength(0);
+  });
+
   it("does not call the API when the selected tables seat fewer guests than the party", async () => {
     const { api, user } = setupTables([party4()]);
 
