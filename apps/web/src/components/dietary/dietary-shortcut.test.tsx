@@ -1,6 +1,6 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { FloorView } from "@/components/floor/floor-view";
 import { NavigationProvider } from "@/components/layout/navigation";
 import { WaitlistView } from "@/components/waitlist/waitlist-view";
@@ -34,22 +34,38 @@ interface Options {
   role?: Role;
   enabled?: boolean;
   reservation?: Reservation;
+  /** A second party in the queue, which is seated as r2. */
+  twoWaiting?: boolean;
 }
 
-function setup(ui: ReactElement, { role = "write", enabled = true, reservation = SEATED }: Options = {}) {
-  let waiting = true;
+function entry(id: string, guestName: string) {
+  return { id, venueId: "v1", partySize: 2, zone: "", guestName, guestContact: "", status: "waiting", reservationId: null, createdAt: new Date().toISOString() };
+}
+
+/** Holds the answer of one read until the returned function is called. */
+function holdRead(path: string) {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const answer = globalThis.fetch;
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input) === path && !init?.method) await held;
+    return answer(input, init);
+  });
+  return release;
+}
+
+function setup(ui: ReactElement, { role = "write", enabled = true, reservation = SEATED, twoWaiting = false }: Options = {}) {
+  let waiting = [entry("w1", "Ana"), ...(twoWaiting ? [entry("w2", "Berta")] : [])];
   const api = mockApi({
     "GET /v1/venues/v1/config": { body: { dietaryEnabled: enabled } },
-    "GET /v1/venues/v1/waitlist": () => ({
-      body: {
-        entries: waiting
-          ? [{ id: "w1", venueId: "v1", partySize: 2, zone: "", guestName: "Ana", guestContact: "", status: "waiting", reservationId: null, createdAt: new Date().toISOString() }]
-          : [],
-      },
-    }),
+    "GET /v1/venues/v1/waitlist": () => ({ body: { entries: waiting } }),
     "POST /v1/venues/v1/waitlist/w1/seat": () => {
-      waiting = false;
+      waiting = waiting.filter((e) => e.id !== "w1");
       return { body: reservation };
+    },
+    "POST /v1/venues/v1/waitlist/w2/seat": () => {
+      waiting = waiting.filter((e) => e.id !== "w2");
+      return { body: { ...reservation, id: "r2" } };
     },
     "GET /v1/venues/v1/floor": {
       body: { tables: [{ id: "t1", name: "Table 1", seats: 2, zone: "", shape: "round", posX: 0, posY: 0, rotation: 0, occupied: true, reservationId: "r1", guestName: "Ana", partySize: 2 }] },
@@ -72,6 +88,10 @@ async function recordPeanuts(user: ReturnType<typeof userEvent.setup>, dialog: H
 
 const editDialog = () => screen.findByRole("dialog", { name: /allergies/i });
 
+// As main.tsx renders the app. StrictMode runs effects twice, and the second run comes after the dialog's autofocus.
+beforeAll(() => configure({ reactStrictMode: true }));
+afterAll(() => configure({ reactStrictMode: false }));
+
 afterEach(() => {
   resetApiMocks();
   window.history.replaceState(null, "", "/");
@@ -93,11 +113,31 @@ describe("after seating from the waitlist", () => {
     await waitFor(() => expect(shortcut).toHaveFocus());
 
     await user.keyboard("{Enter}");
+    await user.click(within(await editDialog()).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(shortcut).toHaveFocus());
+
+    await user.keyboard("{Enter}");
     await recordPeanuts(user, await editDialog());
 
     await waitFor(() => expect(api.calls("POST", MODIFY_PATH)).toHaveLength(1));
     expect(api.calls("POST", MODIFY_PATH)[0].body).toMatchObject({ dietary: { allergens: ["peanuts"], consented: true } });
     await waitFor(() => expect(screen.queryByRole("button", { name: RECORD })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add" })).toHaveFocus());
+  });
+
+  it("puts the focus on Add when another seat has replaced the button that opened the dialog", async () => {
+    const { api, user } = setup(<WaitlistView venueId="v1" />, { twoWaiting: true });
+    const answer = holdRead("/v1/venues/v1/reservations/r1");
+    const [first, second] = await screen.findAllByRole("button", { name: "Seat" });
+    await user.click(first);
+    await user.click(await screen.findByRole("button", { name: RECORD }));
+    // The first booking is still being read when the second party is seated, which replaces the notice.
+    await user.click(second);
+    await waitFor(() => expect(api.calls("POST", "/v1/venues/v1/waitlist/w2/seat")).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Seat" })).not.toBeInTheDocument());
+    answer();
+    await editDialog();
+    await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.getByRole("button", { name: "Add" })).toHaveFocus());
   });
 
@@ -128,6 +168,16 @@ describe("on an occupied table card", () => {
     await waitFor(() => expect(api.calls("POST", MODIFY_PATH)).toHaveLength(1));
     await waitFor(() => expect(node).toHaveFocus());
     expect(document.body.style.pointerEvents).not.toBe("none");
+  });
+
+  it.each(["Escape", "Cancel"])("returns focus to the table when the dialog is closed with %s", async (how) => {
+    const { user } = setup(<FloorView venueId="v1" />);
+    const { node, card } = await openCard(user);
+    await user.click(await within(card).findByRole("button", { name: RECORD }));
+    const dialog = await editDialog();
+    if (how === "Escape") await user.keyboard("{Escape}");
+    else await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(node).toHaveFocus());
   });
 
   it("says edit when something is already recorded", async () => {

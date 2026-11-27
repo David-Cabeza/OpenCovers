@@ -59,11 +59,13 @@ function focusReturnTarget(): HTMLElement | null {
   return trigger ?? active
 }
 
-// Mounts with the open dialog, before it takes focus, so it sees where the focus was.
+// Mounts with the open dialog and reads the focus while rendering, before anything in it can take the focus. An effect
+// is too late: StrictMode runs effects a second time, after a field has focused itself.
 function RememberFocus({ into }: { into: React.RefObject<HTMLElement | null> }) {
+  const [target] = React.useState(focusReturnTarget)
   React.useLayoutEffect(() => {
-    into.current = focusReturnTarget()
-  }, [into])
+    into.current = target
+  }, [into, target])
   return null
 }
 
