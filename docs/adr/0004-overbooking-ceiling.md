@@ -22,7 +22,7 @@ What the database enforces, unchanged:
 What application code enforces:
 
 - The cover sum. `hasOverbookRoom` in `apps/api/src/lib/reservations.ts` selects the active bookings of the venue that overlap the window and have no allocation row, sums their party sizes, and tests `used + covers <= overbookingCeiling`.
-- Serialization. With `lock: true` it first runs `pg_advisory_xact_lock(hashtextextended('overbooking:<venueId>', 0))`. The lock is per venue, held to the end of the transaction, and taken only on the overbooking path. Ordinary bookings do not take it.
+- Serialization. With `lock: true` (since the amendment below, `claimOverbookRoom`) it first runs `pg_advisory_xact_lock(hashtextextended('overbooking:<venueId>', 0))`. The lock is per venue, held to the end of the transaction, and taken only on the overbooking path. Ordinary bookings do not take it.
 - The same check on three paths. `createReservation` (with the lock), `modifyReservation` (with the lock, when the party of a booking without tables grows or its tables change and it would hold none), and `evaluateSlot`, which backs availability and `GET /availability/explain` (without the lock, read only).
 
 Why a database constraint does not fit the sum. The exclusion constraint compares pairs of rows on one key. The ceiling is a sum over every row whose window overlaps another window, and the rows hold no key. One booking window can overlap several others that do not overlap each other. PostgreSQL has no declarative constraint for "the sum over overlapping ranges stays under N".
@@ -38,13 +38,27 @@ The justification, in order:
 - REQ-B2 and the design rule are about no table double-held. That stays in the database. Nothing in PR #26 relaxes or bypasses the exclusion constraint.
 - The new limit is a different rule, a capacity cap, and no declarative constraint expresses it.
 - The decision and the insert share one transaction, so "One transaction decides availability and booking" holds. The advisory lock closes the window between the sum and the insert that the default isolation level leaves open.
-- Eight concurrent creates against a ceiling of 4 take exactly 4 covers. Removing the lock makes that test fail.
+- Eight concurrent creates against a ceiling of 4 take exactly 4 covers. This is not evidence for the lock: the planner lock also serializes auto-assigned creates, so that test passes without the overbooking lock (corrected, see the amendment below). The races that need it are in `apps/api/test/overbooking-races.test.ts`.
 
 This is a judgment about how to read the design rule. If the rule is read as "application code never enforces any cap", the ceiling breaks it, and the alternatives below apply.
 
 Decision note, 2026-11-15. The maintainer accepted this record in the 2026-11-15 session, on one condition. Only the venue's responsible person, the `admin` role, can configure the ceiling. This is already enforced. `PUT /venues/{venueId}/config` is guarded by `adminOnly` in `apps/api/src/app.ts`, so a `read` or `write` key or session fails with `forbidden` and the ceiling does not change. `apps/api/test/overbooking.test.ts` ("needs an admin key") shows a `write` key getting `403` and the stored ceiling staying at 0. The `PUT /config` case in `apps/api/test/authorization.test.ts` sends `overbookingCeiling` with a `write` key and a `read` key, checks the venue state is unchanged, and then shows the `admin` key changing it.
 
 The maintainer also decided that a reservation cannot be seated without a table, so an overbooked booking has to get a real table before it is seated. Conformance case C26 and the error `table_required` carry that rule.
+
+## Amendment, 2026-11-27: the ceiling in force at commit
+
+This record first said that removing the overbooking lock makes the 8 concurrent creates test fail. It does not. With the lock removed that test passes, and the races of creates against modifies that give up their tables, of concurrent party increases and of creates counting after a cancel fail.
+
+It also left open which ceiling binds a write while an admin changes it, and a write could commit above a value lowered before it ([issue 446](https://github.com/David-Cabeza/OpenCovers/issues/446)). The owner decided: the ceiling in force when the write commits.
+
+- A write takes the overbooking lock, then reads the ceiling from the database, then counts. It never uses the venue row it read earlier. The lock is held to commit.
+- `setConfig` takes the same lock when it changes `overbookingCeiling`, after its `FOR NO KEY UPDATE` on the venue row. So no change commits between a write's read and its commit.
+- The change waits at most 5 seconds and then answers `venue_busy`, saving nothing, like a reservation write (ADR-0030). A save that keeps the value does not take the lock.
+- A staff create or modify with no free table now takes the lock even when the ceiling is 0, because a value read before the lock could be out of date.
+- Lock order: no writer that holds the overbooking lock waits for anything the config write holds. The config write holds the venue row `for no key update`, which lets the writer's foreign key checks through, and waits for nothing after the overbooking lock.
+
+A `FOR SHARE` on the venue row in the booking was rejected: every booking would wait behind a config save.
 
 ## Consequences
 

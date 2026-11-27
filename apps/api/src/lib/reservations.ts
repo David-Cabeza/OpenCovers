@@ -352,6 +352,16 @@ async function lockPlanner(tx: DbTx, venueId: string) {
 }
 
 /**
+ * Serializes, per venue and until the transaction ends, the writes that count the covers held without a table and the
+ * config write that changes the overbooking ceiling (C24). Lock order: after the idempotency key, guest, planner and
+ * reservation row, before events. The config write asks for it while it holds the venue row `for no key update`,
+ * which still lets a holder's foreign key checks on that row through.
+ */
+export async function lockOverbooking(tx: DbTx, venueId: string) {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`overbooking:${venueId}`}, 0))`);
+}
+
+/**
  * Caps how long this transaction waits for any one lock, so a stuck writer cannot hold back the rest of its venue
  * for good. The write that gives up answers `venue_busy`.
  */
@@ -659,7 +669,7 @@ async function evaluateSlot(
   if (
     fit.reason.code === "no_suitable_table" &&
     !request.walkIn &&
-    (await hasOverbookRoom(db, venue, startsAt, endsAt, request.partySize))
+    (await hasOverbookRoom(db, venue.id, venue.overbookingCeiling, startsAt, endsAt, request.partySize))
   ) {
     return reasons;
   }
@@ -686,24 +696,23 @@ async function totalSeats(db: Db, venueId: string, tableIds: string[]) {
   return rows.reduce((sum, r) => sum + r.seats, 0);
 }
 
+/** Whether `covers` more fit under `ceiling` beside the bookings without tables that overlap the window. */
 async function hasOverbookRoom(
   exec: Db | DbTx,
-  venue: VenueRow,
+  venueId: string,
+  ceiling: number,
   startsAt: Date,
   endsAt: Date,
   covers: number,
-  opts: { lock?: boolean; exceptId?: string } = {},
+  exceptId?: string,
 ): Promise<boolean> {
-  if (covers > venue.overbookingCeiling) return false;
-  if (opts.lock) {
-    await exec.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`overbooking:${venue.id}`}, 0))`);
-  }
+  if (covers > ceiling) return false;
   const unseated = await exec
     .select({ partySize: reservations.partySize })
     .from(reservations)
     .where(
       and(
-        eq(reservations.venueId, venue.id),
+        eq(reservations.venueId, venueId),
         inArray(reservations.status, ACTIVE_STATUSES),
         lt(reservations.startsAt, endsAt),
         gt(reservations.endsAt, startsAt),
@@ -713,11 +722,32 @@ async function hasOverbookRoom(
             .from(tableAllocations)
             .where(eq(tableAllocations.reservationId, reservations.id)),
         ),
-        opts.exceptId ? ne(reservations.id, opts.exceptId) : undefined,
+        exceptId ? ne(reservations.id, exceptId) : undefined,
       ),
     );
   const used = unseated.reduce((sum, r) => sum + r.partySize, 0);
-  return used + covers <= venue.overbookingCeiling;
+  return used + covers <= ceiling;
+}
+
+/**
+ * The check of a write. It takes no ceiling: it reads it under the overbooking lock, held to commit, so the value is
+ * the one in force when the write commits (C24). A venue row read before the lock may be out of date. This ignores the
+ * channel, so a public write must be refused before it gets here.
+ */
+async function claimOverbookRoom(
+  tx: DbTx,
+  venueId: string,
+  startsAt: Date,
+  endsAt: Date,
+  covers: number,
+  exceptId?: string,
+): Promise<boolean> {
+  await lockOverbooking(tx, venueId);
+  const [{ ceiling }] = await tx
+    .select({ ceiling: venues.overbookingCeiling })
+    .from(venues)
+    .where(eq(venues.id, venueId));
+  return hasOverbookRoom(tx, venueId, ceiling, startsAt, endsAt, covers, exceptId);
 }
 
 function pickCombination(
@@ -956,7 +986,7 @@ export async function createReservation(
         } else if (
           fit.reason.code === "no_suitable_table" &&
           !request.walkIn &&
-          (await hasOverbookRoom(tx, venue, startsAt, endsAt, input.partySize, { lock: true }))
+          (await claimOverbookRoom(tx, venueId, startsAt, endsAt, input.partySize))
         ) {
           tableIds = [];
         } else {
@@ -1185,14 +1215,8 @@ export async function modifyReservation(
                   .from(tableAllocations)
                   .where(eq(tableAllocations.reservationId, id))
               ).length;
-        const venue = (await tx.select().from(venues).where(eq(venues.id, venueId)).limit(1))[0];
-        if (
-          held === 0 &&
-          !(await hasOverbookRoom(tx, venue, current.startsAt, current.endsAt, input.partySize ?? current.partySize, {
-            lock: true,
-            exceptId: id,
-          }))
-        ) {
+        const covers = input.partySize ?? current.partySize;
+        if (held === 0 && !(await claimOverbookRoom(tx, venueId, current.startsAt, current.endsAt, covers, id))) {
           throw new ReservationError("no_suitable_table");
         }
       }

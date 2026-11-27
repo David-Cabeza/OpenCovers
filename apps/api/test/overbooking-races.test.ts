@@ -334,13 +334,14 @@ describe("an admin lowering the ceiling while bookings are written", () => {
   interface Interleaving {
     writer: string;
     answer: string | undefined;
-    loweredFirst: boolean;
+    changeWaited: boolean;
     covers: number;
+    ceiling: number;
   }
 
   /**
-   * Stops one write on the advisory lock `point:venue`, lowers the ceiling from 4 to 1 while it waits, then lets it go.
-   * `overbooking` stops it before it counts the covers, `events` after it counted and before it commits.
+   * Stops one write on the advisory lock `point:venue`, asks to lower the ceiling from 4 to 1 while it waits, then lets
+   * it go. `overbooking` stops it before it counts the covers, `events` after it counted and before it commits.
    */
   async function lowerUnderAWrite(point: "overbooking" | "events", round: number): Promise<Interleaving> {
     const venueId = `or-${point}-${round}`;
@@ -349,7 +350,7 @@ describe("an admin lowering the ceiling while bookings are written", () => {
     const open = await holdAdvisory(`${point}:${venueId}`);
     let writing: ReturnType<typeof create> | undefined;
     let lowering: ReturnType<typeof setCeiling> | undefined;
-    let loweredFirst = false;
+    let changeWaited = false;
     try {
       let wrote = false;
       writing = writers(venueId, seeded)[writer]().finally(() => (wrote = true));
@@ -358,29 +359,80 @@ describe("an admin lowering the ceiling while bookings are written", () => {
       let lowered = false;
       lowering = setCeiling(venueId, 1).finally(() => (lowered = true));
       await until(async () => lowered || (await waiting()) === 2);
-      // The new value is readable while the write is still uncommitted, so the change committed first.
-      loweredFirst = lowered && (await ceilingOf(venueId)) === 1;
+      // The old value is still the one in force while the write is uncommitted.
+      changeWaited = !lowered && (await ceilingOf(venueId)) === 4;
     } finally {
       await open();
     }
     const [result] = await settled([writing!]);
     expect((await lowering!).ok).toBe(true);
-    return { writer, answer: answer(result), loweredFirst, covers: await coversOf(venueId) };
+    const ceiling = await ceilingOf(venueId);
+    return { writer, answer: answer(result), changeWaited, covers: await coversOf(venueId), ceiling };
   }
 
   describe.each(["overbooking", "events"] as const)("a write stopped on the %s lock", (point) => {
-    const observed: Interleaving[] = [];
-
-    it("lets the change commit first", { timeout: RACE_TIMEOUT }, async () => {
-      for (let round = 0; round < ROUNDS; round++) observed.push(await lowerUnderAWrite(point, round));
-      expect(observed.map((o) => o.loweredFirst)).toEqual(Array(ROUNDS).fill(true));
-      for (const o of observed) expect(["ok", "no_suitable_table"]).toContain(o.answer);
+    it("commits under the old ceiling, and the change commits after it", { timeout: RACE_TIMEOUT }, async () => {
+      for (let round = 0; round < ROUNDS; round++) {
+        const seen = await lowerUnderAWrite(point, round);
+        expect(seen, `round ${round}`).toEqual({
+          writer: seen.writer,
+          answer: "ok",
+          changeWaited: true,
+          covers: 3,
+          ceiling: 1,
+        });
+      }
     });
+  });
 
-    // Known bug: https://github.com/David-Cabeza/OpenCovers/issues/446. The writer keeps the ceiling it read before the change. Remove `.fails` with the fix.
-    it.fails("does not land the write above the new ceiling (https://github.com/David-Cabeza/OpenCovers/issues/446)", () => {
-      expect(observed).toHaveLength(ROUNDS);
-      expect(observed.filter((o) => o.loweredFirst && o.covers > 1)).toEqual([]);
-    });
+  it("refuses a write queued behind the change, which read the old ceiling", { timeout: RACE_TIMEOUT }, async () => {
+    for (let round = 0; round < ROUNDS; round++) {
+      const venueId = `or-behind-${round}`;
+      const seeded = await seedTaken(venueId, 4);
+      const writer = (["create", "release", "resize"] as const)[round % 3];
+      const open = await holdAdvisory(`overbooking:${venueId}`);
+      let writing: ReturnType<typeof create> | undefined;
+      let lowering: ReturnType<typeof setCeiling> | undefined;
+      try {
+        let lowered = false;
+        lowering = setCeiling(venueId, 1).finally(() => (lowered = true));
+        await until(async () => lowered || (await waiting()) === 1);
+        expect(lowered, "the change did not wait for the overbooking lock").toBe(false);
+        // The change is not committed yet, so every read the write makes before the lock sees 4.
+        writing = writers(venueId, seeded)[writer]();
+        await until(async () => (await waiting()) === 2);
+      } finally {
+        await open();
+      }
+
+      expect((await lowering!).ok).toBe(true);
+      const [result] = await settled([writing!]);
+      expect(answer(result), `round ${round}, ${writer}`).toBe("no_suitable_table");
+      expect(await coversOf(venueId)).toBe(1);
+    }
+  });
+
+  // A create reads the venue row before its transaction, so a change can commit between that read and its count.
+  it.each([
+    { from: 4, to: 1, expected: "no_suitable_table" },
+    { from: 4, to: 0, expected: "no_suitable_table" },
+    { from: 0, to: 4, expected: "ok" },
+  ])("answers a create with the ceiling changed from $from to $to before it counted", async ({ from, to, expected }) => {
+    const venueId = `or-stale-${from}-${to}`;
+    await seedVenue(venueId, from, { a: 2 });
+    await booked(venueId, 2, ["a"]);
+    const open = await holdAdvisory(`planner:${venueId}`);
+    let creating: ReturnType<typeof create> | undefined;
+    try {
+      creating = create(venueId, 2);
+      await until(async () => (await waiting()) === 1);
+      expect((await setCeiling(venueId, to)).ok).toBe(true);
+    } finally {
+      await open();
+    }
+
+    const [result] = await settled([creating!]);
+    expect(answer(result)).toBe(expected);
+    expect(await coversOf(venueId)).toBe(expected === "ok" ? 2 : 0);
   });
 });
