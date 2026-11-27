@@ -94,9 +94,9 @@ Acceptance: the engine refuses a status it does not define, and a transition tha
 
 ### REQ-B7 Explicit overbooking ceiling
 
-A venue can set `overbookingCeiling`, the most covers it accepts without tables at any one time. The default is 0, and then every booking holds tables as REQ-B3 says. Above 0, a booking that fits the venue but finds no free table combination is accepted with no tables while the covers of the overlapping active bookings without tables stay within the ceiling. The ceiling never relaxes REQ-B2. A booking without tables holds no allocation, and tables are assigned later through a modify that the exclusion constraint checks, and the booking cannot be seated before then (REQ-B6). It does not apply to walk-ins, to named tables, or to a party larger than the venue.
+A venue can set `overbookingCeiling`, the most covers it accepts without tables at any one time. The default is 0, and then every booking holds tables as REQ-B3 says. Above 0, a booking that fits the venue but finds no free table combination is accepted with no tables while the covers of the overlapping active bookings without tables stay within the ceiling. The ceiling never relaxes REQ-B2. A booking without tables holds no allocation, and tables are assigned later through a modify that the exclusion constraint checks, and the booking cannot be seated before then (REQ-B6). It does not apply to walk-ins, to named tables, or to a party larger than the venue. A write is bound by the ceiling in force when it commits, and a lowered ceiling removes no booking.
 
-Acceptance: conformance case C24. At 0 every booking holds tables, and a modify cannot release them all. Concurrent creates never take more than the ceiling. A table assigned to a booking over the ceiling is refused when another booking holds it.
+Acceptance: conformance case C24. At 0 every booking holds tables, and a modify cannot release them all. Concurrent creates never take more than the ceiling. No write commits above a ceiling lowered before it. A table assigned to a booking over the ceiling is refused when another booking holds it.
 
 ### REQ-B8 Retries never write twice
 

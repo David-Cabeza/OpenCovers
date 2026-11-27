@@ -32,14 +32,16 @@ async function book(venueId: string, tableId: string) {
   return res.id;
 }
 
-/** Another session holding the venue's planner lock, as a writer stuck in the middle of a claim would. */
-async function holdPlanner(venueId: string) {
+/** Another session holding one of the venue's advisory locks, as a writer stuck in the middle of a write would. */
+async function holdLock(name: string) {
   const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
   await client.query("begin");
-  await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [`planner:${venueId}`]);
+  await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [name]);
   return client;
 }
+
+const holdPlanner = (venueId: string) => holdLock(`planner:${venueId}`);
 
 async function snapshot(venueId: string) {
   const rows = await db.select().from(reservations).where(eq(reservations.venueId, venueId));
@@ -110,6 +112,35 @@ describe("a write stuck behind another write of the venue", () => {
       expect(await write(), name).toMatchObject({ ok: true });
     }
     expect((await post()).status).toBe(200);
+  });
+});
+
+describe("a ceiling change stuck behind a write on the overbooking path", () => {
+  it("gives up with venue_busy and changes nothing, while a save that keeps the ceiling goes through", async () => {
+    const venueId = await seedVenue();
+    await addKey(db, `admin-${venueId}`, `boss-${venueId}`, [venueId], "admin");
+    const put = (body: Record<string, unknown>) =>
+      app.request(`/v1/venues/${venueId}/config`, {
+        method: "PUT",
+        headers: { apikey: `admin-${venueId}`, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const stored = async () => (await db.select().from(venues).where(eq(venues.id, venueId)))[0];
+    const before = await stored();
+
+    const holder = await holdLock(`overbooking:${venueId}`);
+    try {
+      expect((await put({ overbookingCeiling: 0, leadTimeMinutes: 5 })).status).toBe(200);
+      const refused = await put({ overbookingCeiling: 4, leadTimeMinutes: 30 });
+      expect(refused.status).toBe(503);
+      expect(await refused.json()).toEqual({ code: "venue_busy", message: "venue_busy", retryable: true });
+      expect(await stored()).toEqual({ ...before, leadTimeMinutes: 5 });
+    } finally {
+      await holder.end();
+    }
+
+    expect((await put({ overbookingCeiling: 4 })).status).toBe(200);
+    expect((await stored()).overbookingCeiling).toBe(4);
   });
 });
 

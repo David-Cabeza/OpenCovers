@@ -22,7 +22,7 @@ import { normalizeContact, venueCountry } from "./contact";
 import { forgetMergeState, lockReservations, movedAtMerge } from "./guests";
 import { ratingColumns } from "./rating";
 import { reconfirmationColumns } from "./reconfirmation";
-import { sha256Hex } from "./reservations";
+import { boundLockWaits, isLockFailure, lockOverbooking, sha256Hex } from "./reservations";
 import { deleteLinks } from "./self-service";
 import type { TurnTime } from "./turn-times";
 
@@ -52,7 +52,7 @@ export interface VenueConfig {
 
 export type ConfigResult =
   | { ok: true; config: VenueConfig }
-  | { ok: false; code: "notice_address_required" | "venue_not_found" };
+  | { ok: false; code: "notice_address_required" | "venue_not_found" | "venue_busy" };
 
 export interface ErasureResult {
   erasedReservations: number;
@@ -134,7 +134,7 @@ export async function setConfig(
 ): Promise<ConfigResult> {
   // The merge reads every column and writes every column back, so two updates to different fields would lose one.
   // FOR NO KEY UPDATE serializes config writers and still lets bookings (plain reads, FOR KEY SHARE on inserts) through.
-  return db.transaction(async (tx) => {
+  const save = db.transaction(async (tx): Promise<ConfigResult> => {
     const venue = (
       await tx.select().from(venues).where(eq(venues.id, venueId)).for("no key update").limit(1)
     )[0];
@@ -164,6 +164,12 @@ export async function setConfig(
           ? null
           : input.resendApiKey
         : venue.resendApiKey;
+    // C24: a write that counted under the old ceiling commits before the new one does. The wait is bounded, so a
+    // change that gives up lets the bookings queued behind it go on.
+    if (overbookingCeiling !== venue.overbookingCeiling) {
+      await boundLockWaits(tx);
+      await lockOverbooking(tx, venueId);
+    }
     await tx
       .update(venues)
       .set({
@@ -204,6 +210,10 @@ export async function setConfig(
         dietaryValuesHidden: await dietaryValuesHidden(tx, venueId, venue.timezone),
       },
     };
+  });
+  return save.catch((error): ConfigResult => {
+    if (isLockFailure(error)) return { ok: false, code: "venue_busy" };
+    throw error;
   });
 }
 

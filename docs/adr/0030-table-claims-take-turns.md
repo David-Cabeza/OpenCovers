@@ -58,7 +58,7 @@ The replan loop, which retried an auto-assignment up to three times on an exclus
 - Claims of one venue run one at a time, from the lock to the commit. That costs about 30% of one venue's peak rate for writes that would not have collided (262 to 179 creates per second above), as auto-assigned writes already paid. A venue's writes already took turns on their last insert and commit (ADR-0026). Venues do not wait for each other on this lock.
 - A queued writer holds a pool connection, as it does on the events lock. A stuck holder can occupy the pool for up to 5 s.
 - A write that used to wait without limit, for example a modify of a reservation inside a long erasure, now fails with `venue_busy` after 5 s.
-- The limit is per lock wait, not per transaction. It does not end a stuck holder, bound a slow statement, or cover erasure, setup and other writes. Statement and idle-transaction timeouts, which the ROADMAP's Saturday Gate also asks for, are still open.
+- The limit is per lock wait, not per transaction. It does not end a stuck holder, bound a slow statement, or cover erasure, setup and other writes, except a config save that changes the overbooking ceiling (ADR-0004, amendment of 2026-11-27). Statement and idle-transaction timeouts, which the ROADMAP's Saturday Gate also asks for, are still open.
 - A new writer that claims tables must take the planner lock. `apps/api/test/overlap-races.test.ts` checks each existing one.
 
 ## Alternatives considered

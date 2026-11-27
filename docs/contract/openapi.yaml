@@ -13,7 +13,8 @@ info:
 
     A reservation write that waits 5 seconds for another write of the venue
     gives up with 503 and the code `venue_busy`. Nothing was written, so
-    send it again with the same `Idempotency-Key` (C1).
+    send it again with the same `Idempotency-Key` (C1). A config save that
+    changes `overbookingCeiling` can answer it too (C24).
 
     Some calls are rate limited per client address. A refused call returns
     429 with the code `rate_limited` and a `Retry-After` header. The limited
@@ -796,6 +797,11 @@ paths:
 
         Takes no `Idempotency-Key`. The body replaces the fields it names,
         so a repeat with the same body sets the same configuration.
+
+        A save that changes `overbookingCeiling` waits for the bookings
+        that already counted against the old value, so they commit first.
+        After 5 seconds it fails with 503 and the code `venue_busy`, and
+        saves none of its fields. Send it again (C24).
       parameters:
         - $ref: "#/components/parameters/venueId"
       requestBody:
@@ -5007,6 +5013,9 @@ components:
             refuses any table that another booking holds. The ceiling never
             applies to a walk-in, to a booking that names its tables, or to a
             party larger than the venue. It is venue-wide, whatever the zone.
+
+            The value that binds a write is the one in force when the write
+            commits. A lower value never removes a booking (C24).
         maxAdvanceDays:
           type: integer
           nullable: true
