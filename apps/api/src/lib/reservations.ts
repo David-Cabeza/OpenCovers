@@ -1304,7 +1304,7 @@ export async function modifyReservation(
       partySizeChanged = partyChanged;
       return nextVersion;
     });
-    return { ok: true, id, version, partySizeChanged };
+    return { ok: true, id, version, ...(partySizeChanged ? { partySizeChanged } : {}) };
   } catch (error) {
     // A guest's party never uses the ceiling, so a table taken by a concurrent write leaves no fitting table.
     if (isExclusionViolation(error)) return { ok: false, code: guest ? "no_suitable_table" : "slot_taken" };
