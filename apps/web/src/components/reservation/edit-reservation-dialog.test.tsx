@@ -134,4 +134,58 @@ describe("EditReservationDialog", () => {
     expect(await screen.findByText("Could not update the reservation.")).toBeInTheDocument();
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
+
+  it("does not undo what another person saved after the dialog opened", async () => {
+    // One booking behind two screens that both read it before either one saved.
+    let stored = RESERVATION;
+    const api = mockApi({
+      [MODIFY]: (req) => {
+        const { guest, ...rest } = req.body as Partial<Reservation>;
+        stored = { ...stored, ...rest, guest: { ...stored.guest, ...guest } };
+        return { body: stored };
+      },
+    });
+    const user = userEvent.setup();
+    const open = () =>
+      renderWithApp(<EditReservationDialog venueId="v1" reservation={RESERVATION} onOpenChange={() => {}} />);
+
+    const first = open();
+    await user.click(screen.getByRole("combobox", { name: "Contact permission" }));
+    await user.click(await screen.findByRole("option", { name: "Granted" }));
+    await user.clear(screen.getByLabelText("Note"));
+    await user.type(screen.getByLabelText("Note"), "Birthday");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(api.writes()).toHaveLength(1));
+    first.unmount();
+
+    open();
+    await user.click(screen.getByRole("combobox", { name: "Rating" }));
+    await user.click(await screen.findByRole("option", { name: "5" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(api.writes()).toHaveLength(2));
+
+    expect(stored).toMatchObject({ guest: { consent: "granted" }, commentary: "Birthday", rating: 5 });
+  });
+
+  it.each([
+    ["nothing was touched", ""],
+    ["only spaces were added around the note", "  "],
+  ])("closes without a write or a success message when %s", async (_, padding) => {
+    const api = mockApi({ [MODIFY]: { body: RESERVATION } });
+    const onOpenChange = vi.fn();
+    const onSaved = vi.fn();
+    renderWithApp(
+      <EditReservationDialog venueId="v1" reservation={RESERVATION} onOpenChange={onOpenChange} onSaved={onSaved} />,
+    );
+    const user = userEvent.setup();
+
+    if (padding) await user.type(screen.getByLabelText("Note"), padding);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(api.writes()).toHaveLength(0);
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(screen.queryByText("Reservation updated")).not.toBeInTheDocument();
+  });
 });
+
