@@ -6,6 +6,10 @@ All notable changes to OpenCovers are listed here. The format follows [Keep a Ch
 
 Feature PRs append their entries here. The release PR moves them under a version heading.
 
+### Fixed
+
+- A guest who raised the party size from the self-service link had the seats of same-numbered tables of other venues counted as their own, so a party could be accepted on a table too small for it. Only this venue's tables count now.
+
 ### Breaking
 
 - The staff reservation and waitlist writes refuse what they do not fully understand ([ADR-0029](docs/adr/0029-contract-rules-for-writes.md), C94): create, walk-in, modify, status and cancel of a reservation, and add, seat and cancel of a waitlist entry. They answer `400 invalid_request`, write nothing and store no idempotency key. For named fields the answer adds `details.fields`. There is no warning window. Requests that used to answer success and now fail:
