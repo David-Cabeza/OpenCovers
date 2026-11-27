@@ -11,6 +11,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 - The floor plan (`GET /v1/venues/{venueId}/floor`) shows a table as occupied from the exact minute its booking starts. It used to show it as free during that minute, so a booking at 21:00, or a walk-in just seated, read as a free table. The end stays excluded.
 - A guest who raised the party size from the self-service link had the seats of same-numbered tables of other venues counted as their own, so a party could be accepted on a table too small for it. Only this venue's tables count now.
 - A guest whose booking, change or cancellation fails with `venue_busy` now reads that it was not saved and that trying again should work, in the widget's seven languages. It used to read as an unexpected failure that sent them to the venue.
+- The demo tour's cancel step told visitors to look at the floor plan 15 minutes after the booking time. It now says to look at the booking time itself.
 
 ### Breaking
 
