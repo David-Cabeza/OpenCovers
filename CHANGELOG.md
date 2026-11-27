@@ -12,6 +12,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 - A guest who raised the party size from the self-service link had the seats of same-numbered tables of other venues counted as their own, so a party could be accepted on a table too small for it. Only this venue's tables count now.
 - A guest whose booking, change or cancellation fails with `venue_busy` now reads that it was not saved and that trying again should work, in the widget's seven languages. It used to read as an unexpected failure that sent them to the venue.
 - A booking without a table could commit above an `overbookingCeiling` that an admin had just lowered. The ceiling in force when the write commits now binds it. A config save that changes the ceiling waits for the bookings that already counted, and after 5 s answers `503 venue_busy` (retryable) and saves nothing ([issue 446](https://github.com/David-Cabeza/OpenCovers/issues/446)).
+- The demo tour's cancel step told visitors to look at the floor plan 15 minutes after the booking time. It now says to look at the booking time itself.
 
 ### Breaking
 
