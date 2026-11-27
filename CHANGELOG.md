@@ -8,6 +8,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 
 ### Fixed
 
+- Saving **Edit details** in the staff app sends only the fields that changed since the dialog opened. It used to send contact permission, rating and note every time, so a second person's save undid the first one's. Saving with nothing changed now closes the dialog without a write. Two people who change the same field still overwrite each other, and the later save wins.
 - The floor plan (`GET /v1/venues/{venueId}/floor`) shows a table as occupied from the exact minute its booking starts. It used to show it as free during that minute, so a booking at 21:00, or a walk-in just seated, read as a free table. The end stays excluded.
 - A guest who raised the party size from the self-service link had the seats of same-numbered tables of other venues counted as their own, so a party could be accepted on a table too small for it. Only this venue's tables count now.
 - A guest whose booking, change or cancellation fails with `venue_busy` now reads that it was not saved and that trying again should work, in the widget's seven languages. It used to read as an unexpected failure that sent them to the venue.

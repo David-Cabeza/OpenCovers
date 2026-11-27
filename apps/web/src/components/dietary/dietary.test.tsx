@@ -318,6 +318,7 @@ describe("changing it on a booking", () => {
 
     expect(await screen.findByRole("button", { name: "Peanuts" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByRole("checkbox", { name: TICK })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("Note"), "Birthday");
     await save(user);
 
     await waitFor(() => expect(api.writes()).toHaveLength(1));

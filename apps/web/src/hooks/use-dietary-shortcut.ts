@@ -9,7 +9,7 @@ export function useDietaryShortcut(venueId: string) {
   const t = useT();
   const [reservation, setReservation] = useState<Reservation | null>(null);
 
-  // Read afresh each time: the dialog writes the note and the rating back too, so an older copy would undo an edit.
+  // Read afresh each time: the dialog compares what was typed with this copy to decide what to send.
   async function open(reservationId: string) {
     try {
       setReservation(await api.getReservation(venueId, reservationId));

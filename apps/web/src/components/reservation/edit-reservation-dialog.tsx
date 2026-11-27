@@ -88,13 +88,22 @@ export function EditReservationDialog({
       setFocus("commentary");
       return;
     }
+    // Only what differs from what the dialog opened with: a field sent as it was would undo another person's save.
+    const opened = toValues(reservation);
+    const commentary = values.commentary.trim();
+    const changes = {
+      ...(values.consent !== opened.consent && { guest: { consent: values.consent } }),
+      ...(values.rating !== opened.rating && { rating: values.rating === NO_RATING ? null : Number(values.rating) }),
+      ...(commentary !== opened.commentary.trim() && { commentary }),
+      ...recorded,
+    };
+    // The API refuses an empty body. Nothing is written, so close without saying anything was saved.
+    if (Object.keys(changes).length === 0) {
+      onOpenChange(false);
+      return;
+    }
     try {
-      await api.modifyReservation(venueId, reservation.id, {
-        guest: { consent: values.consent },
-        rating: values.rating === NO_RATING ? null : Number(values.rating),
-        commentary: values.commentary.trim(),
-        ...recorded,
-      });
+      await api.modifyReservation(venueId, reservation.id, changes);
       // The floor card keeps what it read for a while, and must not show the old allergies.
       void queryClient.invalidateQueries({ queryKey: ["reservation", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
