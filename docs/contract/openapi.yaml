@@ -597,8 +597,8 @@ paths:
         A modify that changes only `guest.consent` and/or `rating` is also
         accepted on `attended`. `cancelled` and `no_show` reject every modify
         with `invalid_transition`, except a modify whose only field is
-        `dietary: null` (C82). A body with only consent or rating sends no
-        email to the guest. A modify that would leave a `seated` reservation
+        `dietary: null` (C82). The guest is emailed only when the party
+        size changes (C4): a change of tables alone sends nothing. A modify that would leave a `seated` reservation
         without tables fails with `table_required`. A table that another
         booking holds fails with `slot_taken`. A table id that is not a table
         of the venue, or a repeated id, fails with `invalid_request`, as on
