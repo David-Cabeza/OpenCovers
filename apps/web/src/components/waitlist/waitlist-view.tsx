@@ -48,6 +48,8 @@ export function WaitlistView({ venueId }: { venueId: string }) {
   const shortcut = useDietaryShortcut(venueId);
   const addButton = useRef<HTMLButtonElement>(null);
   const saved = useRef(false);
+  // The notice's button that opened the allergy dialog.
+  const openedFrom = useRef<HTMLElement | null>(null);
   const list = useRef<HTMLOListElement>(null);
   // The place in the list of the row the remove confirmation was opened from.
   const removingFrom = useRef({ id: "", index: 0 });
@@ -158,7 +160,10 @@ export function WaitlistView({ venueId }: { venueId: string }) {
           key={seated.id}
           name={seated.name}
           parked={parked}
-          onRecord={() => void shortcut.open(seated.id)}
+          onRecord={(button) => {
+            openedFrom.current = button;
+            void shortcut.open(seated.id);
+          }}
           onDismiss={() => {
             setSeated(null);
             addButton.current?.focus();
@@ -261,9 +266,9 @@ export function WaitlistView({ venueId }: { venueId: string }) {
           saved.current = true;
           setSeated(null);
         }}
-        // Saving takes the notice away, and with it the button the dialog would return focus to.
+        // Saving takes the notice away, and another seat replaces it: either way the button that opened this is gone.
         onCloseAutoFocus={(event) => {
-          if (!saved.current) return;
+          if (!saved.current && openedFrom.current?.isConnected) return;
           saved.current = false;
           event.preventDefault();
           addButton.current?.focus();
@@ -282,7 +287,7 @@ function SeatedNotice({
 }: {
   name: string;
   parked: RefObject<HTMLElement | null>;
-  onRecord: () => void;
+  onRecord: (button: HTMLElement) => void;
   onDismiss: () => void;
 }) {
   const t = useT();
@@ -301,7 +306,7 @@ function SeatedNotice({
       <p id={textId} className="min-w-0 flex-1 basis-48 break-words text-sm">
         {name ? t("dietary.shortcut.seated", { name }) : t("dietary.shortcut.seatedUnnamed")}
       </p>
-      <Button ref={record} variant="outline" size="sm" aria-describedby={textId} onClick={onRecord}>
+      <Button ref={record} variant="outline" size="sm" aria-describedby={textId} onClick={(e) => onRecord(e.currentTarget)}>
         {t("dietary.shortcut.record")}
       </Button>
       <Button variant="ghost" size="icon" aria-label={t("common.close")} onClick={onDismiss}>

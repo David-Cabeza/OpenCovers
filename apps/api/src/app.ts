@@ -1052,7 +1052,7 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
     },
     key,
   );
-  if (result.ok && (changes.partySize !== undefined || tableIds !== undefined)) {
+  if (result.ok && result.partySizeChanged) {
     void notifyReservation(db, venueId, result.id, result.version, "confirmation");
   }
   return writeResponse(c, result, venueId);

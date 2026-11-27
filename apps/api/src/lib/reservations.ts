@@ -291,9 +291,12 @@ export type WriteErrorCode =
   | "reservation_changed"
   | "venue_busy";
 
-/** `selfServiceToken` is set only by a public create: the new link, or null on a repeat for a booking no longer `booked`. */
+/**
+ * `selfServiceToken` is set only by a public create: the new link, or null on a repeat for a booking no longer `booked`.
+ * `partySizeChanged` is set only by a modify that changed the party size: a repeat of a key never sets it.
+ */
 export type WriteResult =
-  | { ok: true; id: string; version: number; selfServiceToken?: string | null }
+  | { ok: true; id: string; version: number; selfServiceToken?: string | null; partySizeChanged?: boolean }
   | { ok: false; code: WriteErrorCode; fields?: FieldProblem[] };
 
 export type CancelResult =
@@ -1155,6 +1158,7 @@ export async function modifyReservation(
   key: string,
 ): Promise<WriteResult> {
   const guest = input.selfService;
+  let partySizeChanged = false;
   try {
     const version = await db.transaction(async (tx) => {
       await boundLockWaits(tx);
@@ -1297,9 +1301,10 @@ export async function modifyReservation(
       }
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "modify", version: nextVersion });
       await appendEvents(tx, venueId, [{ type: "modified", reservationId: id, version: nextVersion, origin: input.origin }]);
+      partySizeChanged = partyChanged;
       return nextVersion;
     });
-    return { ok: true, id, version };
+    return { ok: true, id, version, ...(partySizeChanged ? { partySizeChanged } : {}) };
   } catch (error) {
     // A guest's party never uses the ceiling, so a table taken by a concurrent write leaves no fitting table.
     if (isExclusionViolation(error)) return { ok: false, code: guest ? "no_suitable_table" : "slot_taken" };
