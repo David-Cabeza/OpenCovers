@@ -57,6 +57,12 @@ export function AssignTablesDialog({
   async function onSave() {
     if (!reservation) return;
     if (selected.length === 0 || tooSmall) return;
+    // The same tables, in any order, are no change: sending them would undo another person's move.
+    const opened = reservation.tables ?? [];
+    if (selected.length === opened.length && selected.every((id) => opened.includes(id))) {
+      onOpenChange(false);
+      return;
+    }
     setSaving(true);
     try {
       await api.modifyReservation(venueId, reservation.id, { tables: selected });
