@@ -28,6 +28,7 @@ export default defineMessages({
     "layout.loadError.serverError": "The server answered with an error, so this has not been read.",
     "layout.serverBanner.message":
       "Can't reach the server. What you see may be out of date, and changes will not be saved until it comes back. Trying again every few seconds.",
+    "layout.stale.message": "Could not update. Data from {time}.",
     "layout.confirm.keep": "Keep",
     "layout.notFound.title": "Page not found",
     "layout.notFound.description": "There is nothing at this address.",
@@ -60,6 +61,7 @@ export default defineMessages({
     "layout.loadError.serverError": "El servidor respondió con un error, así que esto no se ha leído.",
     "layout.serverBanner.message":
       "No se puede conectar con el servidor. Lo que ves puede estar desactualizado y los cambios no se guardarán hasta que vuelva. Lo intentamos de nuevo cada pocos segundos.",
+    "layout.stale.message": "No se ha podido actualizar. Hora de los datos: {time}.",
     "layout.confirm.keep": "Conservar",
     "layout.notFound.title": "Página no encontrada",
     "layout.notFound.description": "No hay nada en esta dirección.",

@@ -1,10 +1,11 @@
 import { errorMessage } from "@/lib/error-message";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArmchairIcon } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
 import { LoadError } from "@/components/load-error";
+import { StaleNotice } from "@/components/stale-notice";
 import { canEditSetup, useNavigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
 import { useDietaryShortcut } from "@/hooks/use-dietary-shortcut";
 import { useFloor } from "@/hooks/use-floor";
 import { useFloorItems } from "@/hooks/use-floor-items";
+import { useStaleMessage } from "@/hooks/use-stale-message";
 import { useVenueConfig } from "@/hooks/use-venue-config";
 import { api, type FloorTable } from "@/lib/api";
 import { useT } from "@/i18n";
@@ -29,15 +31,24 @@ export function FloorView({ venueId }: { venueId: string }) {
   const t = useT();
   const nav = useNavigation();
   const [date, setDate] = useDayParam();
-  const [time, setTime] = useState(nowTime());
+  // null until the person picks one. Until then, today's plan follows the clock.
+  const [picked, setPicked] = useState<string | null>(null);
   const [seatTable, setSeatTable] = useState<FloorTable | null>(null);
   const [moveFrom, setMoveFrom] = useState<FloorTable | null>(null);
   const queryClient = useQueryClient();
-  const { data, isPending, isError, error, isRefetching, refetch } = useFloor(venueId, date, time);
-  const { data: itemsData } = useFloorItems(venueId);
+  const following = picked === null && date === todayIso();
+  // The last time followed, which another day shows while none is picked.
+  const lastNow = useRef(nowTime());
+  const floor = useFloor(venueId, date, following ? null : (picked ?? lastNow.current));
+  const { data, isPending, isError, error, isRefetching, refetch } = floor;
+  if (following && data) lastNow.current = data.time;
+  const time = picked ?? lastNow.current;
+  const floorItems = useFloorItems(venueId, { live: true });
+  const { data: itemsData } = floorItems;
 
   // The floor route carries no allergies, and the day's agenda does.
-  const agenda = useAgenda(venueId, date);
+  const agenda = useAgenda(venueId, date, { live: true });
+  const staleMessage = useStaleMessage([floor, floorItems, agenda]);
   const config = useVenueConfig(venueId);
   const canRecordDietary = useCanRecordDietary(venueId);
   const shortcut = useDietaryShortcut(venueId);
@@ -84,14 +95,16 @@ export function FloorView({ venueId }: { venueId: string }) {
             type="time"
             aria-label={t("floor.time")}
             value={time}
-            onChange={(e) => setTime(e.target.value)}
+            onChange={(e) => setPicked(e.target.value)}
             className="w-fit"
           />
           <Button
             variant="outline"
             onClick={() => {
               setDate(todayIso());
-              setTime(nowTime());
+              setPicked(null);
+              lastNow.current = nowTime();
+              void queryClient.invalidateQueries({ queryKey: ["floor", venueId] });
             }}
           >
             {t("floor.now")}
@@ -177,6 +190,7 @@ export function FloorView({ venueId }: { venueId: string }) {
         tableId={seatTable?.id}
         tableName={seatTable?.name}
       />
+      <StaleNotice message={staleMessage} />
     </div>
   );
 }

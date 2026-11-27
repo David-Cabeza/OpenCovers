@@ -33,8 +33,10 @@ import { NewReservationDialog } from "@/components/reservation/new-reservation-d
 import { WalkInDialog } from "@/components/reservation/walk-in-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { LoadError } from "@/components/load-error";
+import { StaleNotice } from "@/components/stale-notice";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useAvailability } from "@/hooks/use-availability";
+import { useStaleMessage } from "@/hooks/use-stale-message";
 import { useTables } from "@/hooks/use-tables";
 import { useT, type MessageKey } from "@/i18n";
 import { api, type Reservation } from "@/lib/api";
@@ -88,6 +90,8 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const [date, setDate] = useDayParam();
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+  // Taken when the dialog opens: the screen redraws as it refreshes, and the form must keep the time it showed.
+  const [openedAt, setOpenedAt] = useState(nextQuarterHour);
   const [editing, setEditing] = useState<Reservation | null>(null);
   const [assigning, setAssigning] = useState<Reservation | null>(null);
   const [cancelling, setCancelling] = useState<Reservation | null>(null);
@@ -96,9 +100,12 @@ export function AgendaView({ venueId }: { venueId: string }) {
   // Deleting a recorded value needs no config: the server sends one only while it takes them.
   const canWrite = canEditSetup(useNavigation()?.role);
   const queryClient = useQueryClient();
-  const { data, isPending, isError, error, isRefetching, refetch } = useAgenda(venueId, date);
+  const agenda = useAgenda(venueId, date, { live: true });
+  const { data, isPending, isError, error, isRefetching, refetch } = agenda;
   const reservations = data?.reservations ?? [];
-  const { data: tablesData } = useTables(venueId);
+  const tables = useTables(venueId, { live: true });
+  const { data: tablesData } = tables;
+  const staleMessage = useStaleMessage([agenda, tables]);
   const tableNames = new Map((tablesData?.tables ?? []).map((table) => [table.id, table.name]));
 
   // Only asked for while the dialog is open: the first free time of the day is its default.
@@ -108,7 +115,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const firstFree = Object.values(availability?.availability ?? {})
     .flat()
     .find((slot) => slot.available)?.time;
-  const newTime = isToday ? nextQuarterHour() : (firstFree ?? "20:00");
+  const newTime = isToday ? openedAt : (firstFree ?? "20:00");
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
@@ -171,7 +178,14 @@ export function AgendaView({ venueId }: { venueId: string }) {
         actions={
           <div className="relative flex flex-wrap items-center gap-2">
             <DayNav date={date} onChange={setDate} />
-            <Button disabled={isPast} aria-describedby={isPast ? pastDayId : undefined} onClick={() => setNewOpen(true)}>
+            <Button
+              disabled={isPast}
+              aria-describedby={isPast ? pastDayId : undefined}
+              onClick={() => {
+                setOpenedAt(nextQuarterHour());
+                setNewOpen(true);
+              }}
+            >
               {t("reservation.new.title")}
             </Button>
             <Button variant="outline" onClick={() => setWalkInOpen(true)}>
@@ -295,6 +309,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
           if (!open) setTracing(null);
         }}
       />
+      <StaleNotice message={staleMessage} />
     </div>
   );
 }

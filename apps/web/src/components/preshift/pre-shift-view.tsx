@@ -7,6 +7,7 @@ import { DayNav } from "@/components/day-nav";
 import { EmptyState } from "@/components/empty-state";
 import { LoadError } from "@/components/load-error";
 import { PageHeader } from "@/components/layout/page-header";
+import { StaleNotice } from "@/components/stale-notice";
 import { Pill, type PillTone } from "@/components/pill";
 import {
   Select,
@@ -19,6 +20,7 @@ import { Loading, Skeleton } from "@/components/ui/skeleton";
 import { Stat } from "@/components/stat";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useServices } from "@/hooks/use-services";
+import { useStaleMessage } from "@/hooks/use-stale-message";
 import { useTables } from "@/hooks/use-tables";
 import { useWaitlist } from "@/hooks/use-waitlist";
 import { useT, type MessageKey } from "@/i18n";
@@ -41,10 +43,11 @@ export function PreShiftView({ venueId }: { venueId: string }) {
   const t = useT();
   const [date, setDate] = useDayParam();
   const [service, setService] = useState(ALL_SERVICES);
-  const agenda = useAgenda(venueId, date);
-  const tables = useTables(venueId);
-  const services = useServices(venueId);
-  const waitlist = useWaitlist(venueId);
+  const agenda = useAgenda(venueId, date, { live: true });
+  const tables = useTables(venueId, { live: true });
+  const services = useServices(venueId, { live: true });
+  const waitlist = useWaitlist(venueId, undefined, { live: true });
+  const staleMessage = useStaleMessage([agenda, tables, services, waitlist]);
 
   const rows = buildPreShift(
     agenda.data?.reservations ?? [],
@@ -67,6 +70,8 @@ export function PreShiftView({ venueId }: { venueId: string }) {
               {longDate(date)}
               {service !== ALL_SERVICES && ` · ${service}`}
             </span>
+            {/* Paper is read later and cannot refresh, so a sheet printed from old data says so. */}
+            {staleMessage && <strong className="hidden print:block">{staleMessage}</strong>}
             <span className="print:hidden"> · {t("preshift.subtitle")}</span>
           </>
         }
@@ -151,6 +156,7 @@ export function PreShiftView({ venueId }: { venueId: string }) {
       )}
 
       <WaitlistPending entries={entries} />
+      <StaleNotice message={staleMessage} />
     </div>
   );
 }
