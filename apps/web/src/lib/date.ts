@@ -11,6 +11,16 @@ export function todayIso(): string {
   return toIsoDate(new Date());
 }
 
+/** The date in an IANA time zone. A zone this browser does not know reads as UTC, as the API reads one it does not. */
+export function isoDateIn(timeZone: string, at: Date = new Date()): string {
+  const options = { year: "numeric", month: "2-digit", day: "2-digit" } as const;
+  try {
+    return new Intl.DateTimeFormat("en-CA", { ...options, timeZone }).format(at);
+  } catch {
+    return new Intl.DateTimeFormat("en-CA", { ...options, timeZone: "UTC" }).format(at);
+  }
+}
+
 export function nowTime(): string {
   const now = new Date();
   const h = String(now.getHours()).padStart(2, "0");
