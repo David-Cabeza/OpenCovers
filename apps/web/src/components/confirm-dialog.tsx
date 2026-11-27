@@ -19,6 +19,7 @@ export function ConfirmDialog({
   pending = false,
   onConfirm,
   onClose,
+  onCloseAutoFocus,
 }: {
   open: boolean;
   title: string;
@@ -28,11 +29,12 @@ export function ConfirmDialog({
   pending?: boolean;
   onConfirm: () => void;
   onClose: () => void;
+  onCloseAutoFocus?: (event: Event) => void;
 }) {
   const t = useT();
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
