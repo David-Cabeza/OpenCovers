@@ -22,7 +22,7 @@ Availability returns a free slot. A create for that slot then either fails with 
 
 ## C4. Modify bumps the version
 
-A modify that changes a field produces a version one greater than before. A no-op modify produces no new version. The confirmation is sent once for the new version when the modify carries `partySize` or `tables`. A modify with only consent, rating, the booking note, or reconfirmation sends no email.
+A modify that changes a field produces a version one greater than before. A no-op modify produces no new version. The confirmation is sent once for the new version when the modify changes the party size. A value sent unchanged is not a change, and a repeat of a key sends none. A modify that changes only tables, consent, rating, the booking note, or reconfirmation sends no email.
 
 A modify that changes only consent, rating, or the booking note is allowed on `booked`, `seated` and `attended`. A change to party size or tables is allowed only on `booked` and `seated`, and fails with `invalid_transition` otherwise. A change to reconfirmation is allowed only on `booked`. `cancelled` and `no_show` reject every modify.
 
@@ -450,7 +450,7 @@ A booking with a self-service link keeps it through a staff move: the same token
 
 ## C90. Email after a change
 
-Specified in ADR-0028, not built. Once built, this replaces the email rule of C4. Today a modify sends a confirmation when its body carries `partySize` or `tables`.
+Specified in ADR-0028, not built. Once built, this replaces the email rule of C4. Today a modify sends a confirmation when it changes the party size.
 
 With email on and a guest contact, a staff modify that changes the date, the time or the party size sends one `confirmation` for the new version. Its calendar attachment keeps the reservation's UID and carries the new version as `SEQUENCE`, so the guest's calendar entry moves. `notifyGuest: false` on that request sends no email for that version, and `true` or no field sends it. A modify that changes only tables, zone, consent, rating, the note, reconfirmation or `dietary` sends none. A refused modify and a repeat of a key send none. A staff confirmation still counts toward the guest's limit of C49 and is never held back by it. The venue gets no notice for a staff move.
 
