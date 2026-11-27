@@ -9,6 +9,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 ### Fixed
 
 - A guest who raised the party size from the self-service link had the seats of same-numbered tables of other venues counted as their own, so a party could be accepted on a table too small for it. Only this venue's tables count now.
+- A guest whose booking, change or cancellation fails with `venue_busy` now reads that it was not saved and that trying again should work, in the widget's seven languages. It used to read as an unexpected failure that sent them to the venue.
 
 ### Breaking
 
