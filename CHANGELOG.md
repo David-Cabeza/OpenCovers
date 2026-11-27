@@ -9,6 +9,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 ### Fixed
 
 - The floor plan (`GET /v1/venues/{venueId}/floor`) shows a table as occupied from the exact minute its booking starts. It used to show it as free during that minute, so a booking at 21:00, or a walk-in just seated, read as a free table. The end stays excluded.
+- A guest who raised the party size from the self-service link had the seats of same-numbered tables of other venues counted as their own, so a party could be accepted on a table too small for it. Only this venue's tables count now.
 
 ### Breaking
 
@@ -36,6 +37,8 @@ Feature PRs append their entries here. The release PR moves them under a version
 
 ### Changed
 
+- Writes that claim tables now take turns per venue ([ADR-0030](docs/adr/0030-table-claims-take-turns.md), C1). Two writes that claim one table at the same instant, or each other's tables, answer a normal refusal such as `slot_taken` instead of a plain-text `500`.
+- A reservation write that waits more than 5 s for another write of the venue now fails with `503 venue_busy` (a new code, retryable) instead of waiting without limit. Nothing is written, so send it again with the same `Idempotency-Key`.
 - `POST /v1/venues/{venueId}/tables` applies the `id` rule to new tables only. A table the venue stored before the rule, with a space, `:` or more than 64 characters in its id, can be edited again.
 - `POST`, `PATCH` and `DELETE /v1/venues/{venueId}/floor-items` check their input (C80). A bad body, a fractional or out-of-range number and a field not listed fail with `400 invalid_request` instead of a `500` or a silent success. An unknown venue fails with `404 venue_not_found`, and a `PATCH` of an unknown item or another venue's item with `404 floor_item_not_found` (a new code). `POST` takes an optional `Idempotency-Key`. `POST /v1/venues/{venueId}/services` refuses a name over 200 characters.
 - `POST` and `DELETE /v1/venues/{venueId}/keys` and `/v1/auth/keys` check their input (C81). A bad or missing body and any query parameter (a key or hash in the URL) fail with `400 invalid_request` instead of a `500`. A new key must be 32 to 256 visible ASCII characters and a `principal` must not be empty; keys registered before keep working. An unknown venue fails with `404 venue_not_found` instead of a `201`. Registering a key again with the same `principal` and `role` answers as before; with another one it fails with `409 key_conflict` (a new code) instead of answering success and keeping the old role.

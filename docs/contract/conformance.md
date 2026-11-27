@@ -8,6 +8,10 @@ A case is satisfied when a conforming engine produces the stated result. The ids
 
 Two concurrent creates for the same venue, date, time, and table produce exactly one booking and one `slot_taken`. The loser never double-books the table.
 
+The same holds for any writes that claim one table at the same time, whatever their kind (create, walk-in, modify, seat from the waitlist, public create or self-service modify): one gets the table and each other gets the refusal it would get had it arrived afterwards. Two modifies that each ask for the table the other booking holds are both refused and change nothing. No caller gets a deadlock or a `500` out of such a race.
+
+A create, walk-in, modify, cancel, status change or seat from the waitlist waits at most 5 seconds for each lock another write holds. A write that gives up fails with `venue_busy` (`503`, retryable), changes nothing and does not store its idempotency key, so the same key succeeds once the other write has finished.
+
 ## C2. Idempotent create
 
 Replaying a create with the same idempotency key returns the original reservation id and version. No second reservation exists. A replay returns the stored answer even when the rules or the clock have since changed: after the date is blocked, or after the start moves inside the lead time, the same key still returns the original id and version, while a new key for the same request is refused with `date_blocked` or `lead_time_violation`. The hours, lead time, horizon, blocked date and table checks refuse a first attempt only.
@@ -144,7 +148,7 @@ A venue publishes structured local data that is separate from its private data. 
 
 ## C34. Error retry hint
 
-Every error response carries `retryable`, a boolean, next to `code` and `message`, whatever produced it, including the rate limiter. The value is fixed per `code` and listed in `errors.md`. It is `true` when repeating the same request, unchanged, may succeed later (`rate_limited` after `Retry-After`, `transient`, `idempotency_in_flight`, and `unknown_outcome` with the same idempotency key) and `false` when the caller must change something first (`slot_taken`, `invalid_request`, `forbidden`, `outside_hours`, and the rest). The codes in `errors.md`, in `openapi.yaml`, and in the engine agree. An MCP tool error keeps the text `API error <status>: <code>` and appends ` (retryable)` or ` (not retryable)`, and appends nothing when the response has no `retryable`. Every MCP tool sets `readOnlyHint`, `destructiveHint` and `idempotentHint` explicitly, and every read tool is `readOnlyHint: true`. `docs/contract/mcp.md` lists them.
+Every error response carries `retryable`, a boolean, next to `code` and `message`, whatever produced it, including the rate limiter. The value is fixed per `code` and listed in `errors.md`. It is `true` when repeating the same request, unchanged, may succeed later (`rate_limited` after `Retry-After`, `transient`, and `venue_busy`, `idempotency_in_flight` and `unknown_outcome` with the same idempotency key) and `false` when the caller must change something first (`slot_taken`, `invalid_request`, `forbidden`, `outside_hours`, and the rest). The codes in `errors.md`, in `openapi.yaml`, and in the engine agree. An MCP tool error keeps the text `API error <status>: <code>` and appends ` (retryable)` or ` (not retryable)`, and appends nothing when the response has no `retryable`. Every MCP tool sets `readOnlyHint`, `destructiveHint` and `idempotentHint` explicitly, and every read tool is `readOnlyHint: true`. `docs/contract/mcp.md` lists them.
 
 ## C35. Booking policy: horizon, per-guest cap, blocked dates
 

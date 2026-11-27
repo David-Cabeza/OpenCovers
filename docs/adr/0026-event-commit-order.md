@@ -26,7 +26,7 @@ The webhook settle window is no longer needed for correctness. It stays in this 
 
 - The observable contract does not change. C11 already promised no gap, and the engine now keeps it.
 - Writes of one venue serialize on their last insert and commit. The commit's WAL flush is the limit, because writers of a venue can no longer share one flush. Measured on a dev machine (Postgres 16 in Docker on WSL2, fdatasync about 2.5 ms, 5 runs each): 8 concurrent writers of one venue went from about 400 to about 265 creates per second, and 16 writers stayed at about 245, the ceiling of one insert and commit (3.9 ms measured alone). Writers spread over 8 or 16 venues ran at about 470 per second after (350 to 370 before, a noisy run), and a single writer's create took 8 to 11 ms before and after. A disk with a faster flush raises the ceiling.
-- An erasure of 3,000 reservations held the lock for 25 to 78 ms (median 34) of its 3.3 to 5.1 s. A writer queued on the lock holds a pool connection, so a burst of one venue can delay others only for that long. With 12 writers of one venue and an erasure of 1,000, another venue's create stayed under 200 ms (median about 25 ms), so no lock timeout was added.
+- An erasure of 3,000 reservations held the lock for 25 to 78 ms (median 34) of its 3.3 to 5.1 s. A writer queued on the lock holds a pool connection, so a burst of one venue can delay others only for that long. With 12 writers of one venue and an erasure of 1,000, another venue's create stayed under 200 ms (median about 25 ms), so no lock timeout was added. [ADR-0030](0030-table-claims-take-turns.md) later added one to reservation writes, for the planner lock.
 - A new event writer must call `appendEvents` last.
 
 ## Alternatives considered

@@ -4,38 +4,33 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../src/db/client";
 import { migrateDb } from "../src/db/migrate";
 import { reservations, services, tableAllocations, tables, venues } from "../src/db/schema";
+import { findLink } from "../src/lib/self-service";
 import type { Origin } from "../src/lib/origin";
 import {
   cancelReservation,
   createReservation,
   modifyReservation,
+  walkIn,
   type CreateReservationInput,
+  type OnlineRules,
 } from "../src/lib/reservations";
+import { localDateTime } from "../src/lib/time";
+import { addWaitlist, seatWaitlist } from "../src/lib/waitlist";
 import { PARK, dropParkTrigger, holdPark, installParkTrigger, parked, waitUntil } from "./event-park";
 
 // C1 under pressure (#414): writes of different kinds race for the same table at the same time.
 //
 // Two ways to force the dangerous interleaving:
 //   park: one writer is held after its writes and before its commit (event-park.ts), then the rival arrives.
-//   gate: both writers are held just before they touch a table, then released together.
+//   gate: writers are held just before or after they touch a table, until every one of them waits on a lock.
 //
 // An outcome is "ok", the engine's error code, or the SQLSTATE of an error that reached the caller.
 //
-// Two known bugs let SQLSTATE 40P01 (deadlock) reach a caller:
-//   #451  two writes claim one table at the same instant. https://github.com/David-Cabeza/OpenCovers/issues/451
-//   #452  two writes claim each other's tables. https://github.com/David-Cabeza/OpenCovers/issues/452
-// A passing test here accepts 40P01 from a loser and still checks the tables. The `it.fails` tests state the
-// missing behavior. When an issue is fixed its `it.fails` turns red: make it `it`, delete DEADLOCK from the
-// allowed lists, and for #451 lower DEADLOCK_SEARCH_ROUNDS, because every round then runs (about 90 s).
+// Claims of a venue take turns on its planner lock, so at a gate only one writer ever stands: the others have not
+// reached a table yet. `atGate` is that count. Two writers there are what could deadlock each other (#451, #452),
+// whether or not a given run happens to.
 
-const DEADLOCK = "40P01";
-const ROUNDS = 20;
-const COMBINATION_ROUNDS = 10;
-const SWAP_ROUNDS = 3;
-// The window of #451 is inside Postgres, between inserting a row and checking the exclusion constraint, so nothing
-// outside can hold a writer there. Four creates and four modifies released at once hit it in at least 3% of
-// rounds on one or two CPUs, and the first hit ends the search. At 3%, 500 rounds all miss once in 4 million runs.
-const DEADLOCK_SEARCH_ROUNDS = 500;
+const ROUNDS = 5;
 
 const CLAIM_GATE = 41401; // before a table allocation is inserted
 const FREED_GATE = 41402; // after a table allocation is deleted
@@ -106,19 +101,27 @@ async function whileUncommitted(first: (origin: Origin) => ReturnType<Call>, sec
   return { first: firstOutcome, second: secondOutcome, waited };
 }
 
-/** Holds every writer at `gate` until all of them wait on a lock, then releases them together. */
-async function releasedTogether(gate: number, ...calls: Call[]): Promise<string[]> {
+/** Starts every write while `gate` is closed, waits until all of them wait on a lock, then opens it. */
+async function releasedTogether(gate: number, ...calls: Call[]): Promise<{ outcomes: string[]; atGate: number }> {
   const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
   let running: Promise<string[]> | undefined;
+  let atGate = 0;
   try {
     await client.query("select pg_advisory_lock($1)", [gate]);
-    running = Promise.all(calls.map(outcome));
-    await waitUntil(async () => (await lockWaiters()) >= calls.length, "every write to wait");
+    const early: string[] = [];
+    running = Promise.all(calls.map((call, i) => outcome(call).then((o) => (early.push(`write ${i}: ${o}`), o))));
+    await waitUntil(async () => early.length > 0 || (await lockWaiters()) >= calls.length, "every write to wait");
+    expect(early, "no write may finish while the gate is closed").toEqual([]);
+    const { rows } = await client.query(
+      "select count(*)::int as n from pg_locks where locktype = 'advisory' and not granted and classid = 0 and objid = $1",
+      [gate],
+    );
+    atGate = rows[0].n;
   } finally {
     await client.end(); // ending the session releases the gate
   }
-  return running;
+  return { outcomes: await running, atGate };
 }
 
 /** The no-overlap rule itself: no two live allocations of a table of the venue share any time. */
@@ -211,15 +214,35 @@ describe("a create and a modify that want the same table and time", () => {
     }
   });
 
-  it(`gives one holder when both claim the table at the same instant, ${ROUNDS} times (#451)`, { timeout: 60_000 }, async () => {
+  it(`gives one holder and one slot_taken when both claim the table at the same instant, ${ROUNDS} times (#451)`, async () => {
     for (let round = 0; round < ROUNDS; round++) {
       const race = await createAgainstModify();
-      const [created, modified] = await releasedTogether(CLAIM_GATE, race.create, race.modify);
-      expect([created, modified].filter((o) => o === "ok"), `round ${round}`).toHaveLength(1);
-      expect(["ok", "slot_taken", DEADLOCK], `round ${round}`).toContain(created);
-      expect(["ok", "slot_taken", DEADLOCK], `round ${round}`).toContain(modified);
-      expect(await state(race.venueId), `round ${round}`).toEqual(created === "ok" ? CREATE_WON : MODIFY_WON);
+      const { outcomes, atGate } = await releasedTogether(CLAIM_GATE, race.create, race.modify);
+      expect(atGate, `round ${round}`).toBe(1);
+      expect([...outcomes].sort(), `round ${round}`).toEqual(["ok", "slot_taken"]);
+      expect(await state(race.venueId), `round ${round}`).toEqual(outcomes[0] === "ok" ? CREATE_WON : MODIFY_WON);
       await expectNoOverlap(race.venueId);
+    }
+  });
+});
+
+describe("two creates that name the same tables", () => {
+  it.each([
+    { name: "one table (#451)", first: ["1"], second: ["1"] },
+    { name: "two tables in opposite orders (#452)", first: ["1", "2"], second: ["2", "1"] },
+  ])("books one and refuses the other whole: $name", async ({ first, second }) => {
+    for (let round = 0; round < ROUNDS; round++) {
+      const venueId = await seedVenue();
+      const { outcomes, atGate } = await releasedTogether(
+        CLAIM_GATE,
+        () => create(venueId, "first", { tableIds: first }),
+        () => create(venueId, "second", { tableIds: second }),
+      );
+      expect([...outcomes].sort(), `round ${round}`).toEqual(["ok", "slot_taken"]);
+      expect(atGate, `round ${round}`).toBe(1);
+      const won = outcomes[0] === "ok" ? first : second;
+      expect(await state(venueId), `round ${round}`).toEqual([`booked [${[...won].sort().join(",")}]`]);
+      await expectNoOverlap(venueId);
     }
   });
 });
@@ -307,73 +330,160 @@ describe.each(combinations)("$name against a create on one of its tables", ({ in
     await expectNoOverlap(venueId);
   });
 
-  it(`gives the shared table to one of them when both claim at the same instant, ${COMBINATION_ROUNDS} times (#451)`, { timeout: 60_000 }, async () => {
-    for (let round = 0; round < COMBINATION_ROUNDS; round++) {
+  it("gives the shared table to one of them when both claim at the same instant (#451)", async () => {
+    for (let round = 0; round < ROUNDS; round++) {
       const venueId = await seedVenue();
       // Table 1, the first the combination claims, so the two claims collide.
-      const [combined, alone] = await releasedTogether(CLAIM_GATE, () => combo(venueId), () => single(venueId, "1"));
-      expect([combined, alone].filter((o) => o === "ok"), `round ${round}`).toHaveLength(1);
-      expect(["ok", refusal, DEADLOCK], `round ${round}`).toContain(combined);
-      expect(["ok", "slot_taken", DEADLOCK], `round ${round}`).toContain(alone);
-      expect(await state(venueId), `round ${round}`).toEqual(combined === "ok" ? ["booked [1,2]"] : ["booked [1]"]);
+      const { outcomes, atGate } = await releasedTogether(CLAIM_GATE, () => combo(venueId), () => single(venueId, "1"));
+      const [combined, alone] = outcomes;
+      expect(atGate, `round ${round}`).toBe(1);
+      expect(outcomes, `round ${round}`).toEqual(combined === "ok" ? ["ok", "slot_taken"] : [refusal, "ok"]);
+      expect(await state(venueId), `round ${round}`).toEqual(alone === "ok" ? ["booked [1]"] : ["booked [1,2]"]);
       await expectNoOverlap(venueId);
     }
   });
 });
 
 describe("eight simultaneous claims of one table (#451)", () => {
-  /** Four creates on table "1" and four modifies that move a booking to it. */
-  async function eightClaims() {
-    const venueId = await seedVenue(["1", "2", "3", "4", "5"]);
-    const calls: Call[] = [];
-    for (const own of ["2", "3", "4", "5"]) {
-      const moving = await book(venueId, own, `seed-${own}`);
-      calls.push(
-        () => create(venueId, `create-${own}`, { tableIds: ["1"] }),
-        () => move(venueId, moving, "1", `move-${own}`),
-      );
-    }
-    return releasedTogether(CLAIM_GATE, ...calls);
-  }
-
-  // #451, not fixed. A loser can get 40P01 where it should get slot_taken.
-  // A timeout would count as the expected failure, so it leaves room for every round.
-  it.fails("aborts none of them with a deadlock", { timeout: 300_000 }, async () => {
-    let outcomes: string[] = [];
-    for (let round = 0; round < DEADLOCK_SEARCH_ROUNDS && !outcomes.includes(DEADLOCK); round++) {
-      outcomes = await eightClaims();
-    }
-    expect(outcomes).not.toContain(DEADLOCK);
-  });
-});
-
-describe("two modifies that swap the tables of two bookings", () => {
-  /** Both modifies have freed their own table before either claims the other's. */
-  async function swap() {
-    const venueId = await seedVenue();
-    const one = await book(venueId, "1", "one");
-    const two = await book(venueId, "2", "two");
-    const outcomes = await releasedTogether(
-      FREED_GATE,
-      () => move(venueId, one, "2", "move-one"),
-      () => move(venueId, two, "1", "move-two"),
-    );
-    return { venueId, one, two, outcomes };
-  }
-
-  it("leaves each booking on one table with no overlap (#452)", async () => {
-    for (let round = 0; round < SWAP_ROUNDS; round++) {
-      const { venueId, one, two, outcomes } = await swap();
-      expect(["ok", "slot_taken", DEADLOCK], `round ${round}`).toContain(outcomes[0]);
-      expect(["ok", "slot_taken", DEADLOCK], `round ${round}`).toContain(outcomes[1]);
-      expect(await tablesOf(one), `round ${round}`).toEqual(outcomes[0] === "ok" ? ["2"] : ["1"]);
-      expect(await tablesOf(two), `round ${round}`).toEqual(outcomes[1] === "ok" ? ["1"] : ["2"]);
+  it("gives it to one and answers the other seven slot_taken", async () => {
+    for (let round = 0; round < ROUNDS; round++) {
+      // Four creates on table "1" and four modifies that move a booking to it.
+      const venueId = await seedVenue(["1", "2", "3", "4", "5"]);
+      const calls: Call[] = [];
+      for (const own of ["2", "3", "4", "5"]) {
+        const moving = await book(venueId, own, `seed-${own}`);
+        calls.push(
+          () => create(venueId, `create-${own}`, { tableIds: ["1"] }),
+          () => move(venueId, moving, "1", `move-${own}`),
+        );
+      }
+      const { outcomes, atGate } = await releasedTogether(CLAIM_GATE, ...calls);
+      expect(atGate, `round ${round}`).toBe(1);
+      expect([...outcomes].sort(), `round ${round}`).toEqual(["ok", ...Array(7).fill("slot_taken")]);
       await expectNoOverlap(venueId);
     }
   });
+});
 
-  // #452, not fixed. One modify is aborted with 40P01 and the caller gets it.
-  it.fails("lets no deadlock reach either caller (#452)", async () => {
-    expect((await swap()).outcomes).not.toContain(DEADLOCK);
+const PUBLIC_RULES: OnlineRules = {
+  services: null,
+  weekdays: null,
+  minPartySize: 1,
+  maxPartySize: 8,
+  leadTimeMinutes: 0,
+  maxAdvanceDays: 3650,
+  maxOpenBookingsPerContact: null,
+};
+
+/** A walk-in and a seat happen now, so their venue serves all day. */
+async function seedAllDayVenue() {
+  const venueId = await seedVenue(["1"]);
+  await db.update(services).set({ openStart: "00:00", openEnd: "24:00" }).where(eq(services.venueId, venueId));
+  return venueId;
+}
+
+// Every kind of write that gives a reservation a table, against a create that names the table it is about to take.
+const writers: { name: string; refusal: string; setUp: () => Promise<{ venueId: string; claim: Call; rival: Call }> }[] = [
+  {
+    name: "a create that assigns the table itself",
+    refusal: "no_suitable_table",
+    setUp: async () => {
+      const venueId = await seedVenue(["1"]);
+      return {
+        venueId,
+        claim: () => create(venueId, "claim", {}),
+        rival: () => create(venueId, "rival", { tableIds: ["1"] }),
+      };
+    },
+  },
+  {
+    name: "a walk-in that names the table",
+    refusal: "slot_taken",
+    setUp: async () => {
+      const venueId = await seedVenue(["1"]);
+      return {
+        venueId,
+        claim: () =>
+          walkIn(db, venueId, { partySize: 2, tableIds: ["1"], date: booking.date, time: booking.time }, `${venueId}-claim`),
+        rival: () => create(venueId, "rival", { tableIds: ["1"] }),
+      };
+    },
+  },
+  {
+    name: "a seat from the waitlist",
+    refusal: "no_suitable_table",
+    setUp: async () => {
+      const venueId = await seedAllDayVenue();
+      const added = await addWaitlist(db, venueId, { partySize: 2 });
+      if (!added.ok) throw new Error(`waitlist add failed: ${added.code}`);
+      const now = localDateTime(new Date(), "Europe/Madrid");
+      return {
+        venueId,
+        claim: () => seatWaitlist(db, venueId, added.id, `${venueId}-claim`, null),
+        rival: () => walkIn(db, venueId, { partySize: 2, tableIds: ["1"], ...now }, `${venueId}-rival`),
+      };
+    },
+  },
+  {
+    name: "a public create",
+    refusal: "slot_taken",
+    setUp: async () => {
+      const venueId = await seedVenue(["1"]);
+      return {
+        venueId,
+        claim: () => create(venueId, "claim", { channel: { kind: "public", rules: PUBLIC_RULES } }),
+        rival: () => create(venueId, "rival", { tableIds: ["1"] }),
+      };
+    },
+  },
+  {
+    name: "a self-service modify that needs a second table",
+    refusal: "no_suitable_table",
+    setUp: async () => {
+      // Table ids no other venue has: a guest's modify today sums the seats of same-named tables of every venue.
+      const venueId = await seedVenue(["g1"]);
+      const booked = await create(venueId, "seed", { channel: { kind: "public", rules: PUBLIC_RULES } });
+      if (!booked.ok) throw new Error(`seed booking failed: ${booked.code}`);
+      const link = await findLink(db, booked.selfServiceToken!);
+      // Added after the booking, so the booking holds table "1" and table "2" is the one the larger party needs.
+      await db.insert(tables).values({ id: "g2", venueId, name: "Tg2", seats: 2 });
+      const selfService = { linkId: link!.id, cutoffMinutes: 0, version: 1, rules: PUBLIC_RULES };
+      return {
+        venueId,
+        claim: () => modifyReservation(db, venueId, booked.id, { partySize: 4, selfService }, `${venueId}-claim`),
+        rival: () => create(venueId, "rival", { tableIds: ["g2"] }),
+      };
+    },
+  },
+];
+
+describe.each(writers)("$name against a create that names the table it wants", ({ setUp, refusal }) => {
+  it("waits its turn, and one of the two gets the table", async () => {
+    const { venueId, claim, rival } = await setUp();
+    const { outcomes, atGate } = await releasedTogether(CLAIM_GATE, claim, rival);
+    expect(atGate).toBe(1);
+    expect(outcomes).toEqual(outcomes[0] === "ok" ? ["ok", "slot_taken"] : [refusal, "ok"]);
+    await expectNoOverlap(venueId);
+  });
+});
+
+describe("two modifies that swap the tables of two bookings (#452)", () => {
+  it("refuses both and leaves each booking on its table", async () => {
+    for (let round = 0; round < ROUNDS; round++) {
+      const venueId = await seedVenue();
+      const one = await book(venueId, "1", "one");
+      const two = await book(venueId, "2", "two");
+      // Held after a modify frees its own table: had both freed one, each would then wait for the other's.
+      const { outcomes, atGate } = await releasedTogether(
+        FREED_GATE,
+        () => move(venueId, one, "2", "move-one"),
+        () => move(venueId, two, "1", "move-two"),
+      );
+      expect(outcomes, `round ${round}`).toEqual(["slot_taken", "slot_taken"]);
+      expect(atGate, `round ${round}`).toBe(1);
+      expect(await tablesOf(one), `round ${round}`).toEqual(["1"]);
+      expect(await tablesOf(two), `round ${round}`).toEqual(["2"]);
+      await expectNoOverlap(venueId);
+    }
   });
 });

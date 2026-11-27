@@ -11,6 +11,10 @@ info:
     reservation write produces a monotonic version. See
     docs/contract/errors.md for the error vocabulary.
 
+    A reservation write that waits 5 seconds for another write of the venue
+    gives up with 503 and the code `venue_busy`. Nothing was written, so
+    send it again with the same `Idempotency-Key` (C1).
+
     Some calls are rate limited per client address. A refused call returns
     429 with the code `rate_limited` and a `Retry-After` header. The limited
     calls are the sign-in and sign-up routes under /api/auth, invitation
@@ -6320,6 +6324,7 @@ components:
         - idempotency_in_flight
         - unknown_outcome
         - transient
+        - venue_busy
         - notice_address_required
         - public_profile_incomplete
         - stale_second_factor

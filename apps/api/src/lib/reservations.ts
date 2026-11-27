@@ -288,7 +288,8 @@ export type WriteErrorCode =
   | "venue_not_found"
   | "self_service_link_invalid"
   | "self_service_closed"
-  | "reservation_changed";
+  | "reservation_changed"
+  | "venue_busy";
 
 /** `selfServiceToken` is set only by a public create: the new link, or null on a repeat for a booking no longer `booked`. */
 export type WriteResult =
@@ -305,7 +306,8 @@ export type CancelResult =
         | "invalid_request"
         | "venue_not_found"
         | "self_service_link_invalid"
-        | "self_service_closed";
+        | "self_service_closed"
+        | "venue_busy";
     };
 
 const ACTIVE_STATUSES = ["booked", "seated"];
@@ -335,26 +337,36 @@ function isExclusionViolation(error: unknown): boolean {
 }
 
 /**
- * Serializes table planning per venue until the transaction ends, so a planner reads the allocations the previous
- * plan inserted. Without it concurrent auto-assigns choose the same free tables and the loser gets slot_taken while
- * others are free. Every path that takes it does so before the overbooking lock, never after.
+ * Serializes the writes that claim tables, per venue, until the transaction ends. Every write that gives a reservation
+ * a table takes it, before it frees a table of its own and before it inserts one. Two claims in flight at once can
+ * wait for each other, in the exclusion check or on a table the other just freed, and PostgreSQL then aborts one with
+ * 40P01 (#451, #452). It also lets a planner read what the previous plan inserted. It only orders the writers: the
+ * exclusion constraint is what keeps a table from being held twice. A write that only frees tables does not take it.
+ *
+ * Lock order: take it after the rows the write already needs (its reservation, waitlist entry or guest), so a write
+ * stuck on one of those does not hold up the venue, and before the overbooking lock. While holding it, never wait for
+ * a row held by a write that may itself be waiting for this lock (ADR-0030).
  */
 async function lockPlanner(tx: DbTx, venueId: string) {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`planner:${venueId}`}, 0))`);
 }
 
-// A write that names its tables can still take a planned table between plan and insert. The database refuses it
-// (23P01), so a planned write replans a bounded number of times before it reports the conflict.
-const PLAN_ATTEMPTS = 3;
+/**
+ * Caps how long this transaction waits for any one lock, so a stuck writer cannot hold back the rest of its venue
+ * for good. The write that gives up answers `venue_busy`.
+ */
+export async function boundLockWaits(tx: DbTx) {
+  await tx.execute(sql`set local lock_timeout = '5s'`);
+}
 
-async function replanOnConflict<T>(planned: boolean, run: () => Promise<T>): Promise<T> {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await run();
-    } catch (error) {
-      if (!planned || attempt >= PLAN_ATTEMPTS || !isExclusionViolation(error)) throw error;
-    }
-  }
+/**
+ * A lock wait that ran out (55P03) or a deadlock (40P01). PostgreSQL rolled the write back, so nothing was written
+ * and the same request, with the same idempotency key, may succeed.
+ */
+export function isLockFailure(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const e = error as { code?: string; cause?: unknown };
+  return e.code === "55P03" || e.code === "40P01" || isLockFailure(e.cause);
 }
 
 async function venueOf(db: Db, venueId: string) {
@@ -862,7 +874,8 @@ export async function createReservation(
   const id = crypto.randomUUID();
   const contactKey = input.guestContact != null ? normalizeContact(String(input.guestContact), venueCountry(venue)) : null;
   try {
-    const result = await replanOnConflict(autoAssign, () => db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
+      await boundLockWaits(tx);
       const existing = await claimKey(tx, venueId, key);
       if (existing) {
         if (existing.kind !== "create") throw new ReservationError("invalid_request");
@@ -974,6 +987,8 @@ export async function createReservation(
         dietary: recordDietary(input.dietary ?? null, input.origin),
         ...reconfirmationColumns(input.reconfirmation ?? "none"),
       });
+      // An assigned table was planned under the lock already. Named tables take it here, as late as it can be.
+      if (!autoAssign) await lockPlanner(tx, venueId);
       for (const tableId of tableIds) {
         await tx.insert(tableAllocations).values({
           reservationId: id,
@@ -997,10 +1012,11 @@ export async function createReservation(
       });
       await appendEvents(tx, venueId, [{ type: "created", reservationId: id, version: 1, origin: input.origin }]);
       return { id, version: 1, selfServiceToken: link?.token };
-    }));
+    });
     return { ok: true, ...result };
   } catch (error) {
     if (isExclusionViolation(error)) return { ok: false, code: "slot_taken" };
+    if (isLockFailure(error)) return { ok: false, code: "venue_busy" };
     if (error instanceof ReservationError) return { ok: false, code: error.code };
     throw error;
   }
@@ -1077,7 +1093,8 @@ async function guestTables(tx: DbTx, venueId: string, current: ReservationRow, p
   const held = await tx
     .select({ seats: tables.seats })
     .from(tableAllocations)
-    .innerJoin(tables, eq(tables.id, tableAllocations.tableId))
+    // A table id is unique inside its venue only.
+    .innerJoin(tables, and(eq(tables.venueId, tableAllocations.venueId), eq(tables.id, tableAllocations.tableId)))
     .where(eq(tableAllocations.reservationId, current.id));
   if (held.length > 0 && held.reduce((sum, t) => sum + t.seats, 0) >= partySize) return undefined;
   await lockPlanner(tx, venueId);
@@ -1095,7 +1112,8 @@ export async function modifyReservation(
 ): Promise<WriteResult> {
   const guest = input.selfService;
   try {
-    const version = await replanOnConflict(guest !== undefined, () => db.transaction(async (tx) => {
+    const version = await db.transaction(async (tx) => {
+      await boundLockWaits(tx);
       const existing = await claimKey(tx, venueId, key);
       if (guest) await lockForGuest(tx, venueId, id, guest.linkId);
       if (existing) {
@@ -1214,6 +1232,9 @@ export async function modifyReservation(
         return current.version;
       }
 
+      // Before the delete below: two modifies that had each freed a table would wait on each other's.
+      if (tablesChanged && tableIds!.length > 0) await lockPlanner(tx, venueId);
+
       const nextVersion = current.version + 1;
       await tx
         .update(reservations)
@@ -1239,11 +1260,12 @@ export async function modifyReservation(
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "modify", version: nextVersion });
       await appendEvents(tx, venueId, [{ type: "modified", reservationId: id, version: nextVersion, origin: input.origin }]);
       return nextVersion;
-    }));
+    });
     return { ok: true, id, version };
   } catch (error) {
     // A guest's party never uses the ceiling, so a table taken by a concurrent write leaves no fitting table.
     if (isExclusionViolation(error)) return { ok: false, code: guest ? "no_suitable_table" : "slot_taken" };
+    if (isLockFailure(error)) return { ok: false, code: "venue_busy" };
     if (error instanceof ReservationError) return { ok: false, code: error.code, fields: error.fields };
     throw error;
   }
@@ -1261,6 +1283,7 @@ export async function cancelReservation(
   const hash = await sha256Hex(id);
   try {
     await db.transaction(async (tx) => {
+      await boundLockWaits(tx);
       const existing = await claimKey(tx, venueId, key);
       if (guest) await lockForGuest(tx, venueId, id, guest.linkId, key);
       if (existing) {
@@ -1296,6 +1319,7 @@ export async function cancelReservation(
     if (error instanceof ReservationError) {
       return { ok: false, code: error.code as Extract<CancelResult, { ok: false }>["code"] };
     }
+    if (isLockFailure(error)) return { ok: false, code: "venue_busy" };
     throw error;
   }
 }
@@ -1310,6 +1334,7 @@ export async function setStatus(
 ): Promise<WriteResult> {
   try {
     const version = await db.transaction(async (tx) => {
+      await boundLockWaits(tx);
       const existing = await claimKey(tx, venueId, key);
       if (existing) {
         if (existing.kind !== "status" || existing.reservationId !== id) {
@@ -1350,6 +1375,7 @@ export async function setStatus(
     return { ok: true, id, version };
   } catch (error) {
     if (error instanceof ReservationError) return { ok: false, code: error.code };
+    if (isLockFailure(error)) return { ok: false, code: "venue_busy" };
     throw error;
   }
 }
