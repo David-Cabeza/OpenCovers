@@ -26,7 +26,7 @@ The owner asked that, after a guest books, the guest can keep the booking in the
 What the code and the docs say today, read on `origin/main` at `cb232dd`:
 
 - A guest booking through the widget gets a self-service link, a token `<linkId>.<secret>` in the URL fragment of `/r`. The database stores only the SHA-256 of the secret (`self_service_links` in `apps/api/src/db/schema.ts`). The link lasts until 48 hours after the booking ends (`LINK_LIFE_MS` in `apps/api/src/lib/self-service.ts`). `GET /public/self-service` takes it in `X-Self-Service-Token`, and every failure is the same `404` `self_service_link_invalid` (`docs/contract/openapi.yaml`, line 2249).
-- A modify cannot change the date or the time (ADR-0017, Context). The statuses are closed: `booked`, `seated`, `attended`, `no_show`, `cancelled`.
+- A modify cannot change the date or the time (ADR-0017, Context). Note 2026-11-27: ADR-0028 plans a staff move, not built. Date and time are already in the pass projection, so a move changes `content_hash` and the pass updates like any other change. The statuses are closed: `booked`, `seated`, `attended`, `no_show`, `cancelled`.
 - `reservations.version` is a per-reservation integer, and every write appends an event (`apps/api/src/db/schema.ts`, `events`). `events.id` is a global bigserial. Since [ADR-0026](0026-event-commit-order.md) a venue's events commit in id order, through the lock in `appendEvents` (`apps/api/src/lib/events.ts`). Events carry no guest data, only `type`, `reservationId`, `version`, and the channel and actor (ADR-0023).
 - Webhooks are a cursor over that feed, delivered by a worker with a lease, batches, a timeout and backoff (`apps/api/src/lib/webhooks.ts`: `BATCH_SIZE` 50, `TIMEOUT_MS` 5 s, backoff 30 s to 1 h). Webhooks are blocked in a demo sandbox (`sandboxWebhooksBlocked`, `apps/api/src/demo/limits.ts`).
 - Emails to the guest carry only what the engine wrote and never the guest's name or note (`apps/api/src/lib/mailer.ts`, the comment above `buildEmail`). The same rule is kept here.
@@ -85,6 +85,7 @@ Checked against Apple's and Google's documentation on 2026-11-20 (links at the e
 | --- | --- | --- |
 | Cancelled by staff or guest | `voided: true`, status field changes, its `changeMessage` fires | Object state `INACTIVE`, `addMessage` with `TEXT_AND_NOTIFY` |
 | Party size changed | Party field changes, its `changeMessage` fires | `PATCH` the field, `addMessage` with `TEXT_AND_NOTIFY` |
+| Date or time changed (planned with [ADR-0028](0028-move-a-reservation.md), not built) | Date and time fields change, their `changeMessage` fires | `PATCH` the fields, `addMessage` with `TEXT_AND_NOTIFY` |
 | Status `seated`, `attended`, `no_show` | Status field updates. No `changeMessage` on these (a "no show" alert helps nobody). | `PATCH` only, no notification |
 | Time near | `relevantDates` interval around the start | See Q4 and "Not verified" |
 

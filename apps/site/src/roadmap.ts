@@ -281,7 +281,7 @@ export const quarters: Quarter[] = [
       { text: "MCP remoto completo", done: "Un agente alojado reserva con permiso, y ninguna vía deja leer otro local.", gates: ["nada"] },
       { text: "Textos revisados, aplicados", done: "El enlace para cambiar o cancelar llega en el email y el widget pregunta por el consentimiento.", gates: ["revisión legal"] },
       { text: "Centro de confianza", done: "Cada afirmación sobre datos y seguridad lleva al lado su prueba, o dice \"sin revisar\".", gates: ["nada"] },
-      { text: "Mover una reserva a otro día", done: "La sala cambia fecha y hora sin cancelar y volver a crear.", gates: ["propietario"] },
+      { text: "Mover una reserva a otro día", done: "La sala cambia fecha y hora sin cancelar y volver a crear.", gates: ["nada"] },
       { text: "Ficha de cliente en la app de sala", done: "La sala ve quién viene y su historial.", gates: ["nada"] },
       { text: "Hoja de servicio", done: "La lista del turno llega lista para imprimir antes de abrir.", gates: ["nada"] },
       { text: "Se abre La Prueba del Doble", done: "La instancia estable queda abierta al reto, con las reglas publicadas.", gates: ["propietario"] },
@@ -379,7 +379,7 @@ export const saturdayGate: { group: string; items: string[] }[] = [
 ];
 
 export const today: Today[] = [
-  { area: "Reservas y disponibilidad", works: "Crear, modificar, cancelar y sentar. La base de datos rechaza la doble reserva. Política de reserva por local y explicación de por qué un hueco está cerrado.", preview: "", missing: "Mover una reserva a otro día: el contrato actual no lo permite." },
+  { area: "Reservas y disponibilidad", works: "Crear, modificar, cancelar y sentar. La base de datos rechaza la doble reserva. Política de reserva por local y explicación de por qué un hueco está cerrado.", preview: "", missing: "Mover una reserva a otro día: el contrato ya lo describe y falta construirlo." },
   { area: "Mesas y sala", works: "Zonas, combinaciones, asignación automática, plano y editor visual, vista previa al servicio.", preview: "", missing: "Hoja de servicio para imprimir." },
   { area: "Clientes", works: "Una ficha por local emparejada por email o teléfono, fusión y lista de bloqueados, por API.", preview: "", missing: "Pantalla en la app de sala." },
   { area: "Lista de espera y sin reserva", works: "En la app de sala.", preview: "La lista pública: construida, apagada por defecto y con textos provisionales.", missing: "Aviso de mesa lista; revisión legal de sus textos." },
@@ -395,7 +395,7 @@ export const today: Today[] = [
   { area: "Locales en servicio", works: "Ninguno.", preview: "", missing: "El primero." },
 ];
 
-export const todayLegend = "74 de los 83 casos de conformidad pasan; 9 están a medias y decimos por qué. Uno es alergias y dietas: está en la API y en la app de sala, apagado por defecto, y falta en las herramientas MCP.";
+export const todayLegend = "74 de los 93 casos de conformidad pasan; 9 están a medias y decimos por qué; 10 describen cómo mover una reserva y aún no están construidos. Uno es alergias y dietas: está en la API y en la app de sala, apagado por defecto, y falta en las herramientas MCP.";
 
 export const notPlanned: string[] = [
   "Paridad de funciones con las plataformas consolidadas. Llevan años de oficio en depósitos, marketing a clientes, integraciones de TPV y soporte a escala. Igualamos solo lo que la sala usa en cada servicio.",

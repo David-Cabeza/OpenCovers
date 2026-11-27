@@ -388,6 +388,7 @@ David Cabeza answered Q1 to Q4 on 2026-11-17. The others have a gate in the stag
 - **Q4. Token storage.** Hash only, as ADR-0006 (recommended), or HMAC-derived so links can be re-sent and a replay returns the same link?
   Answered 2026-11-17: hash only, SHA-256 with a constant-time compare, as ADR-0006. HMAC-derived tokens are rejected, because a master key could rebuild every link. A re-send always issues a new token.
 - **Q5. Moving a booking.** Is "cancel and book again" enough for Phase 11, or should a modify that changes date and time, re-running the time rules, come before the self-service link ships?
+  Answered 2026-11-26, planned and not built ([ADR-0028](0028-move-a-reservation.md)): staff and integrators move a `booked` reservation with a modify first (C83 to C92). A staff move keeps the self-service link working and moves its expiry to 48 hours after the new end (C89). The guest moves through the link in a later phase, behind a per-venue setting that is off by default, after the legal review of its texts. Until then a guest cancels and books again, as this record says.
 - **Q6. Per-venue public limit.** Should `public_venue` be a per-venue setting, so a large venue can raise it, or stay an instance variable?
 - **Q7. Proof-of-work difficulty.** Measure the default on a low-end phone before stage 3. Should proof of work be on by default at all, given that it slows older devices?
 - **Q8. Contact verification.** After email is on, should online bookings stay unconfirmed until the guest clicks a link sent to the email?
