@@ -25,6 +25,9 @@ import { errorMessage, isApiError } from "@/lib/error-message";
 import { guestInitials } from "@/lib/format";
 import { AddWaitlistDialog } from "./add-waitlist-dialog";
 
+/** How long a row that a refresh just moved ignores Seat and Remove. */
+const MOVED_HOLD_MS = 1000;
+
 export function WaitlistView({ venueId }: { venueId: string }) {
   const t = useT();
   const queryClient = useQueryClient();
@@ -51,6 +54,28 @@ export function WaitlistView({ venueId }: { venueId: string }) {
   const parked = useRef<HTMLElement | null>(null);
   // First come, first seated: the queue is shown oldest first.
   const entries = [...(data?.entries ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+  // A press aimed at one party must not land on the one a refresh has just put in its place.
+  const [held, setHeld] = useState<ReadonlySet<string>>(new Set());
+  const takenHere = useRef(new Set<string>());
+  const shown = useRef<{ list: string; ids: string[] }>({ list: "", ids: [] });
+  const listKey = `${venueId} ${filterDate}`;
+  useLayoutEffect(() => {
+    const before = shown.current;
+    const ids = entries.map((e) => e.id);
+    shown.current = { list: listKey, ids };
+    if (before.list !== listKey) return;
+    // Rows that close up after the user's own seat or removal are expected to move.
+    const was = before.ids.filter((id) => !takenHere.current.has(id));
+    const moved = ids.filter((id, i) => (was.includes(id) ? was.indexOf(id) !== i : was[i] !== undefined));
+    if (moved.length > 0) setHeld((now) => new Set([...now, ...moved]));
+    // `entries` is rebuilt on every render and changes only with `data`.
+  }, [listKey, data]);
+  useEffect(() => {
+    if (held.size === 0) return;
+    const timer = setTimeout(() => setHeld(new Set()), MOVED_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [held]);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["waitlist", venueId] });
@@ -84,6 +109,7 @@ export function WaitlistView({ venueId }: { venueId: string }) {
   const seat = useMutation({
     mutationFn: ({ id }: WaitlistEntry) => api.seatWaitlist(venueId, id),
     onSuccess: (reservation, entry) => {
+      takenHere.current.add(entry.id);
       setSeated({ id: reservation.id, venueId: reservation.venueId, name: entry.guestName });
       toast.success(t("waitlist.seated"));
       invalidate();
@@ -94,7 +120,8 @@ export function WaitlistView({ venueId }: { venueId: string }) {
 
   const cancel = useMutation({
     mutationFn: (id: string) => api.cancelWaitlist(venueId, id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
+      takenHere.current.add(id);
       toast.success(t("waitlist.removed"));
       invalidate();
     },
@@ -174,6 +201,7 @@ export function WaitlistView({ venueId }: { venueId: string }) {
                 key={e.id}
                 entry={e}
                 position={index + 1}
+                held={held.has(e.id)}
                 onSeat={() => seat.mutate(e)}
                 onRemove={() => {
                   removingFrom.current = { id: e.id, index };
@@ -274,12 +302,14 @@ function SeatedNotice({
 function WaitlistRow({
   entry,
   position,
+  held,
   onSeat,
   onRemove,
   onFocusLeft,
 }: {
   entry: WaitlistEntry;
   position: number;
+  held: boolean;
   onSeat: () => void;
   onRemove: () => void;
   onFocusLeft: () => void;
@@ -323,10 +353,24 @@ function WaitlistRow({
         </div>
       </div>
       <div className="flex items-center justify-end gap-1 max-sm:order-last max-sm:col-span-3 md:order-last">
-        <Button variant="outline" size="sm" onClick={onSeat}>
+        {/* Not `disabled`, which would drop the keyboard focus. */}
+        <Button
+          variant="outline"
+          size="sm"
+          aria-disabled={held || undefined}
+          className="aria-disabled:opacity-50"
+          onClick={held ? undefined : onSeat}
+        >
           {t("waitlist.seat")}
         </Button>
-        <Button variant="ghost" size="icon" aria-label={t("waitlist.remove")} onClick={onRemove}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t("waitlist.remove")}
+          aria-disabled={held || undefined}
+          className="aria-disabled:opacity-50"
+          onClick={held ? undefined : onRemove}
+        >
           <Trash2Icon className="size-4" />
         </Button>
       </div>

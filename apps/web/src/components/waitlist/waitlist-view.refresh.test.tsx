@@ -278,3 +278,80 @@ describe("the keyboard focus", () => {
     expect(shortcut).toHaveAccessibleDescription("You seated Ana.");
   });
 });
+
+describe("a row that a refresh moved", () => {
+  const held = (name: string) => [seatOf(name), removeOf(name)].map((b) => b.getAttribute("aria-disabled") === "true");
+  const writes = (api: ReturnType<typeof server>["api"]) => api.requests.filter((r) => r.method === "POST");
+
+  it("ignores Seat and Remove for a second, and keeps the focus", async () => {
+    const { api, drop } = server();
+    await open();
+    const u = user();
+    const seat = seatOf("Berta");
+    act(() => seat.focus());
+
+    drop("w1");
+    await wait(30_000);
+    await waitFor(() => expect(screen.queryByText("Ana")).toBeNull());
+
+    expect(held("Berta")).toEqual([true, true]);
+    expect(seat).toHaveFocus();
+    await u.keyboard("{Enter}");
+    await u.click(seat);
+    await u.click(removeOf("Berta"));
+    expect(writes(api)).toHaveLength(0);
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await wait(1000);
+    expect(held("Berta")).toEqual([false, false]);
+    await u.click(seat);
+    await waitFor(() => expect(writes(api)).toHaveLength(1));
+  });
+
+  it("is also one pushed down by an entry that appeared above it", async () => {
+    const { state } = server();
+    await open();
+
+    state.entries = [...state.entries, entry("w4", "Dora", 30)];
+    await wait(30_000);
+    await screen.findByText("Dora");
+
+    for (const name of ["Dora", "Ana", "Berta", "Carlos"]) expect(held(name)).toEqual([true, true]);
+  });
+
+  it("is not one above the change, nor one added at the end", async () => {
+    const { state, drop } = server();
+    await open();
+
+    drop("w3");
+    await wait(30_000);
+    await waitFor(() => expect(screen.queryByText("Carlos")).toBeNull());
+    expect(held("Ana")).toEqual([false, false]);
+    expect(held("Berta")).toEqual([false, false]);
+
+    state.entries = [...state.entries, entry("w4", "Dora", 0)];
+    await wait(30_000);
+    await screen.findByText("Dora");
+    for (const name of ["Ana", "Berta", "Dora"]) expect(held(name)).toEqual([false, false]);
+  });
+
+  const seatAna = (u: ReturnType<typeof user>) => u.click(seatOf("Ana"));
+  const removeAna = async (u: ReturnType<typeof user>) => {
+    await u.click(removeOf("Ana"));
+    await u.click(await screen.findByRole("button", { name: "Remove from waitlist" }));
+  };
+
+  it.each([
+    ["seat", seatAna],
+    ["removal", removeAna],
+  ])("is not one that closed up after the user's own %s", async (_, attempt) => {
+    server();
+    await open();
+
+    await attempt(user());
+    await waitFor(() => expect(screen.queryByText("Ana", { selector: "li *" })).toBeNull());
+
+    expect(held("Berta")).toEqual([false, false]);
+    expect(held("Carlos")).toEqual([false, false]);
+  });
+});
