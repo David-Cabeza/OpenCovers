@@ -25,7 +25,8 @@ export function ServerBanner() {
 
   useEffect(() => {
     if (!down) return;
-    const timer = setInterval(() => void queryClient.refetchQueries({ type: "active" }), RETRY_MS);
+    // A read still waiting for its answer is left to finish: restarting it every time would keep it from ever failing.
+    const timer = setInterval(() => void queryClient.refetchQueries({ type: "active" }, { cancelRefetch: false }), RETRY_MS);
     return () => clearInterval(timer);
   }, [down, queryClient]);
 

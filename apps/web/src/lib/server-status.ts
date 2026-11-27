@@ -15,5 +15,7 @@ export function isServerUnreachable(err: unknown): boolean {
   if (err instanceof ApiError) {
     return err.status === 502 || err.status === 503 || err.status === 504 || (err.status >= 500 && err.code === "error");
   }
+  // A read that got no answer in time (`READ_TIMEOUT_MS` in lib/api.ts).
+  if (err instanceof DOMException && err.name === "TimeoutError") return true;
   return err instanceof TypeError && NETWORK_FAILURE.test(err.message);
 }

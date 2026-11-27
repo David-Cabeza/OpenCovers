@@ -248,13 +248,28 @@ export class ApiError extends Error {
   }
 }
 
+/** A read with no answer after this long has failed. Without a limit a hung one never fails, and old data looks current. */
+export const READ_TIMEOUT_MS = 15_000;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> { // i18n-ok
+  // Reads only: giving up on a write would not undo it.
+  if (init?.method) return send<T>(path, init); // i18n-ok
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(new DOMException("Read timed out", "TimeoutError")), READ_TIMEOUT_MS); // i18n-ok
+  try {
+    return await send<T>(path, { ...init, signal: abort.signal }); // i18n-ok
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function send<T>(path: string, init: RequestInit): Promise<T> { // i18n-ok
   const res = await fetch(path, {
     credentials: "same-origin",
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
+      ...(init.headers ?? {}),
     },
   });
 

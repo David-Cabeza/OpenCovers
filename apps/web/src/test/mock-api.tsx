@@ -1,5 +1,5 @@
 import { ThemeProvider } from "@/lib/theme";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, type DefaultOptions } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { Toaster, toast } from "sonner";
@@ -64,9 +64,9 @@ export function mockApi(routes: Record<string, Handler>) {
   };
 }
 
-export function renderWithApp(ui: ReactElement) {
+export function renderWithApp(ui: ReactElement, queries: DefaultOptions["queries"] = {}) {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    defaultOptions: { queries: { ...queries, retry: false }, mutations: { retry: false } },
   });
   return Object.assign(
     render(

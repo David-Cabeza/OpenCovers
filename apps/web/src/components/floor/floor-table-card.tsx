@@ -66,8 +66,10 @@ export function FloorTableCard({
   const returning = useRef(false);
 
   useEffect(() => () => clearTimeout(timer.current), []);
-
-  if (!active) return children;
+  // A card whose table was freed under it must not come back when the table is taken again.
+  useEffect(() => {
+    if (!active) setOpen(false);
+  }, [active]);
 
   function schedule(next: boolean, delay: number) {
     clearTimeout(timer.current);
@@ -99,120 +101,124 @@ export function FloorTableCard({
   const inCard = (node: EventTarget | null) =>
     node instanceof Node && Boolean(contentRef.current?.contains(node));
 
+  const anchorProps = {
+    "data-table-card-anchor": "",
+    "aria-describedby": open ? contentId : undefined,
+    onPointerEnter: (e: React.PointerEvent) => {
+      anchorEl.current = e.currentTarget as HTMLElement;
+      lastPointer.current = e.pointerType;
+      if (e.pointerType === "mouse") schedule(true, OPEN_DELAY);
+    },
+    onPointerLeave: (e: React.PointerEvent) => {
+      if (e.pointerType === "mouse") schedule(false, CLOSE_DELAY);
+    },
+    onPointerDown: (e: React.PointerEvent) => {
+      anchorEl.current = e.currentTarget as HTMLElement;
+      lastPointer.current = e.pointerType;
+    },
+    onClick: () => {
+      // A mouse click already has the card open from hover; only touch and pen toggle on tap.
+      if (lastPointer.current === "mouse") return;
+      if (open) hide();
+      else show();
+    },
+    onFocus: (e: React.FocusEvent) => {
+      anchorEl.current = e.currentTarget as HTMLElement;
+      if (returning.current) return;
+      let visible = true;
+      try {
+        visible = e.currentTarget.matches(":focus-visible");
+      } catch {
+        // Browsers without :focus-visible support: treat focus as keyboard focus.
+      }
+      if (visible) show();
+    },
+    onBlur: (e: React.FocusEvent) => {
+      if (!inCard(e.relatedTarget)) hide();
+    },
+    onKeyDown: (e: React.KeyboardEvent) => {
+      anchorEl.current = e.currentTarget as HTMLElement;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        focusCard.current = true;
+        if (open) contentRef.current?.focus();
+        else show();
+      }
+    },
+    onDragStart: () => {
+      dragging.current = true;
+      hide();
+    },
+    onDragEnd: () => {
+      dragging.current = false;
+    },
+  };
+
   return (
     <Popover
-      open={open}
+      open={active && open}
       onOpenChange={(next) => {
         if (next) show();
         else hide();
       }}
     >
-      <PopoverAnchor
-        asChild
-        data-table-card-anchor=""
-        aria-describedby={open ? contentId : undefined}
-        onPointerEnter={(e: React.PointerEvent) => {
-          anchorEl.current = e.currentTarget as HTMLElement;
-          lastPointer.current = e.pointerType;
-          if (e.pointerType === "mouse") schedule(true, OPEN_DELAY);
-        }}
-        onPointerLeave={(e: React.PointerEvent) => {
-          if (e.pointerType === "mouse") schedule(false, CLOSE_DELAY);
-        }}
-        onPointerDown={(e: React.PointerEvent) => {
-          anchorEl.current = e.currentTarget as HTMLElement;
-          lastPointer.current = e.pointerType;
-        }}
-        onClick={() => {
-          // A mouse click already has the card open from hover; only touch and pen toggle on tap.
-          if (lastPointer.current === "mouse") return;
-          if (open) hide();
-          else show();
-        }}
-        onFocus={(e: React.FocusEvent) => {
-          anchorEl.current = e.currentTarget as HTMLElement;
-          if (returning.current) return;
-          let visible = true;
-          try {
-            visible = e.currentTarget.matches(":focus-visible");
-          } catch {
-            // Browsers without :focus-visible support: treat focus as keyboard focus.
-          }
-          if (visible) show();
-        }}
-        onBlur={(e: React.FocusEvent) => {
-          if (!inCard(e.relatedTarget)) hide();
-        }}
-        onKeyDown={(e: React.KeyboardEvent) => {
-          anchorEl.current = e.currentTarget as HTMLElement;
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            focusCard.current = true;
-            if (open) contentRef.current?.focus();
-            else show();
-          }
-        }}
-        onDragStart={() => {
-          dragging.current = true;
-          hide();
-        }}
-        onDragEnd={() => {
-          dragging.current = false;
-        }}
-      >
+      {/* One tree with a card or without: a different one would replace the table node, and its focus with it. */}
+      <PopoverAnchor asChild {...(active ? anchorProps : {})}>
         {children}
       </PopoverAnchor>
-      <PopoverContent
-        id={contentId}
-        ref={contentRef}
-        side="top"
-        collisionPadding={8}
-        className="max-h-(--radix-popover-content-available-height) overflow-y-auto"
-        onEscapeKeyDown={() => closeToTable()}
-        aria-label={t("floor.card.label", { name: table.guestName || table.name })}
-        onOpenAutoFocus={(e) => {
-          if (!focusCard.current) e.preventDefault();
-        }}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-        onInteractOutside={(e) => {
-          // A tap on a table is handled by that table (toggle), not by outside-dismiss.
-          if (e.target instanceof Element && e.target.closest("[data-table-card-anchor]")) e.preventDefault();
-        }}
-        onPointerEnter={() => clearTimeout(timer.current)}
-        onPointerLeave={(e) => {
-          if (e.pointerType === "mouse") schedule(false, CLOSE_DELAY);
-        }}
-        onBlur={(e) => {
-          if (!inCard(e.relatedTarget) && !(e.relatedTarget instanceof Element && e.relatedTarget.closest("[data-table-card-anchor]"))) {
-            hide();
-          }
-        }}
-      >
-        <CardBody
-          venueId={venueId as string}
-          reservationId={reservationId as string}
-          table={table}
-          tableNames={tableNames}
-          open={open}
-          onClose={closeToTable}
-          onMoveRequest={
-            onMoveRequest
-              ? () => {
-                  closeToTable();
-                  onMoveRequest();
-                }
-              : undefined
-          }
-          onDietaryRequest={
-            onDietaryRequest
-              ? () => {
-                  closeToTable();
-                  onDietaryRequest(reservationId as string);
-                }
-              : undefined
-          }
-        />
-      </PopoverContent>
+      {active && (
+        <PopoverContent
+          id={contentId}
+          ref={contentRef}
+          side="top"
+          collisionPadding={8}
+          className="max-h-(--radix-popover-content-available-height) overflow-y-auto"
+          onEscapeKeyDown={() => closeToTable()}
+          aria-label={t("floor.card.label", { name: table.guestName || table.name })}
+          onOpenAutoFocus={(e) => {
+            if (!focusCard.current) e.preventDefault();
+          }}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+          onInteractOutside={(e) => {
+            // A tap on a table is handled by that table (toggle), not by outside-dismiss.
+            if (e.target instanceof Element && e.target.closest("[data-table-card-anchor]")) e.preventDefault();
+          }}
+          onPointerEnter={() => clearTimeout(timer.current)}
+          onPointerLeave={(e) => {
+            if (e.pointerType === "mouse") schedule(false, CLOSE_DELAY);
+          }}
+          onBlur={(e) => {
+            if (!inCard(e.relatedTarget) && !(e.relatedTarget instanceof Element && e.relatedTarget.closest("[data-table-card-anchor]"))) {
+              hide();
+            }
+          }}
+        >
+          <CardBody
+            venueId={venueId as string}
+            reservationId={reservationId as string}
+            table={table}
+            tableNames={tableNames}
+            open={open}
+            onClose={closeToTable}
+            onMoveRequest={
+              onMoveRequest
+                ? () => {
+                    closeToTable();
+                    onMoveRequest();
+                  }
+                : undefined
+            }
+            onDietaryRequest={
+              onDietaryRequest
+                ? () => {
+                    closeToTable();
+                    onDietaryRequest(reservationId as string);
+                  }
+                : undefined
+            }
+          />
+        </PopoverContent>
+      )}
     </Popover>
   );
 }
