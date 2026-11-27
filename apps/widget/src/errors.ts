@@ -15,6 +15,7 @@ export interface Explanation {
 
 const BY_CODE: Record<string, Explanation> = {
   rate_limited: { message: "error.rateLimited" },
+  venue_busy: { message: "error.busy" },
   slot_taken: { message: "error.slotTaken", back: "time" },
   no_suitable_table: { message: "error.slotTaken", back: "time" },
   outside_hours: { message: "error.timeUnavailable", back: "time" },
@@ -68,6 +69,7 @@ const SELF_SERVICE_BY_CODE: Record<string, SelfServiceOutcome> = {
   no_suitable_table: { kind: "notice", notice: { message: "manage.error.noTable", phone: true } },
   invalid_request: { kind: "notice", notice: { message: "error.invalid" } },
   rate_limited: { kind: "notice", notice: { message: "error.rateLimited" } },
+  venue_busy: { kind: "notice", notice: { message: "manage.error.busy" } },
 };
 
 const SELF_SERVICE_UNEXPECTED: SelfServiceOutcome = {
