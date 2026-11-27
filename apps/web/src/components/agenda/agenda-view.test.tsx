@@ -286,11 +286,7 @@ describe("AgendaView actions", () => {
 
     await waitFor(() => expect(api.writes()).toHaveLength(1));
     expect(api.writes()[0].path).toBe("/v1/venues/v1/reservations/r1/modify");
-    expect(api.writes()[0].body).toEqual({
-      guest: { consent: "unknown" },
-      rating: 3,
-      commentary: "Quiet table",
-    });
+    expect(api.writes()[0].body).toEqual({ commentary: "Quiet table" });
   });
 });
 
