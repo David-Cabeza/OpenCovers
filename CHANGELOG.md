@@ -15,6 +15,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 - A guest whose booking, change or cancellation fails with `venue_busy` now reads that it was not saved and that trying again should work, in the widget's seven languages. It used to read as an unexpected failure that sent them to the venue.
 - A booking without a table could commit above an `overbookingCeiling` that an admin had just lowered. The ceiling in force when the write commits now binds it. A config save that changes the ceiling waits for the bookings that already counted, and after 5 s answers `503 venue_busy` (retryable) and saves nothing ([issue 446](https://github.com/David-Cabeza/OpenCovers/issues/446)).
 - The demo tour's cancel step told visitors to look at the floor plan 15 minutes after the booking time. It now says to look at the booking time itself.
+- Closing the allergy dialog with Escape or **Cancel**, opened from the "You seated" notice of the waitlist or from a floor plan table card, now returns the keyboard focus to what opened it. Under the development server (`pnpm dev`, React StrictMode) it was lost; a production build already returned it. If another seat has replaced the notice meanwhile, the focus goes to **Add**.
 
 ### Breaking
 
