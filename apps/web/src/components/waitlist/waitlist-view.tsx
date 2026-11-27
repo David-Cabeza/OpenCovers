@@ -400,20 +400,23 @@ function WaitlistRow({
         <span className="text-sm text-muted-foreground tabular-nums">
           {t("waitlist.waiting")} <span className="font-medium text-foreground">{elapsed(entry.createdAt)}</span>
         </span>
-        {entry.date && (
-          <span data-slot="waitlist-date" className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{longDate(entry.date)}</span>
-            {entry.windowStart && entry.windowEnd ? ` · ${entry.windowStart}–${entry.windowEnd}` : ""}
-          </span>
-        )}
-        {entry.source === "widget" && <Pill tone="muted">{t("waitlist.source.widget")}</Pill>}
-        {entry.zone ? (
-          <Pill tone="muted">{entry.zone}</Pill>
-        ) : (
-          <span aria-hidden="true" className="hidden text-muted-foreground md:inline">
-            —
-          </span>
-        )}
+        {/* One cell of the wide grid however many there are: each more cell would push Seat and Remove off the row. */}
+        <div className="contents md:flex md:min-w-0 md:flex-col md:items-start md:gap-1">
+          {entry.date && (
+            <span data-slot="waitlist-date" className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{longDate(entry.date)}</span>
+              {entry.windowStart && entry.windowEnd ? ` · ${entry.windowStart}–${entry.windowEnd}` : ""}
+            </span>
+          )}
+          {entry.source === "widget" && <Pill tone="muted">{t("waitlist.source.widget")}</Pill>}
+          {entry.zone ? (
+            <Pill tone="muted">{entry.zone}</Pill>
+          ) : entry.date || entry.source === "widget" ? null : (
+            <span aria-hidden="true" className="hidden text-muted-foreground md:inline">
+              —
+            </span>
+          )}
+        </div>
       </div>
       {/* On the page, not in a tooltip, which a touch screen never shows. Last, so it takes a line of its own. */}
       {otherDay && (
