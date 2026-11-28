@@ -207,7 +207,6 @@ describe("POST /reservations/{id}/modify", () => {
   it.each([
     ["an unknown field", { foo: 1 }, ["foo:unknown"]],
     ["an unknown field next to a good one", { partySize: 3, source: "x" }, ["source:unknown"]],
-    ["notifyGuest, not built", { partySize: 3, notifyGuest: false }, ["notifyGuest:unknown"]],
     ["status", { status: "seated" }, ["status:unknown"]],
     ["a guest name", { guest: { name: "New" } }, ["guest.name:unknown"]],
     ["a guest contact", { guest: { contact: "new@example.com" } }, ["guest.contact:unknown"]],
@@ -238,7 +237,7 @@ describe("POST /reservations/{id}/modify", () => {
   });
 });
 
-describe("a modify may repeat date, time and zone and never change them", () => {
+describe("the date, time and zone of a modify", () => {
   it("answers 200 and writes nothing when the body holds only the current values", async () => {
     const r = await booked();
     const before = await snapshot();
@@ -256,16 +255,12 @@ describe("a modify may repeat date, time and zone and never change them", () => 
   });
 
   it.each([
-    ["another date", () => ({ date: "2031-01-04" }), ["date:unchangeable"]],
-    ["another time", () => ({ time: "22:00" }), ["time:unchangeable"]],
-    ["another zone", () => ({ zone: "terraza" }), ["zone:unchangeable"]],
-    ["another date and time", () => ({ date: "2031-01-04", time: "22:00" }), ["date:unchangeable", "time:unchangeable"]],
-    ["the same time with seconds", () => ({ time: "21:00:00" }), ["time:unchangeable"]],
-    ["the same time with a space", () => ({ time: " 21:00" }), ["time:unchangeable"]],
-    ["the same date as a timestamp", () => ({ date: `${DATE}T00:00:00Z` }), ["date:unchangeable"]],
-    ["an empty date", () => ({ date: "" }), ["date:unchangeable"]],
-    ["another time next to a new party size", () => ({ date: DATE, time: "22:00", partySize: 3 }), ["time:unchangeable"]],
-    ["another date next to every other field", () => ({ date: "2031-01-04", partySize: 3, tables: ["3"], commentary: "x", rating: 4 }), ["date:unchangeable"]],
+    ["the same time with seconds", () => ({ time: "21:00:00" }), ["time:invalid"]],
+    ["the same time with a space", () => ({ time: " 21:00" }), ["time:invalid"]],
+    ["the same date as a timestamp", () => ({ date: `${DATE}T00:00:00Z` }), ["date:invalid"]],
+    ["an empty date", () => ({ date: "" }), ["date:invalid"]],
+    ["another date without a version", () => ({ date: "2031-01-04" }), ["version:missing"]],
+    ["another time next to a new party size, without a version", () => ({ date: DATE, time: "22:00", partySize: 3 }), ["version:missing"]],
   ] as [string, () => object, string[]][])("refuses %s and applies nothing else", async (_name, body, fields) => {
     const { id } = await booked();
     await expectRefused(() => post(`/reservations/${id}/modify`, body()), fields);
@@ -275,7 +270,8 @@ describe("a modify may repeat date, time and zone and never change them", () => 
     await db.execute(sql`UPDATE tables SET zone = 'Terraza' WHERE venue_id = ${VENUE}`);
     const { id } = await booked({ zone: "Terraza" });
     expect((await post(`/reservations/${id}/modify`, { zone: "Terraza" })).status).toBe(200);
-    await expectRefused(() => post(`/reservations/${id}/modify`, { zone: "terraza" }), ["zone:unchangeable"]);
+    // Another case is another zone, and this venue has no table there.
+    expect((await post(`/reservations/${id}/modify`, { zone: "terraza" })).body.code).toBe("party_size_too_large");
   });
 
   it("compares the time as the venue reads it, not as UTC", async () => {
@@ -311,7 +307,8 @@ describe("a modify may repeat date, time and zone and never change them", () => 
         .toBeGreaterThan(0);
     });
     const res = await pending;
-    expect(res.body.details).toEqual({ fields: [{ path: "zone", problem: "unchangeable" }] });
+    // "" differs from "patio", so the booking leaves the zone. Compared before the commit it would have changed nothing.
+    expect(res.body).toMatchObject({ zone: "", version: 2 });
   });
 
   it("answers reservation_not_found before it compares", async () => {

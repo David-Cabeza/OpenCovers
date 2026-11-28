@@ -1,12 +1,14 @@
 # ADR-0028: Move a reservation to another date or time
 
-- Status: Proposed (contract written as C83 to C92; only the optional `version` check is built)
+- Status: Accepted (phase 1 built for C83 to C90, apart from the match with the explanation in C84; C91 and C92 not built)
 - Date: 2026-11-27
 - Deciders: David Cabeza (owner)
 
-One part of this record is built: the optional `version` of a staff modify and its `reservation_changed` (sections 2 and 6, C87 partly). Nothing else is. The owner approved its decisions on 2026-11-26. This record covers phase 1: staff and integrators move a booking through the API. The contract (`docs/contract`) and the conformance cases C83 to C92 are written first, as GAP, and the code follows in a separate change.
+The owner approved its decisions on 2026-11-26. This record covers phase 1: staff and integrators move a booking through the API. The contract (`docs/contract`) and the conformance cases C83 to C92 were written first, as GAP.
 
-Today a modify whose `date`, `time` or `zone` differs from the booking fails with `400 invalid_request` and the problem `unchangeable`, and nothing moves (C94, [ADR-0029](0029-contract-rules-for-writes.md)). Apart from that check, a client must not rely on anything below until `conformance-status.md` marks C83 to C92 as passing.
+Sections 2 to 8 are built, with section 1 for create and modify. Not built: `changed` and the placement history of section 9, and `reservationId` on the availability reads of section 10. A client must not rely on those until `conformance-status.md` marks C91 and C92 as passing.
+
+Two points the code settles. The overbooking ceiling of section 4 takes only a party within the zone's or the venue's capacity, as for a create (C24). The new expiry of section 7 applies to the link that is not revoked.
 
 ## Context
 
@@ -67,7 +69,7 @@ The time rules run only when the date or the time changes. A change of party siz
 - The other fields keep their meaning. Everything in one body is applied in one transaction, with one new version and one event, or nothing is applied.
 - A value is always absolute, so a repeat leads to the same state.
 
-Compatibility: an integrator that sends `date`, `time` and `partySize` with every modify keeps working. Equal values change nothing and need no `version`, as C94 says today.
+Compatibility: an integrator that sends `date`, `time` and `partySize` with every modify keeps working. Equal values change nothing and need no `version`, as C94 says.
 
 ### 3. Rules for the new slot
 

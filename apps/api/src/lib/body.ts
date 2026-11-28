@@ -14,7 +14,7 @@ export type Fields = { [name: string]: Check<unknown> };
 
 export type Parsed<F extends Fields> = { [K in keyof F]: Exclude<ReturnType<F[K]>, typeof INVALID> };
 
-/** `unchangeable` is a modify that tries to move a booking. */
+/** `unchangeable` is a field a write does not change (ADR-0029). No route uses it today. */
 export type Problem = "unknown" | "missing" | "invalid" | "unchangeable";
 
 export interface FieldProblem {

@@ -63,6 +63,20 @@ export async function findLink(db: Db, token: string | undefined, compare: Compa
   return link;
 }
 
+/** A modify that changes the booking's end moves the live link's expiry with it, token unchanged (C89). */
+export async function moveLinkExpiry(tx: DbTx, venueId: string, reservationId: string, endsAt: Date): Promise<void> {
+  await tx
+    .update(selfServiceLinks)
+    .set({ expiresAt: linkExpiry(endsAt) })
+    .where(
+      and(
+        eq(selfServiceLinks.venueId, venueId),
+        eq(selfServiceLinks.reservationId, reservationId),
+        isNull(selfServiceLinks.revokedAt),
+      ),
+    );
+}
+
 export async function mintLink(tx: DbTx, venueId: string, reservationId: string, endsAt: Date): Promise<IssuedLink> {
   const id = crypto.randomUUID();
   const secret = randomBytes(32).toString("base64url");

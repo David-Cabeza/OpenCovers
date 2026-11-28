@@ -1,6 +1,6 @@
 // What each staff reservation and waitlist write takes (C94): one field list per route, and nothing else passes.
 
-import { INVALID, integer, oneOf, optional, optionalObject, text, type Check, type FieldProblem } from "./body";
+import { INVALID, integer, oneOf, optional, optionalObject, text, type Check } from "./body";
 import { isCommentary } from "./commentary";
 import { CONSENTS } from "./consent";
 import { dietaryField } from "./dietary";
@@ -24,6 +24,7 @@ const tableIds: Check<string[]> = (value) =>
 const rating: Check<Rating | null> = (value) => (value === null || isRating(value) ? value : INVALID);
 const commentary: Check<string> = (value) => (isCommentary(value) && NO_NUL.test(value) ? value : INVALID);
 const consent = oneOf(CONSENTS);
+const flag: Check<boolean> = (value) => (typeof value === "boolean" ? value : INVALID);
 
 const contactFields = { name: optional(anyText), contact: optional(text(MAX_CONTACT_LENGTH, NO_NUL)) };
 
@@ -51,25 +52,14 @@ export const MODIFY_FIELDS = {
   commentary: optional(commentary),
   reconfirmation: optional(oneOf(RECONFIRMATIONS)),
   dietary: dietaryField,
-  // A modify does not move a booking. These may only restate it, which `movedFields` checks under the row lock.
-  date: optional(anyText),
-  time: optional(anyText),
+  // ADR-0028: a value that differs from the booking moves it, and `date` or `time` then needs `version`.
+  date: optional(date),
+  time: optional(time),
   zone: optional(anyText),
+  // Not a change. `false` sends no email for this modify (C90).
+  notifyGuest: optional(flag),
 };
 
 export const STATUS_FIELDS = { status: oneOf(["seated", "attended", "no_show"] as const) };
 
 export const WAITLIST_ADD_FIELDS = { partySize, zone: optional(anyText), guest: optionalObject(contactFields) };
-
-export interface Slot {
-  date: string;
-  time: string;
-  zone: string;
-}
-
-/** The restated values that differ from what a read of the booking returns, compared as exact strings. */
-export function movedFields(restated: Partial<Slot>, stored: Slot): FieldProblem[] {
-  return (["date", "time", "zone"] as const)
-    .filter((name) => restated[name] !== undefined && restated[name] !== stored[name])
-    .map((path) => ({ path, problem: "unchangeable" }));
-}

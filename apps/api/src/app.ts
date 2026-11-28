@@ -1035,10 +1035,10 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
   if (!key) return error(c, "invalid_request");
   const body = checkFields(await c.req.json().catch(() => undefined), MODIFY_FIELDS);
   if (!body.ok) return invalidBody(c, body.fields);
-  const { version, ...fields } = body.value;
+  const { version, notifyGuest, ...fields } = body.value;
   const sent = Object.values(fields).filter((value) => value !== undefined).length;
   if (sent === 0) return error(c, "invalid_request");
-  const { date, time, zone, tables: tableIds, guest, ...changes } = fields;
+  const { tables: tableIds, guest, ...changes } = fields;
   const result = await modifyReservation(
     db,
     venueId,
@@ -1048,13 +1048,12 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
       version,
       tableIds,
       consent: guest?.consent,
-      restated: { date, time, zone },
       dietaryWithdrawal: changes.dietary === null && sent === 1,
       origin: c.get("origin"),
     },
     key,
   );
-  if (result.ok && result.partySizeChanged) {
+  if (result.ok && result.slotOrPartyChanged && notifyGuest !== false) {
     void notifyReservation(db, venueId, result.id, result.version, "confirmation");
   }
   return writeResponse(c, result, venueId);

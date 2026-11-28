@@ -379,7 +379,7 @@ export const saturdayGate: { group: string; items: string[] }[] = [
 ];
 
 export const today: Today[] = [
-  { area: "Reservas y disponibilidad", works: "Crear, modificar, cancelar y sentar. La base de datos rechaza la doble reserva. Política de reserva por local y explicación de por qué un hueco está cerrado.", preview: "", missing: "Mover una reserva a otro día: el contrato ya lo describe y falta construirlo." },
+  { area: "Reservas y disponibilidad", works: "Crear, modificar, cancelar y sentar. La base de datos rechaza la doble reserva. Política de reserva por local y explicación de por qué un hueco está cerrado.", preview: "", missing: "Mover una reserva a otro día desde la sala y las herramientas MCP (la API ya lo hace), con su historial y la consulta previa." },
   { area: "Mesas y sala", works: "Zonas, combinaciones, asignación automática, plano y editor visual, vista previa al servicio.", preview: "", missing: "Hoja de servicio para imprimir." },
   { area: "Clientes", works: "Una ficha por local emparejada por email o teléfono, fusión y lista de bloqueados, por API.", preview: "", missing: "Pantalla en la app de sala." },
   { area: "Lista de espera y sin reserva", works: "En la app de sala.", preview: "La lista pública: construida, apagada por defecto y con textos provisionales.", missing: "Aviso de mesa lista; revisión legal de sus textos." },
@@ -395,7 +395,7 @@ export const today: Today[] = [
   { area: "Locales en servicio", works: "Ninguno.", preview: "", missing: "El primero." },
 ];
 
-export const todayLegend = "74 de los 93 casos de conformidad pasan; 10 están a medias y decimos por qué; 9 describen cómo mover una reserva y aún no están construidos. Uno es alergias y dietas: está en la API y en la app de sala, apagado por defecto, y falta en las herramientas MCP.";
+export const todayLegend = "81 de los 93 casos de conformidad pasan; 10 están a medias y decimos por qué; 2, sobre el historial y la consulta previa de mover una reserva, aún no están construidos. Uno de los que están a medias es alergias y dietas: está en la API y en la app de sala, apagado por defecto, y falta en las herramientas MCP.";
 
 export const notPlanned: string[] = [
   "Paridad de funciones con las plataformas consolidadas. Llevan años de oficio en depósitos, marketing a clientes, integraciones de TPV y soporte a escala. Igualamos solo lo que la sala usa en cada servicio.",

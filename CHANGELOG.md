@@ -8,7 +8,13 @@ Feature PRs append their entries here. The release PR moves them under a version
 
 ### Added
 
-- A staff modify (`POST /v1/venues/{venueId}/reservations/{id}/modify`) takes an optional `version`. If the booking is no longer at that version it answers `409 reservation_changed` and writes nothing, so a client that sends it cannot overwrite a change it has not read. A modify without `version` behaves as before. The staff app sends it (below). The MCP tools do not send it yet (C87, partly built).
+- Staff and integrators can move a `booked` reservation to another date, time or zone with `POST /v1/venues/{venueId}/reservations/{id}/modify` ([ADR-0028](docs/adr/0028-move-a-reservation.md)). A move runs the rules of a staff create for the new slot, keeps the id, the guest and the self-service link, and a refusal changes nothing. A change of date or time needs the `version` last read. `notifyGuest: false` sends no email. The staff app and the MCP tools offer no move yet (C83 to C90).
+- A staff modify takes an optional `version`. If the booking is no longer at that version it answers `409 reservation_changed` and writes nothing, so a client that sends it cannot overwrite a change it has not read. The staff app sends it (below). The MCP tools do not send it yet (C87).
+
+### Changed
+
+- On a `booked` reservation, a change of party size now checks its tables and recomputes its end from the turn times. It keeps the tables it holds while they fit, otherwise takes free ones, and can now fail with `no_suitable_table` or `party_size_too_large`. Named tables must seat the party and lie in the booking's zone, also on a change of tables alone. `seated` reservations and a guest's own party change are as before.
+- A modify that changes the date or time of a booking used to fail with `invalid_request` and the problem `unchangeable`. Another spelling of the current value, such as `21:00:00`, now fails with the problem `invalid`.
 
 ### Fixed
 
@@ -17,7 +23,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 - On a tablet held in landscape, the demo bar and its tour took 45% of a 1024x768 screen, and 58% of a 1024x600 one. They now show as on a tablet held upright, with smaller text and only the next step of the tour, so they take 19% and 24%. This applies to touch screens in landscape up to 1280 px wide. Desktop and phone layouts are unchanged.
 - The waitlist of the staff app offered **Seat** on entries dated another day, which the API always refuses, and answered with a message about reservation statuses. **Seat** is now unavailable on them, and the row says that only today's waitlist can be seated and which day the entry is for. Today is the venue's date, also on a screen left open past midnight.
 - On a tablet or desktop, a waitlist entry with a date pushed **Seat** and **Remove** onto a second line, where **Seat** could be cut off and out of reach. The date, the online label and the zone now share one column.
-- A staff modify that changes only the tables no longer emails the guest. Resending the party size or the tables a booking already had used to email them that the booking had changed, and no longer does. The email goes out when the party size changes. Repeating a request with the same `Idempotency-Key` sends none, so it no longer retries an email that failed.
+- A staff modify that changes only the tables no longer emails the guest. Resending the party size or the tables a booking already had used to email them that the booking had changed, and no longer does. The email goes out when the date, the time or the party size changes. Repeating a request with the same `Idempotency-Key` sends none, so it no longer retries an email that failed.
 - Saving the tables dialog in the staff app with the same tables it opened with now closes it without a write. It used to send them again, which undid a move another person had made while the dialog was open and could email the guest about a change.
 - Saving **Edit details** in the staff app sends only the fields that changed since the dialog opened. It used to send contact permission, rating and note every time, so a second person's save undid the first one's. Saving with nothing changed now closes the dialog without a write.
 - The floor plan (`GET /v1/venues/{venueId}/floor`) shows a table as occupied from the exact minute its booking starts. It used to show it as free during that minute, so a booking at 21:00, or a walk-in just seated, read as a free table. The end stays excluded.

@@ -7,7 +7,7 @@ A reservation product sends a guest a set of emails over the life of a booking. 
 | Email | Sent when | Status | Depends on |
 | --- | --- | --- | --- |
 | Confirmation | A booking is made, on any channel. | Built. Placeholder text pending legal review. | REQ-N2. The self-service link in it is blocked on legal (ADR-0017 stage 8). |
-| Modification | The date, time, or party size changes. | Built. Placeholder text pending legal review. A guest's own changes send at most 3, 15 minutes apart. | REQ-N2. |
+| Modification | The date, time, or party size changes. Staff can send `notifyGuest: false` to send none for one change. | Built. Placeholder text pending legal review. A guest's own changes send at most 3, 15 minutes apart. | REQ-N2. |
 | Cancellation by the guest | The guest cancels with the self-service link. | Built. Placeholder text pending legal review. | REQ-N2. The venue's notice of a guest cancel waits for ADR-0017 stage 8. |
 | Cancellation by the venue | Staff or a platform cancels. | Built, with the same text as a guest cancel. Placeholder text pending legal review. | REQ-N2. |
 | Reminder | A set time before the visit. | Planned in Phase 13. The calendar file in the confirmation already sets an alarm 2 hours before. | ADR-0024 catalogs, consent enforcement, REQ-N2. |

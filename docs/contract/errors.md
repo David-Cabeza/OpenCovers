@@ -6,7 +6,7 @@ Every error response is `{"code": "...", "message": "...", "retryable": true|fal
 
 ## Request errors
 
-- `invalid_request`: the request is malformed or fails validation. A body over 16 KB under `/v1/public/` or over 256 KB elsewhere gets it, and so does a staff write made with a session cookie whose body is not `application/json`. A staff reservation or waitlist write also gets it for a field it does not take, a wrong type, a number out of range, a body that is not a JSON object, malformed JSON or a missing body, and for a `date`, `time` or `zone` on a modify that differs from the booking (C94). Its `details.fields` lists `{ "path", "problem" }`, with `problem` one of `unknown`, `missing`, `invalid` or `unchangeable`. It names fields and never repeats a sent value. `details` is absent when no single field is at fault, such as a body that is not an object. Planned and not built ([ADR-0028](../adr/0028-move-a-reservation.md), C83, C87): a modify that moves a booking stops answering `unchangeable`, and a move without `version` gets the problem `missing` on the path `version`. Not retryable.
+- `invalid_request`: the request is malformed or fails validation. A body over 16 KB under `/v1/public/` or over 256 KB elsewhere gets it, and so does a staff write made with a session cookie whose body is not `application/json`. A staff reservation or waitlist write also gets it for a field it does not take, a wrong type, a number out of range, a body that is not a JSON object, malformed JSON or a missing body (C94). A modify that changes the date or the time without `version` gets it too, with the problem `missing` on the path `version` (C87). Its `details.fields` lists `{ "path", "problem" }`, with `problem` one of `unknown`, `missing`, `invalid` or `unchangeable`. It names fields and never repeats a sent value. `details` is absent when no single field is at fault, such as a body that is not an object. No route answers `unchangeable` today. Not retryable.
 - `venue_not_found`: the venue does not exist, or the caller cannot see it. Indistinguishable from not found. Not retryable.
 - `reservation_not_found`: the reservation does not exist, or the caller cannot see it. Not retryable.
 - `waitlist_entry_not_found`: the waitlist entry does not exist, or the caller cannot see it. Not retryable.
@@ -24,7 +24,7 @@ The guest-facing routes under `/v1/public/` and the `online-booking` settings. S
 - `online_booking_limit`: the contact already holds the venue's `maxOpenBookingsPerContact` future `booked` bookings made online. Public create only. `409`. Nothing is booked. Not retryable.
 - `self_service_link_invalid`: the self-service token does not work. It is missing or malformed, its id is unknown, its secret is wrong, or the link expired, was revoked, or belongs to an erased booking. One answer for every cause, which names no venue and no booking. `404`. Not retryable.
 - `self_service_closed`: the booking can no longer be changed or cancelled through the link, because it is not `booked` or it starts within the venue's `selfServiceCutoffMinutes`. Reading through the link still works. `409`. Not retryable.
-- `reservation_changed`: the `version` sent with a self-service modify, or with a staff modify (C87), is not the stored version, because the booking changed after the caller read it. Read it again, then send the change with the new version. A staff modify that sends no `version` is not checked. `409`. Nothing changed. Not retryable.
+- `reservation_changed`: the `version` sent with a self-service modify, or with a staff modify (C87), is not the stored version, because the booking changed after the caller read it. Read it again, then send the change with the new version. A staff modify that sends no `version` is not checked, and one that changes the date or the time must send it. `409`. Nothing changed. Not retryable.
 - `waitlist_unavailable`: the public waitlist join cannot take this entry. The venue's waitlist or email is off, the date is closed or outside the booking window, or a cap is reached (per contact, per contact and date, or per date in the venue). One answer for every cause, which does not say which. Public waitlist join only ([ADR-0021](../adr/0021-widget-day-status-zones-waitlist.md), C68 to C71). `409`. Nothing is written and no email is sent. Not retryable.
 
 ## Auth
@@ -48,12 +48,12 @@ The guest-facing routes under `/v1/public/` and the `online-booking` settings. S
 - `lead_time_violation`: the booking is too close to the requested time. On the public channel it also covers a start earlier than now, whatever the lead time, so a past date or an earlier time today fails with it (C62). Staff create is unaffected, and a walk-in is never held to it. Not retryable.
 - `beyond_booking_horizon`: the date is further ahead than the venue's `maxAdvanceDays`. Not retryable.
 - `date_blocked`: the venue takes no bookings on that date. Not retryable.
-- `guest_booking_limit`: the guest already holds the venue's `maxActivePerGuestPerDay` active bookings on that date. Create only, because availability does not know the guest. Planned and not built (C84, C92): a move to another date gets it too, and the two availability reads apply it when they name a `reservationId`. Not retryable.
+- `guest_booking_limit`: the guest already holds the venue's `maxActivePerGuestPerDay` active bookings on that date. A create and a move to another date (C84) get it. Availability does not know the guest and never applies it. Planned and not built (C92): the two availability reads apply it when they name a `reservationId`. Not retryable.
 - `booking_declined`: the venue does not accept bookings for this contact. Show the guest a neutral message and send them to the venue directly. `409`. The body has no details: no reason, no date, no actor, and nothing about other entries. Create and the public waitlist join only (C72), because availability does not know the guest. A walk-in, a staff waitlist add and a seat from the waitlist are never declined. Not retryable.
 
 `GET /availability/explain` returns `outside_hours`, `lead_time_violation`, `beyond_booking_horizon`, `date_blocked`, `party_size_too_small`, `party_size_too_large`, and `no_suitable_table` as reason codes in a `200` answer, with the same meaning.
 
-Planned and not built ([ADR-0028](../adr/0028-move-a-reservation.md)): a modify that moves a booking answers the codes of a staff create for the new slot, in the create's order, and adds no new code. With `reservationId`, the explanation can also return `guest_booking_limit` as a reason (C92).
+A modify that moves a booking answers the codes of a staff create for the new slot, in the create's order, and adds no new code ([ADR-0028](../adr/0028-move-a-reservation.md), C84). Planned and not built (C92): with `reservationId`, the explanation can also return `guest_booking_limit` as a reason.
 
 ## Guest
 
@@ -64,7 +64,7 @@ Planned and not built ([ADR-0028](../adr/0028-move-a-reservation.md)): a modify 
 ## State
 
 - `already_cancelled`: the reservation is already cancelled. Not retryable.
-- `invalid_transition`: the requested status change is not allowed from the current status. Planned and not built (C86, C92): a change of `date`, `time` or `zone` of a reservation that is not `booked`, and an availability read whose `reservationId` names one, get it too. Not retryable.
+- `invalid_transition`: the requested status change is not allowed from the current status. A change of `date`, `time` or `zone` of a reservation that is not `booked` gets it too (C86). Planned and not built (C92): an availability read whose `reservationId` names one gets it. Not retryable.
 - `guest_merged`: a guest in a merge or unmerge is already merged into another guest. Not retryable.
 - `guest_not_merged`: the guest to unmerge is not merged. Not retryable.
 - `unmerge_unavailable`: the merge cannot be undone because its audit entry is missing or was cleared by erasure or retention. Not retryable.
