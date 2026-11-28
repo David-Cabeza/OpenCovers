@@ -4,6 +4,13 @@
 @custom-variant dark (&:is(.dark *));
 /* Touch screens of any width: controls need a 44 px target, which a width breakpoint cannot tell. */
 @custom-variant coarse (@media (pointer: coarse));
+/* Where the screen is too short for full chrome: under 1024 px wide, or a touch tablet held in landscape. */
+/* Block form: the one-line form splits a media query list at its comma and emits a broken rule. */
+@custom-variant compact {
+  @media (width < 64rem), (pointer: coarse) and (orientation: landscape) and (width <= 80rem) {
+    @slot;
+  }
+}
 
 :root {
   /* Tells the browser which palette to use for what it draws itself: scrollbars, date and time pickers, form controls. */
