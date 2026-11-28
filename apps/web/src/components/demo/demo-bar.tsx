@@ -17,7 +17,7 @@ export function DemoBar({ status }: { status: DemoStatus }) {
   const { venueId, bookingKey, expiresAt, widgetOrigin } = status;
   if (!venueId) return null;
   return (
-    <div role="region" aria-label={t("demo.bar.label")} className="print:hidden border-b border-primary/30 bg-primary/10 text-sm max-lg:text-xs">
+    <div role="region" aria-label={t("demo.bar.label")} className="print:hidden border-b border-primary/30 bg-primary/10 text-sm compact:text-xs">
       <Checklist
         venueId={venueId}
         lead={
@@ -209,7 +209,7 @@ function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.R
     { id: "rule", text: t("demo.tour.rule"), action: manual("rule", openButton(t("demo.tour.openTomorrow"), shiftIso(todayIso(), 1))) },
   ];
   const count = Object.values(done).filter(Boolean).length;
-  // Below 1024 px only the first step left shows (the count in the title says where the visitor is), so the tour
+  // On a compact screen only the first step left shows (the count in the title says where the visitor is), so the tour
   // leaves room for the app.
   const current = (steps.find((step) => !done[step.id]) ?? steps[steps.length - 1]!).id;
   const open = folded === null ? wide && count < steps.length : !folded;
@@ -240,7 +240,7 @@ function Checklist({ venueId, lead, switcher }: { venueId: string; lead: React.R
       {open && (
         <ol id="demo-checklist" className="space-y-1.5 border-t border-primary/20 px-4 pb-2 pt-1.5 sm:px-6">
           {steps.map((step) => (
-            <li key={step.id} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1", step.id !== current && "max-lg:hidden")}>
+            <li key={step.id} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1", step.id !== current && "compact:hidden")}>
               <span className="inline-flex items-start gap-2">
                 {done[step.id] ? (
                   <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
