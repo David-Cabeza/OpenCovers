@@ -4,7 +4,7 @@
 
 OpenCovers is pre-alpha. No restaurant runs on it yet.
 
-What exists: the booking engine and its HTTP API, a staff app, a guest booking widget, an MCP server with 18 tools on npm, signed webhooks, a production Docker Compose stack, and a hosted demo with invented data. The database, not the application, refuses a double booking. 74 of the 93 conformance cases pass and 9 are partial. The other 10 specify moving a booking to another date or time (C83 to C92, [ADR-0028](docs/adr/0028-move-a-reservation.md)), which is not built yet. One of those is allergies and diets (C82): built in the API and the staff app behind a switch that is off by default, not yet in the MCP tools.
+What exists: the booking engine and its HTTP API, a staff app, a guest booking widget, an MCP server with 18 tools on npm, signed webhooks, a production Docker Compose stack, and a hosted demo with invented data. The database, not the application, refuses a double booking. 74 of the 93 conformance cases pass and 10 are partial. The other 9, and the partial C87, specify moving a booking to another date or time (C83 to C92, [ADR-0028](docs/adr/0028-move-a-reservation.md)), which is not built yet. One of those is allergies and diets (C82): built in the API and the staff app behind a switch that is off by default, not yet in the MCP tools.
 
 What is missing before a real venue can use it: a legal review of the texts a guest sees, automatic backups with a rehearsed restore, alerts, tests in a real browser, and someone to call when something breaks. The demo's terms and privacy notice were written without a lawyer's review.
 
@@ -129,7 +129,7 @@ Everything guest-facing is built off and turned on only with the review that cov
 
 ## Blocked on someone outside the code
 
-- **A legal review.** It unblocks six of the eight partial conformance cases, the public waitlist, reminders and any pilot. The briefs are written: [demo](docs/legal-review-demo.md), [waitlist](docs/legal-review-waitlist.md).
+- **A legal review.** It unblocks six of the ten partial conformance cases, the public waitlist, reminders and any pilot. The briefs are written: [demo](docs/legal-review-demo.md), [waitlist](docs/legal-review-waitlist.md).
 - **A first venue.** Independent, one room, a paper book or a spreadsheet today, willing to keep two books for two weeks. The [founding-venues page](https://opencovers.dev/hoja-de-ruta/#locales-fundadores) explains how.
 - **Native reviewers** for Catalan, French, German, Italian and Portuguese.
 - **Someone to install it and restore it without us,** and to tell us where the guides fail.

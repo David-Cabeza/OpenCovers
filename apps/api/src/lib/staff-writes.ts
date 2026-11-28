@@ -42,6 +42,8 @@ export const CREATE_FIELDS = { date, time, ...bookingFields, reconfirmation: opt
 export const WALK_IN_FIELDS = { date: optional(date), time: optional(time), ...bookingFields };
 
 export const MODIFY_FIELDS = {
+  // C87: not a change. The write goes through only while the stored version equals it.
+  version: optional(integer(1, Number.MAX_SAFE_INTEGER)),
   partySize: optional(partySize),
   tables: optional(tableIds),
   guest: optionalObject({ consent: optional(consent) }),
