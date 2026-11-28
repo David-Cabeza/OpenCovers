@@ -1,4 +1,5 @@
 import { errorMessage, isApiError } from "@/lib/error-message";
+import { tableRefusal } from "@/lib/table-refusal";
 import { statusLabel } from "@/components/agenda/status-badge";
 import { refreshBookings, rememberReservation, rereadReservation, sameTables } from "@/lib/reservation-cache";
 import { useRef, useState } from "react";
@@ -92,6 +93,16 @@ export function FloorView({ venueId }: { venueId: string }) {
     return names ? t("floor.moveConflict.at", { tables: names }) : t("floor.moveConflict.noTable");
   }
 
+  /** What to say when the engine refused the target table, or `null` for the code's general text. */
+  async function targetRefused(err: unknown, { read }: MoveStart, targetTableId: string) {
+    const booking = await read.catch(() => null);
+    if (!booking) return null;
+    const refusal = await tableRefusal(err, queryClient, venueId, booking, [targetTableId]);
+    if (!refusal) return null;
+    if (refusal.kind === "zone") return t("floor.moveRefused.zone", { zone: refusal.zone });
+    return t((booking.tables?.length ?? 0) > 1 ? "floor.moveRefused.joined" : "floor.moveRefused.seats");
+  }
+
   const move = useMutation({
     mutationFn: async ({ start, targetTableId }: { start: MoveStart; targetTableId: string }) => {
       const booking = await start.read;
@@ -106,9 +117,11 @@ export function FloorView({ venueId }: { venueId: string }) {
       rememberReservation(queryClient, venueId, saved);
       refreshBookings(queryClient, venueId);
     },
-    onError: async (err, { start }) => {
+    onError: async (err, { start, targetTableId }) => {
       if (!isApiError(err, "reservation_changed") && !isApiError(err, "reservation_not_found")) {
-        toast.error(errorMessage(err, t("floor.moveFailed")));
+        const refused = await targetRefused(err, start, targetTableId);
+        if (refused) toast.error(refused, { duration: 10_000 });
+        else toast.error(errorMessage(err, t("floor.moveFailed")));
         return;
       }
       const why = await moveRefused(start);
