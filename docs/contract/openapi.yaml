@@ -45,10 +45,9 @@ info:
     GAP, or PARTIAL when a first step is built, in
     docs/contract/conformance-status.md. Until they pass, a
     conforming engine refuses or ignores what the entry lists, as its text
-    says, so a client must not send it. Moving a booking to another date or
-    time (docs/adr/0028-move-a-reservation.md, C83 to C92) is planned this
-    way: today a modify with a different `date`, `time` or `zone` fails
-    with `invalid_request` and the problem `unchangeable` (C94).
+    says, so a client must not send it. The history of a move and checking
+    one before sending it (docs/adr/0028-move-a-reservation.md, C91 and
+    C92) are planned this way.
 
     Paths are relative to `/v1`, except `/w/embed.js`, `/w/{bookingKey}`
     and `/r`, which are served at the root of the widget origin.
@@ -598,45 +597,49 @@ paths:
         A modify that changes only `guest.consent` and/or `rating` is also
         accepted on `attended`. `cancelled` and `no_show` reject every modify
         with `invalid_transition`, except a modify whose only field is
-        `dietary: null` (C82). The guest is emailed only when the party
-        size changes (C4): a change of tables alone sends nothing. A modify that would leave a `seated` reservation
-        without tables fails with `table_required`. A table that another
-        booking holds fails with `slot_taken`. A table id that is not a table
-        of the venue, or a repeated id, fails with `invalid_request`, as on
-        create. A modify does not move a booking: `date`, `time` and `zone`
-        may only repeat its current values (C94). A modify that sends a
-        `version` other than the stored one fails with `reservation_changed`
-        (`409`), writes nothing and stores no key (C87). Moving is planned
-        and not built: see `x-planned` here and on `ReservationModify`.
-      x-planned:
-        cases: [C83, C84, C85, C86, C87, C88, C89, C90]
-        adr: docs/adr/0028-move-a-reservation.md
-        description: |
-          Not built. Once built, a `date` or `time` that differs from the
-          booking moves a `booked` reservation, and needs `version`. A
-          `zone` that differs places it in that zone. The move runs the
-          staff create's rules for the new slot in the create's order:
-          `outside_hours`, `lead_time_violation`, `beyond_booking_horizon`,
-          `date_blocked`, the service's `party_size_too_small` or
-          `party_size_too_large`, `guest_booking_limit` (only when the date
-          changes), then the tables. The reservation never counts against
-          itself. Without `tables` it keeps the tables it holds when they lie
-          in its zone, seat the party and are free for the new window, then
-          takes the free combination a create would assign, then the
-          overbooking ceiling, and otherwise fails with
-          `party_size_too_large` or `no_suitable_table`. On a `booked`
-          reservation, named `tables` must seat the party
-          (`party_size_too_large`), and a change of date, time or party size
-          recomputes the end from the turn times. A change of date or time
-          resets `reconfirmation` to `none` unless the body sets it, and
-          moves the self-service link's expiry to 48 hours after the new end
-          without rotating the link. Only `booked` changes date, time or
-          zone; any other status fails with `invalid_transition`. One
-          `confirmation` email goes out when the date, the time or the party size changes,
-          unless `notifyGuest` is `false`, and none for a change of tables
-          or zone alone. One `modified` event carries `changed`. A refused
-          modify writes nothing and stores no key. Equal `date`, `time` and
-          `zone` stay accepted without `version`.
+        `dietary: null` (C82).
+
+        A `date` or `time` that differs from the booking moves a `booked`
+        reservation and needs `version` (C83, C87). A `zone` that differs
+        places it in that zone. Other statuses answer `invalid_transition`
+        (C86). A move runs the staff create's rules for the new slot in the
+        create's order: `outside_hours`, `lead_time_violation`,
+        `beyond_booking_horizon`, `date_blocked`, the service's
+        `party_size_too_small` or `party_size_too_large`,
+        `guest_booking_limit` (only when the date changes), then the tables
+        (C84).
+
+        On a `booked` reservation a change of date, time, party size or zone
+        places its tables, and the booking never counts against itself.
+        Without `tables` it keeps the tables it holds when they seat the party
+        and are free for the window, then takes the free combination a create
+        would assign in the zone, then the overbooking ceiling, and otherwise
+        fails with `party_size_too_large` or `no_suitable_table`. A change of
+        date, time or zone keeps held tables only inside the zone; a change of
+        party size alone keeps them wherever they are.
+        Named `tables` must seat the party (`party_size_too_large`). They must
+        lie in the zone (`invalid_request`) on a change of date, time or zone;
+        on a change of party size alone, only those the booking does not hold
+        yet; on a change of tables alone, none, and the stored zone stays.
+        `tables: []` holds none under the overbooking ceiling, and still fails
+        with `party_size_too_large` when the party exceeds the capacity of the
+        zone or the venue, or the zone has no table; on a change of tables
+        alone the venue's capacity is the limit (C85). A change of date, time or party size recomputes the end from
+        the turn times. A change of date or time resets `reconfirmation` to
+        `none` unless the body sets it. A new end moves the self-service
+        link's expiry to 48 hours after it, without rotating the link (C89).
+
+        One `confirmation` email goes out when the date, the time or the
+        party size changes, unless `notifyGuest` is `false`, and none for a
+        change of tables or zone alone (C90).
+
+        A modify that would leave a `seated` reservation without tables fails
+        with `table_required`. A table that another booking holds fails with
+        `slot_taken`. A table id that is not a table of the venue, or a
+        repeated id, fails with `invalid_request`, as on create. A `version`
+        other than the stored one fails with `reservation_changed` (`409`).
+        A refused modify writes nothing and stores no key. `date`, `time` and
+        `zone` equal to the booking's change nothing and need no `version`.
       parameters:
         - $ref: "#/components/parameters/venueId"
         - $ref: "#/components/parameters/reservationId"
@@ -4635,44 +4638,19 @@ components:
       description: |
         Only these fields are taken (C94).
 
-        A modify does not move a booking. `date`, `time` and `zone` are not
-        changes: each is accepted when it equals, character for character,
-        what a read of the reservation returns (`date` as `YYYY-MM-DD`,
-        `time` as 24-hour `HH:MM` with two digits each, `zone` with the same
-        case, and the empty string for no zone), and then it changes
-        nothing. Any other string, another spelling of the same moment
-        included (`21:00:00`, `9:00`), fails with `invalid_request` and the
-        problem `unchangeable`, and nothing in the body is applied. The
-        values are compared inside the write transaction. A body that holds
-        only equal values answers 200 with the reservation unchanged, at the
-        same version, where the status accepts a modify. A repeat of a key
-        that already wrote is answered as a repeat, without comparing.
+        `date`, `time` and `zone` move the booking (C83). A value equal,
+        character for character, to what a read of the reservation returns
+        is not a change, and a body that holds only such values answers 200
+        with the reservation unchanged, at the same version, where the status
+        accepts a modify. `date` is `YYYY-MM-DD` and `time` is 24-hour
+        `HH:MM`: another format (`21:00:00`, `9:00`) fails with
+        `invalid_request` and the problem `invalid`. A field left out keeps
+        its value. The values are compared inside the write transaction. A
+        repeat of a key that already wrote is answered as a repeat, without
+        comparing.
 
-        `version` is not a change either: a body that holds only `version`
-        fails with `invalid_request`.
-      x-planned:
-        cases: [C83, C87, C90]
-        adr: docs/adr/0028-move-a-reservation.md
-        description: |
-          Not built. Today the route refuses `notifyGuest` as an unknown
-          field (C94), and `version` is never required. Once built, `date` (`YYYY-MM-DD`) and `time`
-          (`HH:MM`) that differ from the booking move it, `zone` that differs
-          places it in that zone, and `""` removes the zone. A field left out
-          keeps its value. Another format fails with `invalid_request` and
-          the problem `invalid`. `version` becomes required when `date` or
-          `time` differs from the booking, else `invalid_request` with
-          `details.fields` `[{ "path": "version", "problem": "missing" }]`.
-          Equal values remain no change and need no `version`. A body whose
-          only fields are `version` and `notifyGuest` fails with
-          `invalid_request`.
-        properties:
-          notifyGuest:
-            type: boolean
-            default: true
-            description: |
-              `false` sends no email for this modify. Otherwise one
-              `confirmation` goes to the guest when the date, the time or the
-              party size changes (C90).
+        `version` and `notifyGuest` are not changes: a body that holds only
+        them fails with `invalid_request`.
       properties:
         version:
           type: integer
@@ -4683,25 +4661,35 @@ components:
             the stored version, else `reservation_changed` and nothing is
             written (C87). It is compared inside the write transaction, after
             the repeat of a key and `reservation_not_found`, and before
-            `invalid_transition`, `unchangeable` and every other rule. A
-            repeat of a key that already wrote is not compared.
+            `invalid_transition` and every other rule. A repeat of a key that
+            already wrote is not compared. Required when `date` or `time`
+            differs from the booking, else `invalid_request` with
+            `details.fields` `[{ "path": "version", "problem": "missing" }]`.
         date:
           type: string
           format: date
-          description: May only repeat the current date until C83 is built.
+          description: The new local date. A value equal to the booking's is not a change.
         time:
           type: string
-          description: May only repeat the current time, as `HH:MM`, until C83 is built.
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+          description: The new local start, `HH:MM`. A value equal to the booking's is not a change.
         partySize:
           type: integer
           minimum: 1
           maximum: 10000
         zone:
           type: string
-          description: May only repeat the current zone until C83 is built.
+          description: The zone to place the booking in. `""` removes it. A value equal to the booking's is not a change.
         tables:
           type: array
           items: { type: string }
+        notifyGuest:
+          type: boolean
+          default: true
+          description: |
+            `false` sends no email for this modify (C90). Not a change: a body
+            that holds only `version` and `notifyGuest` fails with
+            `invalid_request`.
         guest:
           $ref: "#/components/schemas/GuestModify"
         rating:
@@ -6483,8 +6471,8 @@ components:
                     description: |
                       `unknown` is a field the write does not take, `missing`
                       a required field left out, `invalid` a wrong type or a
-                      value out of range, and `unchangeable` a `date`, `time`
-                      or `zone` of a modify that differs from the booking.
+                      value out of range, and `unchangeable` a field a write
+                      does not change. No route answers it today.
                     enum: [unknown, missing, invalid, unchangeable]
 
     ErrorCode:

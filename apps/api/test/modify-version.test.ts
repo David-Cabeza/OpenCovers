@@ -1,4 +1,4 @@
-// C87, the part that is built: a staff modify that sends `version` writes only over the version it names.
+// C87: a staff modify that sends `version` writes only over the version it names. Moves: move-reservation.test.ts.
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import app from "../src/app";
@@ -138,7 +138,7 @@ describe("POST /reservations/{id}/modify with version", () => {
     expect(res.body.code).toBe("reservation_not_found");
   });
 
-  it("answers reservation_changed before invalid_transition and before a restated value", async () => {
+  it("answers reservation_changed before invalid_transition and before a move", async () => {
     const { id } = await booked();
     expect((await post(`/reservations/${id}/cancel`)).status).toBe(200);
     await expectChanged(() => modify(id, { partySize: 3, version: 1 }));
@@ -148,7 +148,7 @@ describe("POST /reservations/{id}/modify with version", () => {
     await modify(other.id, { rating: 5 });
     await expectChanged(() => modify(other.id, { time: "22:00", version: 1 }));
     const res = await modify(other.id, { time: "22:00", version: 2 });
-    expect(res.body.details).toEqual({ fields: [{ path: "time", problem: "unchangeable" }] });
+    expect(res.body).toMatchObject({ time: "22:00", version: 3 });
   });
 
   it("holds a dietary withdrawal to the version it names, on any status", async () => {

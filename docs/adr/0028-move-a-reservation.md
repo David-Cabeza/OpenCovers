@@ -1,12 +1,14 @@
 # ADR-0028: Move a reservation to another date or time
 
-- Status: Proposed (contract written as C83 to C92; only the optional `version` check is built)
+- Status: Accepted (phase 1 built for C83 to C90, apart from the match with the explanation in C84; C91 and C92 not built)
 - Date: 2026-11-27
 - Deciders: David Cabeza (owner)
 
-One part of this record is built: the optional `version` of a staff modify and its `reservation_changed` (sections 2 and 6, C87 partly). Nothing else is. The owner approved its decisions on 2026-11-26. This record covers phase 1: staff and integrators move a booking through the API. The contract (`docs/contract`) and the conformance cases C83 to C92 are written first, as GAP, and the code follows in a separate change.
+The owner approved its decisions on 2026-11-26. This record covers phase 1: staff and integrators move a booking through the API. The contract (`docs/contract`) and the conformance cases C83 to C92 were written first, as GAP.
 
-Today a modify whose `date`, `time` or `zone` differs from the booking fails with `400 invalid_request` and the problem `unchangeable`, and nothing moves (C94, [ADR-0029](0029-contract-rules-for-writes.md)). Apart from that check, a client must not rely on anything below until `conformance-status.md` marks C83 to C92 as passing.
+Sections 2 to 8 are built, with section 1 for create and modify. Not built: `changed` and the placement history of section 9, and `reservationId` on the availability reads of section 10. A client must not rely on those until `conformance-status.md` marks C91 and C92 as passing.
+
+Two points the code settles. The overbooking ceiling of section 4 takes only a party within the zone's or the venue's capacity, as for a create (C24), also when the body says `tables: []`. The new expiry of section 7 applies to the link that is not revoked.
 
 ## Context
 
@@ -67,7 +69,7 @@ The time rules run only when the date or the time changes. A change of party siz
 - The other fields keep their meaning. Everything in one body is applied in one transaction, with one new version and one event, or nothing is applied.
 - A value is always absolute, so a repeat leads to the same state.
 
-Compatibility: an integrator that sends `date`, `time` and `partySize` with every modify keeps working. Equal values change nothing and need no `version`, as C94 says today.
+Compatibility: an integrator that sends `date`, `time` and `partySize` with every modify keeps working. Equal values change nothing and need no `version`, as C94 says.
 
 ### 3. Rules for the new slot
 
@@ -84,15 +86,22 @@ Not checked: the guest blocklist, `maxOpenBookingsPerContact` (public create onl
 
 ### 4. Tables
 
-On a `booked` reservation, a change of date, time, party size or zone places its tables:
+On a `booked` reservation, a change of date, time, party size or zone places its tables. The zone binds them as the amendment below says:
 
-- With `tables`, it holds exactly those, checked in the create's order. An unknown or repeated id fails with `invalid_request`. Tables whose seats add up to less than the party fail with `party_size_too_large`. A table outside the zone, when the booking has one, fails with `invalid_request`. A table another booking holds in the new window fails with `slot_taken`. `tables: []` holds none and passes the ceiling check, as today.
+- With `tables`, it holds exactly those, checked in the create's order. An unknown or repeated id fails with `invalid_request`. Tables whose seats add up to less than the party fail with `party_size_too_large`. A table outside the zone, when the booking has one, fails with `invalid_request`. A table another booking holds in the new window fails with `slot_taken`. `tables: []` holds none and passes the ceiling check. The ceiling does not lift the capacity limit: a party larger than the zone's or the venue's capacity, a zone with no table included, fails with `party_size_too_large`.
 - Without `tables`, it keeps the tables it holds when they lie in the zone (any table, when the booking has no zone), seat the party and are free for the new window apart from itself. A regular keeps the table.
 - Otherwise it takes the free combination a create would assign in the zone.
 - Otherwise, when the venue's `overbookingCeiling` has room for the party in the new window, it holds no tables (C24).
 - Otherwise it fails with `party_size_too_large` when the party exceeds the zone's or the venue's capacity, and with `no_suitable_table` when it does not.
 
-A change of `tables` alone on a `booked` reservation is held to the same rule for named tables. A `seated` reservation keeps today's rules (C4, C26).
+A change of `tables` alone on a `booked` reservation is held to the same rule for the seats of named tables. A `seated` reservation keeps today's rules (C4, C26).
+
+Amendment of 2026-11-28, which replaces what the list above says about the zone:
+
+- Decided by the owner: staff may keep moving a booking onto tables outside its zone. A staff modify that names tables and changes none of date, time, party size and zone does not require the zone of them. The seats are still checked and the stored zone stays.
+- Following from it: while date, time and zone are unchanged, as on a later party change, the tables the booking holds are kept if they are free and seat the party, also outside the zone, so a party moved indoors is not silently sent back. A table named anew by a party change must lie in the zone. A booking whose zone no table has any more can therefore shrink its party on the tables it holds.
+- A change of date, time or zone applies the zone to the tables it keeps, takes or names.
+- `tables: []` is held to the zone's capacity, except on a change of `tables` alone, where the venue's capacity is the limit.
 
 The reservation never counts against itself. Its own allocations do not block the search, its covers do not count twice under the ceiling, and the daily cap leaves it out. Moving 20:00 to 20:30 on the same table works.
 

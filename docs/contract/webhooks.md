@@ -37,7 +37,7 @@ Each event is one `POST` with `Content-Type: application/json`:
 
 `type` is one of `created`, `modified`, `cancelled`, `seated`, `attended`, `no_show`, or `erased`. An `erased` event also carries `tombstoneHash`. `id` is the feed's event id, as a string.
 
-Planned and not built ([ADR-0028](../adr/0028-move-a-reservation.md), C91): a `modified` event will carry `changed`, the names of the placement fields the write changed, from `date`, `time`, `service`, `partySize`, `zone` and `tables`, never their values. It is empty when only other fields changed, so it never says that `dietary` changed. A move of a booking to another date or time is one `modified` event, never a `cancelled` and a `created`. Today no event carries `changed`. A receiver that does not know the field ignores it and reads the reservation, as it does now.
+Planned and not built ([ADR-0028](../adr/0028-move-a-reservation.md), C91): a `modified` event will carry `changed`, the names of the placement fields the write changed, from `date`, `time`, `service`, `partySize`, `zone` and `tables`, never their values. It is empty when only other fields changed, so it never says that `dietary` changed. A move of a booking to another date or time is already one `modified` event, never a `cancelled` and a `created` (C83). Today no event carries `changed`. A receiver that does not know the field ignores it and reads the reservation, as it does now.
 
 Headers:
 

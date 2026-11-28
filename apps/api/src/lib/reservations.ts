@@ -17,7 +17,7 @@ import { blockedRange } from "./booking-policy";
 import { normalizeCommentary } from "./commentary";
 import { consentColumns, type Consent } from "./consent";
 import { recordDietary, sameDietary, type DietaryValue, type StoredDietary } from "./dietary";
-import { normalizeContact, venueCountry } from "./contact";
+import { normalizeContact, venueCountry, type ContactKey } from "./contact";
 import { linkGuest } from "./guests";
 import { sandboxGuestsFull, sandboxReservationsFull } from "../demo/limits";
 import { demoMode } from "../demo/settings";
@@ -26,8 +26,7 @@ import { claimKey } from "./idempotency";
 import type { Origin } from "./origin";
 import { ratingColumns, type Rating } from "./rating";
 import { reconfirmationColumns, type Reconfirmation } from "./reconfirmation";
-import { linkWorks, mintLink, revokeForCancel, rotateLink } from "./self-service";
-import { movedFields, type Slot } from "./staff-writes";
+import { linkWorks, mintLink, moveLinkExpiry, revokeForCancel, rotateLink } from "./self-service";
 import {
   addDays,
   formatTime,
@@ -118,9 +117,15 @@ export interface ModifyReservationInput {
   dietary?: DietaryValue | null;
   /** The body held only `dietary: null`. A withdrawal is accepted on every status, the one exception to C4. */
   dietaryWithdrawal?: boolean;
-  /** C94: date, time and zone the body repeats. Each must equal the stored one, or nothing is written. */
-  restated?: Partial<Slot>;
-  /** The version the caller read. Another stored version refuses with `reservation_changed` (C49, C87). */
+  /** ADR-0028: the slot to move a `booked` reservation to. A value equal to the stored one is not a change. */
+  date?: string;
+  time?: string;
+  /** The zone to place the booking in. `""` removes it. */
+  zone?: string;
+  /**
+   * The version the caller read. Another stored version refuses with `reservation_changed` (C49, C87). A change of
+   * date or time requires it.
+   */
   version?: number;
   selfService?: SelfServiceWrite & { rules: OnlineRules };
   origin?: Origin | null;
@@ -295,10 +300,11 @@ export type WriteErrorCode =
 
 /**
  * `selfServiceToken` is set only by a public create: the new link, or null on a repeat for a booking no longer `booked`.
- * `partySizeChanged` is set only by a modify that changed the party size: a repeat of a key never sets it.
+ * `slotOrPartyChanged` is set only by a modify that changed the date, the time or the party size (C90): a repeat of a
+ * key never sets it.
  */
 export type WriteResult =
-  | { ok: true; id: string; version: number; selfServiceToken?: string | null; partySizeChanged?: boolean }
+  | { ok: true; id: string; version: number; selfServiceToken?: string | null; slotOrPartyChanged?: boolean }
   | { ok: false; code: WriteErrorCode; fields?: FieldProblem[] };
 
 export type CancelResult =
@@ -440,12 +446,24 @@ interface SlotRequest {
   tableIds?: string[];
   /** A reservation to leave out of the table search and the ceiling, so it never counts against itself. */
   exceptId?: string;
+  /** Tables the reservation holds. The search keeps them while they are free, seat the party and lie in the zone. */
+  heldTableIds?: string[];
+  /**
+   * Which tables need not lie in the zone, when date, time and zone are the booking's own (ADR-0028, section 4): the
+   * ones it holds, or, on a change of tables alone, any. Left out, the zone applies to every table.
+   */
+  outOfZone?: "held" | "any";
+  /**
+   * The booking keeps its date and time, so no time or service rule runs (ADR-0028, section 1). Its start stands,
+   * and its end too unless left out, in which case the turn time of the party sets it.
+   */
+  keeps?: { startsAt: Date; endsAt?: Date };
 }
 
 function bookingWindow(venue: VenueRow, request: SlotRequest) {
   const minutes = request.durationMinutes ?? turnMinutes(venue.turnTimes, request.partySize);
-  const startsAt = toTimestamp(request.date, request.time, venue.timezone);
-  return { startsAt, endsAt: new Date(startsAt.getTime() + minutes * 60000) };
+  const startsAt = request.keeps?.startsAt ?? toTimestamp(request.date, request.time, venue.timezone);
+  return { startsAt, endsAt: request.keeps?.endsAt ?? new Date(startsAt.getTime() + minutes * 60000) };
 }
 
 // The service that covers a local date and time. A service belongs to the weekday it
@@ -664,40 +682,84 @@ async function tableReasons(
   };
 }
 
+/** Whether a reservation can stay on the tables it holds: all in the zone when one is given, seating it and free. */
+async function stillFit(
+  exec: Db | DbTx,
+  venueId: string,
+  startsAt: Date,
+  endsAt: Date,
+  partySize: number,
+  zone: string,
+  tableIds: string[],
+  exceptId?: string,
+) {
+  if (tableIds.length === 0) return false;
+  const rows = await exec
+    .select({ seats: tables.seats })
+    .from(tables)
+    .where(and(eq(tables.venueId, venueId), inArray(tables.id, tableIds), zone ? eq(tables.zone, zone) : undefined));
+  if (rows.length !== tableIds.length || rows.reduce((sum, t) => sum + t.seats, 0) < partySize) return false;
+  const busy = await exec
+    .select({ tableId: tableAllocations.tableId })
+    .from(tableAllocations)
+    .where(
+      and(
+        eq(tableAllocations.venueId, venueId),
+        inArray(tableAllocations.tableId, tableIds),
+        eq(tableAllocations.active, true),
+        lt(tableAllocations.startsAt, endsAt),
+        gt(tableAllocations.endsAt, startsAt),
+        exceptId ? ne(tableAllocations.reservationId, exceptId) : undefined,
+      ),
+    )
+    .limit(1);
+  return busy.length === 0;
+}
+
 /** Whether the overbooking ceiling takes the party. A read only looks; a write takes the lock first (C24). */
 type OverbookRoom = (startsAt: Date, endsAt: Date, covers: number, exceptId?: string) => Promise<boolean>;
 
 /**
- * Places a reservation: its service, window and tables (ADR-0028, section 1). Create and the availability reads all
- * place through here. It reads and never writes. `venue` and `serviceRows` are the channel's view (`applyChannel`).
+ * Places a reservation: its service, window and tables (ADR-0028, section 1). Create, a modify of a `booked`
+ * reservation and the availability reads all place through here. It reads and never writes. `venue` and `serviceRows` are the channel's view (`applyChannel`).
  *
- * `reasons` are the time and service rules the slot breaks, in order. `refusal` is the first code that refuses it
+ * `reasons` are the time and service rules the slot breaks, in order. A request that `keeps` its slot has none, and
+ * no `service` either: the booking keeps the one it has. `refusal` is the first code that refuses it
  * before any table is searched: those rules, then the named tables. The search is `findTables`, apart, so that a write
  * can check its guest caps and take the planner lock first. It answers no tables when the ceiling takes the party.
  */
 async function placeSlot(db: Db | DbTx, venue: ChannelVenue, serviceRows: ServiceRow[], request: SlotRequest) {
   const { partySize, zone, tableIds, exceptId } = request;
   const { startsAt, endsAt } = bookingWindow(venue, request);
-  const { service, reasons } = timeReasons(venue, serviceRows, request, startsAt, Date.now());
+  const { service, reasons } = request.keeps
+    ? { service: null, reasons: [] }
+    : timeReasons(venue, serviceRows, request, startsAt, Date.now());
   reasons.push(...serviceReasons(service, request));
-  let refusal: WriteErrorCode | null = reasons[0]?.code ?? (service ? null : "outside_hours");
+  let refusal: WriteErrorCode | null = reasons[0]?.code ?? (service || request.keeps ? null : "outside_hours");
   if (!refusal && tableIds?.length) {
     if (!(await knownDistinctTables(db, venue.id, tableIds))) {
       refusal = "invalid_request";
     } else if (partySize > (await totalSeats(db, venue.id, tableIds))) {
       refusal = "party_size_too_large";
-    } else if (zone !== "") {
+    } else if (zone !== "" && request.outOfZone !== "any") {
+      const exempt = request.outOfZone === "held" ? (request.heldTableIds ?? []) : [];
+      const bound = tableIds.filter((id) => !exempt.includes(id));
       const inZone = await db
         .select({ id: tables.id })
         .from(tables)
-        .where(and(eq(tables.venueId, venue.id), inArray(tables.id, tableIds), eq(tables.zone, zone)));
-      if (inZone.length !== tableIds.length) refusal = "invalid_request";
+        .where(and(eq(tables.venueId, venue.id), inArray(tables.id, bound), eq(tables.zone, zone)));
+      if (inZone.length !== bound.length) refusal = "invalid_request";
     }
   }
   const findTables = async (
     exec: Db | DbTx,
     overbookRoom: OverbookRoom,
   ): Promise<{ ok: true; tableIds: string[] } | { ok: false; reason: Reason }> => {
+    const held = request.heldTableIds ?? [];
+    const heldZone = request.outOfZone ? "" : zone;
+    if (await stillFit(exec, venue.id, startsAt, endsAt, partySize, heldZone, held, exceptId)) {
+      return { ok: true, tableIds: held };
+    }
     const fit = await tableReasons(exec, venue.id, startsAt, endsAt, partySize, zone, exceptId);
     const overbooks =
       !fit.ok &&
@@ -894,6 +956,30 @@ async function isErased(tx: DbTx, venueId: string, id: string): Promise<boolean>
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+/** Serializes count-then-write of one contact's bookings on one date, until the transaction ends. */
+async function lockGuestDay(tx: DbTx, venueId: string, contact: ContactKey, date: string) {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`guest-day:${venueId}:${contact.kind}:${contact.value}:${date}`}, 0))`,
+  );
+}
+
+/** The guest's active bookings on a date, `exceptId` left out. */
+async function guestDayCount(tx: DbTx, venueId: string, guestId: string, date: string, exceptId?: string) {
+  const [{ held }] = await tx
+    .select({ held: count() })
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.venueId, venueId),
+        eq(reservations.guestId, guestId),
+        eq(reservations.date, date),
+        inArray(reservations.status, ACTIVE_STATUSES),
+        exceptId ? ne(reservations.id, exceptId) : undefined,
+      ),
+    );
+  return held;
+}
+
 export async function createReservation(
   db: Db,
   venueId: string,
@@ -949,11 +1035,7 @@ export async function createReservation(
       }
       const cap = request.walkIn ? null : venue.maxActivePerGuestPerDay;
       // linkGuest also row-locks the guest, but only as a side effect. This lock keeps count-then-insert serial on its own.
-      if (cap !== null && contactKey) {
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`guest-day:${venueId}:${contactKey.kind}:${contactKey.value}:${input.date}`}, 0))`,
-        );
-      }
+      if (cap !== null && contactKey) await lockGuestDay(tx, venueId, contactKey, input.date);
       if (openCap !== null && contactKey) {
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${`online-open:${venueId}:${contactKey.kind}:${contactKey.value}`}, 0))`,
@@ -965,19 +1047,8 @@ export async function createReservation(
       if (sandbox && guest && (await sandboxGuestsFull(tx as unknown as Db, venueId))) {
         throw new ReservationError("guest_booking_limit");
       }
-      if (cap !== null && guest) {
-        const [{ held }] = await tx
-          .select({ held: count() })
-          .from(reservations)
-          .where(
-            and(
-              eq(reservations.venueId, venueId),
-              eq(reservations.guestId, guest.id),
-              eq(reservations.date, input.date),
-              inArray(reservations.status, ACTIVE_STATUSES),
-            ),
-          );
-        if (held >= cap) throw new ReservationError("guest_booking_limit");
+      if (cap !== null && guest && (await guestDayCount(tx, venueId, guest.id, input.date)) >= cap) {
+        throw new ReservationError("guest_booking_limit");
       }
       if (openCap !== null && guest) {
         const [{ held }] = await tx
@@ -1152,6 +1223,67 @@ async function guestTables(tx: DbTx, venueId: string, current: ReservationRow, p
   return fit.tableIds;
 }
 
+/**
+ * Where a staff modify puts a `booked` reservation (ADR-0028, sections 3 and 4): the first refusal, thrown, or its
+ * service, window and tables. The time rules, the service limits and the daily cap run only when the date or the time
+ * changes. It takes the guest-day lock, the planner lock and, for a booking left without tables, the overbooking lock,
+ * in that order. The caller holds the reservation's row lock and writes the result. A create takes the guest-day lock
+ * while it holds no existing reservation's row, so taking it after the row closes no cycle.
+ */
+async function placeAgain(
+  tx: DbTx,
+  venue: VenueRow,
+  current: ReservationRow,
+  next: { date: string; time: string; zone: string; partySize: number; slotChanged: boolean },
+  namedTableIds: string[] | undefined,
+  heldTableIds: string[],
+) {
+  const { date, time, zone, partySize, slotChanged } = next;
+  const serviceRows = await tx.select().from(services).where(eq(services.venueId, venue.id));
+  const resized = partySize !== current.partySize;
+  const outOfZone = slotChanged || zone !== current.zone ? undefined : resized ? "held" : "any";
+  const request: SlotRequest = {
+    date,
+    time,
+    partySize,
+    zone,
+    walkIn: false,
+    tableIds: namedTableIds,
+    exceptId: current.id,
+    heldTableIds,
+    outOfZone,
+    keeps: slotChanged ? undefined : { startsAt: current.startsAt, endsAt: resized ? undefined : current.endsAt },
+  };
+  const { service, startsAt, endsAt, reasons, refusal, findTables } = await placeSlot(tx, venue, serviceRows, request);
+  if (reasons.length > 0 || (slotChanged && !service)) throw new ReservationError(reasons[0]?.code ?? "outside_hours");
+  const cap = venue.maxActivePerGuestPerDay;
+  if (date !== current.date && cap !== null && current.guestId) {
+    const contact = normalizeContact(current.guestContact, venueCountry(venue));
+    if (contact) await lockGuestDay(tx, venue.id, contact, date);
+    if ((await guestDayCount(tx, venue.id, current.guestId, date, current.id)) >= cap) {
+      throw new ReservationError("guest_booking_limit");
+    }
+  }
+  if (refusal) throw new ReservationError(refusal);
+  await lockPlanner(tx, venue.id);
+  const placed = { service: service?.name ?? current.service, startsAt, endsAt };
+  const overbookRoom: OverbookRoom = (...slot) => claimOverbookRoom(tx, venue.id, ...slot);
+  if (namedTableIds === undefined) {
+    const found = await findTables(tx, overbookRoom);
+    if (!found.ok) throw new ReservationError(found.reason.code);
+    return { ...placed, tableIds: found.tableIds };
+  }
+  if (namedTableIds.length === 0) {
+    // The ceiling never takes more than the zone or the venue seats (C24), nor a zone without tables. A change of
+    // tables alone asks nothing of the zone, so only the venue's seats bind it.
+    const bound = outOfZone === "any" ? "" : zone;
+    const fit = await tableReasons(tx, venue.id, startsAt, endsAt, partySize, bound, current.id);
+    if (!fit.ok && fit.reason.code === "party_size_too_large") throw new ReservationError(fit.reason.code);
+    if (!(await overbookRoom(startsAt, endsAt, partySize, current.id))) throw new ReservationError("no_suitable_table");
+  }
+  return { ...placed, tableIds: namedTableIds };
+}
+
 export async function modifyReservation(
   db: Db,
   venueId: string,
@@ -1160,7 +1292,7 @@ export async function modifyReservation(
   key: string,
 ): Promise<WriteResult> {
   const guest = input.selfService;
-  let partySizeChanged = false;
+  let slotOrPartyChanged = false;
   try {
     const version = await db.transaction(async (tx) => {
       await boundLockWaits(tx);
@@ -1182,16 +1314,24 @@ export async function modifyReservation(
       )[0];
       if (!current) throw new ReservationError("reservation_not_found");
       if (guest) assertChangeable(current, guest);
+      const venue = (await tx.select().from(venues).where(eq(venues.id, venueId)).limit(1))[0];
+      const storedTime = formatTime(current.startsAt, venue.timezone);
+      const date = input.date ?? current.date;
+      const time = input.time ?? storedTime;
+      const zone = input.zone ?? current.zone;
+      const slotChanged = date !== current.date || time !== storedTime;
+      const zoneChanged = zone !== current.zone;
+      if (slotChanged && input.version === undefined) {
+        throw new ReservationError("invalid_request", [{ path: "version", problem: "missing" }]);
+      }
       if (input.version !== undefined && current.version !== input.version) {
         throw new ReservationError("reservation_changed");
       }
-      if (input.restated) {
-        const [{ timezone }] = await tx.select({ timezone: venues.timezone }).from(venues).where(eq(venues.id, venueId));
-        const stored = { date: current.date, time: formatTime(current.startsAt, timezone), zone: current.zone };
-        const moved = movedFields(input.restated, stored);
-        if (moved.length > 0) throw new ReservationError("invalid_request", moved);
-      }
       if (!input.dietaryWithdrawal && !MODIFIABLE_STATUSES.includes(current.status)) {
+        throw new ReservationError("invalid_transition");
+      }
+
+      if ((slotChanged || zoneChanged) && current.status !== "booked") {
         throw new ReservationError("invalid_transition");
       }
 
@@ -1199,18 +1339,26 @@ export async function modifyReservation(
         input.partySize !== undefined && input.partySize !== current.partySize;
       const tableIds =
         guest && partyChanged ? await guestTables(tx, venueId, current, input.partySize!, guest.rules) : input.tableIds;
-      let tablesChanged = false;
-      if (tableIds !== undefined) {
-        if (!(await knownDistinctTables(tx, venueId, tableIds))) throw new ReservationError("invalid_request");
-        const currentTables = await tx
+      const currentIds = (
+        await tx
           .select({ tableId: tableAllocations.tableId })
           .from(tableAllocations)
-          .where(eq(tableAllocations.reservationId, id));
-        const currentIds = currentTables.map((t) => t.tableId).sort();
-        const nextIds = [...tableIds].sort();
-        tablesChanged =
-          currentIds.length !== nextIds.length ||
-          currentIds.some((v, i) => v !== nextIds[i]);
+          .where(eq(tableAllocations.reservationId, id))
+      )
+        .map((t) => t.tableId)
+        .sort();
+      const differs = (ids: string[]) => {
+        const sorted = [...ids].sort();
+        return currentIds.length !== sorted.length || currentIds.some((v, i) => v !== sorted[i]);
+      };
+      let tablesChanged = tableIds !== undefined && differs(tableIds);
+      // ADR-0028: a staff change of where or how many places a `booked` reservation again. A `seated` one and a
+      // guest's own party change keep their window and the rules of C4, C26 and C49.
+      const places =
+        !guest && current.status === "booked" && (slotChanged || zoneChanged || partyChanged || tablesChanged);
+      // A placement checks the named tables itself, after the rules of the slot (C84).
+      if (!places && tableIds !== undefined && !(await knownDistinctTables(tx, venueId, tableIds))) {
+        throw new ReservationError("invalid_request");
       }
 
       if (
@@ -1225,16 +1373,8 @@ export async function modifyReservation(
         throw new ReservationError("table_required");
       }
 
-      if (tablesChanged || grows) {
-        const held =
-          tableIds !== undefined
-            ? tableIds.length
-            : (
-                await tx
-                  .select({ tableId: tableAllocations.tableId })
-                  .from(tableAllocations)
-                  .where(eq(tableAllocations.reservationId, id))
-              ).length;
+      if (!places && (tablesChanged || grows)) {
+        const held = tableIds !== undefined ? tableIds.length : currentIds.length;
         const covers = input.partySize ?? current.partySize;
         if (held === 0 && !(await claimOverbookRoom(tx, venueId, current.startsAt, current.endsAt, covers, id))) {
           throw new ReservationError("no_suitable_table");
@@ -1258,6 +1398,8 @@ export async function modifyReservation(
       }
 
       if (
+        !slotChanged &&
+        !zoneChanged &&
         !partyChanged &&
         !tablesChanged &&
         !consentChanged &&
@@ -1276,37 +1418,58 @@ export async function modifyReservation(
         return current.version;
       }
 
+      const placed = places
+        ? await placeAgain(
+            tx,
+            venue,
+            current,
+            { date, time, zone, partySize: input.partySize ?? current.partySize, slotChanged },
+            input.tableIds,
+            currentIds,
+          )
+        : undefined;
+      const nextTableIds = placed?.tableIds ?? tableIds;
+      if (placed) tablesChanged = differs(placed.tableIds);
+      const window = placed ?? current;
+      const startMoved = window.startsAt.getTime() !== current.startsAt.getTime();
+      const endMoved = window.endsAt.getTime() !== current.endsAt.getTime();
       // Before the delete below: two modifies that had each freed a table would wait on each other's.
-      if (tablesChanged && tableIds!.length > 0) await lockPlanner(tx, venueId);
+      if (tablesChanged && nextTableIds!.length > 0) await lockPlanner(tx, venueId);
 
       const nextVersion = current.version + 1;
       await tx
         .update(reservations)
         .set({
           version: nextVersion,
+          ...(placed
+            ? { date, zone, service: placed.service, startsAt: placed.startsAt, endsAt: placed.endsAt }
+            : {}),
           ...(partyChanged ? { partySize: input.partySize! } : {}),
           ...(consentChanged ? consentColumns(input.consent!) : {}),
           ...(ratingChanged ? ratingColumns(input.rating!) : {}),
           ...(commentaryChanged ? { commentary } : {}),
           ...(dietaryChanged ? { dietary: recordDietary(input.dietary!, input.origin) } : {}),
+          // A reconfirmation was of the old slot. It stays only when the same body sets it.
+          ...(slotChanged && input.reconfirmation === undefined ? reconfirmationColumns("none") : {}),
           ...(reconfirmationChanged ? reconfirmationColumns(input.reconfirmation!) : {}),
         })
         .where(eq(reservations.id, id));
-      if (tablesChanged) {
+      if (tablesChanged || startMoved || endMoved) {
         await tx.delete(tableAllocations).where(eq(tableAllocations.reservationId, id));
-        for (const tableId of tableIds!) {
+        for (const tableId of nextTableIds ?? currentIds) {
           await tx.insert(tableAllocations).values({
             reservationId: id, venueId, tableId,
-            startsAt: current.startsAt, endsAt: current.endsAt,
+            startsAt: window.startsAt, endsAt: window.endsAt,
           });
         }
       }
+      if (endMoved) await moveLinkExpiry(tx, venueId, id, window.endsAt);
       await tx.insert(idempotencyKeys).values({ key, venueId, reservationId: id, kind: "modify", version: nextVersion });
       await appendEvents(tx, venueId, [{ type: "modified", reservationId: id, version: nextVersion, origin: input.origin }]);
-      partySizeChanged = partyChanged;
+      slotOrPartyChanged = slotChanged || partyChanged;
       return nextVersion;
     });
-    return { ok: true, id, version, ...(partySizeChanged ? { partySizeChanged } : {}) };
+    return { ok: true, id, version, ...(slotOrPartyChanged ? { slotOrPartyChanged } : {}) };
   } catch (error) {
     // A guest's party never uses the ceiling, so a table taken by a concurrent write leaves no fitting table.
     if (isExclusionViolation(error)) return { ok: false, code: guest ? "no_suitable_table" : "slot_taken" };

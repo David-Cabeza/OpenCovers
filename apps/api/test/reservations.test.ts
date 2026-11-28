@@ -120,8 +120,8 @@ describe("reservations", () => {
     if (!created.ok) throw new Error("create failed");
     const m1 = await modifyReservation(db, "modify", created.id, { partySize: 3 }, "k2");
     const m2 = await modifyReservation(db, "modify", created.id, { partySize: 4 }, "k3");
-    expect(m1).toEqual({ ok: true, id: created.id, version: 2, partySizeChanged: true });
-    expect(m2).toEqual({ ok: true, id: created.id, version: 3, partySizeChanged: true });
+    expect(m1).toEqual({ ok: true, id: created.id, version: 2, slotOrPartyChanged: true });
+    expect(m2).toEqual({ ok: true, id: created.id, version: 3, slotOrPartyChanged: true });
   });
 
   it("does not bump the version on a no-op modify", async () => {
@@ -129,7 +129,7 @@ describe("reservations", () => {
     const created = await createReservation(db, "modify-noop", input, "k1");
     if (!created.ok) throw new Error("create failed");
     const changed = await modifyReservation(db, "modify-noop", created.id, { partySize: 3 }, "k2");
-    expect(changed).toEqual({ ok: true, id: created.id, version: 2, partySizeChanged: true });
+    expect(changed).toEqual({ ok: true, id: created.id, version: 2, slotOrPartyChanged: true });
     const noop = await modifyReservation(db, "modify-noop", created.id, { partySize: 3 }, "k3");
     expect(noop).toEqual({ ok: true, id: created.id, version: 2 });
   });
