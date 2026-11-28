@@ -28,7 +28,6 @@ export default defineMessages({
     "reservation.assign.done": "Tables assigned",
     "reservation.assign.failed": "Could not assign the tables.",
     "reservation.assign.refusedSeats": "Not saved: those tables do not seat the whole party. Add a table or pick bigger ones.",
-    "reservation.assign.refusedZone": "Not saved: this booking is for the {zone} zone. Remove the tables in other zones from the selection: {tables}.",
     "reservation.assign.save": "Save tables",
     "reservation.cancel.title": "Cancel this reservation?",
     "reservation.cancel.description":
@@ -126,7 +125,6 @@ export default defineMessages({
     "reservation.assign.done": "Mesas asignadas",
     "reservation.assign.failed": "No se pudieron asignar las mesas.",
     "reservation.assign.refusedSeats": "No se ha guardado: en esas mesas no cabe todo el grupo. Añade una mesa o elige otras más grandes.",
-    "reservation.assign.refusedZone": "No se ha guardado: esta reserva es de la zona {zone}. Quita de la selección las mesas de otras zonas: {tables}.",
     "reservation.assign.save": "Guardar mesas",
     "reservation.cancel.title": "¿Cancelar esta reserva?",
     "reservation.cancel.description":

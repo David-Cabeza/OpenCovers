@@ -1,5 +1,4 @@
 import { errorMessage, isApiError } from "@/lib/error-message";
-import { tableRefusal } from "@/lib/table-refusal";
 import { statusLabel } from "@/components/agenda/status-badge";
 import { refreshBookings, rememberReservation, rereadReservation, sameTables } from "@/lib/reservation-cache";
 import { useRef, useState } from "react";
@@ -93,14 +92,10 @@ export function FloorView({ venueId }: { venueId: string }) {
     return names ? t("floor.moveConflict.at", { tables: names }) : t("floor.moveConflict.noTable");
   }
 
-  /** What to say when the engine refused the target table, or `null` for the code's general text. */
-  async function targetRefused(err: unknown, { read }: MoveStart, targetTableId: string) {
+  /** What to say when the target table does not seat the party. */
+  async function targetTooSmall({ read }: MoveStart) {
     const booking = await read.catch(() => null);
-    if (!booking) return null;
-    const refusal = await tableRefusal(err, queryClient, venueId, booking, [targetTableId]);
-    if (!refusal) return null;
-    if (refusal.kind === "zone") return t("floor.moveRefused.zone", { zone: refusal.zone });
-    return t((booking.tables?.length ?? 0) > 1 ? "floor.moveRefused.joined" : "floor.moveRefused.seats");
+    return t((booking?.tables?.length ?? 0) > 1 ? "floor.moveRefused.joined" : "floor.moveRefused.seats");
   }
 
   const move = useMutation({
@@ -117,10 +112,9 @@ export function FloorView({ venueId }: { venueId: string }) {
       rememberReservation(queryClient, venueId, saved);
       refreshBookings(queryClient, venueId);
     },
-    onError: async (err, { start, targetTableId }) => {
+    onError: async (err, { start }) => {
       if (!isApiError(err, "reservation_changed") && !isApiError(err, "reservation_not_found")) {
-        const refused = await targetRefused(err, start, targetTableId);
-        if (refused) toast.error(refused, { duration: 10_000 });
+        if (isApiError(err, "party_size_too_large")) toast.error(await targetTooSmall(start), { duration: 10_000 });
         else toast.error(errorMessage(err, t("floor.moveFailed")));
         return;
       }
