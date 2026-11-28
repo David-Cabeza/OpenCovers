@@ -407,6 +407,25 @@ describe("C85 a move does not count itself", () => {
     expect(await code(r.id, { time: "22:00", tables: [] })).toBe("no_suitable_table");
   });
 
+  it("never holds more than the venue or the zone seats without tables, whatever the ceiling", async () => {
+    await config({ overbookingCeiling: 100 });
+    const r = await booked({ tables: ["a"] });
+    expect((await post("/reservations", { date: SUN, time: "20:00", partySize: 13 })).body.code).toBe("party_size_too_large");
+    expect(await code(r.id, { partySize: 13, tables: [] })).toBe("party_size_too_large");
+    expect(await code(r.id, { time: "21:00", partySize: 50, tables: [] })).toBe("party_size_too_large");
+    // The terrace seats 2.
+    expect(await code(r.id, { zone: "terrace", partySize: 3, tables: [] })).toBe("party_size_too_large");
+    expect((await modify(r.id, { partySize: 12, tables: [] })).body).toMatchObject({ partySize: 12, tables: [] });
+  });
+
+  it("refuses a zone with no table, also when the booking would hold none", async () => {
+    await config({ overbookingCeiling: 100 });
+    const r = await booked({ tables: ["a"] });
+    expect(await code(r.id, { zone: "nowhere" })).toBe("party_size_too_large");
+    expect(await code(r.id, { zone: "nowhere", tables: [] })).toBe("party_size_too_large");
+    expect(await code(r.id, { time: "21:00", zone: "nowhere", tables: [] })).toBe("party_size_too_large");
+  });
+
   it("holds exactly the named tables, checked in the create's order", async () => {
     const r = await booked({ tables: ["a"] });
     await booked({ date: SUN, tables: ["b"] });

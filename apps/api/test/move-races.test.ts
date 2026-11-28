@@ -362,17 +362,23 @@ describe("a mix of writes on one venue", () => {
     const times = ["18:00", "19:00", "20:00", "21:00", "22:00"];
     const venueId = await seedVenue({ maxActivePerGuestPerDay: 3, overbookingCeiling: 4 }, ["1", "2", "3", "4"]);
     const contacts = ["a@example.com", "b@example.com", "c@example.com"];
-    const seen = new Set<string>();
+    const ALLOWED = ["ok", "slot_taken", "no_suitable_table", "guest_booking_limit", "reservation_changed", "invalid_transition", "already_cancelled"];
+    // A move that names fewer seats than the party it read must be refused (C85), never written.
+    const TOO_SMALL = ["party_size_too_large", "guest_booking_limit", "reservation_changed", "invalid_transition"];
+    const unexpected: string[] = [];
     for (let round = 0; round < 30; round++) {
       const rows = await db.select().from(reservations).where(eq(reservations.venueId, venueId));
       const live = rows.filter((r) => r.status === "booked");
       const calls: Call[] = [];
+      const allowed: string[][] = [];
       for (let i = 0; i < 8; i++) {
         const target = live.length ? pick(live) : undefined;
         const what = target ? pick(["move", "move", "move", "create", "cancel", "party", "status", "erase"]) : "create";
         const date = pick([DAY, NEXT_DAY]);
         const time = pick(times);
         const tableIds = pick([undefined, undefined, ["1"], ["2"], ["3", "4"], []]);
+        // Every table seats 2.
+        const tooSmall = what === "move" && !!tableIds?.length && tableIds.length * 2 < target!.partySize;
         if (what === "create") calls.push(() => create(venueId, { date, time, guestContact: pick(contacts) }));
         else if (what === "move") calls.push(() => move(venueId, target!.id, { date, time, tableIds, version: target!.version }));
         else if (what === "party") calls.push(() => modifyReservation(db, venueId, target!.id, { partySize: pick([1, 2, 4]) }, key()));
@@ -381,11 +387,13 @@ describe("a mix of writes on one venue", () => {
         else if (pick([true, false, false]) && target!.guestId) {
           calls.push(async () => (await erase(db, venueId, target!.guestId!), { ok: true as const }));
         }
+        if (calls.length > allowed.length) allowed.push(tooSmall ? TOO_SMALL : ALLOWED);
       }
-      for (const o of await Promise.all(calls.map(outcome))) seen.add(o);
+      (await Promise.all(calls.map(outcome))).forEach((o, i) => {
+        if (!allowed[i].includes(o)) unexpected.push(`round ${round} call ${i}: ${o}`);
+      });
       await expectConsistent(venueId);
     }
-    const allowed = ["ok", "slot_taken", "no_suitable_table", "guest_booking_limit", "reservation_changed", "invalid_transition", "already_cancelled"];
-    expect([...seen].filter((o) => !allowed.includes(o))).toEqual([]);
+    expect(unexpected).toEqual([]);
   }, 120_000);
 });

@@ -8,7 +8,7 @@ The owner approved its decisions on 2026-11-26. This record covers phase 1: staf
 
 Sections 2 to 8 are built, with section 1 for create and modify. Not built: `changed` and the placement history of section 9, and `reservationId` on the availability reads of section 10. A client must not rely on those until `conformance-status.md` marks C91 and C92 as passing.
 
-Two points the code settles. The overbooking ceiling of section 4 takes only a party within the zone's or the venue's capacity, as for a create (C24). The new expiry of section 7 applies to the link that is not revoked.
+Two points the code settles. The overbooking ceiling of section 4 takes only a party within the zone's or the venue's capacity, as for a create (C24), also when the body says `tables: []`. The new expiry of section 7 applies to the link that is not revoked.
 
 ## Context
 
@@ -88,7 +88,7 @@ Not checked: the guest blocklist, `maxOpenBookingsPerContact` (public create onl
 
 On a `booked` reservation, a change of date, time, party size or zone places its tables:
 
-- With `tables`, it holds exactly those, checked in the create's order. An unknown or repeated id fails with `invalid_request`. Tables whose seats add up to less than the party fail with `party_size_too_large`. A table outside the zone, when the booking has one, fails with `invalid_request`. A table another booking holds in the new window fails with `slot_taken`. `tables: []` holds none and passes the ceiling check, as today.
+- With `tables`, it holds exactly those, checked in the create's order. An unknown or repeated id fails with `invalid_request`. Tables whose seats add up to less than the party fail with `party_size_too_large`. A table outside the zone, when the booking has one, fails with `invalid_request`. A table another booking holds in the new window fails with `slot_taken`. `tables: []` holds none and passes the ceiling check. The ceiling does not lift the capacity limit: a party larger than the zone's or the venue's capacity, a zone with no table included, fails with `party_size_too_large`.
 - Without `tables`, it keeps the tables it holds when they lie in the zone (any table, when the booking has no zone), seat the party and are free for the new window apart from itself. A regular keeps the table.
 - Otherwise it takes the free combination a create would assign in the zone.
 - Otherwise, when the venue's `overbookingCeiling` has room for the party in the new window, it holds no tables (C24).

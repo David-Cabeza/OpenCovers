@@ -1230,8 +1230,11 @@ async function placeAgain(
     if (!found.ok) throw new ReservationError(found.reason.code);
     return { ...placed, tableIds: found.tableIds };
   }
-  if (namedTableIds.length === 0 && !(await overbookRoom(startsAt, endsAt, partySize, current.id))) {
-    throw new ReservationError("no_suitable_table");
+  if (namedTableIds.length === 0) {
+    // The ceiling never takes more than the zone or the venue seats (C24), nor a zone without tables.
+    const fit = await tableReasons(tx, venue.id, startsAt, endsAt, partySize, zone, current.id);
+    if (!fit.ok && fit.reason.code === "party_size_too_large") throw new ReservationError(fit.reason.code);
+    if (!(await overbookRoom(startsAt, endsAt, partySize, current.id))) throw new ReservationError("no_suitable_table");
   }
   return { ...placed, tableIds: namedTableIds };
 }

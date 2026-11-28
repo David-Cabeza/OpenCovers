@@ -616,8 +616,10 @@ paths:
         combination a create would assign, then the overbooking ceiling, and
         otherwise fails with `party_size_too_large` or `no_suitable_table`.
         Named `tables` must seat the party (`party_size_too_large`) and lie
-        in the zone (`invalid_request`), also on a change of tables alone
-        (C85). A change of date, time or party size recomputes the end from
+        in the zone (`invalid_request`), also on a change of tables alone.
+        `tables: []` holds none under the overbooking ceiling, and still fails
+        with `party_size_too_large` when the party exceeds the capacity of the
+        zone or the venue, or the zone has no table (C85). A change of date, time or party size recomputes the end from
         the turn times. A change of date or time resets `reconfirmation` to
         `none` unless the body sets it. A new end moves the self-service
         link's expiry to 48 hours after it, without rotating the link (C89).

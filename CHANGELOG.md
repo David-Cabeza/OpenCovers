@@ -13,7 +13,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 
 ### Changed
 
-- On a `booked` reservation, a change of party size now checks its tables and recomputes its end from the turn times. It keeps the tables it holds while they fit, otherwise takes free ones, and can now fail with `no_suitable_table` or `party_size_too_large`. Named tables must seat the party and lie in the booking's zone, also on a change of tables alone. `seated` reservations and a guest's own party change are as before.
+- On a `booked` reservation, a change of party size now checks its tables and recomputes its end from the turn times. It keeps the tables it holds while they fit, otherwise takes free ones, and can now fail with `no_suitable_table` or `party_size_too_large`. Named tables must seat the party and lie in the booking's zone, also on a change of tables alone. Releasing the tables (`tables: []`) is refused when the party is larger than the zone or the venue seats, whatever the overbooking ceiling. `seated` reservations and a guest's own party change are as before.
 - A modify that changes the date or time of a booking used to fail with `invalid_request` and the problem `unchangeable`. Another spelling of the current value, such as `21:00:00`, now fails with the problem `invalid`.
 
 ### Fixed
