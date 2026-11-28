@@ -16,6 +16,7 @@ import { useTables } from "@/hooks/use-tables";
 import { api, type Reservation } from "@/lib/api";
 import { useT } from "@/i18n";
 import { errorMessage, isApiError } from "@/lib/error-message";
+import { tableRefusal } from "@/lib/table-refusal";
 import { ConflictNotice, StoredNow } from "@/components/reservation/conflict-notice";
 import { useReservationConflict } from "@/hooks/use-reservation-conflict";
 import { rememberReservation, sameTables } from "@/lib/reservation-cache";
@@ -90,7 +91,17 @@ export function AssignTablesDialog({
           setSelected((prev) => (sameTables(prev, base.tables) ? (fresh.tables ?? []) : prev));
         }
       } else if (isApiError(err, "reservation_not_found")) gone();
-      else toast.error(errorMessage(err, t("reservation.assign.failed")));
+      else {
+        const refusal = await tableRefusal(err, queryClient, venueId, base, selected);
+        if (!refusal) toast.error(errorMessage(err, t("reservation.assign.failed")));
+        else
+          toast.error(
+            refusal.kind === "seats"
+              ? t("reservation.assign.refusedSeats")
+              : t("reservation.assign.refusedZone", { zone: refusal.zone, tables: refusal.outside.join(", ") }),
+            { duration: 10_000 },
+          );
+      }
     } finally {
       setSaving(false);
     }
