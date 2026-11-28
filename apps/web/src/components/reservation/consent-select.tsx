@@ -19,16 +19,18 @@ export function ConsentSelect({
   id,
   value,
   onChange,
+  describedBy,
 }: {
   /** The id a `<Label htmlFor>` points at, so the select has a name of its own. */
   id: string;
   value: Consent;
   onChange: (value: Consent) => void;
+  describedBy?: string;
 }) {
   useT();
   return (
     <Select value={value} onValueChange={(v) => onChange(v as Consent)}>
-      <SelectTrigger id={id} className="w-full">
+      <SelectTrigger id={id} className="w-full" aria-describedby={describedBy}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

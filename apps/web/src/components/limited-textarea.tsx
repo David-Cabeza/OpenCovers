@@ -10,6 +10,7 @@ export function LimitedTextarea({
   text,
   limit,
   hint,
+  "aria-describedby": describedBy,
   ...props
 }: React.ComponentProps<typeof Textarea> & { id: string; text: string; limit: number; hint: string }) {
   const t = useT();
@@ -19,7 +20,7 @@ export function LimitedTextarea({
       <Textarea
         id={id}
         aria-invalid={over || undefined}
-        aria-describedby={`${over ? `${id}-error ` : ""}${id}-count ${id}-hint`}
+        aria-describedby={`${describedBy ? `${describedBy} ` : ""}${over ? `${id}-error ` : ""}${id}-count ${id}-hint`}
         {...props}
       />
       <p id={`${id}-count`} className={`text-right text-sm tabular-nums ${over ? "text-destructive" : "text-muted-foreground"}`}>

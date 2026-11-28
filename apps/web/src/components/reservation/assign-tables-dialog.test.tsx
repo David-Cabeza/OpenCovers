@@ -84,7 +84,7 @@ describe("AssignTablesDialog", () => {
     await press(user, "Save tables");
 
     await waitFor(() => expect(api.writes()).toHaveLength(1));
-    expect(api.writes()[0].body).toEqual({ tables });
+    expect(api.writes()[0].body).toEqual({ tables, version: 1 });
   });
 
   it("cannot save a booking that has no tables until one is picked", async () => {

@@ -44,6 +44,22 @@ export default defineMessages({
     "reservation.edit.noRating": "No rating",
     "reservation.edit.done": "Reservation updated",
     "reservation.edit.failed": "Could not update the reservation.",
+    "reservation.conflict.changed": "Not saved: this booking changed while you had it open. Check it and save again.",
+    "reservation.conflict.status": "Its status is now: {status}.",
+    "reservation.conflict.closed":
+      "Not saved: this booking changed while you had it open. Its status is now: {status}. This can no longer be saved.",
+    "reservation.conflict.gone": "Not saved: this booking no longer exists.",
+    "reservation.conflict.unread": "Not saved: this booking changed and could not be read again. Try saving again.",
+    "reservation.conflict.unsaved": "Not saved: this booking changed while you had it open.",
+    "reservation.conflict.withdrawn":
+      "The allergies and diets were deleted. Your other changes were not saved, because this booking changed while you had it open. Check it and save again.",
+    "reservation.conflict.withdrawnClosed":
+      "The allergies and diets were deleted. Your other changes were not saved. The status of this booking is now: {status}.",
+    "reservation.conflict.storedNow": "Saved now: {value}",
+    "reservation.conflict.noNote": "no note",
+    "reservation.conflict.noTables": "no tables",
+    "reservation.conflict.dietaryStored": "Allergies and diets saved now:",
+    "reservation.conflict.dietaryDeleted": "The recorded allergies and diets were deleted while you had this open.",
     "reservation.new.title": "New reservation",
     "reservation.new.description": "{date} at {time}",
     "reservation.new.creating": "Creating…",
@@ -124,6 +140,24 @@ export default defineMessages({
     "reservation.edit.noRating": "Sin valoración",
     "reservation.edit.done": "Reserva actualizada",
     "reservation.edit.failed": "No se pudo actualizar la reserva.",
+    "reservation.conflict.changed":
+      "No se ha guardado: esta reserva ha cambiado mientras la tenías abierta. Revísala y vuelve a guardar.",
+    "reservation.conflict.status": "Su estado ahora es: {status}.",
+    "reservation.conflict.closed":
+      "No se ha guardado: esta reserva ha cambiado mientras la tenías abierta. Su estado ahora es: {status}. Esto ya no se puede guardar.",
+    "reservation.conflict.gone": "No se ha guardado: esta reserva ya no existe.",
+    "reservation.conflict.unread":
+      "No se ha guardado: esta reserva ha cambiado y no se ha podido volver a leer. Prueba a guardar otra vez.",
+    "reservation.conflict.unsaved": "No se ha guardado: esta reserva ha cambiado mientras la tenías abierta.",
+    "reservation.conflict.withdrawn":
+      "Se han borrado las alergias y dietas. Los demás cambios no se han guardado porque la reserva ha cambiado mientras la tenías abierta. Revísala y vuelve a guardar.",
+    "reservation.conflict.withdrawnClosed":
+      "Se han borrado las alergias y dietas. Los demás cambios no se han guardado. El estado de esta reserva ahora es: {status}.",
+    "reservation.conflict.storedNow": "Guardado ahora: {value}",
+    "reservation.conflict.noNote": "sin nota",
+    "reservation.conflict.noTables": "sin mesas",
+    "reservation.conflict.dietaryStored": "Alergias y dietas guardadas ahora:",
+    "reservation.conflict.dietaryDeleted": "Las alergias y dietas anotadas se han borrado mientras tenías esto abierto.",
     "reservation.new.title": "Nueva reserva",
     "reservation.new.description": "{date} a las {time}",
     "reservation.new.creating": "Creando…",

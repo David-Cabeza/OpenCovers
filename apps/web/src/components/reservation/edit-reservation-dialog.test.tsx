@@ -2,6 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Reservation } from "@/lib/api";
+import { fakeBooking } from "@/test/fake-booking";
 import { mockApi, renderWithApp, resetApiMocks } from "@/test/mock-api";
 import { EditReservationDialog } from "./edit-reservation-dialog";
 
@@ -68,7 +69,7 @@ describe("EditReservationDialog", () => {
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     const [req] = api.calls("POST", MODIFY_PATH);
-    expect(req.body).toEqual({ guest: { consent: "granted" } });
+    expect(req.body).toEqual({ guest: { consent: "granted" }, version: 1 });
     expect(req.headers["Idempotency-Key"]).toBeTruthy();
     expect(await screen.findByText("Reservation updated")).toBeInTheDocument();
   });
@@ -81,7 +82,7 @@ describe("EditReservationDialog", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(api.writes()).toHaveLength(1));
-    expect(api.writes()[0].body).toEqual({ commentary: "Birthday" });
+    expect(api.writes()[0].body).toEqual({ commentary: "Birthday", version: 1 });
   });
 
   it("sends a numeric rating and clears it with null", async () => {
@@ -130,14 +131,8 @@ describe("EditReservationDialog", () => {
 
   it("does not undo what another person saved after the dialog opened", async () => {
     // One booking behind two screens that both read it before either one saved.
-    let stored = RESERVATION;
-    const api = mockApi({
-      [MODIFY]: (req) => {
-        const { guest, ...rest } = req.body as Partial<Reservation>;
-        stored = { ...stored, ...rest, guest: { ...stored.guest, ...guest } };
-        return { body: stored };
-      },
-    });
+    const server = fakeBooking(RESERVATION);
+    const api = mockApi(server.routes);
     const user = userEvent.setup();
     const open = () =>
       renderWithApp(<EditReservationDialog venueId="v1" reservation={RESERVATION} onOpenChange={() => {}} />);
@@ -155,9 +150,11 @@ describe("EditReservationDialog", () => {
     await user.click(screen.getByRole("combobox", { name: "Rating" }));
     await user.click(await screen.findByRole("option", { name: "5" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(api.writes()).toHaveLength(2));
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(api.writes()).toHaveLength(3));
 
-    expect(stored).toMatchObject({ guest: { consent: "granted" }, commentary: "Birthday", rating: 5 });
+    expect(server.stored).toMatchObject({ guest: { consent: "granted" }, commentary: "Birthday", rating: 5 });
   });
 
   it.each([
