@@ -7,6 +7,7 @@ import {
   OctagonXIcon,
   TriangleAlertIcon,
 } from "lucide-react"
+import { useEffect, useRef } from "react"
 import { useT } from "@/i18n"
 import { useTheme } from "@/lib/theme"
 import { toast, Toaster as Sonner, type ToasterProps } from "sonner"
@@ -21,12 +22,43 @@ toast.error = (message, data) =>
     ...data,
   })
 
+// Marks the page while a toast shows and publishes the height it takes, so a dialog can stay above it (index.css).
+function useToastRoom(region: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const node = region.current
+    if (!node) return
+    const root = document.documentElement
+    const clear = () => {
+      root.removeAttribute("data-toast")
+      root.style.removeProperty("--toast-height")
+    }
+    const publish = () => {
+      const list = node.querySelector<HTMLElement>("[data-sonner-toaster]")
+      if (!list) return clear()
+      // Up to two older toasts stack behind the front one, and each shows 14 px above it.
+      const stacked = Math.max(0, Math.min(list.childElementCount, 3) - 1) * 14
+      root.style.setProperty("--toast-height", `calc(${list.style.getPropertyValue("--front-toast-height") || "0px"} + ${stacked}px)`)
+      root.setAttribute("data-toast", "")
+    }
+    publish()
+    const observer = new MutationObserver(publish)
+    observer.observe(node, { subtree: true, childList: true, attributes: true, attributeFilter: ["style"] })
+    return () => {
+      observer.disconnect()
+      clear()
+    }
+  }, [region])
+}
+
 const Toaster = ({ ...props }: ToasterProps) => {
   const { resolvedTheme } = useTheme()
   const t = useT()
+  const region = useRef<HTMLElement>(null)
+  useToastRoom(region)
 
   return (
     <Sonner
+      ref={region}
       theme={resolvedTheme}
       className="toaster group"
       closeButton

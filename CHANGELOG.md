@@ -8,6 +8,7 @@ Feature PRs append their entries here. The release PR moves them under a version
 
 ### Fixed
 
+- On a phone, a message at the bottom of the screen covered **Cancel** in the walk-in, new reservation and other dialogs of the staff app. While a message shows, the dialog now ends above it. This also applies to screens up to 500 px tall, such as a phone held sideways. Closing a message while a dialog is open now closes only the message: before, it closed the dialog on a desktop and did nothing on a phone.
 - On a tablet held in landscape, the demo bar and its tour took 45% of a 1024x768 screen, and 58% of a 1024x600 one. They now show as on a tablet held upright, with smaller text and only the next step of the tour, so they take 19% and 24%. This applies to touch screens in landscape up to 1280 px wide. Desktop and phone layouts are unchanged.
 - The waitlist of the staff app offered **Seat** on entries dated another day, which the API always refuses, and answered with a message about reservation statuses. **Seat** is now unavailable on them, and the row says that only today's waitlist can be seated and which day the entry is for. Today is the venue's date, also on a screen left open past midnight.
 - On a tablet or desktop, a waitlist entry with a date pushed **Seat** and **Remove** onto a second line, where **Seat** could be cut off and out of reach. The date, the online label and the zone now share one column.
