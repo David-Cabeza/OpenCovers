@@ -6,6 +6,10 @@ All notable changes to OpenCovers are listed here. The format follows [Keep a Ch
 
 Feature PRs append their entries here. The release PR moves them under a version heading.
 
+### Added
+
+- A staff modify (`POST /v1/venues/{venueId}/reservations/{id}/modify`) takes an optional `version`. If the booking is no longer at that version it answers `409 reservation_changed` and writes nothing, so a client that sends it cannot overwrite a change it has not read. A modify without `version` behaves as before. The staff app and the MCP tools do not send it yet (C87, partly built).
+
 ### Fixed
 
 - The waitlist of the staff app offered **Seat** on entries dated another day, which the API always refuses, and answered with a message about reservation statuses. **Seat** is now unavailable on them, and the row says that only today's waitlist can be seated and which day the entry is for. Today is the venue's date, also on a screen left open past midnight.

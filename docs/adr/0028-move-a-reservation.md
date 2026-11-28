@@ -1,12 +1,12 @@
 # ADR-0028: Move a reservation to another date or time
 
-- Status: Proposed (contract written as C83 to C92, not built)
+- Status: Proposed (contract written as C83 to C92; only the optional `version` check is built)
 - Date: 2026-11-27
 - Deciders: David Cabeza (owner)
 
-Nothing in this record is built. The owner approved its decisions on 2026-11-26. This record covers phase 1: staff and integrators move a booking through the API. The contract (`docs/contract`) and the conformance cases C83 to C92 are written first, as GAP, and the code follows in a separate change.
+One part of this record is built: the optional `version` of a staff modify and its `reservation_changed` (sections 2 and 6, C87 partly). Nothing else is. The owner approved its decisions on 2026-11-26. This record covers phase 1: staff and integrators move a booking through the API. The contract (`docs/contract`) and the conformance cases C83 to C92 are written first, as GAP, and the code follows in a separate change.
 
-Today a modify whose `date`, `time` or `zone` differs from the booking fails with `400 invalid_request` and the problem `unchangeable`, and nothing moves (C94, [ADR-0029](0029-contract-rules-for-writes.md)). A client must not rely on anything below until `conformance-status.md` marks C83 to C92 as passing.
+Today a modify whose `date`, `time` or `zone` differs from the booking fails with `400 invalid_request` and the problem `unchangeable`, and nothing moves (C94, [ADR-0029](0029-contract-rules-for-writes.md)). Apart from that check, a client must not rely on anything below until `conformance-status.md` marks C83 to C92 as passing.
 
 ## Context
 

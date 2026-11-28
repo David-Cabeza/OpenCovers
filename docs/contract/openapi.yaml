@@ -42,7 +42,8 @@ info:
 
     An `x-planned` entry on an operation or a schema describes a part of
     the contract that is specified and not built. Its conformance cases are
-    GAP in docs/contract/conformance-status.md. Until they pass, a
+    GAP, or PARTIAL when a first step is built, in
+    docs/contract/conformance-status.md. Until they pass, a
     conforming engine refuses or ignores what the entry lists, as its text
     says, so a client must not send it. Moving a booking to another date or
     time (docs/adr/0028-move-a-reservation.md, C83 to C92) is planned this
@@ -603,8 +604,10 @@ paths:
         booking holds fails with `slot_taken`. A table id that is not a table
         of the venue, or a repeated id, fails with `invalid_request`, as on
         create. A modify does not move a booking: `date`, `time` and `zone`
-        may only repeat its current values (C94). Moving is planned and not
-        built: see `x-planned` here and on `ReservationModify`.
+        may only repeat its current values (C94). A modify that sends a
+        `version` other than the stored one fails with `reservation_changed`
+        (`409`), writes nothing and stores no key (C87). Moving is planned
+        and not built: see `x-planned` here and on `ReservationModify`.
       x-planned:
         cases: [C83, C84, C85, C86, C87, C88, C89, C90]
         adr: docs/adr/0028-move-a-reservation.md
@@ -628,10 +631,8 @@ paths:
           resets `reconfirmation` to `none` unless the body sets it, and
           moves the self-service link's expiry to 48 hours after the new end
           without rotating the link. Only `booked` changes date, time or
-          zone; any other status fails with `invalid_transition`. A sent
-          `version` that is not the stored one fails with
-          `reservation_changed` and writes nothing. One `confirmation` email
-          goes out when the date, the time or the party size changes,
+          zone; any other status fails with `invalid_transition`. One
+          `confirmation` email goes out when the date, the time or the party size changes,
           unless `notifyGuest` is `false`, and none for a change of tables
           or zone alone. One `modified` event carries `changed`. A refused
           modify writes nothing and stores no key. Equal `date`, `time` and
@@ -4646,28 +4647,25 @@ components:
         only equal values answers 200 with the reservation unchanged, at the
         same version, where the status accepts a modify. A repeat of a key
         that already wrote is answered as a repeat, without comparing.
+
+        `version` is not a change either: a body that holds only `version`
+        fails with `invalid_request`.
       x-planned:
         cases: [C83, C87, C90]
         adr: docs/adr/0028-move-a-reservation.md
         description: |
-          Not built. Today the route refuses `version` and `notifyGuest` as
-          unknown fields (C94). Once built, `date` (`YYYY-MM-DD`) and `time`
+          Not built. Today the route refuses `notifyGuest` as an unknown
+          field (C94), and `version` is never required. Once built, `date` (`YYYY-MM-DD`) and `time`
           (`HH:MM`) that differ from the booking move it, `zone` that differs
           places it in that zone, and `""` removes the zone. A field left out
           keeps its value. Another format fails with `invalid_request` and
-          the problem `invalid`. Equal values remain no change and need no
-          `version`. A body whose only fields are `version` and
-          `notifyGuest` fails with `invalid_request`.
+          the problem `invalid`. `version` becomes required when `date` or
+          `time` differs from the booking, else `invalid_request` with
+          `details.fields` `[{ "path": "version", "problem": "missing" }]`.
+          Equal values remain no change and need no `version`. A body whose
+          only fields are `version` and `notifyGuest` fails with
+          `invalid_request`.
         properties:
-          version:
-            type: integer
-            minimum: 1
-            description: |
-              The version a read returned. Required when `date` or `time`
-              differs from the booking, else `invalid_request` with
-              `details.fields` `[{ "path": "version", "problem": "missing" }]`.
-              When sent on any modify it must equal the stored version, else
-              `reservation_changed` and nothing is written.
           notifyGuest:
             type: boolean
             default: true
@@ -4676,6 +4674,17 @@ components:
               `confirmation` goes to the guest when the date, the time or the
               party size changes (C90).
       properties:
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: |
+            The version the caller read. Optional. When sent it must equal
+            the stored version, else `reservation_changed` and nothing is
+            written (C87). It is compared inside the write transaction, after
+            the repeat of a key and `reservation_not_found`, and before
+            `invalid_transition`, `unchangeable` and every other rule. A
+            repeat of a key that already wrote is not compared.
         date:
           type: string
           format: date
@@ -4707,8 +4716,8 @@ components:
           nullable: true
           description: |
             Omitted keeps the value (ADR-0027, C82).
-            Null clears it, and a modify whose only field is `dietary: null`
-            is accepted on every status, `cancelled` and `no_show` included,
+            Null clears it, and a modify whose only field is `dietary: null`,
+            `version` aside, is accepted on every status, `cancelled` and `no_show` included,
             so a guest's withdrawal always works. An object replaces the whole
             value and is accepted on `booked`, `seated` and `attended`. A
             change bumps the version once, emits one `modified` event with no

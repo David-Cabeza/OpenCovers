@@ -207,7 +207,7 @@ describe("POST /reservations/{id}/modify", () => {
   it.each([
     ["an unknown field", { foo: 1 }, ["foo:unknown"]],
     ["an unknown field next to a good one", { partySize: 3, source: "x" }, ["source:unknown"]],
-    ["version", { version: 1 }, ["version:unknown"]],
+    ["notifyGuest, not built", { partySize: 3, notifyGuest: false }, ["notifyGuest:unknown"]],
     ["status", { status: "seated" }, ["status:unknown"]],
     ["a guest name", { guest: { name: "New" } }, ["guest.name:unknown"]],
     ["a guest contact", { guest: { contact: "new@example.com" } }, ["guest.contact:unknown"]],

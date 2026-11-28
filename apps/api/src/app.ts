@@ -335,10 +335,10 @@ app.post("/v1/public/self-service/modify", async (c) => {
       partySize: input.partySize,
       commentary: input.commentary,
       consent: settings.askConsent ? input.consent : undefined,
+      version: input.version,
       selfService: {
         linkId: link.id,
         cutoffMinutes: settings.selfServiceCutoffMinutes,
-        version: input.version,
         rules: rulesOf(settings),
       },
       origin: WIDGET,
@@ -1035,15 +1035,17 @@ app.post("/v1/venues/:venueId/reservations/:id/modify", async (c) => {
   if (!key) return error(c, "invalid_request");
   const body = checkFields(await c.req.json().catch(() => undefined), MODIFY_FIELDS);
   if (!body.ok) return invalidBody(c, body.fields);
-  const sent = Object.values(body.value).filter((value) => value !== undefined).length;
+  const { version, ...fields } = body.value;
+  const sent = Object.values(fields).filter((value) => value !== undefined).length;
   if (sent === 0) return error(c, "invalid_request");
-  const { date, time, zone, tables: tableIds, guest, ...changes } = body.value;
+  const { date, time, zone, tables: tableIds, guest, ...changes } = fields;
   const result = await modifyReservation(
     db,
     venueId,
     id,
     {
       ...changes,
+      version,
       tableIds,
       consent: guest?.consent,
       restated: { date, time, zone },

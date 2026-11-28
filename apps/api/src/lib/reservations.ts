@@ -120,7 +120,9 @@ export interface ModifyReservationInput {
   dietaryWithdrawal?: boolean;
   /** C94: date, time and zone the body repeats. Each must equal the stored one, or nothing is written. */
   restated?: Partial<Slot>;
-  selfService?: SelfServiceWrite & { version: number; rules: OnlineRules };
+  /** The version the caller read. Another stored version refuses with `reservation_changed` (C49, C87). */
+  version?: number;
+  selfService?: SelfServiceWrite & { rules: OnlineRules };
   origin?: Origin | null;
 }
 
@@ -1179,15 +1181,15 @@ export async function modifyReservation(
           .limit(1)
       )[0];
       if (!current) throw new ReservationError("reservation_not_found");
+      if (guest) assertChangeable(current, guest);
+      if (input.version !== undefined && current.version !== input.version) {
+        throw new ReservationError("reservation_changed");
+      }
       if (input.restated) {
         const [{ timezone }] = await tx.select({ timezone: venues.timezone }).from(venues).where(eq(venues.id, venueId));
         const stored = { date: current.date, time: formatTime(current.startsAt, timezone), zone: current.zone };
         const moved = movedFields(input.restated, stored);
         if (moved.length > 0) throw new ReservationError("invalid_request", moved);
-      }
-      if (guest) {
-        assertChangeable(current, guest);
-        if (current.version !== guest.version) throw new ReservationError("reservation_changed");
       }
       if (!input.dietaryWithdrawal && !MODIFIABLE_STATUSES.includes(current.status)) {
         throw new ReservationError("invalid_transition");
