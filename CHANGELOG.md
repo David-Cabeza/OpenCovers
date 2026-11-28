@@ -8,6 +8,8 @@ Feature PRs append their entries here. The release PR moves them under a version
 
 ### Fixed
 
+- The waitlist of the staff app offered **Seat** on entries dated another day, which the API always refuses, and answered with a message about reservation statuses. **Seat** is now unavailable on them, and the row says that only today's waitlist can be seated and which day the entry is for. Today is the venue's date, also on a screen left open past midnight.
+- On a tablet or desktop, a waitlist entry with a date pushed **Seat** and **Remove** onto a second line, where **Seat** could be cut off and out of reach. The date, the online label and the zone now share one column.
 - A staff modify that changes only the tables no longer emails the guest. Resending the party size or the tables a booking already had used to email them that the booking had changed, and no longer does. The email goes out when the party size changes. Repeating a request with the same `Idempotency-Key` sends none, so it no longer retries an email that failed.
 - Saving the tables dialog in the staff app with the same tables it opened with now closes it without a write. It used to send them again, which undid a move another person had made while the dialog was open and could email the guest about a change. A changed selection still replaces whatever is stored then.
 - Saving **Edit details** in the staff app sends only the fields that changed since the dialog opened. It used to send contact permission, rating and note every time, so a second person's save undid the first one's. Saving with nothing changed now closes the dialog without a write. Two people who change the same field still overwrite each other, and the later save wins.

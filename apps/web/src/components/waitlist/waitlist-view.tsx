@@ -17,10 +17,11 @@ import { Stat } from "@/components/stat";
 import { useCanRecordDietary } from "@/hooks/use-can-record-dietary";
 import { useDietaryShortcut } from "@/hooks/use-dietary-shortcut";
 import { useStaleMessage } from "@/hooks/use-stale-message";
+import { useVenueToday } from "@/hooks/use-venue-today";
 import { useWaitlist } from "@/hooks/use-waitlist";
 import { useT } from "@/i18n";
 import { api, type WaitlistEntry } from "@/lib/api";
-import { elapsed, longDate, todayIso } from "@/lib/date";
+import { elapsed, longDate } from "@/lib/date";
 import { errorMessage, isApiError } from "@/lib/error-message";
 import { guestInitials } from "@/lib/format";
 import { AddWaitlistDialog } from "./add-waitlist-dialog";
@@ -31,6 +32,8 @@ const MOVED_HOLD_MS = 1000;
 export function WaitlistView({ venueId }: { venueId: string }) {
   const t = useT();
   const queryClient = useQueryClient();
+  // A seat is a walk-in now, so the API seats only entries for the venue's today, and those with no date.
+  const { today, readToday } = useVenueToday(venueId);
   // "" is the default list: today and the entries with no date. A date shows the entries guests asked for that day.
   const [filterDate, setFilterDate] = useState("");
   const waitlist = useWaitlist(venueId, filterDate || undefined, { live: true });
@@ -116,8 +119,16 @@ export function WaitlistView({ venueId }: { venueId: string }) {
       toast.success(t("waitlist.seated"));
       invalidate();
     },
-    // An entry for another day is refused with the same code while it still waits.
-    onError: (err, entry) => onActionError(err, t("waitlist.seatFailed"), !entry.date || entry.date === todayIso()),
+    onError: (err, entry) => {
+      // An entry for another day is refused with the code of a gone one, while it still waits. The day may have just
+      // changed, so the clock is asked again.
+      if (isApiError(err, "invalid_transition") && entry.date && entry.date !== readToday()) {
+        toast.error(t("waitlist.otherDay", { date: longDate(entry.date) }));
+        invalidate();
+        return;
+      }
+      onActionError(err, t("waitlist.seatFailed"), true);
+    },
   });
 
   const cancel = useMutation({
@@ -207,6 +218,7 @@ export function WaitlistView({ venueId }: { venueId: string }) {
                 entry={e}
                 position={index + 1}
                 held={held.has(e.id)}
+                otherDay={e.date && e.date !== today ? e.date : null}
                 onSeat={() => seat.mutate(e)}
                 onRemove={() => {
                   removingFrom.current = { id: e.id, index };
@@ -308,6 +320,7 @@ function WaitlistRow({
   entry,
   position,
   held,
+  otherDay,
   onSeat,
   onRemove,
   onFocusLeft,
@@ -315,12 +328,15 @@ function WaitlistRow({
   entry: WaitlistEntry;
   position: number;
   held: boolean;
+  /** The day the entry is for, when it is not today and so it cannot be seated. */
+  otherDay: string | null;
   onSeat: () => void;
   onRemove: () => void;
   onFocusLeft: () => void;
 }) {
   const t = useT();
   const row = useRef<HTMLLIElement>(null);
+  const otherDayId = useId();
   const leave = useRef(onFocusLeft);
   useLayoutEffect(() => {
     leave.current = onFocusLeft;
@@ -362,9 +378,10 @@ function WaitlistRow({
         <Button
           variant="outline"
           size="sm"
-          aria-disabled={held || undefined}
+          aria-disabled={held || otherDay !== null || undefined}
+          aria-describedby={otherDay ? otherDayId : undefined}
           className="aria-disabled:opacity-50"
-          onClick={held ? undefined : onSeat}
+          onClick={held || otherDay ? undefined : onSeat}
         >
           {t("waitlist.seat")}
         </Button>
@@ -388,21 +405,34 @@ function WaitlistRow({
         <span className="text-sm text-muted-foreground tabular-nums">
           {t("waitlist.waiting")} <span className="font-medium text-foreground">{elapsed(entry.createdAt)}</span>
         </span>
-        {entry.date && (
-          <span data-slot="waitlist-date" className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{longDate(entry.date)}</span>
-            {entry.windowStart && entry.windowEnd ? ` · ${entry.windowStart}–${entry.windowEnd}` : ""}
-          </span>
-        )}
-        {entry.source === "widget" && <Pill tone="muted">{t("waitlist.source.widget")}</Pill>}
-        {entry.zone ? (
-          <Pill tone="muted">{entry.zone}</Pill>
-        ) : (
-          <span aria-hidden="true" className="hidden text-muted-foreground md:inline">
-            —
-          </span>
-        )}
+        {/* One cell of the wide grid however many there are: each more cell would push Seat and Remove off the row. */}
+        <div className="contents md:flex md:min-w-0 md:flex-col md:items-start md:gap-1">
+          {entry.date && (
+            <span data-slot="waitlist-date" className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{longDate(entry.date)}</span>
+              {entry.windowStart && entry.windowEnd ? ` · ${entry.windowStart}–${entry.windowEnd}` : ""}
+            </span>
+          )}
+          {entry.source === "widget" && <Pill tone="muted">{t("waitlist.source.widget")}</Pill>}
+          {entry.zone ? (
+            <Pill tone="muted">{entry.zone}</Pill>
+          ) : entry.date || entry.source === "widget" ? null : (
+            <span aria-hidden="true" className="hidden text-muted-foreground md:inline">
+              —
+            </span>
+          )}
+        </div>
       </div>
+      {/* On the page, not in a tooltip, which a touch screen never shows. Last, so it takes a line of its own. */}
+      {otherDay && (
+        <p
+          id={otherDayId}
+          data-slot="waitlist-other-day"
+          className="order-last col-span-full pl-[calc(2rem+0.75rem)] text-sm text-muted-foreground"
+        >
+          {t("waitlist.otherDay", { date: longDate(otherDay) })}
+        </p>
+      )}
     </li>
   );
 }
