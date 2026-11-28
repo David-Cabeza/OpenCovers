@@ -74,6 +74,7 @@ function DialogContent({
   children,
   showCloseButton = true,
   onCloseAutoFocus,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
@@ -97,6 +98,11 @@ function DialogContent({
             event.preventDefault()
             target.focus()
           }
+        }}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event)
+          // A toast is drawn outside the dialog, but dismissing it is not a way of leaving the dialog.
+          if (event.target instanceof Element && event.target.closest("[data-sonner-toaster]")) event.preventDefault()
         }}
         {...props}
       >

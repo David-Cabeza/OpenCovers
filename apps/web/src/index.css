@@ -185,6 +185,21 @@
   letter-spacing: -0.03em;
 }
 
+/* A modal dialog turns pointer events off on the page. A toast beside it still has to take its own taps. */
+body:has([data-slot="dialog-content"]) [data-sonner-toaster] {
+  pointer-events: auto;
+}
+
+/* A toast sits at the bottom of the screen, 16 px up below 600 px wide and 24 px up above it. Where the screen is
+   narrow or short that is where a dialog has its buttons, so while one shows the dialog ends above it and keeps 16 px
+   from the top. */
+@media (max-width: 600px), (max-height: 500px) {
+  :root[data-toast] [data-slot="dialog-content"] {
+    top: calc(50% - (var(--toast-height) + 16px) / 2);
+    max-height: calc(100dvh - 2rem - var(--toast-height) - 16px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
