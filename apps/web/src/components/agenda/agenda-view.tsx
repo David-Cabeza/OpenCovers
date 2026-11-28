@@ -43,6 +43,7 @@ import { api, type Reservation } from "@/lib/api";
 import { longDate, nowTime, todayIso } from "@/lib/date";
 import { useDayParam } from "@/lib/day-param";
 import { errorMessage, isApiError } from "@/lib/error-message";
+import { rememberReservation } from "@/lib/reservation-cache";
 import { guestInitials } from "@/lib/format";
 
 type RowAction =
@@ -126,8 +127,9 @@ export function AgendaView({ venueId }: { venueId: string }) {
 
   const cancel = useMutation({
     mutationFn: (id: string) => api.cancelReservation(venueId, id),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       toast.success(t("agenda.cancelled"));
+      rememberReservation(queryClient, venueId, saved);
       invalidate();
     },
     onError: (err) => toast.error(errorMessage(err, t("agenda.cancelFailed"))),
@@ -137,8 +139,9 @@ export function AgendaView({ venueId }: { venueId: string }) {
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       api.setStatus(venueId, id, status),
-    onSuccess: (_, { status }) => {
+    onSuccess: (saved, { status }) => {
       toast.success(t("agenda.statusChanged", { status: statusLabel(status) }));
+      rememberReservation(queryClient, venueId, saved);
       invalidate();
     },
     onError: (err, { id }) => {
@@ -155,8 +158,9 @@ export function AgendaView({ venueId }: { venueId: string }) {
   // A body of `dietary: null` alone, which the engine takes on every status, so a withdrawal always works.
   const withdraw = useMutation({
     mutationFn: (id: string) => api.modifyReservation(venueId, id, { dietary: null }),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       toast.success(t("dietary.deleted"));
+      rememberReservation(queryClient, venueId, saved);
       invalidate();
       void queryClient.invalidateQueries({ queryKey: ["reservation", venueId] });
       setWithdrawing(null);
@@ -246,6 +250,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
                     key={r.id}
                     reservation={r}
                     tableNames={tableNames}
+                    saving={setStatus.isPending && setStatus.variables.id === r.id}
                     onAssign={() => setAssigning(r)}
                     onCancel={() => setCancelling(r)}
                     onStatus={(status) => setStatus.mutate({ id: r.id, status })}
@@ -317,6 +322,7 @@ export function AgendaView({ venueId }: { venueId: string }) {
 function ReservationRow({
   reservation,
   tableNames,
+  saving,
   onAssign,
   onCancel,
   onStatus,
@@ -326,6 +332,8 @@ function ReservationRow({
 }: {
   reservation: Reservation;
   tableNames: Map<string, string>;
+  /** A status change of this booking is on its way, so its version is about to move. */
+  saving: boolean;
   onAssign: () => void;
   onCancel: () => void;
   onStatus: (status: string) => void;
@@ -384,12 +392,12 @@ function ReservationRow({
               </DropdownMenuItem>
             ))}
             {canAssign && (
-              <DropdownMenuItem onSelect={onAssign}>
+              <DropdownMenuItem onSelect={onAssign} disabled={saving}>
                 {tableIds.length > 0 ? t("agenda.changeTables") : t("agenda.assignTables")}
               </DropdownMenuItem>
             )}
             {canEdit && (
-              <DropdownMenuItem onSelect={onEdit}>{t("agenda.editDetails")}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onEdit} disabled={saving}>{t("agenda.editDetails")}</DropdownMenuItem>
             )}
             <DropdownMenuItem onSelect={onTrace}>{t("agenda.viewTrace")}</DropdownMenuItem>
             {onWithdraw && (

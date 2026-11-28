@@ -286,7 +286,7 @@ describe("AgendaView actions", () => {
 
     await waitFor(() => expect(api.writes()).toHaveLength(1));
     expect(api.writes()[0].path).toBe("/v1/venues/v1/reservations/r1/modify");
-    expect(api.writes()[0].body).toEqual({ commentary: "Quiet table" });
+    expect(api.writes()[0].body).toEqual({ commentary: "Quiet table", version: 1 });
   });
 });
 
@@ -333,7 +333,7 @@ describe("AgendaView table assignment", () => {
 
     await waitFor(() => expect(api.writes()).toHaveLength(1));
     expect(api.writes()[0].path).toBe("/v1/venues/v1/reservations/r1/modify");
-    expect(api.writes()[0].body).toEqual({ tables: ["t2"] });
+    expect(api.writes()[0].body).toEqual({ tables: ["t2"], version: 1 });
   });
 
   it("keeps a half-made selection when the agenda refreshes, and compares it with what it opened with", async () => {

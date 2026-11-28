@@ -91,6 +91,7 @@ describe("FloorView", () => {
       status: "booked",
       tables: ["t1"],
       bookedVia: "staff",
+      version: 3,
     };
 
     function setupMove(list: FloorTable[]) {
@@ -140,6 +141,7 @@ describe("FloorView", () => {
       );
       expect(api.calls("POST", "/v1/venues/v1/reservations/r1/modify")[0].body).toEqual({
         tables: ["t3"],
+        version: 3,
       });
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     });

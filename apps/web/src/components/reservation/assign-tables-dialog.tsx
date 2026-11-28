@@ -15,7 +15,13 @@ import { Label } from "@/components/ui/label";
 import { useTables } from "@/hooks/use-tables";
 import { api, type Reservation } from "@/lib/api";
 import { useT } from "@/i18n";
-import { errorMessage } from "@/lib/error-message";
+import { errorMessage, isApiError } from "@/lib/error-message";
+import { ConflictNotice, StoredNow } from "@/components/reservation/conflict-notice";
+import { useReservationConflict } from "@/hooks/use-reservation-conflict";
+import { rememberReservation, sameTables } from "@/lib/reservation-cache";
+
+/** The statuses whose tables the engine changes. */
+const ASSIGNABLE = ["booked", "seated"];
 
 export function AssignTablesDialog({
   venueId,
@@ -33,6 +39,10 @@ export function AssignTablesDialog({
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
+  const { base, conflict, reread, clear, gone } = useReservationConflict(venueId, reservation);
+  const closed = base !== null && !ASSIGNABLE.includes(base.status);
+  const tablesTaken = !sameTables(base?.tables, reservation?.tables) && !sameTables(selected, base?.tables);
+
   useEffect(() => {
     setSelected(reservation?.tables ?? []);
   }, [reservation]);
@@ -45,7 +55,7 @@ export function AssignTablesDialog({
     [tables, selected],
   );
 
-  const partySize = reservation?.partySize ?? 0;
+  const partySize = base?.partySize ?? 0;
   const tooSmall = selected.length > 0 && partySize > totalSeats;
 
   function toggleTable(id: string) {
@@ -55,23 +65,32 @@ export function AssignTablesDialog({
   }
 
   async function onSave() {
-    if (!reservation) return;
+    if (!reservation || !base) return;
     if (selected.length === 0 || tooSmall) return;
     // The same tables, in any order, are no change: sending them would undo another person's move.
-    const opened = reservation.tables ?? [];
-    if (selected.length === opened.length && selected.every((id) => opened.includes(id))) {
+    if (sameTables(selected, base.tables)) {
       onOpenChange(false);
       return;
     }
     setSaving(true);
+    clear();
     try {
-      await api.modifyReservation(venueId, reservation.id, { tables: selected });
+      const saved = await api.modifyReservation(venueId, reservation.id, { tables: selected, version: base.version });
+      rememberReservation(queryClient, venueId, saved);
       await queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
       await queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
       toast.success(t("reservation.assign.done"));
       onOpenChange(false);
     } catch (err) {
-      toast.error(errorMessage(err, t("reservation.assign.failed")));
+      if (isApiError(err, "reservation_changed")) {
+        const { fresh, stillShown } = await reread();
+        if (!stillShown) toast.error(t("reservation.conflict.unsaved"));
+        // A selection nobody touched follows what is stored now.
+        else if (typeof fresh !== "string") {
+          setSelected((prev) => (sameTables(prev, base.tables) ? (fresh.tables ?? []) : prev));
+        }
+      } else if (isApiError(err, "reservation_not_found")) gone();
+      else toast.error(errorMessage(err, t("reservation.assign.failed")));
     } finally {
       setSaving(false);
     }
@@ -83,19 +102,15 @@ export function AssignTablesDialog({
         <DialogHeader>
           <DialogTitle>{t("reservation.assign.title")}</DialogTitle>
           <DialogDescription>
-            {reservation
-              ? reservation.guest.name
-                ? t("reservation.assign.summaryNamed", {
-                    time: reservation.time,
-                    count: reservation.partySize,
-                    name: reservation.guest.name,
-                  })
-                : t("reservation.assign.summary", { time: reservation.time, count: reservation.partySize })
+            {base
+              ? base.guest.name
+                ? t("reservation.assign.summaryNamed", { time: base.time, count: base.partySize, name: base.guest.name })
+                : t("reservation.assign.summary", { time: base.time, count: base.partySize })
               : ""}
           </DialogDescription>
         </DialogHeader>
 
-        {reservation?.dietary && <DietarySummary dietary={reservation.dietary} />}
+        {base?.dietary && <DietarySummary dietary={base.dietary} />}
 
         <div className="space-y-2">
           <Label id="assign-tables-label">{t("reservation.tables")}</Label>
@@ -128,13 +143,28 @@ export function AssignTablesDialog({
               {t("reservation.partyTooLarge")}
             </p>
           )}
+          {tablesTaken && (
+            <StoredNow
+              value={
+                (base?.tables ?? []).map((id) => tables.find((x) => x.id === id)?.name ?? id).join(", ") ||
+                t("reservation.conflict.noTables")
+              }
+            />
+          )}
         </div>
+
+        <ConflictNotice
+          conflict={conflict}
+          status={base?.status}
+          openedStatus={reservation?.status}
+          closed={closed}
+        />
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {t("common.close")}
           </Button>
-          <Button type="button" disabled={saving || selected.length === 0 || tooSmall} onClick={() => void onSave()}>
+          <Button type="button" disabled={saving || selected.length === 0 || tooSmall || closed || conflict?.kind === "gone"} onClick={() => void onSave()}>
             {saving ? t("common.saving") : t("reservation.assign.save")}
           </Button>
         </DialogFooter>

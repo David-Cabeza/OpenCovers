@@ -1,4 +1,6 @@
-import { errorMessage } from "@/lib/error-message";
+import { errorMessage, isApiError } from "@/lib/error-message";
+import { statusLabel } from "@/components/agenda/status-badge";
+import { refreshBookings, rememberReservation, rereadReservation, sameTables } from "@/lib/reservation-cache";
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArmchairIcon } from "lucide-react";
@@ -22,10 +24,20 @@ import { useFloor } from "@/hooks/use-floor";
 import { useFloorItems } from "@/hooks/use-floor-items";
 import { useStaleMessage } from "@/hooks/use-stale-message";
 import { useVenueConfig } from "@/hooks/use-venue-config";
-import { api, type FloorTable } from "@/lib/api";
+import { api, ApiError, type FloorTable, type Reservation } from "@/lib/api";
 import { useT } from "@/i18n";
 import { nowTime, todayIso } from "@/lib/date";
 import { useDayParam } from "@/lib/day-param";
+
+/** A move being made: the tables the plan showed the booking on, and the booking as read when the move began. */
+interface MoveStart {
+  reservationId: string;
+  shown: string[];
+  read: Promise<Reservation>;
+}
+
+/** The statuses whose tables the engine changes. */
+const MOVABLE = ["booked", "seated"];
 
 export function FloorView({ venueId }: { venueId: string }) {
   const t = useT();
@@ -34,7 +46,7 @@ export function FloorView({ venueId }: { venueId: string }) {
   // null until the person picks one. Until then, today's plan follows the clock.
   const [picked, setPicked] = useState<string | null>(null);
   const [seatTable, setSeatTable] = useState<FloorTable | null>(null);
-  const [moveFrom, setMoveFrom] = useState<FloorTable | null>(null);
+  const [moveFrom, setMoveFrom] = useState<{ table: FloorTable; start: MoveStart } | null>(null);
   const queryClient = useQueryClient();
   const following = picked === null && date === todayIso();
   // The last time followed, which another day shows while none is picked.
@@ -61,16 +73,49 @@ export function FloorView({ venueId }: { venueId: string }) {
   const free = tables.length - occupied;
   const seatedCovers = tables.reduce((n, t) => n + (t.occupied ? (t.partySize ?? 0) : 0), 0);
 
+  // The plan carries no version, so the booking is read as a move begins: when "Move to…" opens, or at a drop.
+  function startMove(reservationId: string): MoveStart {
+    const read = api.getReservation(venueId, reservationId);
+    // A dialog closed without a move leaves nobody to hear a failed read.
+    read.catch(() => {});
+    return { reservationId, shown: tables.filter((x) => x.reservationId === reservationId).map((x) => x.id), read };
+  }
+
+  /** Why a move was refused, from what is stored now. */
+  async function moveRefused({ reservationId, shown }: MoveStart) {
+    const fresh = await rereadReservation(venueId, reservationId);
+    if (typeof fresh === "string") return t(`floor.moveConflict.${fresh}`);
+    rememberReservation(queryClient, venueId, fresh);
+    if (!MOVABLE.includes(fresh.status)) return t("floor.moveConflict.status", { status: statusLabel(fresh.status) });
+    if (sameTables(fresh.tables, shown)) return t("floor.moveConflict.changed");
+    const names = (fresh.tables ?? []).map((id) => tables.find((x) => x.id === id)?.name ?? id).join(", ");
+    return names ? t("floor.moveConflict.at", { tables: names }) : t("floor.moveConflict.noTable");
+  }
+
   const move = useMutation({
-    mutationFn: ({ reservationId, targetTableId }: { reservationId: string; targetTableId: string }) =>
-      api.modifyReservation(venueId, reservationId, { tables: [targetTableId] }),
-    onSuccess: () => {
-      toast.success(t("floor.moved"));
-      void queryClient.invalidateQueries({ queryKey: ["floor", venueId] });
-      void queryClient.invalidateQueries({ queryKey: ["agenda", venueId] });
-      void queryClient.invalidateQueries({ queryKey: ["availability", venueId] });
+    mutationFn: async ({ start, targetTableId }: { start: MoveStart; targetTableId: string }) => {
+      const booking = await start.read;
+      // The booking is not where the plan showed it, so this would not be the move the person made.
+      if (!MOVABLE.includes(booking.status) || !sameTables(booking.tables, start.shown)) {
+        throw new ApiError("reservation_changed", 409);
+      }
+      return api.modifyReservation(venueId, booking.id, { tables: [targetTableId], version: booking.version });
     },
-    onError: (err) => toast.error(errorMessage(err, t("floor.moveFailed"))),
+    onSuccess: (saved) => {
+      toast.success(t("floor.moved"));
+      rememberReservation(queryClient, venueId, saved);
+      refreshBookings(queryClient, venueId);
+    },
+    onError: async (err, { start }) => {
+      if (!isApiError(err, "reservation_changed") && !isApiError(err, "reservation_not_found")) {
+        toast.error(errorMessage(err, t("floor.moveFailed")));
+        return;
+      }
+      const why = await moveRefused(start);
+      refreshBookings(queryClient, venueId);
+      // Longer than usual: with no form to stay open, this is all that says the move did not happen.
+      toast.error(why, { duration: 10_000 });
+    },
     onSettled: () => setMoveFrom(null),
   });
 
@@ -157,22 +202,20 @@ export function FloorView({ venueId }: { venueId: string }) {
             const table = tables.find((t) => t.id === tableId);
             if (table) setSeatTable(table);
           }}
-          onMove={(reservationId, targetTableId) =>
-            move.mutate({ reservationId, targetTableId })
-          }
+          onMove={(reservationId, targetTableId) => move.mutate({ start: startMove(reservationId), targetTableId })}
           onMoveRequest={(tableId) => {
             const table = tables.find((t) => t.id === tableId);
-            if (table?.reservationId) setMoveFrom(table);
+            if (table?.reservationId) setMoveFrom({ table, start: startMove(table.reservationId) });
           }}
           onDietaryRequest={canRecordDietary ? (reservationId) => void shortcut.open(reservationId) : undefined}
         />
       )}
 
       <MoveDialog
-        source={moveFrom}
+        source={moveFrom?.table ?? null}
         tables={tables}
         pending={move.isPending}
-        onMove={(reservationId, targetTableId) => move.mutate({ reservationId, targetTableId })}
+        onMove={(_, targetTableId) => moveFrom && move.mutate({ start: moveFrom.start, targetTableId })}
         onClose={() => setMoveFrom(null)}
       />
 

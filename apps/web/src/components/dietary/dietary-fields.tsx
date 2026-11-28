@@ -24,6 +24,8 @@ export interface DietaryForm {
   noteRef: RefObject<HTMLTextAreaElement | null>;
   edit: (patch: Partial<DietaryDraft>) => void;
   reset: (stored?: Dietary) => void;
+  /** The stored value was read again: a draft nobody changed follows it, and a changed one is kept. */
+  rebase: (stored?: Dietary) => void;
   /** The `dietary` to put in a request body, to be spread into it. Null means do not send the request yet. */
   take: () => { dietary?: DietaryInput | null } | null;
 }
@@ -35,10 +37,22 @@ export function useDietaryForm(): DietaryForm {
   }));
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const reset = useCallback((stored?: Dietary) => setState({ stored, draft: draftFrom(stored), consentMissing: false }), []);
+  const rebase = useCallback(
+    (stored?: Dietary) =>
+      setState((prev) => {
+        if (dietaryChange(prev.draft, prev.stored).kind === "unchanged") {
+          return { stored, draft: draftFrom(stored), consentMissing: false };
+        }
+        const needsTick = dietaryChange({ ...prev.draft, consented: false }, stored).kind === "needsConsent";
+        return { stored, draft: { ...prev.draft, consented: needsTick && prev.draft.consented }, consentMissing: false };
+      }),
+    [],
+  );
   return {
     ...state,
     noteRef,
     reset,
+    rebase,
     edit: (patch) =>
       setState((prev) => {
         const draft = { ...prev.draft, ...patch };

@@ -538,6 +538,8 @@ export const api = {
     venueId: string,
     id: string,
     body: {
+      /** The version the caller read. Another stored version answers `reservation_changed` and writes nothing. */
+      version?: number;
       partySize?: number;
       tables?: string[];
       guest?: { consent?: Consent };
