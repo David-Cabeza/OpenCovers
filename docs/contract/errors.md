@@ -53,7 +53,7 @@ The guest-facing routes under `/v1/public/` and the `online-booking` settings. S
 
 `GET /availability/explain` returns `outside_hours`, `lead_time_violation`, `beyond_booking_horizon`, `date_blocked`, `party_size_too_small`, `party_size_too_large`, and `no_suitable_table` as reason codes in a `200` answer, with the same meaning.
 
-A modify that moves a booking answers the codes of a staff create for the new slot, in the create's order, and adds no new code ([ADR-0028](../adr/0028-move-a-reservation.md), C84). Planned and not built (C92): with `reservationId`, the explanation can also return `guest_booking_limit` as a reason.
+A modify that moves a booking answers the codes of a staff create for the new slot, in the create's order, and adds no new code ([ADR-0028](../adr/0028-move-a-reservation.md), C84). Named tables outside the booking's zone answer `invalid_request` on a change of date, time or zone, and on a change of party size for tables the booking does not hold yet; a change of tables alone takes any table of the venue (C85). Planned and not built (C92): with `reservationId`, the explanation can also return `guest_booking_limit` as a reason.
 
 ## Guest
 

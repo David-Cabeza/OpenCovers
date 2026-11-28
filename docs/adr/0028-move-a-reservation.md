@@ -86,7 +86,7 @@ Not checked: the guest blocklist, `maxOpenBookingsPerContact` (public create onl
 
 ### 4. Tables
 
-On a `booked` reservation, a change of date, time, party size or zone places its tables:
+On a `booked` reservation, a change of date, time, party size or zone places its tables. The zone binds them as the amendment below says:
 
 - With `tables`, it holds exactly those, checked in the create's order. An unknown or repeated id fails with `invalid_request`. Tables whose seats add up to less than the party fail with `party_size_too_large`. A table outside the zone, when the booking has one, fails with `invalid_request`. A table another booking holds in the new window fails with `slot_taken`. `tables: []` holds none and passes the ceiling check. The ceiling does not lift the capacity limit: a party larger than the zone's or the venue's capacity, a zone with no table included, fails with `party_size_too_large`.
 - Without `tables`, it keeps the tables it holds when they lie in the zone (any table, when the booking has no zone), seat the party and are free for the new window apart from itself. A regular keeps the table.
@@ -94,7 +94,14 @@ On a `booked` reservation, a change of date, time, party size or zone places its
 - Otherwise, when the venue's `overbookingCeiling` has room for the party in the new window, it holds no tables (C24).
 - Otherwise it fails with `party_size_too_large` when the party exceeds the zone's or the venue's capacity, and with `no_suitable_table` when it does not.
 
-A change of `tables` alone on a `booked` reservation is held to the same rule for named tables. A `seated` reservation keeps today's rules (C4, C26).
+A change of `tables` alone on a `booked` reservation is held to the same rule for the seats of named tables. A `seated` reservation keeps today's rules (C4, C26).
+
+Amendment of 2026-11-28, which replaces what the list above says about the zone:
+
+- Decided by the owner: staff may keep moving a booking onto tables outside its zone. A staff modify that names tables and changes none of date, time, party size and zone does not require the zone of them. The seats are still checked and the stored zone stays.
+- Following from it: while date, time and zone are unchanged, as on a later party change, the tables the booking holds are kept if they are free and seat the party, also outside the zone, so a party moved indoors is not silently sent back. A table named anew by a party change must lie in the zone. A booking whose zone no table has any more can therefore shrink its party on the tables it holds.
+- A change of date, time or zone applies the zone to the tables it keeps, takes or names.
+- `tables: []` is held to the zone's capacity, except on a change of `tables` alone, where the venue's capacity is the limit.
 
 The reservation never counts against itself. Its own allocations do not block the search, its covers do not count twice under the ceiling, and the daily cap leaves it out. Moving 20:00 to 20:30 on the same table works.
 

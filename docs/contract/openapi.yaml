@@ -611,15 +611,20 @@ paths:
 
         On a `booked` reservation a change of date, time, party size or zone
         places its tables, and the booking never counts against itself.
-        Without `tables` it keeps the tables it holds when they lie in its
-        zone, seat the party and are free for the window, then takes the free
-        combination a create would assign, then the overbooking ceiling, and
-        otherwise fails with `party_size_too_large` or `no_suitable_table`.
-        Named `tables` must seat the party (`party_size_too_large`) and lie
-        in the zone (`invalid_request`), also on a change of tables alone.
+        Without `tables` it keeps the tables it holds when they seat the party
+        and are free for the window, then takes the free combination a create
+        would assign in the zone, then the overbooking ceiling, and otherwise
+        fails with `party_size_too_large` or `no_suitable_table`. A change of
+        date, time or zone keeps held tables only inside the zone; a change of
+        party size alone keeps them wherever they are.
+        Named `tables` must seat the party (`party_size_too_large`). They must
+        lie in the zone (`invalid_request`) on a change of date, time or zone;
+        on a change of party size alone, only those the booking does not hold
+        yet; on a change of tables alone, none, and the stored zone stays.
         `tables: []` holds none under the overbooking ceiling, and still fails
         with `party_size_too_large` when the party exceeds the capacity of the
-        zone or the venue, or the zone has no table (C85). A change of date, time or party size recomputes the end from
+        zone or the venue, or the zone has no table; on a change of tables
+        alone the venue's capacity is the limit (C85). A change of date, time or party size recomputes the end from
         the turn times. A change of date or time resets `reconfirmation` to
         `none` unless the body sets it. A new end moves the self-service
         link's expiry to 48 hours after it, without rotating the link (C89).

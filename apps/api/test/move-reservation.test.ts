@@ -437,19 +437,93 @@ describe("C85 a move does not count itself", () => {
     expect((await move(r.id, { date: SUN, tables: ["a", "t"] })).body.tables).toEqual(["a", "t"]);
   });
 
-  it("holds a change of tables or party alone to the same rule for named tables", async () => {
+  it("holds a change of tables or party alone to the seats of the named tables", async () => {
     const r = await booked({ tables: ["a"] });
     expect(await code(r.id, { partySize: 5, tables: ["a"] })).toBe("party_size_too_large");
     await modify(r.id, { partySize: 4, tables: ["c"] });
     expect(await code(r.id, { tables: ["a"] })).toBe("party_size_too_large");
-    const terrace = await booked({ time: "13:00", zone: "terrace" });
-    expect(await code(terrace.id, { tables: ["a"] })).toBe("invalid_request");
   });
 
   it("checks nothing when the body only restates the tables of a booking that no longer fits them", async () => {
     const r = await booked({ tables: ["a"] });
     await db.execute(sql`update tables set seats = 1 where id = 'a'`);
     expect((await modify(r.id, { tables: ["a"], commentary: "high chair" })).body).toMatchObject({ version: 2, tables: ["a"] });
+  });
+});
+
+// The owner's decision of 2026-11-28: staff may keep a booking on tables outside its zone. "a", "b" and "c" are not
+// in the terrace; "t" is its only table.
+describe("C85 tables outside the booking's zone", () => {
+  const terrace = (extra: object = {}) => booked({ zone: "terrace", tables: ["t"], ...extra });
+
+  it("are accepted on a change of tables alone, which keeps the zone and still counts seats", async () => {
+    const r = await terrace();
+    expect((await modify(r.id, { tables: ["a"] })).body).toMatchObject({ zone: "terrace", tables: ["a"], version: 2 });
+    expect((await modify(r.id, { tables: ["c"], date: SAT, time: "20:00", partySize: 2, zone: "terrace" })).body).toMatchObject({
+      zone: "terrace",
+      tables: ["c"],
+    });
+    await modify(r.id, { tables: ["a", "b"] });
+    expect(await code(r.id, { partySize: 3, tables: ["t"] })).toBe("party_size_too_large");
+    expect((await post(`/reservations/${r.id}/modify`, { tables: ["t"] })).status).toBe(200);
+  });
+
+  it("are kept by a later party change while they are free and seat the party", async () => {
+    const r = await terrace();
+    await modify(r.id, { tables: ["c"] });
+    expect((await modify(r.id, { partySize: 4 })).body).toMatchObject({ zone: "terrace", tables: ["c"], partySize: 4 });
+    expect((await window(r.id)).to).toBe(at(SAT, "22:30"));
+    // Restating the held table with a party change keeps it too, and so does adding a table of the zone.
+    expect((await modify(r.id, { partySize: 5, tables: ["c"] })).body.tables).toEqual(["c"]);
+    expect((await modify(r.id, { partySize: 7, tables: ["c", "t"] })).body.tables).toEqual(["c", "t"]);
+  });
+
+  it("are not newly named by a change of party size", async () => {
+    const r = await terrace();
+    expect(await code(r.id, { partySize: 1, tables: ["a"] })).toBe("invalid_request");
+    await modify(r.id, { tables: ["a"] });
+    expect(await code(r.id, { partySize: 4, tables: ["a", "b"] })).toBe("invalid_request");
+  });
+
+  it("give way to the zone when they no longer seat the party or are taken for the new window", async () => {
+    const r = await terrace();
+    await modify(r.id, { tables: ["a"] });
+    // The terrace seats 2, so a party of 3 that "a" cannot hold finds nothing.
+    expect(await code(r.id, { partySize: 3 })).toBe("party_size_too_large");
+    const other = await terrace({ time: "13:00" });
+    expect((await modify(other.id, { tables: ["c"] })).status).toBe(200);
+    await booked({ time: "14:30", tables: ["c"] });
+    await db.execute(sql`update tables set zone = 'terrace', seats = 6 where id = 'b'`);
+    // "c" seats 4, but a longer turn runs into the 14:30 booking on it.
+    expect((await modify(other.id, { partySize: 4 })).body).toMatchObject({ zone: "terrace", tables: ["b"] });
+  });
+
+  it("do not survive a change of date, time or zone", async () => {
+    const r = await terrace();
+    await modify(r.id, { tables: ["c"] });
+    for (const body of [{ date: SUN }, { time: "21:00" }]) {
+      expect(await code(r.id, { ...body, tables: ["c"] })).toBe("invalid_request");
+    }
+    expect(await code(r.id, { zone: "nowhere", tables: ["c"] })).toBe("invalid_request");
+    expect((await move(r.id, { time: "21:00" })).body).toMatchObject({ zone: "terrace", tables: ["t"] });
+  });
+
+  it("let a booking whose zone no table has any more shrink its party on the tables it holds", async () => {
+    const r = await terrace();
+    await db.execute(sql`update tables set zone = 'patio' where id = 't'`);
+    expect((await modify(r.id, { partySize: 1 })).body).toMatchObject({ zone: "terrace", tables: ["t"], partySize: 1 });
+    expect((await modify(r.id, { partySize: 2, tables: ["t"] })).body.tables).toEqual(["t"]);
+    expect((await modify(r.id, { tables: ["a"] })).body.tables).toEqual(["a"]);
+    // A move places by the zone, which no table has.
+    expect(await code(r.id, { time: "21:00" })).toBe("party_size_too_large");
+  });
+
+  it("hold tables: [] on a change of tables alone to the venue's seats, not the zone's", async () => {
+    await config({ overbookingCeiling: 100 });
+    const r = await terrace();
+    await modify(r.id, { tables: ["c"] });
+    await modify(r.id, { partySize: 6 });
+    expect((await modify(r.id, { tables: [] })).body).toMatchObject({ zone: "terrace", tables: [], partySize: 6 });
   });
 });
 

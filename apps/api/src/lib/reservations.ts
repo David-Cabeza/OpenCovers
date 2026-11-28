@@ -446,8 +446,13 @@ interface SlotRequest {
   tableIds?: string[];
   /** A reservation to leave out of the table search and the ceiling, so it never counts against itself. */
   exceptId?: string;
-  /** Tables the reservation holds. The search keeps them while they are free, in the zone and seat the party. */
+  /** Tables the reservation holds. The search keeps them while they are free, seat the party and lie in the zone. */
   heldTableIds?: string[];
+  /**
+   * Which tables need not lie in the zone, when date, time and zone are the booking's own (ADR-0028, section 4): the
+   * ones it holds, or, on a change of tables alone, any. Left out, the zone applies to every table.
+   */
+  outOfZone?: "held" | "any";
   /**
    * The booking keeps its date and time, so no time or service rule runs (ADR-0028, section 1). Its start stands,
    * and its end too unless left out, in which case the turn time of the party sets it.
@@ -627,7 +632,6 @@ async function tableReasons(
   partySize: number,
   zone: string,
   exceptId?: string,
-  heldTableIds: string[] = [],
 ): Promise<{ ok: true; tableIds: string[] } | { ok: false; reason: Reason }> {
   const allTables = await exec
     .select({ id: tables.id, seats: tables.seats })
@@ -659,10 +663,6 @@ async function tableReasons(
     );
   const busyIds = new Set(busy.map((b) => b.tableId));
   const free = allTables.filter((t) => !busyIds.has(t.id));
-  const held = free.filter((t) => heldTableIds.includes(t.id));
-  if (held.length > 0 && held.length === heldTableIds.length && held.reduce((sum, t) => sum + t.seats, 0) >= partySize) {
-    return { ok: true, tableIds: heldTableIds };
-  }
   const picked = pickCombination(free, partySize);
   if (picked !== null) return { ok: true, tableIds: picked };
   return {
@@ -680,6 +680,40 @@ async function tableReasons(
       },
     },
   };
+}
+
+/** Whether a reservation can stay on the tables it holds: all in the zone when one is given, seating it and free. */
+async function stillFit(
+  exec: Db | DbTx,
+  venueId: string,
+  startsAt: Date,
+  endsAt: Date,
+  partySize: number,
+  zone: string,
+  tableIds: string[],
+  exceptId?: string,
+) {
+  if (tableIds.length === 0) return false;
+  const rows = await exec
+    .select({ seats: tables.seats })
+    .from(tables)
+    .where(and(eq(tables.venueId, venueId), inArray(tables.id, tableIds), zone ? eq(tables.zone, zone) : undefined));
+  if (rows.length !== tableIds.length || rows.reduce((sum, t) => sum + t.seats, 0) < partySize) return false;
+  const busy = await exec
+    .select({ tableId: tableAllocations.tableId })
+    .from(tableAllocations)
+    .where(
+      and(
+        eq(tableAllocations.venueId, venueId),
+        inArray(tableAllocations.tableId, tableIds),
+        eq(tableAllocations.active, true),
+        lt(tableAllocations.startsAt, endsAt),
+        gt(tableAllocations.endsAt, startsAt),
+        exceptId ? ne(tableAllocations.reservationId, exceptId) : undefined,
+      ),
+    )
+    .limit(1);
+  return busy.length === 0;
 }
 
 /** Whether the overbooking ceiling takes the party. A read only looks; a write takes the lock first (C24). */
@@ -707,19 +741,26 @@ async function placeSlot(db: Db | DbTx, venue: ChannelVenue, serviceRows: Servic
       refusal = "invalid_request";
     } else if (partySize > (await totalSeats(db, venue.id, tableIds))) {
       refusal = "party_size_too_large";
-    } else if (zone !== "") {
+    } else if (zone !== "" && request.outOfZone !== "any") {
+      const exempt = request.outOfZone === "held" ? (request.heldTableIds ?? []) : [];
+      const bound = tableIds.filter((id) => !exempt.includes(id));
       const inZone = await db
         .select({ id: tables.id })
         .from(tables)
-        .where(and(eq(tables.venueId, venue.id), inArray(tables.id, tableIds), eq(tables.zone, zone)));
-      if (inZone.length !== tableIds.length) refusal = "invalid_request";
+        .where(and(eq(tables.venueId, venue.id), inArray(tables.id, bound), eq(tables.zone, zone)));
+      if (inZone.length !== bound.length) refusal = "invalid_request";
     }
   }
   const findTables = async (
     exec: Db | DbTx,
     overbookRoom: OverbookRoom,
   ): Promise<{ ok: true; tableIds: string[] } | { ok: false; reason: Reason }> => {
-    const fit = await tableReasons(exec, venue.id, startsAt, endsAt, partySize, zone, exceptId, request.heldTableIds);
+    const held = request.heldTableIds ?? [];
+    const heldZone = request.outOfZone ? "" : zone;
+    if (await stillFit(exec, venue.id, startsAt, endsAt, partySize, heldZone, held, exceptId)) {
+      return { ok: true, tableIds: held };
+    }
+    const fit = await tableReasons(exec, venue.id, startsAt, endsAt, partySize, zone, exceptId);
     const overbooks =
       !fit.ok &&
       fit.reason.code === "no_suitable_table" &&
@@ -1200,6 +1241,7 @@ async function placeAgain(
   const { date, time, zone, partySize, slotChanged } = next;
   const serviceRows = await tx.select().from(services).where(eq(services.venueId, venue.id));
   const resized = partySize !== current.partySize;
+  const outOfZone = slotChanged || zone !== current.zone ? undefined : resized ? "held" : "any";
   const request: SlotRequest = {
     date,
     time,
@@ -1209,6 +1251,7 @@ async function placeAgain(
     tableIds: namedTableIds,
     exceptId: current.id,
     heldTableIds,
+    outOfZone,
     keeps: slotChanged ? undefined : { startsAt: current.startsAt, endsAt: resized ? undefined : current.endsAt },
   };
   const { service, startsAt, endsAt, reasons, refusal, findTables } = await placeSlot(tx, venue, serviceRows, request);
@@ -1231,8 +1274,10 @@ async function placeAgain(
     return { ...placed, tableIds: found.tableIds };
   }
   if (namedTableIds.length === 0) {
-    // The ceiling never takes more than the zone or the venue seats (C24), nor a zone without tables.
-    const fit = await tableReasons(tx, venue.id, startsAt, endsAt, partySize, zone, current.id);
+    // The ceiling never takes more than the zone or the venue seats (C24), nor a zone without tables. A change of
+    // tables alone asks nothing of the zone, so only the venue's seats bind it.
+    const bound = outOfZone === "any" ? "" : zone;
+    const fit = await tableReasons(tx, venue.id, startsAt, endsAt, partySize, bound, current.id);
     if (!fit.ok && fit.reason.code === "party_size_too_large") throw new ReservationError(fit.reason.code);
     if (!(await overbookRoom(startsAt, endsAt, partySize, current.id))) throw new ReservationError("no_suitable_table");
   }
